@@ -45,13 +45,31 @@ Verification and actual GitHub Maven publication succeeded:
 | slicer | [43514341208](https://github.com/Voxel-Brew/api-slicer/actions/runs/43514341208) |
 
 Dependent API publication jobs successfully consumed GitHub Maven snapshots using
-their workflow tokens. Hosted application consumption is verified after pushing
-the migration commit; archival waits for that result.
+their workflow tokens. The [hosted application migration check](https://github.com/Voxel-Brew/VoxelBrew/actions/runs/43516793973)
+passed at `74a2bb763e9d6cab2d7491caf7547eefe305df33`, consuming all five APIs from GitHub
+Packages without sibling checkouts or Maven Local. The first hosted run exposed
+that api-printer was private; the user approved making it public. Dependency checks
+now surface underlying Maven resolution failures instead of reporting only a missing API.
+The diagnostic change also passed boundary checks on Windows and Ubuntu.
+
+The old `magx2/VoxelBrew` repository was archived after publishing relocation-notice
+commit `1dc3bf6`. Its issues and releases remain there. All six active repositories
+are public and use master. Application implementation commit: `caa29a3`; final
+build-validation commit: `74a2bb7`. API heads at cutover:
+
+| API | Commit |
+| --- | --- |
+| model | `487a839` |
+| import | `4c0904d` |
+| export | `510a14e` |
+| printer | `731d741` |
+| slicer | `a4a0eff` |
 
 ## Evidence and limits
 
 Local logs, original Git bundle, extraction backups, and source manifests are in
-`D:\repos\VoxelBrew\.migration`. Gradle reports remain under each repository's
+`D:\repos\VoxelBrew\.migration`; extraction commit maps are in its `history-maps`
+directory. Gradle reports remain under each repository's
 `build/reports` and module `build/reports/tests` directories. Windows package evidence
 is in `cli/build/package-artifacts/result.json`, `update-result.json`,
 `launcher-evidence`, and `update-evidence`.

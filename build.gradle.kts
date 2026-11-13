@@ -360,13 +360,17 @@ for (module in listOf(":cli", ":gui")) {
         val verifyFrontendIoDependencies by
             tasks.registering {
                 doLast {
-                    fun modules(scope: String) =
-                        configurations[scope]
+                    fun modules(scope: String): Set<String> {
+                        // ResolutionResult alone omits failed dependencies; surface the actual
+                        // cause.
+                        configurations[scope].resolve()
+                        return configurations[scope]
                             .incoming
                             .resolutionResult
                             .allComponents
                             .mapNotNull { it.moduleVersion?.let { id -> "${id.group}:${id.name}" } }
                             .toSet()
+                    }
                     val compile = modules("compileClasspath")
                     val runtime = modules("runtimeClasspath")
                     val apis =

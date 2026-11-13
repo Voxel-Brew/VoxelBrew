@@ -10,6 +10,7 @@ repositories {
         maven {
             name = "github" + apiName.replaceFirstChar { it.uppercase() }
             url = uri("https://maven.pkg.github.com/voxel-brew/api-$apiName")
+            mavenContent { snapshotsOnly() }
             content { includeModule("dev.voxelbrew.api", apiName) }
             credentials {
                 username =

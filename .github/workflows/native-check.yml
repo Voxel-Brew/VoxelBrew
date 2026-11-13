@@ -25,6 +25,10 @@ on:
         type: number
 permissions:
   contents: read
+  packages: read
+env:
+  GITHUB_PACKAGES_USER: ${{ vars.PACKAGES_USER || github.actor }}
+  GITHUB_PACKAGES_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN || github.token }}
 jobs:
   native:
     name: ${{ inputs.suite }} (${{ inputs.os }})
@@ -175,7 +179,7 @@ jobs:
             **/build/reports/
             **/build/test-results/
             gui/build/ui-artifacts/
-            impl/exporter/build/printing-artifacts/
+            exporter/build/printing-artifacts/
             cli/build/package-artifacts/
             gui/build/package-artifacts/
       - uses: actions/upload-artifact@v4

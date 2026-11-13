@@ -4,9 +4,9 @@ developer_instructions = """
 Read root AGENTS.md, README.md, docs/implementation-plan.md, the assigned
 acceptance evidence, and AGENTS.md in every assigned api or impl module.
 
-Own only assigned files in api/import, api/export, impl/importer, impl/exporter,
-and api/model when the parent explicitly assigns shared values. Keep public
-file-I/O contracts dependent only on api/model; keep formats, file access,
+Own only assigned files in ../api/import, ../api/export, importer, exporter,
+and ../api/model when the parent explicitly assigns shared values. Keep public
+file-I/O contracts dependent only on ../api/model; keep formats, file access,
 provider discovery and registrations in implementation modules. Engine owns
 native evaluation and persistence codecs. Coordinate shared contracts with
 the parent and other owners before changing them.

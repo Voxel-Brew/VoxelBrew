@@ -14,15 +14,10 @@ val sourceProjects =
     listOf(
         "util",
         "engine",
-        "api/model",
-        "api/import",
-        "api/export",
-        "api/slicer",
-        "api/printer",
-        "impl/importer",
-        "impl/exporter",
-        "impl/slicer",
-        "impl/printer",
+        "importer",
+        "exporter",
+        "slicer",
+        "printer",
         "cli",
         "gui",
         "fixtures/exporter-plugin",
@@ -106,9 +101,10 @@ spotless {
         target(
             "*.md",
             "*/AGENTS.md",
-            "api/*.md",
-            "api/*/AGENTS.md",
-            "impl/*/*.md",
+            "importer/*.md",
+            "exporter/*.md",
+            "slicer/*.md",
+            "printer/*.md",
             "docs/*.md",
             ".github/**/*.yml",
             ".github/scripts/*.cjs",
@@ -147,11 +143,15 @@ tasks
 allprojects {
     group = "dev.voxelbrew"
     version = rootProject.providers.gradleProperty("projectVersion").get()
-    repositories { mavenCentral() }
+    apply(from = rootProject.file("gradle/repositories.gradle.kts"))
 }
 
-// The implicit :api and :impl parents group directories; neither is a Java module.
-val libraryProjects = subprojects.filter { it.path !in setOf(":api", ":impl") }
+val libraryProjects = subprojects
+
+// Composite builds invoke these root tasks directly rather than CLI task selectors.
+tasks.named("assemble") { dependsOn(libraryProjects.map { "${it.path}:assemble" }) }
+
+tasks.named("clean") { dependsOn(libraryProjects.map { "${it.path}:clean" }) }
 
 configure(libraryProjects) {
     // Fixture publications share engine/build; its clean must finish before any publisher writes.
@@ -185,7 +185,7 @@ configure(libraryProjects) {
         "testImplementation"(platform("org.junit:junit-bom:5.12.1"))
         "testImplementation"("org.junit.jupiter:junit-jupiter")
         "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
-        if (project.name != "util" && !project.path.startsWith(":api:")) {
+        if (project.name != "util") {
             "testImplementation"(testFixtures(project(":util")))
         }
     }
@@ -354,104 +354,44 @@ tasks.wrapper {
     distributionSha256Sum = "a17ddd85a26b6a7f5ddb71ff8b05fc5104c0202c6e64782429790c933686c806"
 }
 
-for (module in listOf(":api:model", ":api:import", ":api:export", ":api:slicer", ":api:printer")) {
+// Frontends compile against API modules; implementations are runtime-only.
+for (module in listOf(":cli", ":gui")) {
     project(module) {
-        tasks.register("verifyApiDependencies") {
-            group = "verification"
-            description = "Reject application/AGPL project dependencies in the MIT API."
-            doLast {
-                for (scope in listOf("compileClasspath", "runtimeClasspath")) {
-                    val components =
-                        configurations.getByName(scope).incoming.resolutionResult.allComponents
-                    for (component in components) {
-                        val id = component.id
-                        if (id is org.gradle.api.artifacts.component.ProjectComponentIdentifier) {
-                            check(id.projectPath.startsWith(":api:")) {
-                                "$module $scope depends on non-API project ${id.projectPath}"
-                            }
+        val verifyFrontendIoDependencies by
+            tasks.registering {
+                doLast {
+                    fun modules(scope: String) =
+                        configurations[scope]
+                            .incoming
+                            .resolutionResult
+                            .allComponents
+                            .mapNotNull { it.moduleVersion?.let { id -> "${id.group}:${id.name}" } }
+                            .toSet()
+                    val compile = modules("compileClasspath")
+                    val runtime = modules("runtimeClasspath")
+                    val apis =
+                        setOf("import", "export", "slicer", "printer").map {
+                            "dev.voxelbrew.api:$it"
                         }
+                    val implementations =
+                        setOf("importer", "exporter", "slicer", "printer").map {
+                            "dev.voxelbrew:$it"
+                        }
+                    check(compile.containsAll(apis)) {
+                        "$module is missing public API dependencies"
+                    }
+                    check(compile.intersect(implementations.toSet()).isEmpty()) {
+                        "$module compiles against implementations"
+                    }
+                    check(runtime.containsAll(apis + implementations)) {
+                        "$module runtime is missing APIs or implementations"
                     }
                 }
             }
-        }
+        tasks.named("check") { dependsOn(verifyFrontendIoDependencies) }
     }
 }
 
-tasks.register("verifyApiDependencies") {
-    group = "verification"
-    dependsOn(
-        ":api:model:verifyApiDependencies",
-        ":api:import:verifyApiDependencies",
-        ":api:export:verifyApiDependencies",
-        ":api:slicer:verifyApiDependencies",
-        ":api:printer:verifyApiDependencies",
-    )
+tasks.register("verifyFrontendIoDependencies") {
+    dependsOn(":cli:verifyFrontendIoDependencies", ":gui:verifyFrontendIoDependencies")
 }
-
-tasks.named("check") { dependsOn("verifyApiDependencies") }
-
-// Frontends compile against APIs and ship concrete implementations only at runtime.
-for (module in listOf(":cli", ":gui")) {
-    project(module) {
-        tasks.register("verifyFrontendIoDependencies") {
-            group = "verification"
-            doLast {
-                fun projects(scope: String) =
-                    configurations
-                        .getByName(scope)
-                        .incoming
-                        .resolutionResult
-                        .allComponents
-                        .mapNotNull {
-                            (it.id
-                                    as?
-                                    org.gradle.api.artifacts.component.ProjectComponentIdentifier)
-                                ?.projectPath
-                        }
-                        .toSet()
-                val compile = projects("compileClasspath")
-                val runtime = projects("runtimeClasspath")
-                check(compile.containsAll(listOf(":api:import", ":api:export", ":api:slicer"))) {
-                    "$module must compile against file-I/O APIs"
-                }
-                check(
-                    compile
-                        .intersect(
-                            setOf(
-                                ":impl:importer",
-                                ":impl:exporter",
-                                ":impl:slicer",
-                                ":impl:printer",
-                            )
-                        )
-                        .isEmpty()
-                ) {
-                    "$module compiles against file-I/O implementations"
-                }
-                check(
-                    runtime.containsAll(
-                        listOf(
-                            ":api:import",
-                            ":api:export",
-                            ":api:slicer",
-                            ":impl:importer",
-                            ":impl:exporter",
-                            ":impl:slicer",
-                        )
-                    )
-                ) {
-                    "$module runtime is missing file-I/O JARs"
-                }
-            }
-        }
-        tasks.named("check") { dependsOn("verifyFrontendIoDependencies") }
-    }
-}
-
-val verifyFrontendIoDependencies by
-    tasks.registering {
-        group = "verification"
-        dependsOn(":cli:verifyFrontendIoDependencies", ":gui:verifyFrontendIoDependencies")
-    }
-
-tasks.named("check") { dependsOn(verifyFrontendIoDependencies) }

@@ -19,7 +19,7 @@ import lombok.RequiredArgsConstructor;
 
 /** Anonymous HTTPS release transport. No external executable, credentials or startup requests. */
 public final class GitHubReleaseSource implements ReleaseSource {
-    public static final String REPOSITORY = "magx2/VoxelBrew";
+    public static final String REPOSITORY = "Voxel-Brew/VoxelBrew";
     private static final String FIXTURE_PROPERTY = "voxelbrew.update.fixtureUrl";
     private static final long MAX_METADATA_BYTES = 1024 * 1024;
     private final URI releases, downloads;

@@ -62,7 +62,7 @@ class GitHubReleaseSourceTest {
                         "application/vnd.github+json",
                         exchange.getRequestHeaders().getFirst("Accept"));
                 respond(exchange, 200, metadata().getBytes(StandardCharsets.UTF_8));
-            } else if (path.startsWith("/magx2/")) {
+            } else if (path.startsWith("/Voxel-Brew/")) {
                 exchange.getResponseHeaders().set("Location", "/cdn/asset");
                 exchange.sendResponseHeaders(302, -1);
             } else respond(exchange, 200, new byte[] {0, 1, 2, (byte) 255});
@@ -78,9 +78,9 @@ class GitHubReleaseSourceTest {
         assertArrayEquals(new byte[] {0, 1, 2, (byte) 255}, Files.readAllBytes(file));
         assertEquals(
                 List.of(
-                        "/repos/magx2/VoxelBrew/releases/latest",
-                        "/repos/magx2/VoxelBrew/releases/tags/v1.2.3",
-                        "/magx2/VoxelBrew/releases/download/v1.2.3/" + asset,
+                        "/repos/Voxel-Brew/VoxelBrew/releases/latest",
+                        "/repos/Voxel-Brew/VoxelBrew/releases/tags/v1.2.3",
+                        "/Voxel-Brew/VoxelBrew/releases/download/v1.2.3/" + asset,
                         "/cdn/asset"),
                 paths);
         assertTrue(userAgents.stream().allMatch(agent -> agent.startsWith("VoxelBrew/")));

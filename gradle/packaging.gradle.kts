@@ -51,12 +51,17 @@ val packageInput = layout.buildDirectory.dir("package-input")
 val imageRoot = layout.buildDirectory.dir("app-image")
 val image = imageRoot.map { it.dir(applicationName + if (packageMac) ".app" else "") }
 
+val apiVersions =
+    listOf("model", "import", "export", "slicer", "printer").associateWith {
+        providers.gradleProperty("${it}ApiVersion").get()
+    }
 val installationMetadata = layout.buildDirectory.dir("installation-metadata")
 val generateInstallationMetadata by
     tasks.registering {
         inputs.property("version", productVersion)
         inputs.property("platform", "$packagePlatform-$packageArchitecture")
         inputs.property("component", project.name)
+        inputs.properties(apiVersions)
         outputs.dir(installationMetadata)
         val component = if (project.name == "gui") "GUI" else "CLI"
         val module = project.name
@@ -64,7 +69,10 @@ val generateInstallationMetadata by
             val destination = installationMetadata.get().file("voxelbrew-install.properties").asFile
             destination.parentFile.mkdirs()
             destination.writeText(
-                "format=1\ncomponent=$component\nversion=$productVersion\nplatform=$packagePlatform-$packageArchitecture\nengineJar=engine-$productVersion.jar\nutilJar=util-$productVersion.jar\nimportJar=importer-impl-$productVersion.jar\nexportJar=exporter-impl-$productVersion.jar\nimport-apiJar=import-api-$productVersion.jar\nexport-apiJar=export-api-$productVersion.jar\nslicer-apiJar=slicer-api-$productVersion.jar\nmodel-apiJar=model-api-$productVersion.jar\nmainJar=$module-$productVersion.jar\n"
+                "format=1\ncomponent=$component\nversion=$productVersion\nplatform=$packagePlatform-$packageArchitecture\nengineJar=engine-$productVersion.jar\nutilJar=util-$productVersion.jar\nimportJar=importer-impl-$productVersion.jar\nexportJar=exporter-impl-$productVersion.jar\nmainJar=$module-$productVersion.jar\n" +
+                    apiVersions.entries.joinToString("") { (api, apiVersion) ->
+                        "${api}-apiJar=$api-$apiVersion.jar\n${api}-apiVersion=$apiVersion\n"
+                    }
             )
         }
     }

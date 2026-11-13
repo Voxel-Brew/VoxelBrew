@@ -58,7 +58,7 @@ new_version = ".".join(map(str, numeric))
 marker = payload / app_relative / "voxelbrew-install.properties"
 marker.write_text(marker.read_text().replace("version=" + old_version, "version=" + new_version), encoding="utf-8")
 metadata = dict(line.split("=", 1) for line in marker.read_text().splitlines() if "=" in line)
-for module in ("engine", "util", "import", "export", "import-api", "export-api", "slicer-api", "model-api"):
+for module in ("engine", "util", "import", "export"):
     jar_path = payload / app_relative / metadata[module + "Jar"]
     temporary = jar_path.with_suffix(".new")
     with zipfile.ZipFile(jar_path) as original, zipfile.ZipFile(temporary, "w") as changed:
@@ -96,7 +96,7 @@ class Releases(BaseHTTPRequestHandler):
         if (workspace / "deny-access").exists():
             self.send_error(503, "fixture server unavailable")
             return
-        if self.path in ("/repos/magx2/VoxelBrew/releases/latest", "/repos/magx2/VoxelBrew/releases/tags/v" + new_version):
+        if self.path in ("/repos/Voxel-Brew/VoxelBrew/releases/latest", "/repos/Voxel-Brew/VoxelBrew/releases/tags/v" + new_version):
             body = json.dumps({"tag_name": "v" + new_version, "draft": False, "prerelease": False,
                                "assets": [{"name": asset}, {"name": "SHA256SUMS"}]}).encode()
             self.send_response(200)
@@ -106,7 +106,7 @@ class Releases(BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
         for name in (asset, "SHA256SUMS"):
-            if self.path == "/magx2/VoxelBrew/releases/download/v" + new_version + "/" + name:
+            if self.path == "/Voxel-Brew/VoxelBrew/releases/download/v" + new_version + "/" + name:
                 self.send_response(302)
                 self.send_header("Location", "/cdn/" + name)
                 self.send_header("Content-Length", "0")

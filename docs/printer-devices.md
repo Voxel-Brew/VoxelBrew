@@ -60,9 +60,9 @@ Files with packages use schema 11; existing text-only files retain schema 10.
 The total document payload limit is 128 MiB; each package is limited to 48 MiB.
 **File > Export > Sliced printer package** writes the original package bytes.
 
-The API is `dev.voxelbrew:printer-api`, under MIT. Frontends compile against
-`:api:printer` and discover `PrinterRuntime` through ServiceLoader. Implementation
-and transport libraries remain in `:impl:printer`; the engine has no printer dependency.
+The API is `dev.voxelbrew.api:printer`, under MIT. Frontends compile against
+`dev.voxelbrew.api:printer` and discover `PrinterRuntime` through ServiceLoader. Implementation
+and transport libraries remain in `:printer`; the engine has no printer dependency.
 OrcaSlicer is an external executable, not redistributed with VoxelBrew.
 
 ## Verification boundary

@@ -14,13 +14,13 @@
 ## Architecture
 
 - Use Java 21, the committed Gradle wrapper, and `dev.voxelbrew` packages.
-- Keep thirteen first-party subprojects: `util`, `engine`, `:api:model`, `:api:import`, `:api:export`, `:api:slicer`, `:api:printer`, `:impl:importer`, `:impl:exporter`, `:impl:slicer`, `:impl:printer`, `cli`, and `gui`.
-  api/printer owns physical-device contracts; impl/printer owns device configuration and network transport.
+- Keep eight application subprojects and five independent API repositories: `util`, `engine`, `dev.voxelbrew.api:model`, `dev.voxelbrew.api:import`, `dev.voxelbrew.api:export`, `dev.voxelbrew.api:slicer`, `dev.voxelbrew.api:printer`, `:importer`, `:exporter`, `:slicer`, `:printer`, `cli`, and `gui`.
+  api/printer owns physical-device contracts; printer owns device configuration and network transport.
   Engine owns native CAD evaluation, persistence codecs and feature execution.
   api/model owns shared domain values and validation helpers under MIT.
   api/import and api/export own only public file-I/O and provider contracts; they depend only on api/model.
   api/slicer owns public slicing contracts and depends only on api/model and api/export.
-  Import/export own format implementations, provider discovery; impl/slicer owns slicer discovery and job pipelines.
+  Import/export own format implementations, provider discovery; slicer owns slicer discovery and job pipelines.
   Production dependencies point from file I/O to engine, never from engine to file I/O.
   Util owns CAD-independent application services and depends on none of the other projects.
 - Use Dagger at CLI/window composition roots and constructor injection for service

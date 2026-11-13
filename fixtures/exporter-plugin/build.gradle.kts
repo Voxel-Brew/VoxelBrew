@@ -4,10 +4,9 @@ group = "external.consumer"
 
 version = "1.0"
 
-repositories {
-    maven { url = uri("../../engine/build/repository") }
-    mavenCentral()
-}
+repositories { maven { url = uri("../../engine/build/repository") } }
+
+apply(from = "../../gradle/repositories.gradle.kts")
 
 java { toolchain.languageVersion.set(JavaLanguageVersion.of(21)) }
 
@@ -15,9 +14,15 @@ java { toolchain.languageVersion.set(JavaLanguageVersion.of(21)) }
 val engineVersion = providers.gradleProperty("engineVersion").orElse("0.1.0-SNAPSHOT")
 
 dependencies {
-    compileOnly("dev.voxelbrew:export-api:${engineVersion.get()}")
-    compileOnly("dev.voxelbrew:slicer-api:${engineVersion.get()}")
-    compileOnly("dev.voxelbrew:import-api:${engineVersion.get()}")
+    compileOnly(
+        "dev.voxelbrew.api:export:${providers.gradleProperty("exportApiVersion").orElse("0.1.0-SNAPSHOT").get()}"
+    )
+    compileOnly(
+        "dev.voxelbrew.api:slicer:${providers.gradleProperty("slicerApiVersion").orElse("0.1.0-SNAPSHOT").get()}"
+    )
+    compileOnly(
+        "dev.voxelbrew.api:import:${providers.gradleProperty("importApiVersion").orElse("0.1.0-SNAPSHOT").get()}"
+    )
 }
 
 // Native feature providers still exercise the AGPL engine contract separately.
@@ -47,10 +52,10 @@ tasks.named("jar") {
                 .resolvedConfiguration
                 .resolvedArtifacts
                 .map { it.moduleVersion.id }
-                .filter { it.group == "dev.voxelbrew" }
+                .filter { it.group.startsWith("dev.voxelbrew") }
                 .map { it.name }
                 .toSet()
-        check(hostModules == setOf("model-api", "import-api", "export-api", "slicer-api")) {
+        check(hostModules == setOf("model", "import", "export", "slicer")) {
             "The external consumer must compile with API/domain artifacts only: $hostModules"
         }
     }

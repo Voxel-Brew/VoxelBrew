@@ -44,6 +44,23 @@ class UpdateTest {
     }
 
     @Test
+    void apiVersionsAreIndependentAndStillVerified() throws Exception {
+        var image = image(directory.resolve("independent-api"), current);
+        Path marker = image.appDirectory().resolve(ApplicationImage.MARKER);
+        Files.writeString(
+                marker,
+                Files.readString(marker) + "model-apiJar=model-0.1.0-SNAPSHOT.jar\nmodel-apiVersion=0.1.0-SNAPSHOT\n");
+        Path artifact = image.appDirectory().resolve("model-0.1.0-SNAPSHOT.jar");
+        jar(artifact, "voxelbrew-model-api-version.properties", "version=0.1.0-SNAPSHOT");
+        assertEquals(
+                current,
+                ApplicationImage.open(image.root(), image.component(), image.platform())
+                        .version());
+        jar(artifact, "voxelbrew-model-api-version.properties", "version=0.2.0-SNAPSHOT");
+        assertThrows(IOException.class, () -> ApplicationImage.open(image.root(), image.component(), image.platform()));
+    }
+
+    @Test
     void utilityIdentityIsRequiredWhenDeclaredAndLegacyMetadataStillOpens() throws Exception {
         var image = image(directory.resolve("installation"), current);
         assertEquals("util.jar", image.updaterJar());

@@ -53,11 +53,11 @@ resolution. No release tag or published download is overwritten automatically.
 Equivalent GitHub CLI commands (replace the example release line):
 
 ```text
-gh workflow run release.yml --repo magx2/VoxelBrew --ref master -f dry-run=true
-gh workflow run release-prepare.yml --repo magx2/VoxelBrew --ref master
-gh workflow run release.yml --repo magx2/VoxelBrew --ref release/0.1.x -f dry-run=false
-gh run list --repo magx2/VoxelBrew --workflow release.yml
-gh run watch RUN_ID --repo magx2/VoxelBrew --exit-status
+gh workflow run release.yml --repo Voxel-Brew/VoxelBrew --ref master -f dry-run=true
+gh workflow run release-prepare.yml --repo Voxel-Brew/VoxelBrew --ref master
+gh workflow run release.yml --repo Voxel-Brew/VoxelBrew --ref release/0.1.x -f dry-run=false
+gh run list --repo Voxel-Brew/VoxelBrew --workflow release.yml
+gh run watch RUN_ID --repo Voxel-Brew/VoxelBrew --exit-status
 ```
 
 For later patches, start at step 4 on the existing release branch after merging

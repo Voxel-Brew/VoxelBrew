@@ -14,7 +14,7 @@ build identities are checked. Format-1 metadata without `utilJar` remains readab
 for older images and recovery. The helper is staged from the running utility JAR.
 
 Release metadata comes from the [public releases API](https://docs.github.com/en/rest/releases/releases),
-and assets come from `https://github.com/magx2/VoxelBrew/releases/download/vVERSION/ASSET`.
+and assets come from `https://github.com/Voxel-Brew/VoxelBrew/releases/download/vVERSION/ASSET`.
 The client follows HTTPS redirects to GitHub's download storage, without sending
 credentials or cookies. It does not read `gh` configuration, `VOXELBREW_GH` or token
 environment variables. Missing releases, network failures and GitHub rate limits

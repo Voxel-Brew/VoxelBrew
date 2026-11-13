@@ -67,8 +67,11 @@ assert installation["mainJar"] == f"{kind}-{version}.jar", installation
 assert installation["utilJar"] == f"util-{version}.jar", installation
 assert installation["importJar"] == f"importer-impl-{version}.jar", installation
 assert installation["exportJar"] == f"exporter-impl-{version}.jar", installation
-for module in ("import-api", "export-api", "slicer-api", "model-api"):
-    assert installation[module + "Jar"] == f"{module}-{version}.jar", installation
+for module in ("import-api", "export-api", "slicer-api", "model-api", "printer-api"):
+    api = module.removesuffix("-api")
+    api_version = properties(root / "gradle.properties")[api + "ApiVersion"]
+    assert installation[module + "Version"] == api_version, installation
+    assert installation[module + "Jar"] == f"{api}-{api_version}.jar", installation
     assert (app / installation[module + "Jar"]).is_file()
 for jar in (f"engine-{version}.jar", f"util-{version}.jar", f"importer-impl-{version}.jar", f"exporter-impl-{version}.jar", f"{kind}-{version}.jar"):
     assert (app / jar).is_file(), "Missing application dependency: " + jar

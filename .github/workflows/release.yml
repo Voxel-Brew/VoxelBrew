@@ -8,6 +8,7 @@ on:
         default: true
 permissions:
   contents: read
+  packages: read
 concurrency:
   group: release-mutations
   cancel-in-progress: false
@@ -47,6 +48,7 @@ jobs:
             suite: check
           - os: voxelbrew-macos-intel-gui
             suite: headlessPlatformCheck
+    secrets: inherit
     uses: ./.github/workflows/native-check.yml
     with:
       os: ${{ matrix.os }}

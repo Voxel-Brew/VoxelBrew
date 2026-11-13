@@ -132,8 +132,8 @@ public record ApplicationImage(
             }
             if (!Files.isDirectory(result.appDirectory().resolve("native")))
                 throw new IOException("App image has no native libraries");
-            for (String module :
-                    List.of("util", "import", "export", "import-api", "export-api", "slicer-api", "model-api")) {
+            for (String module : List.of(
+                    "util", "import", "export", "import-api", "export-api", "slicer-api", "model-api", "printer-api")) {
                 if (!p.containsKey(module + "Jar")) continue; // Older format-1 installations.
                 Path utility = result.appDirectory().resolve(fileName(p.getProperty(module + "Jar")));
                 if (!Files.isRegularFile(utility, LinkOption.NOFOLLOW_LINKS)
@@ -146,7 +146,11 @@ public record ApplicationImage(
                     try (var in = jar.getInputStream(entry)) {
                         build.load(in);
                     }
-                    if (!result.version.toString().equals(build.getProperty("version")))
+                    String expectedVersion = module.endsWith("-api")
+                            ? p.getProperty(module + "Version", result.version.toString())
+                            : result.version.toString();
+                    ReleaseVersion.parse(expectedVersion);
+                    if (!expectedVersion.equals(build.getProperty("version")))
                         throw new IOException(module + "/installation version mismatch");
                 }
             }

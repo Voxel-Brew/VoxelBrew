@@ -11,8 +11,10 @@ on:
           - ubuntu-24.04
 permissions:
   contents: read
+  packages: read
 jobs:
   full:
+    secrets: inherit
     uses: ./.github/workflows/native-check.yml
     with:
       os: ${{ inputs.os }}

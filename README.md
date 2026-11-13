@@ -14,15 +14,15 @@ marker and step/playback controls. The shared subproject
 `util`, owns translations, user configuration, logging, application updates and
 generic CPU workers. It has no CAD or frontend dependencies; engine and both
 frontends depend on it. See [shared utilities and configuration](docs/shared-utilities.md).
-The `impl/importer` and `impl/exporter` projects own document/G-code reading, document writing,
-STL/3MF/OBJ mesh exporters and exact STEP export; `impl/slicer` owns slicer execution and the job pipeline. The `:api:import` and `:api:export`
+The `importer` and `exporter` projects own document/G-code reading, document writing,
+STL/3MF/OBJ mesh exporters and exact STEP export; `slicer` owns slicer execution and the job pipeline. The `dev.voxelbrew.api:import` and `dev.voxelbrew.api:export`
 projects publish provider contracts so external JARs can add formats without depending
 on implementation projects. Both file-I/O APIs depend only on the MIT `api/model` module; engine also depends
-on that model API. The `:api:slicer` project publishes slicing contracts and depends only on the model and export APIs. The `:api:printer` and `:impl:printer` projects provide physical-device connections. There are thirteen first-party projects. See
+on that model API. The `dev.voxelbrew.api:slicer` project publishes slicing contracts and depends only on the model and export APIs. The `dev.voxelbrew.api:printer` and `:printer` projects provide physical-device connections. There are eight application subprojects and five independent API repositories. See
 [file import/export boundaries and API migration](docs/file-io.md).
 Printer profile catalogs are exposed by `dev.voxelbrew.slicer.api.PrinterProfileCatalog` through
 `SlicerRuntime.printers(Path)`. The implementation, bundled presets, images and
-custom-resource loading live in `impl/slicer`; frontends use the existing
+custom-resource loading live in `slicer`; frontends use the existing
 `SlicerRuntime` ServiceLoader provider. The former engine `PrinterCatalog` and
 util `PrinterResources` implementation types have moved out of those modules.
 
@@ -329,5 +329,5 @@ successfully rebuilt document; the output is published only after success.
 
 VoxelBrew retains the repository's **AGPL-3.0** license. The `api/model`, `api/import` and
 `api/export` and `api/slicer` modules are licensed separately under MIT; see the
-[API licensing rationale](api/READEME.md). OCCT is dynamically linked
+[API licensing rationale](docs/api-repositories.md). OCCT is dynamically linked
 under LGPL-2.1 with the OCCT exception. See [third-party notices](THIRD_PARTY_NOTICES.md).

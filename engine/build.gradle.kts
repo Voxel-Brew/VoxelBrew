@@ -7,9 +7,9 @@ plugins {
 }
 
 dependencies {
-    api(project(":api:model"))
-    add("integrationTestImplementation", project(":impl:importer"))
-    add("integrationTestImplementation", project(":impl:exporter"))
+    api("dev.voxelbrew.api:model:${providers.gradleProperty("modelApiVersion").get()}")
+    add("integrationTestImplementation", project(":importer"))
+    add("integrationTestImplementation", project(":exporter"))
     implementation(project(":util"))
     implementation("com.google.code.gson:gson:2.15.0")
     api("javax.measure:unit-api:2.2")
@@ -272,17 +272,27 @@ publishing {
 
 val buildExporterFixture by
     tasks.registering(GradleBuild::class) {
+        if (System.getProperty("voxelbrew.workspace") != null && gradle.parent != null) {
+            dependsOn(
+                listOf("model", "import", "export", "slicer", "printer").map {
+                    gradle.parent!!.includedBuild(it).task(":publishToMavenLocal")
+                }
+            )
+        }
         dependsOn(
             "publishEnginePublicationToFixtureRepository",
             ":util:publishUtilPublicationToFixtureRepository",
-            ":api:model:publishApiPublicationToFixtureRepository",
-            ":api:export:publishApiPublicationToFixtureRepository",
-            ":api:slicer:publishApiPublicationToFixtureRepository",
-            ":api:import:publishApiPublicationToFixtureRepository",
         )
         dir = rootProject.file("fixtures/exporter-plugin")
         tasks = listOf("jar")
-        startParameter.projectProperties = mapOf("engineVersion" to project.version.toString())
+        startParameter.projectProperties =
+            mapOf("engineVersion" to project.version.toString()) +
+                listOf("model", "import", "export", "slicer", "printer").associate {
+                    "${it}ApiVersion" to providers.gradleProperty("${it}ApiVersion").get()
+                } +
+                listOf("useMavenLocal", "githubPackagesUser", "githubPackagesToken")
+                    .mapNotNull { key -> providers.gradleProperty(key).orNull?.let { key to it } }
+                    .toMap()
     }
 
 tasks.named<Test>("integrationTest") {

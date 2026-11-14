@@ -11,9 +11,9 @@ val javafxPlatform =
     else "linux"
 
 dependencies {
-    implementation("io.modelcontextprotocol.sdk:mcp:1.1.5")
-    implementation("org.eclipse.jetty.ee10:jetty-ee10-servlet:12.0.16")
-    implementation("com.google.code.gson:gson:2.15.0")
+    implementation("io.modelcontextprotocol.sdk:mcp")
+    implementation("org.eclipse.jetty.ee10:jetty-ee10-servlet")
+    implementation("com.google.code.gson:gson")
     implementation("dev.voxelbrew.api:import")
     implementation("dev.voxelbrew.api:export")
     implementation("dev.voxelbrew.api:slicer")
@@ -27,11 +27,12 @@ dependencies {
     testImplementation(project(":slicer-impl"))
     implementation(project(":util"))
     implementation(project(":engine"))
-    runtimeOnly("com.twelvemonkeys.imageio:imageio-webp:3.15.0")
-    testImplementation("org.apache.commons:commons-compress:1.28.0")
-    testImplementation("com.google.protobuf:protobuf-java:4.30.2")
+    runtimeOnly("com.twelvemonkeys.imageio:imageio-webp")
+    testImplementation("org.apache.commons:commons-compress")
+    testImplementation("com.google.protobuf:protobuf-java")
     for (module in listOf("base", "graphics", "controls")) {
-        implementation("org.openjfx:javafx-$module:21.0.13:$javafxPlatform") {
+        implementation("org.openjfx:javafx-$module") {
+            artifact { classifier = javafxPlatform }
             isTransitive = false
         }
     }

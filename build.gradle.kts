@@ -188,7 +188,6 @@ configure(libraryProjects) {
                 "dev.voxelbrew:bom:${rootProject.providers.gradleProperty("bomVersion").get()}"
             )
         )
-        "testImplementation"(platform("org.junit:junit-bom:5.12.1"))
         "testImplementation"("org.junit.jupiter:junit-jupiter")
         "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
         if (project.name != "util") {

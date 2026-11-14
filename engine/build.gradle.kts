@@ -11,13 +11,13 @@ dependencies {
     add("integrationTestImplementation", project(":importer-impl"))
     add("integrationTestImplementation", project(":exporter-impl"))
     implementation(project(":util"))
-    implementation("com.google.code.gson:gson:2.15.0")
-    api("javax.measure:unit-api:2.2")
-    implementation("tech.units:indriya:2.2.4")
-    compileOnly("org.apiguardian:apiguardian-api:1.1.2")
-    implementation("com.google.protobuf:protobuf-java:4.30.2")
-    implementation("com.google.protobuf:protobuf-java-util:4.30.2")
-    implementation("org.apache.commons:commons-math3:3.6.1")
+    implementation("com.google.code.gson:gson")
+    api("javax.measure:unit-api")
+    implementation("tech.units:indriya")
+    compileOnly("org.apiguardian:apiguardian-api")
+    implementation("com.google.protobuf:protobuf-java")
+    implementation("com.google.protobuf:protobuf-java-util")
+    implementation("org.apache.commons:commons-math3")
 }
 
 val buildVersion = project.version.toString()
@@ -27,7 +27,20 @@ tasks.processResources {
     filesMatching("voxelbrew-engine-version.properties") { expand("version" to buildVersion) }
 }
 
-protobuf { protoc { artifact = "com.google.protobuf:protoc:4.30.2" } }
+protobuf { protoc { artifact = "com.google.protobuf:protoc" } }
+
+// The Protobuf plugin creates a separate executable configuration after evaluation.
+afterEvaluate {
+    configurations.named("protobufToolsLocator_protoc") {
+        // The plugin disables transitivity; enable it so the platform's constraints apply.
+        isTransitive = true
+        dependencies.add(
+            project.dependencies.platform(
+                "dev.voxelbrew:bom:${providers.gradleProperty("bomVersion").get()}"
+            )
+        )
+    }
+}
 
 val windows = System.getProperty("os.name").startsWith("Windows")
 val mac = System.getProperty("os.name").startsWith("Mac")

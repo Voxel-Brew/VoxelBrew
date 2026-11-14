@@ -71,8 +71,8 @@ dialog, with verified app-image replacement and recovery backups. See
 ## Prerequisites and locked dependencies
 
 - JDK **21**, with `JAVA_HOME` set to a full JDK (including JNI headers).
-- Dagger **2.60.1**, pinned in `gradle/di.gradle.kts`; its compiler is build-only.
-- Lombok **1.18.48** (compile-only) and SLF4J **2.0.20**, pinned in `gradle/lombok.gradle.kts`.
+- Dagger **2.60.1**, managed by the BOM; its compiler is build-only.
+- Lombok **1.18.48** (compile-only) and SLF4J **2.0.20**, managed by the BOM.
 - Gson **2.15.0**, used for public update metadata; updates need no `gh` or GitHub login.
 - Units of Measurement API **2.2** and Indriya **2.2.4**, resolved by Gradle.
 - Gradle **9.1.0**, through the committed, SHA-256-verified wrapper.
@@ -339,7 +339,8 @@ under LGPL-2.1 with the OCCT exception. See [third-party notices](THIRD_PARTY_NO
 ## BOM alignment
 
 All eight modules import `dev.voxelbrew:bom`, selected by `bomVersion` in
-`gradle.properties`. API dependencies omit individual versions. `projectVersion`
+`gradle.properties`. API and third-party dependencies omit individual versions. The BOM also manages
+annotation processors, JavaFX modules, protoc, and the imported JUnit platform. `projectVersion`
 still controls the application version; the independent provider fixture uses the
 same BOM for API and engine dependencies. Installation metadata records resolved
 API versions, including local composite substitutions.

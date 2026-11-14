@@ -12,8 +12,8 @@ dependencies {
     api("dev.voxelbrew.api:export")
     implementation(project(":importer-impl"))
     implementation(project(":util"))
-    testImplementation("com.google.protobuf:protobuf-java:4.30.2")
-    testImplementation("com.google.protobuf:protobuf-java-util:4.30.2")
+    testImplementation("com.google.protobuf:protobuf-java")
+    testImplementation("com.google.protobuf:protobuf-java-util")
 }
 
 val buildVersion = project.version.toString()

@@ -7,11 +7,13 @@ plugins {
 apply(from = rootProject.file("gradle/di.gradle.kts"))
 
 dependencies {
-    implementation("org.apache.commons:commons-compress:1.28.0")
-    implementation("com.google.code.gson:gson:2.15.0")
-    testFixturesImplementation(platform("org.junit:junit-bom:5.12.1"))
+    implementation("org.apache.commons:commons-compress")
+    implementation("com.google.code.gson:gson")
+    testFixturesImplementation(
+        platform("dev.voxelbrew:bom:${providers.gradleProperty("bomVersion").get()}")
+    )
     testFixturesImplementation("org.junit.jupiter:junit-jupiter-api")
-    testFixturesImplementation("org.slf4j:slf4j-api:2.0.20")
+    testFixturesImplementation("org.slf4j:slf4j-api")
     testImplementation("org.junit.platform:junit-platform-testkit")
 }
 

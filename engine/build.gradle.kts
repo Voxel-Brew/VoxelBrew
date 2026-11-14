@@ -8,8 +8,8 @@ plugins {
 
 dependencies {
     api("dev.voxelbrew.api:model:${providers.gradleProperty("modelApiVersion").get()}")
-    add("integrationTestImplementation", project(":importer"))
-    add("integrationTestImplementation", project(":exporter"))
+    add("integrationTestImplementation", project(":importer-impl"))
+    add("integrationTestImplementation", project(":exporter-impl"))
     implementation(project(":util"))
     implementation("com.google.code.gson:gson:2.15.0")
     api("javax.measure:unit-api:2.2")

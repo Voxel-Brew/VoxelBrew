@@ -322,7 +322,7 @@ Older format-1 installation metadata remains readable for recovery/downgrades.
 Focused checks:
 
 ```text
-./gradlew :importer:test :importer:integrationTest :exporter:test :exporter:integrationTest
+./gradlew :importer-impl:test :importer-impl:integrationTest :exporter-impl:test :exporter-impl:integrationTest
 ```
 
 The compatibility fixture in `exporter/src/test/test/resources/fixtures/` was
@@ -344,8 +344,8 @@ CI artifacts retain the existing three-day limit. macOS GUI qualification remain
 
 ## Frontend runtime boundary
 
-CLI and GUI compile against `dev.voxelbrew.api:import`, `dev.voxelbrew.api:export` and `dev.voxelbrew.api:slicer`. Their `:importer` and
-`:exporter` dependencies are `runtimeOnly`; all five JARs ship in each application
+CLI and GUI compile against `dev.voxelbrew.api:import`, `dev.voxelbrew.api:export` and `dev.voxelbrew.api:slicer`. Their `:importer-impl` and
+`:exporter-impl` dependencies are `runtimeOnly`; all five JARs ship in each application
 distribution's `lib` directory. The application JARs remain thin JARs.
 `verifyFrontendIoDependencies` enforces both compile and runtime classpaths.
 
@@ -371,8 +371,8 @@ External format providers retain their existing SPI and service registrations.
 
 ## Implementation project layout
 
-Concrete file I/O lives in `importer` (`:importer`) and `exporter`
-(`:exporter`). Their JARs and Maven artifact IDs are `importer-impl` and
+Concrete file I/O lives in `importer` (`:importer-impl`) and `exporter`
+(`:exporter-impl`). Their JARs and Maven artifact IDs are `importer-impl` and
 `exporter-impl`, under `dev.voxelbrew`; the public `*-api` artifacts are unchanged.
 Java packages remain `dev.voxelbrew.importer` and `dev.voxelbrew.exporter`.
 Frontends compile against the APIs and include the implementations at runtime.
@@ -384,7 +384,7 @@ identities remain stable so existing update validation continues to check versio
 
 ## Independent slicer configuration
 
-`slicer` (`:slicer`, artifact `slicer-impl`) owns backend execution,
+`slicer` (`:slicer-impl`, artifact `slicer-impl`) owns backend execution,
 ServiceLoader discovery and atomic job publication. CLI and GUI include it at
 runtime. Prusa project and INI serialization stay in `exporter`.
 
@@ -438,4 +438,4 @@ util `PrinterResources` implementation types have moved out of those modules.
 `FileExportDialog` accepts compound extensions such as `gcode.3mf` (each segment
 must be ASCII alphanumeric). The `gcode-package` exporter writes the active plate's
 original sliced package. `dev.voxelbrew.api:printer` owns physical-device contracts and depends
-only on `dev.voxelbrew.api:model`; `:printer` supplies the ServiceLoader runtime.
+only on `dev.voxelbrew.api:model`; `:printer-impl` supplies the ServiceLoader runtime.

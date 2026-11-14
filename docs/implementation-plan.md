@@ -32,7 +32,7 @@ Once the check passes, review and stage the milestone changes and create a Git c
 | gui                      | JavaFX desktop, sketch tools, viewport, properties, timeline, file and print dialogs                 | engine, api:import, api:export, api:slicer, util; importer/exporter/slicer at runtime |
 | cli                      | Headless modeling, editing, file operations, inspection, export, plugin listing and slicing commands | engine, api:import, api:export, api:slicer, util; importer/exporter/slicer at runtime |
 
-Keep eight application subprojects and five independent API repositories, including `dev.voxelbrew.api:printer` and `:printer` for physical devices. The user-requested utility and file-I/O
+Keep eight application subprojects and five independent API repositories, including `dev.voxelbrew.api:printer` and `:printer-impl` for physical devices. The user-requested utility and file-I/O
 extractions supersede the original three-project boundary. Example plugins belong
 in test fixtures or a separate consumer build. Publish the versioned plugin
 feature contracts from engine and file-I/O contracts from api/import and api/export, with slicing contracts in api/slicer. Keep JavaFX, CLI parsing, generated Protobuf classes and

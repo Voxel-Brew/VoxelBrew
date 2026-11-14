@@ -10,7 +10,7 @@ base { archivesName.set("exporter-impl") }
 dependencies {
     implementation(project(":engine"))
     api("dev.voxelbrew.api:export:${providers.gradleProperty("exportApiVersion").get()}")
-    implementation(project(":importer"))
+    implementation(project(":importer-impl"))
     implementation(project(":util"))
     testImplementation("com.google.protobuf:protobuf-java:4.30.2")
     testImplementation("com.google.protobuf:protobuf-java-util:4.30.2")

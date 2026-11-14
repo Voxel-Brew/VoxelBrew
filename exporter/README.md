@@ -1,6 +1,6 @@
 # Export module
 
-The `:exporter` Gradle project implements VoxelBrew's document and geometry exporters,
+The `:exporter-impl` Gradle project implements VoxelBrew's document and geometry exporters,
 runtime exporter discovery, and external-slicer file pipeline. Its Java package is
 `dev.voxelbrew.exporter`. Both the JavaFX desktop and headless CLI use this module.
 

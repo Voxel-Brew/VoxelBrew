@@ -10,8 +10,8 @@ dependencies {
     implementation("com.google.code.gson:gson:2.15.0")
     testImplementation("com.google.protobuf:protobuf-java:4.30.2")
     implementation(project(":engine"))
-    implementation(project(":exporter"))
-    implementation(project(":importer"))
+    implementation(project(":exporter-impl"))
+    implementation(project(":importer-impl"))
     implementation(project(":util"))
 }
 

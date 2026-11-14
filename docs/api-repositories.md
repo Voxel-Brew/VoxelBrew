@@ -16,6 +16,8 @@ repository retains its pinned Gradle 9.1.0 wrapper. The composite publishes curr
 API sources to Maven Local before compiling the independent plugin fixture.
 `assemble`, `check`, `build`, `clean`, and `publishToMavenLocal` aggregate the builds.
 Composite dependency substitution makes local API source edits visible immediately.
+Only importer, exporter, slicer, and printer application projects use an `-impl` suffix; API build names remain
+`model`, `import`, `export`, `printer`, and `slicer`.
 The parent build files and launchers are intentionally outside Git.
 
 Each API supports `./gradlew publishToMavenLocal`. Standalone consumers opt in

@@ -159,6 +159,7 @@ configure(libraryProjects) {
         if (name.endsWith("ToFixtureRepository")) mustRunAfter(":engine:clean")
     }
     apply(plugin = "java-library")
+    extensions.configure<BasePluginExtension> { archivesName.set(projectDir.name) }
     apply(plugin = "com.github.spotbugs")
     extensions.configure<SpotBugsExtension> {
         toolVersion.set("4.10.5")
@@ -379,7 +380,7 @@ for (module in listOf(":cli", ":gui")) {
                         }
                     val implementations =
                         setOf("importer", "exporter", "slicer", "printer").map {
-                            "dev.voxelbrew:$it"
+                            "dev.voxelbrew:$it-impl"
                         }
                     check(compile.containsAll(apis)) {
                         "$module is missing public API dependencies"

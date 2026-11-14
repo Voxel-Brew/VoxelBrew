@@ -1,5 +1,9 @@
 # VoxelBrew CAD
 
+The API implementation projects are `:importer-impl`, `:exporter-impl`, `:slicer-impl`, and
+`:printer-impl`; their source directories retain their existing names.
+The independent API builds keep their original names.
+
 Desktop parametric CAD for mechanical parts and FDM preparation. Project domain:
 **voxelbrew.dev**, Java/Gradle namespace: **dev.voxelbrew**.
 
@@ -18,7 +22,7 @@ The `importer` and `exporter` projects own document/G-code reading, document wri
 STL/3MF/OBJ mesh exporters and exact STEP export; `slicer` owns slicer execution and the job pipeline. The `dev.voxelbrew.api:import` and `dev.voxelbrew.api:export`
 projects publish provider contracts so external JARs can add formats without depending
 on implementation projects. Both file-I/O APIs depend only on the MIT `api/model` module; engine also depends
-on that model API. The `dev.voxelbrew.api:slicer` project publishes slicing contracts and depends only on the model and export APIs. The `dev.voxelbrew.api:printer` and `:printer` projects provide physical-device connections. There are eight application subprojects and five independent API repositories. See
+on that model API. The `dev.voxelbrew.api:slicer` project publishes slicing contracts and depends only on the model and export APIs. The `dev.voxelbrew.api:printer` and `:printer-impl` projects provide physical-device connections. There are eight application subprojects and five independent API repositories. See
 [file import/export boundaries and API migration](docs/file-io.md).
 Printer profile catalogs are exposed by `dev.voxelbrew.slicer.api.PrinterProfileCatalog` through
 `SlicerRuntime.printers(Path)`. The implementation, bundled presets, images and

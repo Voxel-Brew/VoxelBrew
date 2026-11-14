@@ -14,7 +14,9 @@
 ## Architecture
 
 - Use Java 21, the committed Gradle wrapper, and `dev.voxelbrew` packages.
-- Keep eight application subprojects and five independent API repositories: `util`, `engine`, `dev.voxelbrew.api:model`, `dev.voxelbrew.api:import`, `dev.voxelbrew.api:export`, `dev.voxelbrew.api:slicer`, `dev.voxelbrew.api:printer`, `:importer`, `:exporter`, `:slicer`, `:printer`, `cli`, and `gui`.
+- Keep eight application subprojects: `util`, `engine`, `importer`, `exporter`, `slicer`, `printer`, `cli`, and `gui`.
+  The five independent API repositories live at `../api/{model,import,export,slicer,printer}`
+  and publish `dev.voxelbrew.api` artifacts; they are not application subprojects.
   api/printer owns physical-device contracts; printer owns device configuration and network transport.
   Engine owns native CAD evaluation, persistence codecs and feature execution.
   api/model owns shared domain values and validation helpers under MIT.
@@ -23,6 +25,8 @@
   Import/export own format implementations, provider discovery; slicer owns slicer discovery and job pipelines.
   Production dependencies point from file I/O to engine, never from engine to file I/O.
   Util owns CAD-independent application services and depends on none of the other projects.
+- CLI and GUI compile against the import/export/slicer/printer APIs and load their
+  implementations at runtime. Preserve `verifyFrontendIoDependencies`.
 - Use Dagger at CLI/window composition roots and constructor injection for service
   dependencies. Keep mutable command instances unscoped, window state isolated,
   and resource shutdown explicit. Do not inject components as service locators or
@@ -47,6 +51,10 @@
   `.\gradlew.bat spotlessApply` on Windows or `./gradlew spotlessApply` on Ubuntu.
   Wait for the formatter to succeed, then review the resulting changes before
   staging and committing. This applies to documentation-only commits too.
+  In a dirty checkout, scope formatting to owned files with
+  `-PspotlessIdeHook=<comma-separated absolute paths>` to preserve unrelated work.
+  Instruction-only edits need formatting and diff review, not native builds or
+  milestone acceptance runs.
 - Do not run the full end-to-end (E2E) test suite unless the user explicitly
   requests it. When E2E validation is relevant, run only the tests covering the
   implemented change; skip E2E tests for changes that do not benefit from them.

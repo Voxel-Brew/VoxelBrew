@@ -62,7 +62,7 @@ The total document payload limit is 128 MiB; each package is limited to 48 MiB.
 
 The API is `dev.voxelbrew.api:printer`, under MIT. Frontends compile against
 `dev.voxelbrew.api:printer` and discover `PrinterRuntime` through ServiceLoader. Implementation
-and transport libraries remain in `:printer`; the engine has no printer dependency.
+and transport libraries remain in `:printer-impl`; the engine has no printer dependency.
 OrcaSlicer is an external executable, not redistributed with VoxelBrew.
 
 ## Verification boundary

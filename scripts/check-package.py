@@ -58,6 +58,8 @@ def architecture(value):
 
 version = properties(root / "gradle.properties")["projectVersion"]
 installation = properties(app / "voxelbrew-install.properties")
+expected_installation = properties(root / kind / "build/installation-metadata/voxelbrew-install.properties")
+assert installation == expected_installation, installation
 expected_platform = {"win32": "windows", "darwin": "macos", "linux": "linux"}[sys.platform]
 expected_platform += "-" + architecture(platform.machine())
 assert installation["format"] == "1" and installation["component"] == kind.upper(), installation
@@ -69,10 +71,10 @@ assert installation["importJar"] == f"importer-impl-{version}.jar", installation
 assert installation["exportJar"] == f"exporter-impl-{version}.jar", installation
 for module in ("import-api", "export-api", "slicer-api", "model-api", "printer-api"):
     api = module.removesuffix("-api")
-    api_version = properties(root / "gradle.properties")[api + "ApiVersion"]
-    assert installation[module + "Version"] == api_version, installation
+    api_version = installation[module + "Version"]
     assert installation[module + "Jar"] == f"{api}-{api_version}.jar", installation
     assert (app / installation[module + "Jar"]).is_file()
+    assert list(app.glob(f"{api}-*.jar")) == [app / installation[module + "Jar"]]
 for jar in (f"engine-{version}.jar", f"util-{version}.jar", f"importer-impl-{version}.jar", f"exporter-impl-{version}.jar", f"{kind}-{version}.jar"):
     assert (app / jar).is_file(), "Missing application dependency: " + jar
 

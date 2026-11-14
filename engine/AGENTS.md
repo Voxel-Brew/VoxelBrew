@@ -15,7 +15,7 @@
   must invalidate relevant Gradle tests, even when Java sources are unchanged.
 - Depend on the MIT api/model values; keep native evaluation and persistence codecs here.
 - Keep production code independent of the import/export modules. Cross-module integration
-  tests may use their public readers and writers; export-specific tests belong in export.
+  tests may use their public readers and writers; export-specific tests belong in exporter.
 - Evolve `src/main/proto/document.proto` and the in-memory `DocumentCodec` compatibly: reserve retired field numbers,
   never hand-edit generated code, and protect newer/unknown documents from
   destructive writes. File access and atomic publication belong to import/export.

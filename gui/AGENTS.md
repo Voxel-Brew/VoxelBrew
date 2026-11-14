@@ -1,9 +1,10 @@
 # Desktop GUI instructions
 
-- Implement the JavaFX desktop milestone only after preceding gates pass.
-  Read the M3 acceptance cases in `docs/implementation-plan.md` before UI work.
+- Read the relevant feature documentation and acceptance cases in
+  `docs/implementation-plan.md`; the desktop already includes work beyond M3.
 - Use `dev.voxelbrew.gui` and engine services for model edits, history and tessellation;
-  use import/export for file operations and slicing. Keep every service module headless.
+  use public import/export, slicer and printer runtime APIs for those workflows.
+  Keep implementation modules runtime-only and every service module headless.
 - Obtain render meshes and triangle-to-face mapping from engine. Preserve model
   millimeter coordinates when converting to viewport and sketch-plane coordinates.
 - Run expensive rebuilds away from the JavaFX application thread. Track revision

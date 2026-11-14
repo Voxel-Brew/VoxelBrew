@@ -223,7 +223,8 @@ public final class Solid implements AutoCloseable {
      */
     public synchronized dev.voxelbrew.engine.mesh.MeshData tessellate(dev.voxelbrew.engine.mesh.MeshOptions options) {
         requireOpen();
-        return NativeKernel.tessellate(token, options.chordToleranceMm(), value(options.angularTolerance(), RADIAN));
+        return TessellationCleanup.removeCollapsedTriangles(
+                NativeKernel.tessellate(token, options.chordToleranceMm(), value(options.angularTolerance(), RADIAN)));
     }
 
     public synchronized Bounds bounds() {

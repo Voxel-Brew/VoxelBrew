@@ -7,6 +7,30 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class NativeKernelTest {
+    @Test
+    void bearingMountFilletsAndSubsequentCutsProducePrintableMeshes() {
+        int before = NativeKernel.liveHandles();
+        try (Solid box = Solid.rectanglePrism(0, 0, 0, 76, 52, 6);
+                Solid rounded = box.edgeFinish(
+                        true, 2, java.util.stream.IntStream.rangeClosed(1, 12).toArray());
+                Solid cut1 = rounded.cutThroughCircle(9, 9, 6);
+                Solid cut2 = cut1.cutThroughCircle(67, 9, 6);
+                Solid cut3 = cut2.cutThroughCircle(67, 43, 6);
+                Solid cut4 = cut3.cutThroughCircle(9, 43, 6);
+                Solid bored = cut4.cutThroughCircle(38, 26, 20)) {
+            for (var solid : java.util.List.of(rounded, cut1, cut2, cut3, cut4, bored)) {
+                var mesh = solid.tessellate(dev.voxelbrew.engine.mesh.MeshOptions.DEFAULT);
+                var report = dev.voxelbrew.engine.mesh.MeshValidation.inspect(mesh);
+                assertTrue(report.closed(), report.toString());
+                for (int t = 0; t < mesh.triangleCount(); t++) {
+                    assertTrue(mesh.faceIndex(t) >= 0);
+                }
+            }
+            assertEquals(20786.053208586636, bored.volume(), VOLUME_TOLERANCE_MM3);
+        }
+        assertEquals(before, NativeKernel.liveHandles());
+    }
+
     private static final double VOLUME_TOLERANCE_MM3 = 0.01;
     private static final double BOUNDS_TOLERANCE_MM = 0.001;
 

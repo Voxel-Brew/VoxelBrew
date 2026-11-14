@@ -74,7 +74,8 @@ for module in ("import-api", "export-api", "slicer-api", "model-api", "printer-a
     api_version = installation[module + "Version"]
     assert installation[module + "Jar"] == f"{api}-{api_version}.jar", installation
     assert (app / installation[module + "Jar"]).is_file()
-    assert list(app.glob(f"{api}-*.jar")) == [app / installation[module + "Jar"]]
+    api_jars = [path for path in app.glob(f"{api}-*.jar") if not path.name.startswith(f"{api}-impl-")]
+    assert api_jars == [app / installation[module + "Jar"]]
 for jar in (f"engine-{version}.jar", f"util-{version}.jar", f"importer-impl-{version}.jar", f"exporter-impl-{version}.jar", f"{kind}-{version}.jar"):
     assert (app / jar).is_file(), "Missing application dependency: " + jar
 

@@ -58,6 +58,18 @@ class PrintDepthBufferTest {
     }
 
     @Test
+    void highResolutionEdgesRetainLogicalWidthAndDepthOcclusion() {
+        var raster = new PrintDepthBuffer(40, 40, 2);
+        raster.triangle(point(0, 0, 5), point(40, 0, 5), point(0, 40, 5), 0xff112233, 1);
+        raster.edge(point(2, 8, 10), point(24, 8, 10), 0xff000000);
+        assertEquals(0xff112233, raster.pixels()[7 * 40 + 8]);
+        raster.edge(point(2, 8, 5), point(24, 8, 5), 0xff000000);
+        assertEquals(0xff000000, raster.pixels()[7 * 40 + 8]);
+        assertEquals(0xff000000, raster.pixels()[8 * 40 + 8]);
+        assertEquals(1, raster.owner(8, 8));
+    }
+
+    @Test
     void cameraDepthFollowsOrbitAndTopViewLooksDown() {
         var top = new PrintCamera(false);
         assertTrue(top.depth(0, 0, 10) < top.depth(0, 0, 0));

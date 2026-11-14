@@ -7,11 +7,17 @@ final class PrintDepthBuffer {
     record Point(double x, double y, double depth) {}
 
     private final int width, height;
+    private final double strokeScale;
     private final int[] pixels, owners, surfaces, edgeColors;
     private final double[] depths, tolerances, edgeDepths;
     private final double[] edgeCoverage;
 
     PrintDepthBuffer(int width, int height) {
+        this(width, height, 1);
+    }
+
+    PrintDepthBuffer(int width, int height, double strokeScale) {
+        this.strokeScale = strokeScale;
         this.width = width;
         this.height = height;
         pixels = new int[Math.multiplyExact(width, height)];
@@ -67,16 +73,16 @@ final class PrintDepthBuffer {
         double dx = b.x - a.x, dy = b.y - a.y;
         double lengthSquared = dx * dx + dy * dy;
         if (lengthSquared < 1e-12) return;
-        int minX = (int) Math.max(0, Math.floor(Math.min(a.x, b.x) - 1));
-        int maxX = (int) Math.min(width - 1, Math.ceil(Math.max(a.x, b.x) + 1));
-        int minY = (int) Math.max(0, Math.floor(Math.min(a.y, b.y) - 1));
-        int maxY = (int) Math.min(height - 1, Math.ceil(Math.max(a.y, b.y) + 1));
+        int minX = (int) Math.max(0, Math.floor(Math.min(a.x, b.x) - strokeScale));
+        int maxX = (int) Math.min(width - 1, Math.ceil(Math.max(a.x, b.x) + strokeScale));
+        int minY = (int) Math.max(0, Math.floor(Math.min(a.y, b.y) - strokeScale));
+        int maxY = (int) Math.min(height - 1, Math.ceil(Math.max(a.y, b.y) + strokeScale));
         for (int y = minY; y <= maxY; y++) {
             for (int x = minX; x <= maxX; x++) {
                 double t = Math.clamp(((x + 0.5 - a.x) * dx + (y + 0.5 - a.y) * dy) / lengthSquared, 0, 1);
                 double ex = x + 0.5 - a.x - t * dx, ey = y + 0.5 - a.y - t * dy;
-                // One-pixel antialiased stroke, rather than a solid ~1.5-pixel band.
-                double coverage = Math.max(0, 1 - Math.hypot(ex, ey));
+                // Preserve logical stroke width when rendering at higher pixel density.
+                double coverage = Math.clamp((strokeScale + 1) / 2 - Math.hypot(ex, ey), 0, 1);
                 if (coverage == 0) continue;
                 int index = y * width + x;
                 double depth = a.depth + t * (b.depth - a.depth);

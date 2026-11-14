@@ -124,6 +124,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     private final Label placementHint = new Label();
     private double viewScale, viewOx, viewOy;
     private PrintDepthBuffer placementRaster;
+    private double placementRasterScale = 1;
     private final PrintCamera topCamera = new PrintCamera(false), spatialCamera = new PrintCamera(true);
     private boolean navigating, primaryNavigation;
     private double navigationX, navigationY;
@@ -1315,7 +1316,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
                         validationLabel.setText(
                                 result.valid()
                                         ? translations.text("gui.print_setup_valid_millimeters")
-                                        : result.diagnostics().toString());
+                                        : PrintValidationMessages.format(result, translations, this::instanceName));
                         updateJob();
                     });
                 });
@@ -1358,7 +1359,9 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         status.setText(translations.text("print.state." + jobs.state().name())
                 + ": "
                 + (jobs.state() == PrintController.State.IDLE
-                        ? translations.text("gui.ready_to_slice")
+                        ? (validation != null && !validation.valid()
+                                ? translations.text("print.validation.blocked")
+                                : translations.text("gui.ready_to_slice"))
                         : jobs.state() == PrintController.State.SUCCEEDED
                                 ? translations.text("print.jobReady")
                                 : jobs.message()));
@@ -1597,7 +1600,16 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     }
 
     private void renderPlacement(double ox, double oy, double scale, int width, int height) {
-        var raster = new PrintDepthBuffer(width, height);
+        // Render at physical-pixel resolution, with supersampling for smooth silhouettes.
+        var window = canvas.getScene() == null ? null : canvas.getScene().getWindow();
+        double pixelScale =
+                Math.max(2, window == null ? 1 : Math.max(window.getOutputScaleX(), window.getOutputScaleY()));
+        int imageWidth = (int) Math.ceil(width * pixelScale);
+        int imageHeight = (int) Math.ceil(height * pixelScale);
+        var raster = new PrintDepthBuffer(imageWidth, imageHeight, pixelScale);
+        ox *= pixelScale;
+        oy *= pixelScale;
+        scale *= pixelScale;
         int palette = 0;
         var all = model.instances();
         for (int owner = 0; owner < all.size(); owner++) {
@@ -1655,19 +1667,20 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
                 raster.edge(d, a, color);
             }
         }
-        var image = new javafx.scene.image.WritableImage(width, height);
+        var image = new javafx.scene.image.WritableImage(imageWidth, imageHeight);
         image.getPixelWriter()
                 .setPixels(
                         0,
                         0,
-                        width,
-                        height,
+                        imageWidth,
+                        imageHeight,
                         javafx.scene.image.PixelFormat.getIntArgbInstance(),
                         raster.pixels(),
                         0,
-                        width);
-        canvas.getGraphicsContext2D().drawImage(image, 0, 0);
+                        imageWidth);
+        canvas.getGraphicsContext2D().drawImage(image, 0, 0, width, height);
         placementRaster = raster;
+        placementRasterScale = pixelScale;
     }
 
     private void drawRotationGizmo() {
@@ -2014,7 +2027,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
 
     private BodyInstance objectAt(double pointerX, double pointerY) {
         if (model == null || placementRaster == null || toolpathPreview.isSelected()) return null;
-        int index = placementRaster.owner(pointerX, pointerY);
+        int index = placementRaster.owner(pointerX * placementRasterScale, pointerY * placementRasterScale);
         return index < 0 || index >= model.instances().size()
                 ? null
                 : model.instances().get(index);

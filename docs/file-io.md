@@ -273,7 +273,9 @@ with a `scale` option) and `consumer.DocumentProbeProvider` (a document report u
 `engine/build/repository`, then compiles that consumer against independently published APIs.
 For local API development, run `publishToMavenLocal` in the unversioned parent workspace,
 then use `-PuseMavenLocal=true` in standalone application builds. Composite builds
-publish the local APIs automatically before building the fixture.
+publish the local BOM and APIs automatically before building the fixture.
+The application and fixture use `bomVersion` to import `dev.voxelbrew:bom`;
+individual API and fixture engine dependencies omit versions.
 The API artifacts also publish source JARs. Copy the consumer JAR into a trusted plugin directory.
 
 ```text

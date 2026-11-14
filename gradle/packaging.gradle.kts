@@ -52,8 +52,16 @@ val imageRoot = layout.buildDirectory.dir("app-image")
 val image = imageRoot.map { it.dir(applicationName + if (packageMac) ".app" else "") }
 
 val apiVersions =
-    listOf("model", "import", "export", "slicer", "printer").associateWith {
-        providers.gradleProperty("${it}ApiVersion").get()
+    providers.provider {
+        configurations
+            .getByName("runtimeClasspath")
+            .incoming
+            .resolutionResult
+            .allComponents
+            .mapNotNull { it.moduleVersion }
+            .filter { it.group == "dev.voxelbrew.api" }
+            .associate { it.name to it.version }
+            .also { check(it.keys == setOf("model", "import", "export", "slicer", "printer")) }
     }
 val installationMetadata = layout.buildDirectory.dir("installation-metadata")
 val generateInstallationMetadata by
@@ -61,7 +69,7 @@ val generateInstallationMetadata by
         inputs.property("version", productVersion)
         inputs.property("platform", "$packagePlatform-$packageArchitecture")
         inputs.property("component", project.name)
-        inputs.properties(apiVersions)
+        inputs.property("apiVersions", apiVersions)
         outputs.dir(installationMetadata)
         val component = if (project.name == "gui") "GUI" else "CLI"
         val module = project.name
@@ -70,7 +78,7 @@ val generateInstallationMetadata by
             destination.parentFile.mkdirs()
             destination.writeText(
                 "format=1\ncomponent=$component\nversion=$productVersion\nplatform=$packagePlatform-$packageArchitecture\nengineJar=engine-$productVersion.jar\nutilJar=util-$productVersion.jar\nimportJar=importer-impl-$productVersion.jar\nexportJar=exporter-impl-$productVersion.jar\nmainJar=$module-$productVersion.jar\n" +
-                    apiVersions.entries.joinToString("") { (api, apiVersion) ->
+                    apiVersions.get().entries.joinToString("") { (api, apiVersion) ->
                         "${api}-apiJar=$api-$apiVersion.jar\n${api}-apiVersion=$apiVersion\n"
                     }
             )

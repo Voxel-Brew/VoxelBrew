@@ -7,7 +7,7 @@ plugins {
 }
 
 dependencies {
-    api("dev.voxelbrew.api:model:${providers.gradleProperty("modelApiVersion").get()}")
+    api("dev.voxelbrew.api:model")
     add("integrationTestImplementation", project(":importer-impl"))
     add("integrationTestImplementation", project(":exporter-impl"))
     implementation(project(":util"))
@@ -274,7 +274,7 @@ val buildExporterFixture by
     tasks.registering(GradleBuild::class) {
         if (System.getProperty("voxelbrew.workspace") != null && gradle.parent != null) {
             dependsOn(
-                listOf("model", "import", "export", "slicer", "printer").map {
+                listOf("bom", "model", "import", "export", "slicer", "printer").map {
                     gradle.parent!!.includedBuild(it).task(":publishToMavenLocal")
                 }
             )
@@ -286,10 +286,7 @@ val buildExporterFixture by
         dir = rootProject.file("fixtures/exporter-plugin")
         tasks = listOf("jar")
         startParameter.projectProperties =
-            mapOf("engineVersion" to project.version.toString()) +
-                listOf("model", "import", "export", "slicer", "printer").associate {
-                    "${it}ApiVersion" to providers.gradleProperty("${it}ApiVersion").get()
-                } +
+            mapOf("bomVersion" to providers.gradleProperty("bomVersion").get()) +
                 listOf("useMavenLocal", "githubPackagesUser", "githubPackagesToken")
                     .mapNotNull { key -> providers.gradleProperty(key).orNull?.let { key to it } }
                     .toMap()

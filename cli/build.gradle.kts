@@ -12,12 +12,10 @@ apply(from = rootProject.file("gradle/di.gradle.kts"))
 apply(from = rootProject.file("gradle/packaging.gradle.kts"))
 
 dependencies {
-    implementation("dev.voxelbrew.api:import:${providers.gradleProperty("importApiVersion").get()}")
-    implementation("dev.voxelbrew.api:export:${providers.gradleProperty("exportApiVersion").get()}")
-    implementation("dev.voxelbrew.api:slicer:${providers.gradleProperty("slicerApiVersion").get()}")
-    implementation(
-        "dev.voxelbrew.api:printer:${providers.gradleProperty("printerApiVersion").get()}"
-    )
+    implementation("dev.voxelbrew.api:import")
+    implementation("dev.voxelbrew.api:export")
+    implementation("dev.voxelbrew.api:slicer")
+    implementation("dev.voxelbrew.api:printer")
     runtimeOnly(project(":importer-impl"))
     runtimeOnly(project(":exporter-impl"))
     runtimeOnly(project(":slicer-impl"))

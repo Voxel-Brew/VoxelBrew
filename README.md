@@ -335,3 +335,17 @@ VoxelBrew retains the repository's **AGPL-3.0** license. The `api/model`, `api/i
 `api/export` and `api/slicer` modules are licensed separately under MIT; see the
 [API licensing rationale](docs/api-repositories.md). OCCT is dynamically linked
 under LGPL-2.1 with the OCCT exception. See [third-party notices](THIRD_PARTY_NOTICES.md).
+
+## BOM alignment
+
+All eight modules import `dev.voxelbrew:bom`, selected by `bomVersion` in
+`gradle.properties`. API dependencies omit individual versions. `projectVersion`
+still controls the application version; the independent provider fixture uses the
+same BOM for API and engine dependencies. Installation metadata records resolved
+API versions, including local composite substitutions.
+
+The parent workspace includes `BOM` and the five API builds. For standalone local
+builds, publish the BOM and APIs to Maven local first and use `-PuseMavenLocal=true`.
+Remote builds need the selected BOM available in Maven Central or the configured
+GitHub Packages BOM repository. Publish it before rolling out consumers in CI.
+The website has no VoxelBrew Maven dependencies and does not import this platform.

@@ -10,19 +10,13 @@ apply(from = "../../gradle/repositories.gradle.kts")
 
 java { toolchain.languageVersion.set(JavaLanguageVersion.of(21)) }
 
-// Standalone consumers can choose any published version with -PengineVersion=...
-val engineVersion = providers.gradleProperty("engineVersion").orElse("0.1.0-SNAPSHOT")
+val bomVersion = providers.gradleProperty("bomVersion").orElse("0.1.0-SNAPSHOT").get()
 
 dependencies {
-    compileOnly(
-        "dev.voxelbrew.api:export:${providers.gradleProperty("exportApiVersion").orElse("0.1.0-SNAPSHOT").get()}"
-    )
-    compileOnly(
-        "dev.voxelbrew.api:slicer:${providers.gradleProperty("slicerApiVersion").orElse("0.1.0-SNAPSHOT").get()}"
-    )
-    compileOnly(
-        "dev.voxelbrew.api:import:${providers.gradleProperty("importApiVersion").orElse("0.1.0-SNAPSHOT").get()}"
-    )
+    compileOnly(platform("dev.voxelbrew:bom:$bomVersion"))
+    compileOnly("dev.voxelbrew.api:export")
+    compileOnly("dev.voxelbrew.api:slicer")
+    compileOnly("dev.voxelbrew.api:import")
 }
 
 // Native feature providers still exercise the AGPL engine contract separately.
@@ -37,7 +31,8 @@ val features =
     }
 
 dependencies {
-    add(features.compileOnlyConfigurationName, "dev.voxelbrew:engine:${engineVersion.get()}")
+    add(features.compileOnlyConfigurationName, platform("dev.voxelbrew:bom:$bomVersion"))
+    add(features.compileOnlyConfigurationName, "dev.voxelbrew:engine")
 }
 
 tasks.named<Jar>("jar") { from(features.output) }

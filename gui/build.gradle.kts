@@ -14,12 +14,10 @@ dependencies {
     implementation("io.modelcontextprotocol.sdk:mcp:1.1.5")
     implementation("org.eclipse.jetty.ee10:jetty-ee10-servlet:12.0.16")
     implementation("com.google.code.gson:gson:2.15.0")
-    implementation("dev.voxelbrew.api:import:${providers.gradleProperty("importApiVersion").get()}")
-    implementation("dev.voxelbrew.api:export:${providers.gradleProperty("exportApiVersion").get()}")
-    implementation("dev.voxelbrew.api:slicer:${providers.gradleProperty("slicerApiVersion").get()}")
-    implementation(
-        "dev.voxelbrew.api:printer:${providers.gradleProperty("printerApiVersion").get()}"
-    )
+    implementation("dev.voxelbrew.api:import")
+    implementation("dev.voxelbrew.api:export")
+    implementation("dev.voxelbrew.api:slicer")
+    implementation("dev.voxelbrew.api:printer")
     runtimeOnly(project(":printer-impl"))
     runtimeOnly(project(":importer-impl"))
     runtimeOnly(project(":exporter-impl"))

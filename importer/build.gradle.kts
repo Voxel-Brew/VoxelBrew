@@ -7,7 +7,7 @@ base { archivesName.set("importer-impl") }
 
 dependencies {
     implementation(project(":engine"))
-    api("dev.voxelbrew.api:import:${providers.gradleProperty("importApiVersion").get()}")
+    api("dev.voxelbrew.api:import")
     implementation(project(":util"))
 }
 

@@ -5,6 +5,9 @@ operations use `document`; application preferences use `settings`. The previous
 flat command syntax is removed. Commands show their complete argument list with
 `--help`. Enum values accept either engine spelling or lowercase kebab-case.
 
+Use **Settings → Report a bug** in the GUI or `cli settings report-bug` in the
+CLI to open the GitHub issue form in your default web browser.
+
 ```sh
 cli document new part.vxb
 cli --document part.vxb designer sketch rectangle --id plate --width 60 --height 40

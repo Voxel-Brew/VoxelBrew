@@ -12,6 +12,11 @@ import dev.voxelbrew.engine.feature.FeatureRegistry;
 abstract class CommandBindings {
     @Binds
     @IntoMap
+    @ClassKey(ReportBugCommand.class)
+    abstract Object reportBugCommand(ReportBugCommand command);
+
+    @Binds
+    @IntoMap
     @ClassKey(PreferenceCommands.class)
     abstract Object preferenceCommands(PreferenceCommands command);
 

@@ -1,13 +1,23 @@
-# File import instructions
+# Repository Guidelines
 
-- Use `dev.voxelbrew.importer` (Java reserves the word `import`).
-- Own bounded VXB/ProtoJSON/G-code reading, importer discovery and invocation.
-  Return detached api/model values; engine owns document codecs.
-- Preserve importer-owned typed dialogs and asynchronous `importFrom(ImportWindow)`
-  results. Never modify input files; propagate cancellation and read failures.
-- Put only public importer contracts in api/import; keep concrete readers and ServiceLoader registrations here.
-- Keep readers headless and independent of export, CLI and JavaFX.
-- Preserve .vxb schema compatibility, opaque plugin payloads and corruption/newer-schema diagnostics.
-- Do not reinterpret a mesh import as editable CAD history or claim unsupported formats work.
-- Unit tests use temporary files. Run focused reader/integration checks for changed
-  formats and follow root validation rules for milestone gates.
+## Module Scope
+
+Follow the root `AGENTS.md` in addition to this guide. This module implements file readers,
+provider discovery, and import invocation under `dev.voxelbrew.importer` (`import` is a Java
+keyword). Public contracts remain in the independent `api-import` artifact; document codecs and
+editable history belong in `engine`.
+
+## Import Rules
+
+Readers must be headless, bounded, and independent of exporter, CLI, and JavaFX code. Never modify
+an input file. Return detached model values, propagate cancellation and read failures, and preserve
+clear diagnostics for corrupt or newer-schema documents. Keep ServiceLoader registrations in
+`src/main/resources/META-INF/services/`. Do not represent mesh-only imports as editable parametric
+history.
+
+## Verification
+
+Use temporary files and realistic malformed inputs in `src/test/test/`. Run
+`./gradlew :importer-impl:test` for reader behavior and `./gradlew :importer-impl:integrationTest`
+when changes involve native geometry, plugins, or complete document workflows. Format and run the
+root basic checks before submission.

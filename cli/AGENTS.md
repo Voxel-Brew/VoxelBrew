@@ -1,19 +1,23 @@
-# CLI instructions
+# Repository Guidelines
 
-- Read `docs/editable-workflow.md` and the public reference scripts under `scripts/`.
-- Use picocli under `dev.voxelbrew.cli`. Delegate modeling/history to engine and
-  file reading/writing, export, slicing and device operations to the corresponding
-  public runtime APIs. Implementation modules remain runtime dependencies.
-- Preserve useful diagnostics and nonzero failure exit codes. Reject invalid
-  inputs before publishing output; failed commands must not corrupt documents.
-- Keep output usable in scripts. Check save/reopen/edit workflows across fresh
-  JVM processes, including native loading and paths containing spaces.
-- Exercise public commands through the installed distribution when validating
-  distribution behavior. Use `:cli:installDist`; the development distribution
-  still requires Java 21 and must not be described as a bundled-JVM installer.
-- Keep `scripts/reference-part.ps1` and `scripts/reference-part.sh` equivalent.
-  Use a fresh destination for demos; preserve their overwrite protection.
-- Use targeted `:cli:e2eTest --tests <class>` runs for fresh-process workflows;
-  follow root E2E scope rules for milestone gates.
-  Changes to launchers, native loading, or process invocation need Windows and
-  Ubuntu checks. Use argument lists for external processes, not shell interpolation.
+## Module Scope
+
+Follow the root `AGENTS.md` in addition to this guide. The CLI uses picocli under
+`dev.voxelbrew.cli`. Commands orchestrate `engine` and public import, export, slicer, and printer
+runtime APIs; implementation modules must remain runtime dependencies rather than command-layer
+business logic.
+
+## Command Behavior
+
+Keep stdout stable and machine-readable where promised; send diagnostics to stderr and return
+nonzero exit codes for failures. Validate inputs before publishing output, preserve existing files
+on failure, and pass external-process arguments as lists. Fresh-process workflows must handle
+spaces in paths and native-library discovery. Keep `scripts/reference-part.sh` and
+`scripts/reference-part.ps1` behavior equivalent.
+
+## Verification
+
+Run `./gradlew :cli:test` for command parsing and services. Use `./gradlew :cli:installDist` before
+testing launchers or distributions, then invoke the installed executable. Run targeted
+`:cli:e2eTest --tests <ClassName>` checks for save/reopen/edit, native loading, or packaged-process
+changes; avoid the full E2E suite unless the change requires it.

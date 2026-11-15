@@ -1,104 +1,50 @@
-# VoxelBrew contributor instructions
+# Repository Guidelines
 
-## Read before changing code
+## Project Structure & Module Organization
 
-- Read `README.md`, `docs/implementation-plan.md`, and the acceptance evidence for
-  the milestone being changed under `docs/acceptance/`.
-- The implementation plan defines the backlog, exit criteria, and milestone
-  order. Check actual code and evidence before assuming a milestone is complete.
-  Deliver a runnable increment; do not skip a gate to begin a later milestone.
-- Read the `AGENTS.md` in each module you change, even when working from the root.
-- Preserve existing user changes and unrelated files. Keep generated output,
-  downloaded toolchains, and local caches out of source control.
+VoxelBrew is a Java 21 Gradle multi-project application. Core geometry, persistence, and the
+Open CASCADE bridge live in `engine/`; shared application services are in `util/`. File workflows
+are split across `importer/`, `exporter/`, `slicer/`, and `printer/`. User entry points are `cli/`
+and the JavaFX desktop application in `gui/`. Native C++ sources are under `engine/native/`, while
+shared sample models and plugin consumers belong in `fixtures/`. Build logic is centralized in
+`build.gradle.kts` and `gradle/`; automation and bootstrap helpers live in `scripts/`.
 
-## Architecture
+Java production code uses `src/main/java`. Tests intentionally use
+`src/test/test/java`, with additional `src/test/integrationTest/java` and
+`src/test/e2eTest/java` suites. Keep resources beside the corresponding source set.
 
-- Use Java 21, the committed Gradle wrapper, and `dev.voxelbrew` packages.
-- Keep eight application subprojects: `util`, `engine`, `importer`, `exporter`, `slicer`, `printer`, `cli`, and `gui`.
-  The five independent API repositories live at `../api/{model,import,export,slicer,printer}`
-  and publish `dev.voxelbrew.api` artifacts; they are not application subprojects.
-  api/printer owns physical-device contracts; printer owns device configuration and network transport.
-  Engine owns native CAD evaluation, persistence codecs and feature execution.
-  api/model owns shared domain values and validation helpers under MIT.
-  api/import and api/export own only public file-I/O and provider contracts; they depend only on api/model.
-  api/slicer owns public slicing contracts and depends only on api/model and api/export.
-  Import/export own format implementations, provider discovery; slicer owns slicer discovery and job pipelines.
-  Production dependencies point from file I/O to engine, never from engine to file I/O.
-  Util owns CAD-independent application services and depends on none of the other projects.
-- CLI and GUI compile against the import/export/slicer/printer APIs and load their
-  implementations at runtime. Preserve `verifyFrontendIoDependencies`.
-- Use Dagger at CLI/window composition roots and constructor injection for service
-  dependencies. Keep mutable command instances unscoped, window state isolated,
-  and resource shutdown explicit. Do not inject components as service locators or
-  put DI annotations into CAD value objects or plugin contracts. Follow
-  `docs/dependency-injection.md` when adding bindings.
-- Use Lombok `@Slf4j` for application diagnostics and generated accessors/constructors
-  for plain boilerplate. Preserve validation, defensive copies, synchronization,
-  visibility and existing method names; follow `docs/lombok.md`.
-- Keep the GUI a JavaFX desktop application. Headless engine and CLI workflows
-  must not require JavaFX, a display server, or a GPU.
-- Keep JavaFX, CLI parsing, generated Protobuf classes, and native pointers out
-  of public plugin contracts. Put example plugins in independent consumer builds
-  or test fixtures, rather than adding another application subproject.
-- Respect the dependency pins in the build and `scripts/native-versions.properties`.
-  Keep native redistribution notices with redistributed libraries.
+## Build, Test, and Development Commands
 
-## Build and verification
+- `./gradlew assemble` compiles and packages all modules.
+- `./gradlew :gui:run` launches the desktop application; `./gradlew :cli:run --args="--help"`
+  runs the CLI.
+- `./gradlew spotlessApply` formats supported sources and documentation.
+- `./gradlew spotlessCheck basicChecks test` reproduces the fast CI gate: formatting, SpotBugs,
+  and unit tests.
+- `./gradlew integrationTest` runs native-backed integration tests. Bootstrap platform
+  dependencies first with `scripts/bootstrap-native.sh` and `scripts/bootstrap-slicer.sh`.
+- `./gradlew check` runs the complete platform verification, including E2E tests, and is slower.
 
-- Follow the bootstrap and build commands in `README.md`. Windows uses
-  `gradlew.bat`; Ubuntu uses `./gradlew` and its own Linux native toolchain.
-- Always run Spotless formatting from the repository root before every commit:
-  `.\gradlew.bat spotlessApply` on Windows or `./gradlew spotlessApply` on Ubuntu.
-  Wait for the formatter to succeed, then review the resulting changes before
-  staging and committing. This applies to documentation-only commits too.
-  In a dirty checkout, scope formatting to owned files with
-  `-PspotlessIdeHook=<comma-separated absolute paths>` to preserve unrelated work.
-  Instruction-only edits need formatting and diff review, not native builds or
-  milestone acceptance runs.
-- Do not run the full end-to-end (E2E) test suite unless the user explicitly
-  requests it. When E2E validation is relevant, run only the tests covering the
-  implemented change; skip E2E tests for changes that do not benefit from them.
-- Run E2E tests only for the user's native operating system: on Windows, run
-  Windows E2E tests only, without Linux/WSL or macOS E2E runs. Apply the same
-  native-platform rule on Linux and macOS unless the user explicitly requests
-  cross-platform E2E validation.
-- These E2E scope and platform rules take precedence over the cross-platform
-  validation and full-check requirements below. Use targeted tasks or E2E
-  exclusions as needed, and report omitted coverage when recording gate evidence.
-- Validate implementation changes on both Windows and Ubuntu WSL. Use a separate
-  Ubuntu filesystem checkout with the same source revision. Never share native
-  build output or run concurrent Gradle builds in the same checkout.
-- Before completing any milestone, run the full root `gradlew.bat check` and
-  `./gradlew check` without task exclusions. Fix failures and rerun the full check
-  after any further milestone changes. Do not edit sources during a gate run.
-- Review and stage only the milestone changes, then commit with the milestone ID
-  and outcome in the subject before starting the next milestone. Report the
-  commit, exact commands, results, artifact paths, and pending checks at handoff.
-- Native acceptance requires real OCCT; export acceptance requires independent
-  format readers; slicing acceptance requires the real slicer. Test doubles can
-  exercise failure handling, but cannot satisfy these release gates.
-- Distinguish automated results, manual checks, failures, and untested behavior.
-  Headless tests do not qualify GUI gestures, installers, macOS, or hardware.
+On Windows, use `gradlew.bat` and the matching PowerShell bootstrap scripts.
 
-## Reference part
+## Coding Style & Naming Conventions
 
-Use the plan's 60 x 40 mm plate with a diameter-4 mm through-hole at (10, 10).
-Save and reopen the editable 5 mm part, then change thickness to 8 mm. Required
-bounds are (0, 0, 0) to (60, 40, 8) mm; exact volume is
-19099.469035085127 mm^3 within 0.01 mm^3, with bounds within 0.001 mm.
-Rollback before the cut must give 19200 mm^3. Use a separately documented
-tolerance for mesh measurements. Keep the public CLI reference scripts working.
+Use four-space indentation, UTF-8, Unix line endings, and the `dev.voxelbrew` package hierarchy.
+Spotless applies Palantir Java Format, ktfmt for Gradle Kotlin, clang-format for C++/Protobuf, and
+Prettier for Markdown, YAML, and CSS. Java compilation enables `-Xlint:all -Werror`; resolve
+warnings instead of suppressing them broadly. Use `UpperCamelCase` for classes, `lowerCamelCase`
+for methods and fields, and descriptive feature-oriented package names.
 
-## Working with Codex agents
+## Testing Guidelines
 
-Project roles are defined in `.codex/agents/`; usage is in `docs/codex-agents.md`.
-Use them when the user requests agents or delegated/parallel work. Do not launch
-workers merely because their definitions exist.
+Tests use JUnit 5 and should end in `Test` (for example, `SketchSolverTest`). Add focused unit tests
+in the owning module; reserve integration and E2E suites for native, packaged, or UI behavior.
+There is no numeric coverage quota, but every behavior change should include regression coverage.
 
-Before delegating, assign a bounded task, owned files, expected public behavior,
-and validation criteria. Assign shared files to one owner; coordinate API changes
-before concurrent frontend work. Workers report changes and test evidence to the
-parent and do not stage or commit. The parent integrates, resolves conflicts,
-coordinates full checks, and owns milestone acceptance and commits. Run validation
-against a stable integrated source tree after implementation workers have stopped
-editing it. Instruction-only maintenance does not complete a CAD milestone.
+## Commit & Pull Request Guidelines
+
+Recent history favors concise, imperative subjects such as `Fix collapsed tessellation triangles`;
+documentation commits may use a `docs:` prefix. Keep commits scoped to one coherent change. Pull
+requests should explain the motivation and behavior, link relevant issues, list exact verification
+commands, and include screenshots for visible GUI changes. Do not commit `.tools/`, build outputs,
+downloaded toolchains, or local IDE state.

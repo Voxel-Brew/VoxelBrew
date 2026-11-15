@@ -1,14 +1,23 @@
-# File export instructions
+# Repository Guidelines
 
-- Use `dev.voxelbrew.exporter`; keep format writers, export-view adapters/selection, provider discovery and file publication here.
-- Keep shared CAD values in api/model, native evaluation and codecs in engine,
-  exporter contracts in api/export and slicer contracts in api/slicer.
-- Own VXB/ProtoJSON, STL/3MF/OBJ, STEP and stored G-code exporters, plus Prusa
-  project serialization. Slicer execution and job pipelines belong in slicer.
-- Preserve `Exporter<R>.export(CadDocument, ExportWindow)`: providers own typed
-  dialogs and asynchronous publication. Do not restore the removed `ModelExporter` SPI.
-- Validate before publishing; failed operations must preserve existing destinations.
-- Never export failed or rolled-back geometry. Preserve units, identities and transforms.
-- Use import readers to independently validate document and G-code files where required.
-- Run focused exporter tests and real-kernel integration tests for changed formats.
-  Follow root validation rules for milestone gates; instruction-only edits need no E2E run.
+## Module Scope
+
+Follow the root `AGENTS.md` in addition to this guide. `exporter` owns format writers, export
+selection/adapters, provider discovery, and atomic publication for VXB, ProtoJSON, STL, 3MF, OBJ,
+STEP, stored G-code, and slicer project data. Public contracts remain in `api-export`; geometry and
+codecs remain in `engine`.
+
+## Export Rules
+
+Validate the document and destination before writing. Publish atomically so cancellation or
+failure preserves an existing target. Never export failed, stale, or rolled-back geometry, and
+preserve units, identities, and transforms. Keep format-specific implementations headless and
+register providers through `META-INF/services`. Where practical, verify output with an independent
+reader rather than the writer’s own parser.
+
+## Verification
+
+Add focused tests under `src/test/test/` and fixtures under test resources. Run
+`./gradlew :exporter-impl:test`; use `./gradlew :exporter-impl:integrationTest` for STEP, native
+geometry, plugin, or round-trip changes. New formats need success, invalid-input, cancellation, and
+destination-preservation coverage.

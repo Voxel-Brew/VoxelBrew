@@ -43,8 +43,8 @@ There is no numeric coverage quota, but every behavior change should include reg
 
 ## Commit & Pull Request Guidelines
 
-Recent history favors concise, imperative subjects such as `Fix collapsed tessellation triangles`;
-documentation commits may use a `docs:` prefix. Keep commits scoped to one coherent change. Pull
-requests should explain the motivation and behavior, link relevant issues, list exact verification
-commands, and include screenshots for visible GUI changes. Do not commit `.tools/`, build outputs,
-downloaded toolchains, or local IDE state.
+Start every commit subject with `feat:`, `fix:`, or `chore:` and follow it with a concise,
+imperative description, for example `fix: preserve tessellation face mapping`. Keep commits scoped
+to one coherent change. Pull requests should explain the motivation and behavior, link relevant
+issues, list exact verification commands, and include screenshots for visible GUI changes. Do not
+commit `.tools/`, build outputs, downloaded toolchains, or local IDE state.

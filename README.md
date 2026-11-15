@@ -79,10 +79,6 @@ Please read the [contributor instructions](AGENTS.md) before making changes.
 You can fork VoxelBrew and build on it under the terms of the
 [GNU Affero General Public License v3.0](LICENSE). The application uses Java 21,
 JavaFX, and Gradle, with Open CASCADE providing the native CAD kernel.
-See the [implementation plan](docs/implementation-plan.md),
-[testing guide](docs/testing.md), and
-[API repository guide](docs/api-repositories.md) for architecture, validation,
-and local workspace setup.
 
 You can also extend VoxelBrew through its public APIs, maintained in independent
 repositories under the MIT license:
@@ -95,10 +91,6 @@ repositories under the MIT license:
 | [Slicer](https://github.com/Voxel-Brew/api-slicer)   | Slicer backend and job execution contracts.        |
 | [Printer](https://github.com/Voxel-Brew/api-printer) | Physical printer and device integration contracts. |
 
-See the [file I/O guide](docs/file-io.md) and
-[printing workflow](docs/printing-workflow.md) to learn how these integrations
-fit into the application.
-
 ## License
 
 VoxelBrew is licensed under the
@@ -107,5 +99,4 @@ VoxelBrew is licensed under the
 The five public API repositories listed above are separately licensed under the
 MIT license; each repository includes its own license file. This does not change
 the application's AGPL license. See the
-[API licensing guide](docs/api-repositories.md#history-and-licensing) and
-[third-party notices](THIRD_PARTY_NOTICES.md) for details.
+[third-party notices](THIRD_PARTY_NOTICES.md) for dependency licensing details.

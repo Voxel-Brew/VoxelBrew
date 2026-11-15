@@ -25,8 +25,7 @@ The native document extension is `.vxb`. Existing `.vxb` documents remain readab
 **File > Save** uses the native document writer; **File > Export** lists discovered
 exporters through one registry. Exporting JSON or STEP does not change the active
 project path or save counter. STEP exports complete design solids, without print-bed
-placements, supports or editable history. See [file I/O](../../docs/file-io.md) and the
-[printing workflow](../../docs/printing-workflow.md) for more detail.
+placements, supports or editable history.
 
 ## Write your own exporter
 

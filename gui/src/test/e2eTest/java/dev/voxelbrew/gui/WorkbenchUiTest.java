@@ -39,6 +39,57 @@ import org.junit.jupiter.api.io.TempDir;
 @ExtendWith(UiTestShard.class)
 class WorkbenchUiTest {
     @Test
+    void readmeLightWorkspaceScreenshots() throws Exception {
+        ready();
+        openPrepared("plate-5mm.vxb");
+        choice("appearance", 1);
+        fx(() -> {
+            var screen = Screen.getPrimary().getVisualBounds();
+            stage.setWidth(Math.min(1440, screen.getWidth() - 60));
+            stage.setHeight(Math.min(960, screen.getHeight() - 80));
+            stage.centerOnScreen();
+            return null;
+        });
+        ready();
+        click("view-cube-home");
+        ready();
+        readmeScreenshot("designer");
+        click("workspace-print");
+        ready();
+        click("print-add");
+        ready();
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+        while (fx(() -> node("#print-slice").isDisabled()) && System.nanoTime() < deadline) Thread.sleep(25);
+        click("print-slice");
+        deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(45);
+        while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().running()) && System.nanoTime() < deadline)
+            Thread.sleep(25);
+        assertEquals(
+                PrintController.State.SUCCEEDED,
+                fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()));
+        assertFalse(document().activeGcode().isEmpty());
+        ready();
+        click("print-view-3d");
+        ready();
+        readmeScreenshot("slicer");
+        click("workspace-printer");
+        ready();
+        assertEquals("workspace-printer", selectedWorkspace());
+        readmeScreenshot("printer");
+    }
+
+    private void readmeScreenshot(String workspace) throws Exception {
+        fx(() -> {
+            workbench.applyCss();
+            workbench.layout();
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "readme-" + workspace + "-light.png"));
+            return null;
+        });
+    }
+
+    @Test
     void middleClickMenuUsesWorkspaceAndSketchCommands() throws Exception {
         ready();
         openPrepared("plate-5mm.vxb");

@@ -35,12 +35,21 @@ or explore the [desktop workflow](docs/gui-workflow.md).
 
 ### Screenshots
 
-An early preview of the workbench, captured during automated Windows GUI
-acceptance tests. The interface continues to evolve.
+The Designer, Slicer, and Printer workspaces in the light theme, captured from
+the Windows desktop application.
 
-![Light-themed workbench showing a parametric plate with a through-hole](docs/acceptance/M3/windows/workbench-light.png)
+**Designer** — build and edit parametric parts.
 
-![Dark-themed workbench showing the model, properties, and editable history](docs/acceptance/M3/windows/workbench-dark.png)
+![Designer workspace in the light theme](docs/screenshots/designer-light.png)
+
+**Slicer** — prepare a plate and preview its generated toolpaths.
+
+![Slicer workspace in the light theme](docs/screenshots/slicer-light.png)
+
+**Printer** — select a sliced plate and export its G-code or send it to a
+configured printer. This example uses a profile-only job with no device connected.
+
+![Printer workspace in the light theme](docs/screenshots/printer-light.png)
 
 ## Bug reports and contributions
 

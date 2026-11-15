@@ -4,9 +4,9 @@
 [![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/Voxel-Brew/VoxelBrew)](https://github.com/Voxel-Brew/VoxelBrew/releases/latest)
 
-[![Windows](https://img.shields.io/badge/%F0%9F%AA%9F_Windows-0078D4?style=for-the-badge)](docs/packaging.md)
-[![macOS](https://img.shields.io/badge/macOS-222222?style=for-the-badge&logo=apple&logoColor=white)](docs/packaging.md)
-[![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](docs/packaging.md)
+![Windows](https://img.shields.io/badge/%F0%9F%AA%9F_Windows-0078D4?style=for-the-badge)
+![macOS](https://img.shields.io/badge/macOS-222222?style=for-the-badge&logo=apple&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
 
 ## About
 
@@ -20,12 +20,9 @@ Create editable models in the desktop application, export them for printing, or
 use an integrated slicer backend to turn your designs into printer-ready jobs.
 A headless command-line interface also supports modeling and automation.
 
-VoxelBrew supports **Windows, macOS, and Linux**. See the
-[platform and packaging guide](docs/packaging.md) for supported versions,
-architectures, and available packages.
+VoxelBrew supports **Windows, macOS, and Linux**.
 
-[Download the latest release](https://github.com/Voxel-Brew/VoxelBrew/releases/latest)
-or explore the [desktop workflow](docs/gui-workflow.md).
+[Download the latest release](https://github.com/Voxel-Brew/VoxelBrew/releases/latest).
 
 ### Features
 

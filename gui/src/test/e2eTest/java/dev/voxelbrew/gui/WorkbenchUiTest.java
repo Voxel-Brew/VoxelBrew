@@ -39,6 +39,40 @@ import org.junit.jupiter.api.io.TempDir;
 @ExtendWith(UiTestShard.class)
 class WorkbenchUiTest {
     @Test
+    void readmeLightSketchScreenshots() throws Exception {
+        ready();
+        choice("appearance", 1);
+        fx(() -> {
+            var screen = Screen.getPrimary().getVisualBounds();
+            stage.setWidth(Math.min(1440, screen.getWidth() - 60));
+            stage.setHeight(Math.min(960, screen.getHeight() - 80));
+            stage.centerOnScreen();
+            return null;
+        });
+        click("view-cube-home");
+        click("constrained-sketch");
+        ready();
+        assertNotNull(fx(() -> node("#sketch-plane-hint")));
+        readmeScreenshot("sketch-plane");
+        standardView(1);
+        modelClick(12, 12, 0);
+        sketchReady();
+        sketchType(SketchTools.Tool.RECTANGLE_TWO_POINT);
+        sketchNumericPoint(0, 0);
+        sketchNumericPoint(60, 40);
+        sketchType(SketchTools.Tool.CIRCLE_CENTER);
+        sketchNumericPoint(15, 20);
+        sketchNumericPoint(21, 20);
+        click("sketch-tool-select");
+        sketchReady();
+        readmeScreenshot("sketch-drawing");
+        assertTrue(fx(() -> ((SketchEditor) node("#sketch-editor")).controller().canFinish()));
+        click("constraint-finish");
+        ready();
+        assertEquals(1, document().features().size());
+    }
+
+    @Test
     void readmeLightWorkspaceScreenshots() throws Exception {
         ready();
         openPrepared("plate-5mm.vxb");

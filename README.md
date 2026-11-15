@@ -47,6 +47,12 @@ the Windows desktop application.
 
 ![Designer workspace in the light theme](docs/screenshots/designer-light.png)
 
+Choose a sketch plane, then draw your profile with precise dimensions.
+
+![Choosing a plane for a new sketch in the light theme](docs/screenshots/sketch-plane-light.png)
+
+![Creating a rectangle and circle in the light-themed sketch editor](docs/screenshots/sketch-drawing-light.png)
+
 **Slicer** — prepare a plate and preview its generated toolpaths.
 
 ![Slicer workspace in the light theme](docs/screenshots/slicer-light.png)

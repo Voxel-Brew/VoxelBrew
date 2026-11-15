@@ -1,352 +1,91 @@
-# VoxelBrew CAD
+﻿# VoxelBrew CAD
 
-The API implementation projects are `:importer-impl`, `:exporter-impl`, `:slicer-impl`, and
-`:printer-impl`; their source directories retain their existing names.
-The independent API builds keep their original names.
+[![Build on master](https://github.com/Voxel-Brew/VoxelBrew/actions/workflows/check.yml/badge.svg?branch=master)](https://github.com/Voxel-Brew/VoxelBrew/actions/workflows/check.yml?query=branch%3Amaster)
+[![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/Voxel-Brew/VoxelBrew)](https://github.com/Voxel-Brew/VoxelBrew/releases/latest)
 
-Desktop parametric CAD for mechanical parts and FDM preparation. Project domain:
-**voxelbrew.dev**, Java/Gradle namespace: **dev.voxelbrew**.
+## About
 
-**M0 through M3** provide a real Java → JNI → Open CASCADE Technology (OCCT) kernel
-and an editable headless CAD workflow. `engine` owns modeling, history and
-the versioned Protobuf `.vxb` schema; `cli` exposes the same engine operations;
-`gui` provides the JavaFX CAD workbench. M2 adds tessellation, binary STL,
-portable 3MF and external exporter plugins; M3 adds interactive sketching,
-extrusion, picking, editable history and export. The compact
-[history strip](docs/history-timeline.md) provides feature icons, a draggable rollback
-marker and step/playback controls. The shared subproject
-`util`, owns translations, user configuration, logging, application updates and
-generic CPU workers. It has no CAD or frontend dependencies; engine and both
-frontends depend on it. See [shared utilities and configuration](docs/shared-utilities.md).
-The `importer` and `exporter` projects own document/G-code reading, document writing,
-STL/3MF/OBJ mesh exporters and exact STEP export; `slicer` owns slicer execution and the job pipeline. The `dev.voxelbrew.api:import` and `dev.voxelbrew.api:export`
-projects publish provider contracts so external JARs can add formats without depending
-on implementation projects. Both file-I/O APIs depend only on the MIT `api/model` module; engine also depends
-on that model API. The `dev.voxelbrew.api:slicer` project publishes slicing contracts and depends only on the model and export APIs. The `dev.voxelbrew.api:printer` and `:printer-impl` projects provide physical-device connections. There are eight application subprojects and five independent API repositories. See
-[file import/export boundaries and API migration](docs/file-io.md).
-Printer profile catalogs are exposed by `dev.voxelbrew.slicer.api.PrinterProfileCatalog` through
-`SlicerRuntime.printers(Path)`. The implementation, bundled presets, images and
-custom-resource loading live in `slicer`; frontends use the existing
-`SlicerRuntime` ServiceLoader provider. The former engine `PrinterCatalog` and
-util `PrinterResources` implementation types have moved out of those modules.
+VoxelBrew is an open-source parametric CAD application for 3D designers and makers.
+Design parts, refine their dimensions, and prepare them for 3D printing in one
+workspace. With a focus on ease of use and flexibility, VoxelBrew aims to make
+modeling approachable for beginners while giving experienced designers room to
+experiment and extend their workflow.
 
-CLI commands and each desktop window are assembled by Dagger with constructor
-injection, scoped services and explicit resource ownership. See
-[dependency injection and application composition](docs/dependency-injection.md).
-Lombok generates routine constructors/accessors and SLF4J loggers; see
-[Lombok conventions and logging](docs/lombok.md).
-M4 adds editable splitting, build placement, persisted
-PLA/PETG process settings, supports and real PrusaSlicer jobs. See the
-[printing workflow](docs/printing-workflow.md) and [qualification record](docs/acceptance/M4.md).
-The complete backlog is in [the implementation plan](docs/implementation-plan.md).
-M4 is complete for the first-printable scope; advanced support capabilities and
-hardware validation remain tracked separately in its acceptance record.
-M5 is complete for Windows/Ubuntu desktop and macOS Intel CLI, with bundled-JVM
-app images and checks of both original images and extracted distribution ZIPs.
-macOS GUI qualification remains explicitly deferred. See
-[packaging and platform qualification](docs/packaging.md).
-M6 is complete for persistent custom feature providers, with a consumer-built
-spacer plugin, shared CLI/GUI parameter editing, provider-failure isolation and
-lossless missing-plugin recovery. See [feature plugins](docs/feature-plugins.md)
-and [M6 acceptance](docs/acceptance/M6.md).
-M7 adds a 2D sketch constraint workspace: lines, circles, arcs, cubic splines,
-regular polygons, driving dimensions and geometric constraints. See
-[sketch constraints](docs/sketch-constraints.md).
-M8 adds the remaining Fusion-style 2D geometry families and creation variants:
-ellipses, conics, slots, fit/control splines, text and text on a path. See
-[sketch geometry types and the comparison](docs/sketch-types.md).
-M9 adds named parameters, unit-aware formulas, and parameter configurations in
-one design. Create them from the workbench or a sketch, then use their names in
-driving dimensions and extrusion distances. See [parameters and configurations](docs/parameters.md).
-M10 uses JSR 385 quantities and units throughout parameter evaluation, CAD
-measurement boundaries and print settings. See [units and typed APIs](docs/units.md).
-M11 parallelizes independent body meshing, larger sketch Jacobians and print
-preflight using a bounded CPU pool. See [computation and performance](docs/computation.md).
-M12 adds release branches, versioned native application downloads, checksums and
-release rehearsals. See [release steps and recovery](docs/releases.md).
-M13 adds explicit CLI `update` / `update check` commands and a GUI **Updates…**
-dialog, with verified app-image replacement and recovery backups. See
-[updating VoxelBrew](docs/updating.md).
+Create editable models in the desktop application, export them for printing, or
+use an integrated slicer backend to turn your designs into printer-ready jobs.
+A headless command-line interface also supports modeling and automation.
 
-## Prerequisites and locked dependencies
+[Download the latest release](https://github.com/Voxel-Brew/VoxelBrew/releases/latest)
+or explore the [desktop workflow](docs/gui-workflow.md).
 
-- JDK **21**, with `JAVA_HOME` set to a full JDK (including JNI headers).
-- Dagger **2.60.1**, managed by the BOM; its compiler is build-only.
-- Lombok **1.18.48** (compile-only) and SLF4J **2.0.20**, managed by the BOM.
-- Gson **2.15.0**, used for public update metadata; updates need no `gh` or GitHub login.
-- Units of Measurement API **2.2** and Indriya **2.2.4**, resolved by Gradle.
-- Gradle **9.1.0**, through the committed, SHA-256-verified wrapper.
-- CMake **3.31.6** and OCCT **7.9.0**, downloaded and checksum-verified by the bootstrap.
-- Windows x86-64: Visual Studio 2019 C++ tools **14.29.30133**, v142. The bootstrap
-  supplies Windows SDK **10.0.22621.0** from Microsoft NuGet **10.0.22621.1** locally.
-  With VS 2022 and the same v142 tools, pass `-PvsGenerator="Visual Studio 17 2022"`.
-- Ubuntu 24.04 x86-64: **gcc-13, g++-13, make, curl, tar**, and JDK 21.
-  Install with `sudo apt-get install openjdk-21-jdk gcc-13 g++-13 make curl` if absent.
+### Features
 
-All native archive hashes and compiler versions are in
-[`scripts/native-versions.properties`](scripts/native-versions.properties).
-Bootstrapping writes only to the ignored `.tools` directory; it does not modify
-Visual Studio or the system SDK. The first kernel build takes several minutes.
-Native compilation defaults to four workers; use `-PnativeJobs=8` if appropriate.
-Gradle and Maven dependency downloads require network access on the first run.
+- **Parametric modeling:** create dimensioned sketches, extrude solids, and cut
+  holes, then adjust dimensions as your design evolves.
+- **Editable history:** revisit earlier modeling steps, roll back the timeline,
+  and undo or redo changes.
+- **Save and reopen:** keep your editable designs in VoxelBrew's `.vxb` format.
+- **3D printing workflow:** export STL and 3MF files, configure slicing, and
+  inspect toolpaths before printing.
+- **Desktop and command line:** work visually in the JavaFX desktop application
+  or automate operations through the headless CLI.
+- **Extensible workflows:** add importers, exporters, slicer backends, and printer
+  integrations through public APIs.
 
-## Desktop installers
+### Screenshots
 
-Build the native GUI launcher, bundled Java 21 runtime and installer in one command
-on the target host. Run the native bootstrap above first. Windows also requires
-[Inno Setup 6](https://jrsoftware.org/isinfo.php) (`ISCC.exe` in its default location,
-or set `INNO_SETUP_ISCC` to its full path); macOS requires `hdiutil`.
+An early preview of the workbench, captured during automated Windows GUI
+acceptance tests. The interface continues to evolve.
 
-```powershell
-.\gradlew.bat :gui:packageInstaller
-```
+![Light-themed workbench showing a parametric plate with a through-hole](docs/acceptance/M3/windows/workbench-light.png)
 
-```bash
-./gradlew :gui:packageInstaller
-```
+![Dark-themed workbench showing the model, properties, and editable history](docs/acceptance/M3/windows/workbench-dark.png)
 
-Windows writes `gui/build/distributions/VoxelBrew-<version>-windows-x64-Setup.exe`.
-macOS Intel writes `gui/build/distributions/VoxelBrew-<version>-macos-x64.dmg`.
-The installers retain the existing jpackage launcher and its bundled JVM, so users
-need no Java installation. Local installers are unsigned and the macOS DMG is not
-notarized. macOS GUI release publication requires installation and rendering on a
-graphics-capable Mac runner; see [packaging](docs/packaging.md).
+## Bug reports and contributions
 
-## Formatting
+Found a bug? [Open a GitHub issue](https://github.com/Voxel-Brew/VoxelBrew/issues/new)
+with the steps to reproduce it, what you expected to happen, and what happened
+instead. Include your VoxelBrew version, operating system, and any relevant logs
+or screenshots.
 
-[Spotless](https://github.com/diffplug/spotless/tree/main/plugin-gradle) runs from
-the root build and is included in `check` and CI. Format the whole project with
-`./gradlew spotlessApply`, or verify it with `./gradlew spotlessCheck` (Windows:
-`.\gradlew.bat spotlessApply` / `.\gradlew.bat spotlessCheck`). Formatting does
-not require the native bootstrap or a display.
+Contributions are welcome, from bug fixes and documentation improvements to new
+features. Fork the repository and
+[submit a pull request](https://github.com/Voxel-Brew/VoxelBrew/pulls).
+Please read the [contributor instructions](AGENTS.md) before making changes.
 
-The pinned formatters cover Java (including the independent exporter fixture),
-Gradle Kotlin scripts, native C++, Protobuf, CSS, Markdown, workflow YAML and release JavaScript. Other owned
-text files and scripts receive consistent whitespace and
-LF line endings. Java uses Palantir Java Format 2.103.0; Kotlin
-uses ktfmt's Kotlin style. Prettier requires Node.js 18 or later with npm on
-`PATH`; CI supplies Node.js 24. Python 3 with `venv` is also required (`python`
-on Windows, `python3` on Ubuntu; install `python3-venv` on Ubuntu if absent).
-Gradle downloads the pinned clang-format into a project-local `.tools/formatters`
-virtual environment and resolves the other formatters on first use. Generated output,
-Gradle wrapper files, acceptance artifacts, third-party
-licenses and local agent configuration are excluded.
+## Development
 
-`./gradlew basicChecks` also checks high-confidence correctness bugs with SpotBugs.
-CI requires these checks alongside formatting and every test suite. See the
-[code quality policy](docs/code-quality.md) for scope and reports. No external
-analysis service or credentials are required.
+You can fork VoxelBrew and build on it under the terms of the
+[GNU Affero General Public License v3.0](LICENSE). The application uses Java 21,
+JavaFX, and Gradle, with Open CASCADE providing the native CAD kernel.
+See the [implementation plan](docs/implementation-plan.md),
+[testing guide](docs/testing.md), and
+[API repository guide](docs/api-repositories.md) for architecture, validation,
+and local workspace setup.
 
-## Windows: build, integration test, demo
+You can also extend VoxelBrew through its public APIs, maintained in independent
+repositories under the MIT license:
 
-From PowerShell at the repository root:
+| API                                                  | Purpose                                            |
+| ---------------------------------------------------- | -------------------------------------------------- |
+| [Model](https://github.com/Voxel-Brew/api-model)     | Shared model values and validation helpers.        |
+| [Import](https://github.com/Voxel-Brew/api-import)   | File import contracts and provider interfaces.     |
+| [Export](https://github.com/Voxel-Brew/api-export)   | File export contracts and provider interfaces.     |
+| [Slicer](https://github.com/Voxel-Brew/api-slicer)   | Slicer backend and job execution contracts.        |
+| [Printer](https://github.com/Voxel-Brew/api-printer) | Physical printer and device integration contracts. |
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\bootstrap-native.ps1
-.\gradlew.bat :engine:nativeIntegrationTest
-.\gradlew.bat check
-.\gradlew.bat :cli:run --args="designer native-demo"
-```
+See the [file I/O guide](docs/file-io.md) and
+[printing workflow](docs/printing-workflow.md) to learn how these integrations
+fit into the application.
 
-## Ubuntu / Ubuntu WSL: build, integration test, demo
+## License
 
-Use an Ubuntu filesystem checkout for fast compilation, e.g. `~/src/VoxelBrew`.
-Do not run Windows and Linux builds simultaneously in the same checkout: native
-binaries and Gradle intermediate files are platform specific.
+VoxelBrew is licensed under the
+[GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE).
 
-```bash
-bash scripts/bootstrap-native.sh
-./gradlew :engine:nativeIntegrationTest
-./gradlew check
-./gradlew :cli:run --args='designer native-demo'
-```
-
-From Windows, an existing Ubuntu checkout can be tested with:
-
-```powershell
-wsl -d Ubuntu --exec bash -lc 'cd ~/src/VoxelBrew && ./gradlew check'
-```
-
-The dedicated native test **requires** OCCT; it never substitutes a mock or skips
-when the library is unavailable. `check` runs every subproject's checks without
-exclusions and includes the same tests through `engine:integrationTest`.
-
-Tests are separated into `src/test/test`, `src/test/integrationTest` and
-`src/test/e2eTest` in each module. `test` runs unit tests without native tools;
-`integrationTest` runs real-kernel/service tests; `e2eTest` runs CLI and GUI
-workflows. CI runs unit/integration suites once on Ubuntu and `platformCheck`
-(end-to-end plus packaged apps) on Windows and Ubuntu. macOS runs
-`headlessPlatformCheck` for the CLI and builds both app images; its GUI
-qualification is deferred. The final CI gate requires every configured suite
-and platform. See [test commands and layout](docs/testing.md).
-
-## Workspace CLI
-
-CLI commands follow the desktop workspaces: `designer`, `slicer`, and `printer`.
-Shared file actions use `document`; user preferences and updates use `settings`.
-The former flat command syntax has been removed. See the
-[command map and current parity coverage](docs/cli-gui-parity.md) for commands,
-options, editing sessions, and remaining parity work.
-
-## Reference part and numerical contract
-
-To create, save, reopen, edit and roll back the reference part through public CLI
-commands, build the local CLI distribution and run the script (choose a new file
-path each time; the script deliberately refuses to overwrite an existing file):
-
-```powershell
-.\gradlew.bat :cli:installDist
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\reference-part.ps1 -Destination build\demo\my-part.vxb
-.\cli\build\install\cli\bin\cli.bat designer inspect build\demo\my-part.vxb --point 10,10,4
-```
-
-```bash
-./gradlew :cli:installDist
-bash scripts/reference-part.sh build/demo/my-part.vxb
-cli/build/install/cli/bin/cli designer inspect build/demo/my-part.vxb --point 10,10,4
-```
-
-This development distribution includes the matching native libraries and requires
-an installed Java 21 runtime. It is not an M5 installer or bundled-JVM release.
-See [the editable workflow](docs/editable-workflow.md) for all commands, history
-semantics, failure recovery and the persistence contract.
-
-The native experiment builds a dimensioned 60 × 40 mm rectangular wire at (0, 0)
-on XY, creates a planar face, extrudes it along Z, and subtracts an analytic
-cylinder of diameter 4 mm at (10, 10). It tests both 5 mm and 8 mm thickness.
-The cut tool spans the current body's bounds with 1 mm overrun at each end.
-
-For 8 mm thickness, the analytic volume is **19099.469035085127 mm³**,
-`(60 × 40 − 4π) × 8`. The required bounds are `(0, 0, 0)` to `(60, 40, 8)` mm.
-Exact-solid volume tolerance is **0.01 mm³** and bounds tolerance is **0.001 mm**.
-Point classification uses OCCT's **1e-7 mm** tolerance. The tests sample the hole
-and material at three heights; measurements use B-rep integration, not a mesh.
-Mesh approximation tolerance belongs to M2 and is not used for this gate.
-
-## Native ownership and loading
-
-Every returned `Solid` is an independent, immutable owning handle and implements
-`AutoCloseable`. Always use try-with-resources. Closing the source does not
-invalidate a cut result. Close is idempotent; use after close fails. The JNI
-registry stores opaque monotonic IDs backed by shared ownership, never raw
-addresses in the public Java API. Registry access is locked and Java operations
-serialize against close. Tests verify live handles return to the initial count.
-
-The bridge catches OCCT and C++ failures and returns an operation-specific
-`GeometryException`. Java and native validation reject invalid/nonfinite input.
-Every produced result is validated as exactly one valid solid before publication.
-
-`engine:buildNative` builds/installs the minimal OCCT dependency closure and
-places the JNI library and shared OCCT libraries in `engine/build/native/runtime`.
-Gradle test/demo tasks supply `-Dvoxelbrew.native.path` automatically. For direct
-Java use, set that property to the **absolute** runtime directory. On Linux the
-bridge uses `$ORIGIN` for adjacent shared dependencies; on Windows the loader
-loads OCCT dependencies in order from that exact directory. No system OCCT
-installation, display server or GPU is required for the headless tests.
-
-## Evidence and remaining gates
-
-See [M0 acceptance evidence](docs/acceptance/M0.md) and
-[M1 acceptance evidence](docs/acceptance/M1.md) for actual commands, toolchain
-versions, observed values, failures investigated and platform results. Test XML
-and HTML are generated under `engine/build/test-results` and
-`engine/build/reports/tests`. CI exercises native builds on Ubuntu and Windows;
-CI configuration is not itself proof of a successful hosted run.
-
-See also [M2 export evidence](docs/acceptance/M2.md) and
-[M3 desktop evidence](docs/acceptance/M3.md) and the
-[M4 manufacturing qualification](docs/acceptance/M4.md). Subsequent milestones cover
-persistently named generated-face references. General sketch constraints are
-implemented in M7. Feature plugin
-qualification is tracked in [M6 evidence](docs/acceptance/M6.md). Packaged platform results are tracked in
-[M5 acceptance](docs/acceptance/M5.md); physical printer checks remain unqualified.
-
-## Desktop CAD workbench
-
-The experimental [GUI MCP server](docs/mcp.md) exposes the live document to local
-AI clients. Configure its port and connection settings under **Settings → MCP Server**.
-
-The **Construct / Konstrukcja** menu creates editable reference planes, axes,
-points and local coordinate systems. See [construction geometry](docs/construction.md).
-Text-only documents use `.vxb` schema 10; documents containing sliced printer packages use schema 11.
-Both load in this version; earlier schemas are rejected without migration.
-
-Use Java 21 and the matching native bootstrap above. JavaFX **21.0.13** is
-resolved for the build platform automatically.
-
-```powershell
-.\gradlew.bat :gui:run
-.\gradlew.bat :gui:installDist
-.\gui\build\install\gui\bin\gui.bat --open fixtures\reference-8mm.vxb
-```
-
-```bash
-./gradlew :gui:run
-./gradlew :gui:installDist
-gui/build/install/gui/bin/gui --open fixtures/reference-8mm.vxb
-```
-
-Ubuntu needs GTK 3 and a 3D-capable display (WSLg locally). Linux CI runs the
-actual Robot interaction tests using Xvfb/Mesa and Openbox for window controls:
-
-```bash
-sudo apt-get install xvfb xauth openbox libgtk-3-0t64 libgl1-mesa-dri
-bash scripts/with-virtual-desktop.sh ./gradlew check
-```
-
-The installed development distribution includes JavaFX and matching OCCT
-libraries and requires Java 21. It is platform specific, without an installer
-or bundled JVM. Both launchers accept `--plugin-dir`. See the
-[desktop workflow and shortcuts](docs/gui-workflow.md) for the reference demo,
-graphics diagnostics and interaction test commands. GUI Robot tests temporarily
-bring their own windows to the foreground; avoid interacting with the desktop
-during those checks.
-
-The IDE-style menu bar keeps **New / Open / Import / Save / Save As / Export** under
-**File**, appearance under **View**, and language/updates under **Settings**.
-The modeling toolbar stays focused on sketch and solid tools. Hover over buttons
-and menu actions for English or Polish descriptions and selection requirements.
-
-## Codex agents
-
-Project agents cover the CAD engine, CLI, JavaFX desktop, and Windows/Ubuntu
-validation. See [agent roles and usage](docs/codex-agents.md) and
-[contributor instructions](AGENTS.md) for task ownership and milestone checks.
-
-## Export and plugins
-
-Install plugin JARs directly in `~/.voxelbrew/plugins` (`%USERPROFILE%\.voxelbrew\plugins`
-on Windows). GUI and CLI discover providers there automatically; no classpath
-changes or `--plugin-dir` argument are needed. Exporters, importers, feature
-providers and slicers use this directory. An absent or empty directory is fine.
-Use `--plugin-dir` to select a different directory, or `-Dvoxelbrew.home=...`
-to relocate all user data, including the `plugins` subdirectory. Plugins must
-register their providers through the corresponding `META-INF/services` entries.
-
-After `:cli:installDist`, run `cli document exporters` and
-`cli document export fixtures/reference-8mm.vxb --format 3mf --output plate.3mf`
-using the installed launcher above. See [the export API and commands](docs/export-workflow.md)
-and [M2 acceptance evidence](docs/acceptance/M2.md). Exporters require a complete,
-successfully rebuilt document; the output is published only after success.
-
-## Licenses
-
-VoxelBrew retains the repository's **AGPL-3.0** license. The `api/model`, `api/import` and
-`api/export` and `api/slicer` modules are licensed separately under MIT; see the
-[API licensing rationale](docs/api-repositories.md). OCCT is dynamically linked
-under LGPL-2.1 with the OCCT exception. See [third-party notices](THIRD_PARTY_NOTICES.md).
-
-## BOM alignment
-
-All eight modules import `dev.voxelbrew:bom`, selected by `bomVersion` in
-`gradle.properties`. API and third-party dependencies omit individual versions. The BOM also manages
-annotation processors, JavaFX modules, protoc, and the imported JUnit platform. `projectVersion`
-still controls the application version; the independent provider fixture uses the
-same BOM for API and engine dependencies. Installation metadata records resolved
-API versions, including local composite substitutions.
-
-The parent workspace includes `BOM` and the five API builds. For standalone local
-builds, publish the BOM and APIs to Maven local first and use `-PuseMavenLocal=true`.
-Remote builds need the selected BOM available in Maven Central or the configured
-GitHub Packages BOM repository. Publish it before rolling out consumers in CI.
-The website has no VoxelBrew Maven dependencies and does not import this platform.
+The five public API repositories listed above are separately licensed under the
+MIT license; each repository includes its own license file. This does not change
+the application's AGPL license. See the
+[API licensing guide](docs/api-repositories.md#history-and-licensing) and
+[third-party notices](THIRD_PARTY_NOTICES.md) for details.

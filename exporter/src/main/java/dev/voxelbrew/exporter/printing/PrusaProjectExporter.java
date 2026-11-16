@@ -20,8 +20,8 @@ public final class PrusaProjectExporter extends MeshExporter {
         super();
     }
 
-    public PrusaProjectExporter(java.util.concurrent.Executor worker, java.nio.file.Path plugins) {
-        super(worker, plugins);
+    public PrusaProjectExporter(java.nio.file.Path plugins) {
+        super(plugins);
     }
 
     public record Volume(String name, String type, MeshData mesh) {}

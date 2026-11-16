@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import dev.voxelbrew.engine.geometry.Solid;
 import dev.voxelbrew.engine.mesh.*;
 import dev.voxelbrew.engine.model.*;
-import dev.voxelbrew.exporter.api.FileExportDialog;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -18,7 +17,7 @@ class AdditionalFormatsTest {
 
     @Test
     void allFourFormatsAreDiscoveredAndObjPreservesMultiplePlacedInstances() throws Exception {
-        try (var registry = new ExporterRegistry(directory);
+        try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory);
                 var evaluation = Evaluator.evaluate(ExportTest.reference())) {
             assertNotNull(registry.require("stl"));
             assertNotNull(registry.require("3mf"));
@@ -88,12 +87,10 @@ class AdditionalFormatsTest {
     void stepRoundTripsExactReferenceThroughSeparateReaderAndPreservesDestinationOnFailure() throws Exception {
         var document = ExportTest.reference();
         Path target = directory.resolve("exact reference.step");
-        try (var registry = new ExporterRegistry(directory)) {
+        try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory)) {
             registry.require("step")
-                    .provider()
-                    .create(Runnable::run, directory)
-                    .export(document, FileExportDialog.destination(target, false))
-                    .get();
+                    .create()
+                    .export(document, dev.voxelbrew.util.testing.FileExportWindows.destination(target, false));
         }
         var metrics = inspectStep(target);
         assertEquals("1", metrics.getProperty("solids"));

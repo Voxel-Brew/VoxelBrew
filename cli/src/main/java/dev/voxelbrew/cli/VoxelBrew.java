@@ -1,11 +1,7 @@
 package dev.voxelbrew.cli;
 
 import dev.voxelbrew.engine.geometry.Solid;
-import dev.voxelbrew.engine.mesh.MeshOptions;
 import dev.voxelbrew.engine.model.*;
-import dev.voxelbrew.exporter.DocumentOutput;
-import dev.voxelbrew.exporter.ExportSelection;
-import dev.voxelbrew.exporter.MeshExportDialog;
 import dev.voxelbrew.importer.api.DocumentSource;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -113,7 +109,7 @@ public final class VoxelBrew implements Runnable {
     @Command(name = "exporters", mixinStandardHelpOptions = true, description = "List built-in and external exporters")
     @RequiredArgsConstructor(access = AccessLevel.PACKAGE, onConstructor_ = @javax.inject.Inject)
     static final class Exporters implements Callable<Integer> {
-        private final dev.voxelbrew.exporter.api.ExporterCatalog.Factory exporters;
+        private final java.util.function.Supplier<dev.voxelbrew.api.exporter.ExporterProviderRegistry> exporters;
 
         @Option(names = "--plugin-dir")
         Path pluginDirectory = dev.voxelbrew.util.config.ApplicationPaths.plugins();
@@ -123,11 +119,15 @@ public final class VoxelBrew implements Runnable {
 
         @Override
         public Integer call() throws Exception {
-            try (var registry = exporters.open(pluginDirectory)) {
+            try (var registry = exporters.get().withDirectory(pluginDirectory)) {
+                String appVersion = dev.voxelbrew.util.update.BuildVersion.current();
                 registry.descriptors()
-                        .forEach(descriptor ->
-                                spec.commandLine().getOut().println(descriptor.id() + "\t" + descriptor.name()));
-                registry.diagnostics().forEach(spec.commandLine().getErr()::println);
+                        .forEach(descriptor -> spec.commandLine()
+                                .getOut()
+                                .println(descriptor.id() + "\t" + descriptor.name()
+                                        + (descriptor.version().equals(appVersion)
+                                                ? ""
+                                                : " (" + descriptor.version() + ")")));
             }
             return 0;
         }
@@ -140,7 +140,7 @@ public final class VoxelBrew implements Runnable {
     @RequiredArgsConstructor(access = AccessLevel.PACKAGE, onConstructor_ = @javax.inject.Inject)
     static final class Export implements Callable<Integer> {
         private final DocumentSource documents;
-        private final dev.voxelbrew.exporter.api.ExporterCatalog.Factory exporters;
+        private final java.util.function.Supplier<dev.voxelbrew.api.exporter.ExporterProviderRegistry> exporters;
 
         @Parameters(index = "0", arity = "0..1")
         Path file;
@@ -164,13 +164,13 @@ public final class VoxelBrew implements Runnable {
                 names = "--space",
                 defaultValue = "DESIGN",
                 description = "DESIGN or BUILD_PLATE; all coordinates are millimeters")
-        ExportSelection.Space space;
+        String space;
 
         @Option(
                 names = "--selection",
                 defaultValue = "MODEL",
                 description = "MODEL (default), SUPPORTS or ALL; support solids require BUILD_PLATE")
-        ExportSelection.Contents contents;
+        String contents;
 
         @Option(names = "--plugin-dir")
         Path pluginDirectory = dev.voxelbrew.util.config.ApplicationPaths.plugins();
@@ -187,47 +187,77 @@ public final class VoxelBrew implements Runnable {
         @Option(names = "--overwrite")
         boolean overwrite;
 
+        @Option(names = "--export-no-prompt", description = "Fail with all missing export inputs instead of prompting")
+        boolean noPrompt;
+
+        @CommandLine.Unmatched
+        String[] exportInputs = {};
+
         @Spec
         CommandSpec spec;
 
         @Override
         public Integer call() throws Exception {
+            if (!java.util.List.of("DESIGN", "BUILD_PLATE").contains(space))
+                throw new IllegalArgumentException("Invalid --space: " + space);
+            if (!java.util.List.of("MODEL", "SUPPORTS", "ALL").contains(contents))
+                throw new IllegalArgumentException("Invalid --selection: " + contents);
             var document = documents.load(file);
             if (plate != null) document = WorkspaceCommands.selectPlate(document, plate);
             final var selectedDocument = document;
-            try (var registry = exporters.open(pluginDirectory)) {
-                registry.diagnostics().forEach(spec.commandLine().getErr()::println);
-                var parent = new dev.voxelbrew.exporter.api.ExportDialogs()
-                        .register(dev.voxelbrew.exporter.api.FileExportDialog.class, request -> {
-                            if (output == null)
-                                throw new IllegalArgumentException("--output is required for file exports");
-                            if (body != null
-                                    || instance != null
-                                    || space != ExportSelection.Space.DESIGN
-                                    || contents != ExportSelection.Contents.MODEL
-                                    || !options.isEmpty())
-                                throw new IllegalArgumentException(
-                                        "This exporter requires the complete design without mesh options");
-                            return java.util.Optional.of(
-                                    new dev.voxelbrew.exporter.api.FileExportDialog.Destination(output, overwrite));
-                        })
-                        .register(MeshExportDialog.class, request -> {
-                            if (output == null)
-                                throw new IllegalArgumentException("--output is required for file exports");
-                            return java.util.Optional.of(new MeshExportDialog.Settings(
-                                    new ExportSelection(space, contents, body, instance),
-                                    new MeshOptions(chord, angle),
-                                    options,
-                                    new dev.voxelbrew.exporter.api.FileExportDialog.Destination(output, overwrite)));
-                        });
-                registry.require(format)
-                        .provider()
-                        .create(Runnable::run, pluginDirectory)
-                        .export(selectedDocument, parent)
-                        .get();
+            try (var registry = exporters.get().withDirectory(pluginDirectory)) {
+                var provider = registry.require(format);
+                var matched = spec.commandLine().getParseResult();
+                var supplied = new java.util.LinkedHashMap<String, String>();
+                if (matched.hasMatchedOption("--output")) supplied.put("destination", output.toString());
+                if (matched.hasMatchedOption("--overwrite")) supplied.put("overwrite", Boolean.toString(overwrite));
+                if (matched.hasMatchedOption("--space")) supplied.put("space", space);
+                if (matched.hasMatchedOption("--selection")) supplied.put("selection", contents);
+                if (matched.hasMatchedOption("--body")) supplied.put("body", body);
+                if (matched.hasMatchedOption("--instance")) supplied.put("instance", instance);
+                if (matched.hasMatchedOption("--chord-tolerance"))
+                    supplied.put("chord-tolerance", Double.toString(chord));
+                if (matched.hasMatchedOption("--angular-tolerance"))
+                    supplied.put("angular-tolerance", Double.toString(angle));
+                options.forEach((key, value) -> supplied.put("option." + key, value));
+                boolean meshFlagsProvided = matched.hasMatchedOption("--body")
+                        || matched.hasMatchedOption("--instance")
+                        || matched.hasMatchedOption("--space")
+                        || matched.hasMatchedOption("--selection")
+                        || matched.hasMatchedOption("--option");
+                var parent = new CliExportWindow(
+                        provider.descriptor().id(),
+                        pluginDirectory,
+                        supplied,
+                        exportInputs,
+                        spec.commandLine().getOut(),
+                        spec.commandLine().getErr(),
+                        new java.io.BufferedReader(
+                                new java.io.InputStreamReader(System.in, java.nio.charset.StandardCharsets.UTF_8)),
+                        !noPrompt && (System.console() != null || System.in.available() > 0),
+                        noPrompt,
+                        meshFlagsProvided);
+                try {
+                    if (provider.create().export(selectedDocument, parent).isEmpty()) {
+                        log.info("Export {} cancelled", format);
+                        return 1;
+                    }
+                } catch (java.util.concurrent.CancellationException cancelled) {
+                    log.info("Export {} cancelled", format);
+                    return 1;
+                } catch (Exception | LinkageError failure) {
+                    log.error("Export {} failed", format, failure);
+                    throw failure;
+                }
+                log.info("Export {} succeeded", format);
                 spec.commandLine()
                         .getOut()
-                        .println("Exported " + format + (output == null ? "" : " to " + output.toAbsolutePath()));
+                        .println("Exported " + format
+                                + (parent.values().containsKey("destination")
+                                        ? " to "
+                                                + Path.of(parent.values().get("destination"))
+                                                        .toAbsolutePath()
+                                        : ""));
             }
             return 0;
         }
@@ -257,7 +287,7 @@ public final class VoxelBrew implements Runnable {
     @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     abstract static class FileCommand implements Callable<Integer> {
         final DocumentSource documents;
-        final DocumentOutput documentWriter;
+        final DocumentSave documentWriter;
 
         @Parameters(index = "0", arity = "0..1", description = "Editable .vxb file (or --document)")
         Path file;
@@ -306,7 +336,7 @@ public final class VoxelBrew implements Runnable {
 
     abstract static class AddFeature extends FileCommand {
 
-        AddFeature(DocumentSource documents, DocumentOutput documentWriter) {
+        AddFeature(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 
@@ -336,7 +366,7 @@ public final class VoxelBrew implements Runnable {
         @Option(names = "--construction-plane", description = "Earlier construction plane feature ID")
         String constructionPlane;
 
-        AddSketch(DocumentSource documents, DocumentOutput documentWriter) {
+        AddSketch(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 
@@ -390,7 +420,7 @@ public final class VoxelBrew implements Runnable {
     static final class Create extends FileCommand {
 
         @javax.inject.Inject
-        Create(DocumentSource documents, DocumentOutput documentWriter) {
+        Create(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 
@@ -411,7 +441,7 @@ public final class VoxelBrew implements Runnable {
     static final class Rectangle extends AddSketch {
 
         @javax.inject.Inject
-        Rectangle(DocumentSource documents, DocumentOutput documentWriter) {
+        Rectangle(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 
@@ -437,7 +467,7 @@ public final class VoxelBrew implements Runnable {
     static final class Circle extends AddSketch {
 
         @javax.inject.Inject
-        Circle(DocumentSource documents, DocumentOutput documentWriter) {
+        Circle(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 
@@ -463,7 +493,7 @@ public final class VoxelBrew implements Runnable {
     static final class Extrude extends AddFeature {
 
         @javax.inject.Inject
-        Extrude(DocumentSource documents, DocumentOutput documentWriter) {
+        Extrude(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 
@@ -496,7 +526,7 @@ public final class VoxelBrew implements Runnable {
     static final class Cut extends AddFeature {
 
         @javax.inject.Inject
-        Cut(DocumentSource documents, DocumentOutput documentWriter) {
+        Cut(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 
@@ -527,7 +557,7 @@ public final class VoxelBrew implements Runnable {
     static final class Edit extends FileCommand {
 
         @javax.inject.Inject
-        Edit(DocumentSource documents, DocumentOutput documentWriter) {
+        Edit(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 
@@ -564,7 +594,7 @@ public final class VoxelBrew implements Runnable {
     static final class Cursor extends FileCommand {
 
         @javax.inject.Inject
-        Cursor(DocumentSource documents, DocumentOutput documentWriter) {
+        Cursor(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 
@@ -589,7 +619,7 @@ public final class VoxelBrew implements Runnable {
     static final class Repair extends FileCommand {
 
         @javax.inject.Inject
-        Repair(DocumentSource documents, DocumentOutput documentWriter) {
+        Repair(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 
@@ -643,7 +673,7 @@ public final class VoxelBrew implements Runnable {
     static final class History extends FileCommand {
 
         @javax.inject.Inject
-        History(DocumentSource documents, DocumentOutput documentWriter) {
+        History(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 
@@ -681,7 +711,7 @@ public final class VoxelBrew implements Runnable {
     static final class Inspect extends FileCommand {
 
         @javax.inject.Inject
-        Inspect(DocumentSource documents, DocumentOutput documentWriter) {
+        Inspect(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 

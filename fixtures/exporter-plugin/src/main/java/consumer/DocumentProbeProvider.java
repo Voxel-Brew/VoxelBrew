@@ -1,40 +1,30 @@
 package consumer;
 
-import dev.voxelbrew.exporter.api.*;
+import dev.voxelbrew.api.exporter.*;
 import java.nio.file.Files;
-import java.util.concurrent.*;
 
 /** Independent API-only document exporter used to qualify runtime JAR discovery. */
-public class DocumentProbeProvider implements ExporterProvider {
+public class DocumentProbeProvider implements ExporterProvider<FileExportDialog.Destination> {
     public DocumentProbeProvider() {}
 
     @Override
     public ExporterDescriptor descriptor() {
-        return new ExporterDescriptor("document-probe", "Document probe");
+        return new ExporterDescriptor("document-probe", "Document probe", "1.0");
     }
 
     @Override
-    public Exporter<?> create(Executor worker) {
-        return (document, parent) -> {
-            var dialog = new FileExportDialog("Document probe", "txt");
-            if (parent.show(dialog).isEmpty()) return CompletableFuture.failedFuture(new CancellationException());
-            var destination = dialog.getSettings();
-            return CompletableFuture.supplyAsync(
-                    () -> {
-                        try {
-                            var options = destination.overwrite()
-                                    ? new java.nio.file.OpenOption[] {
-                                        java.nio.file.StandardOpenOption.CREATE,
-                                        java.nio.file.StandardOpenOption.TRUNCATE_EXISTING
-                                    }
-                                    : new java.nio.file.OpenOption[] {java.nio.file.StandardOpenOption.CREATE_NEW};
-                            Files.writeString(destination.path(), "document=" + document.id(), options);
-                            return destination.path();
-                        } catch (java.io.IOException failure) {
-                            throw new CompletionException(failure);
-                        }
-                    },
-                    worker);
+    public Exporter<FileExportDialog.Destination> create() {
+        return (document, window) -> {
+            var selected = window.show(new FileExportDialog("Document probe", "txt"));
+            if (selected.isEmpty()) return java.util.Optional.empty();
+            var destination = selected.get();
+            var options = destination.overwrite()
+                    ? new java.nio.file.OpenOption[] {
+                        java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING
+                    }
+                    : new java.nio.file.OpenOption[] {java.nio.file.StandardOpenOption.CREATE_NEW};
+            Files.writeString(destination.path(), "document=" + document.id(), options);
+            return selected;
         };
     }
 
@@ -43,13 +33,15 @@ public class DocumentProbeProvider implements ExporterProvider {
     public static final class Failing extends DocumentProbeProvider {
         @Override
         public ExporterDescriptor descriptor() {
-            return new ExporterDescriptor("failing", "Failure");
+            return new ExporterDescriptor("failing", "Failure", "1.0");
         }
 
         @Override
-        public Exporter<?> create(Executor worker) {
-            return (document, parent) ->
-                    CompletableFuture.failedFuture(new java.io.IOException("Deliberate provider failure"));
+        public Exporter<FileExportDialog.Destination> create() {
+            return (document, window) -> {
+                if (window.show(new FileExportDialog("Failure", "txt")).isEmpty()) return java.util.Optional.empty();
+                throw new java.io.IOException("Deliberate provider failure");
+            };
         }
     }
 }

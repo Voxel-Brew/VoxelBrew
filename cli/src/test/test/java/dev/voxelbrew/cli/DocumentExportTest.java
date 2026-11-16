@@ -17,6 +17,63 @@ class DocumentExportTest {
     Path directory;
 
     @Test
+    void noPromptReportsMissingDestinationOnStderr() throws Exception {
+        Path source = directory.resolve("source.vxb");
+        DocumentWriter.save(CadDocument.empty(), source, false);
+        var cli = VoxelBrew.commandLine();
+        var out = new StringWriter();
+        var err = new StringWriter();
+        cli.setOut(new PrintWriter(out));
+        cli.setErr(new PrintWriter(err));
+
+        assertNotEquals(
+                0, cli.execute("document", "export", source.toString(), "--format", "json", "--export-no-prompt"));
+
+        assertEquals("", out.toString());
+        assertTrue(err.toString().contains("--export.json.destination"), err::toString);
+    }
+
+    @Test
+    void namespacedComponentInputsSupplyDestinationAndOverwrite() throws Exception {
+        var document = CadDocument.empty();
+        Path source = directory.resolve("source.vxb");
+        Path target = directory.resolve("report.json");
+        DocumentWriter.save(document, source, false);
+        var cli = VoxelBrew.commandLine();
+        assertEquals(
+                0,
+                cli.execute(
+                        "document",
+                        "export",
+                        source.toString(),
+                        "--format",
+                        "json",
+                        "--export.json.destination",
+                        target.toString()));
+        byte[] original = Files.readAllBytes(target);
+        assertNotEquals(
+                0,
+                cli.execute(
+                        "document",
+                        "export",
+                        source.toString(),
+                        "--format",
+                        "json",
+                        "--export.json.destination=" + target));
+        assertArrayEquals(original, Files.readAllBytes(target));
+        assertEquals(
+                0,
+                cli.execute(
+                        "document",
+                        "export",
+                        source.toString(),
+                        "--format",
+                        "json",
+                        "--export.json.destination=" + target,
+                        "--export.json.overwrite=true"));
+    }
+
+    @Test
     @org.junit.jupiter.api.parallel.ResourceLock(org.junit.jupiter.api.parallel.Resources.SYSTEM_PROPERTIES)
     void defaultUserPluginsAreDiscoveredAndCanExportWithoutPluginArguments() throws Exception {
         String home = System.getProperty("user.home");
@@ -78,6 +135,8 @@ class DocumentExportTest {
         cli.setErr(new PrintWriter(new StringWriter()));
         assertEquals(0, cli.execute("document", "exporters", "--plugin-dir", plugins.toString()));
         assertTrue(output.toString().contains("document-probe"));
+        assertTrue(output.toString().contains("Document probe (1.0)"));
+        assertTrue(output.toString().lines().anyMatch(line -> line.equals("json\tJSON")));
         Path target = directory.resolve("report.txt");
         assertEquals(
                 0,

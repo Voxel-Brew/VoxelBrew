@@ -1,17 +1,16 @@
 package dev.voxelbrew.exporter;
 
-import dev.voxelbrew.exporter.api.*;
-import java.util.concurrent.Executor;
+import dev.voxelbrew.api.exporter.*;
 
-public final class GcodeExporterProvider implements ExporterProvider {
+public final class GcodeExporterProvider implements ExporterProvider<FileExportDialog.Destination> {
     @Override
     public ExporterDescriptor descriptor() {
-        return new ExporterDescriptor("gcode", "G-code");
+        return new ExporterDescriptor("gcode", "G-code", dev.voxelbrew.util.update.BuildVersion.current());
     }
 
     @Override
-    public Exporter<?> create(Executor worker) {
-        return new FileExporter("gcode", "G-code (*.gcode)", worker, (document, path, overwrite) -> {
+    public Exporter<FileExportDialog.Destination> create() {
+        return new FileExporter("gcode", "G-code (*.gcode)", (document, path, overwrite, window) -> {
             var lines = document.activeGcode();
             if (lines.isEmpty()) throw new java.io.IOException("No G-code for the active plate; slice it first");
             AtomicExport.write(new FileExportDialog.Destination(path, overwrite), output -> {

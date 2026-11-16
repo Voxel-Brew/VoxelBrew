@@ -20,8 +20,8 @@ public final class ThreeMfExporter extends MeshExporter {
         super();
     }
 
-    public ThreeMfExporter(java.util.concurrent.Executor worker, java.nio.file.Path plugins) {
-        super(worker, plugins);
+    public ThreeMfExporter(java.nio.file.Path plugins) {
+        super(plugins);
     }
 
     @Override

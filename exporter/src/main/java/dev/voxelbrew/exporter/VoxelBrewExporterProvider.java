@@ -1,26 +1,19 @@
 package dev.voxelbrew.exporter;
 
-import dev.voxelbrew.exporter.api.Exporter;
-import dev.voxelbrew.exporter.api.ExporterDescriptor;
-import dev.voxelbrew.exporter.api.ExporterProvider;
-import java.util.concurrent.Executor;
-import lombok.RequiredArgsConstructor;
+import dev.voxelbrew.api.exporter.Exporter;
+import dev.voxelbrew.api.exporter.ExporterDescriptor;
+import dev.voxelbrew.api.exporter.ExporterProvider;
+import dev.voxelbrew.api.exporter.FileExportDialog;
 
-@RequiredArgsConstructor(onConstructor_ = @javax.inject.Inject)
-public final class VoxelBrewExporterProvider implements ExporterProvider {
-    private final DocumentOutput documents;
-
-    public VoxelBrewExporterProvider() {
-        this(DocumentWriter::save);
-    }
+public final class VoxelBrewExporterProvider implements ExporterProvider<FileExportDialog.Destination> {
 
     @Override
     public ExporterDescriptor descriptor() {
-        return new ExporterDescriptor("vxb", "VXB");
+        return new ExporterDescriptor("vxb", "VXB", dev.voxelbrew.util.update.BuildVersion.current());
     }
 
     @Override
-    public Exporter<?> create(Executor worker) {
-        return new VoxelBrewExporter(worker, documents);
+    public Exporter<FileExportDialog.Destination> create() {
+        return new VoxelBrewExporter();
     }
 }

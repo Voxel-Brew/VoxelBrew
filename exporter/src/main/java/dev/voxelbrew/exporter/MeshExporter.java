@@ -1,25 +1,23 @@
 package dev.voxelbrew.exporter;
 
+import dev.voxelbrew.api.exporter.*;
 import dev.voxelbrew.engine.mesh.MeshOptions;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
-import dev.voxelbrew.exporter.api.*;
+import dev.voxelbrew.util.config.PluginDirectorySource;
 import java.io.*;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.*;
 
 /** Implementation helper for built-in mesh formats; all entry points use Exporter. */
-public abstract class MeshExporter implements Exporter<Path> {
-    private final Executor worker;
+public abstract class MeshExporter implements Exporter<MeshExportDialog.Settings> {
     private final Path plugins;
 
     protected MeshExporter() {
-        this(Runnable::run, ExporterRegistry.defaultDirectory());
+        this(dev.voxelbrew.util.config.ApplicationPaths.plugins());
     }
 
-    protected MeshExporter(Executor worker, Path plugins) {
-        this.worker = Objects.requireNonNull(worker);
+    protected MeshExporter(Path plugins) {
         this.plugins = Objects.requireNonNull(plugins);
     }
 
@@ -29,10 +27,19 @@ public abstract class MeshExporter implements Exporter<Path> {
             throws IOException;
 
     @Override
-    public final CompletableFuture<Path> export(CadDocument document, ExportWindow parent) {
-        var dialog = new MeshExportDialog(format());
-        if (parent.show(dialog).isEmpty()) return CompletableFuture.failedFuture(new CancellationException());
-        var requested = dialog.getSettings();
+    public final Optional<MeshExportDialog.Settings> export(CadDocument document, ExportWindow window)
+            throws IOException {
+        var requested = window.show(new MeshExportDialog(format()));
+        if (requested.isEmpty()) return Optional.empty();
+        publish(
+                document,
+                requested.get(),
+                window instanceof PluginDirectorySource source ? source.pluginDirectory() : plugins);
+        return requested;
+    }
+
+    private void publish(CadDocument document, MeshExportDialog.Settings requested, Path pluginDirectory)
+            throws IOException {
         // 3MF is a plate handoff whenever the user has prepared a slicer plate.
         var selection = requested.selection();
         boolean preparedPlate = document.printSetup().plates().stream()
@@ -45,41 +52,27 @@ public abstract class MeshExporter implements Exporter<Path> {
                     selection.instance());
         var settings = new MeshExportDialog.Settings(
                 selection, requested.mesh(), requested.options(), requested.destination(), requested.snapshot());
-        return CompletableFuture.supplyAsync(
-                () -> {
-                    try {
-                        if (settings.snapshot() != null) {
-                            var model = settings.snapshot();
-                            if (!document.id().equals(model.documentId())
-                                    || !DocumentCodec.fingerprint(document).equals(model.revision()))
-                                throw new IllegalArgumentException(
-                                        "Manufacturing snapshot does not match the document");
-                            if (settings.selection().space() != ExportSelection.Space.BUILD_PLATE)
-                                throw new IllegalArgumentException("Manufacturing snapshots require BUILD_PLATE space");
-                            var view =
-                                    ModelViews.from(model, settings.selection().contents());
-                            if (settings.selection().body() != null)
-                                view = ModelViews.select(
-                                        view, settings.selection().body());
-                            if (settings.selection().instance() != null)
-                                view = ModelViews.selectInstance(
-                                        view, settings.selection().instance());
-                            writeFile(view, settings, document.printSetup());
-                        } else {
-                            try (var evaluation = Evaluator.evaluate(document, plugins)) {
-                                writeFile(
-                                        ExportSelections.view(
-                                                settings.selection(), document, evaluation, settings.mesh()),
-                                        settings,
-                                        document.printSetup());
-                            }
-                        }
-                        return settings.destination().path().toAbsolutePath().normalize();
-                    } catch (IOException failure) {
-                        throw new CompletionException(failure);
-                    }
-                },
-                worker);
+        if (settings.snapshot() != null) {
+            var model = settings.snapshot();
+            if (!document.id().equals(model.documentId())
+                    || !DocumentCodec.fingerprint(document).equals(model.revision()))
+                throw new IllegalArgumentException("Manufacturing snapshot does not match the document");
+            if (settings.selection().space() != ExportSelection.Space.BUILD_PLATE)
+                throw new IllegalArgumentException("Manufacturing snapshots require BUILD_PLATE space");
+            var view = ModelViews.from(model, settings.selection().contents());
+            if (settings.selection().body() != null)
+                view = ModelViews.select(view, settings.selection().body());
+            if (settings.selection().instance() != null)
+                view = ModelViews.selectInstance(view, settings.selection().instance());
+            writeFile(view, settings, document.printSetup());
+        } else {
+            try (var evaluation = Evaluator.evaluate(document, pluginDirectory)) {
+                writeFile(
+                        ExportSelections.view(settings.selection(), document, evaluation, settings.mesh()),
+                        settings,
+                        document.printSetup());
+            }
+        }
     }
 
     /** Serialization helper for format-level tests; application callers use export(). */

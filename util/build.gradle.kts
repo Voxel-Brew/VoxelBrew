@@ -14,6 +14,7 @@ dependencies {
     )
     testFixturesImplementation("org.junit.jupiter:junit-jupiter-api")
     testFixturesImplementation("org.slf4j:slf4j-api")
+    testFixturesImplementation("dev.voxelbrew.api:export")
     testImplementation("org.junit.platform:junit-platform-testkit")
 }
 

@@ -2,11 +2,11 @@ package dev.voxelbrew.exporter;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import dev.voxelbrew.api.exporter.*;
 import dev.voxelbrew.engine.mesh.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.persistence.proto.DocumentProto;
 import dev.voxelbrew.engine.printing.*;
-import dev.voxelbrew.exporter.api.*;
 import dev.voxelbrew.importer.*;
 import dev.voxelbrew.importer.api.ImportResult;
 import java.nio.file.*;
@@ -49,16 +49,14 @@ class SlicerSettingsIoTest {
     void bothDocumentProviderPairsPreserveAllAppliedSettingsAndDraftsWithoutModifyingInput() throws Exception {
         var expected = setup();
         var document = new CadDocument("settings", List.of(), 0, expected);
-        try (var exporters = new ExporterRegistry(directory);
+        try (var exporters = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory);
                 var importers = new ImporterRegistry(directory)) {
             for (String format : List.of("vxb", "json")) {
                 Path file = directory.resolve("settings." + format);
                 exporters
                         .require(format)
-                        .provider()
-                        .create(Runnable::run, directory)
-                        .export(document, FileExportDialog.destination(file, false))
-                        .get();
+                        .create()
+                        .export(document, dev.voxelbrew.util.testing.FileExportWindows.destination(file, false));
                 byte[] before = Files.readAllBytes(file);
                 var imported = assertInstanceOf(
                                 ImportResult.Document.class, ImportService.read(importers, format, file, Map.of()))
@@ -68,10 +66,8 @@ class SlicerSettingsIoTest {
                 Path copy = directory.resolve("copy-" + format + ".vxb");
                 exporters
                         .require("vxb")
-                        .provider()
-                        .create(Runnable::run, directory)
-                        .export(imported, FileExportDialog.destination(copy, false))
-                        .get();
+                        .create()
+                        .export(imported, dev.voxelbrew.util.testing.FileExportWindows.destination(copy, false));
                 assertEquals(expected, DocumentReader.load(copy).printSetup());
             }
         }

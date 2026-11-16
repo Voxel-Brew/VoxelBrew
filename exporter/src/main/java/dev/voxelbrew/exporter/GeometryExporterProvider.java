@@ -1,21 +1,27 @@
 package dev.voxelbrew.exporter;
 
-import dev.voxelbrew.exporter.api.*;
+import dev.voxelbrew.api.exporter.*;
 import java.nio.file.Path;
-import java.util.concurrent.Executor;
-import java.util.function.BiFunction;
+import java.util.function.Function;
 
-/** Built-in constructor binding; external JARs implement ExporterProvider directly. */
-public record GeometryExporterProvider(
-        ExporterDescriptor descriptor, BiFunction<Executor, Path, ? extends Exporter<?>> factory)
-        implements ExporterProvider {
-    @Override
-    public Exporter<?> create(Executor worker) {
-        return create(worker, ExporterRegistry.defaultDirectory());
+/** Shared implementation for registered geometry format providers. */
+public class GeometryExporterProvider implements ExporterProvider<MeshExportDialog.Settings> {
+    private final ExporterDescriptor descriptor;
+    private final Function<Path, ? extends Exporter<MeshExportDialog.Settings>> factory;
+
+    public GeometryExporterProvider(
+            ExporterDescriptor descriptor, Function<Path, ? extends Exporter<MeshExportDialog.Settings>> factory) {
+        this.descriptor = java.util.Objects.requireNonNull(descriptor);
+        this.factory = java.util.Objects.requireNonNull(factory);
     }
 
     @Override
-    public Exporter<?> create(Executor worker, Path plugins) {
-        return factory.apply(worker, plugins);
+    public ExporterDescriptor descriptor() {
+        return descriptor;
+    }
+
+    @Override
+    public Exporter<MeshExportDialog.Settings> create() {
+        return factory.apply(dev.voxelbrew.util.config.ApplicationPaths.plugins());
     }
 }

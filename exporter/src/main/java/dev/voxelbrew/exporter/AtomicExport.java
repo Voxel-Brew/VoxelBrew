@@ -1,6 +1,6 @@
 package dev.voxelbrew.exporter;
 
-import dev.voxelbrew.exporter.api.FileExportDialog;
+import dev.voxelbrew.api.exporter.FileExportDialog;
 import java.io.*;
 import java.nio.channels.*;
 import java.nio.file.*;

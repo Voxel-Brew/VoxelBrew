@@ -2,7 +2,7 @@ package dev.voxelbrew.gui;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import dev.voxelbrew.exporter.ExporterRegistry;
+import dev.voxelbrew.api.exporter.ExporterProviderRegistry;
 import dev.voxelbrew.slicer.SlicerRegistry;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -27,9 +27,19 @@ class WindowResourcesTest {
             java.nio.file.Files.copy(
                     Path.of(System.getProperty("voxelbrew.test.plugin")), plugins.resolve("provider.jar"));
             var resources = new WindowResources(
-                    ExporterRegistry.defaultDirectory(), ExporterRegistry::new, SlicerRegistry::new);
+                    dev.voxelbrew.util.config.ApplicationPaths.plugins(),
+                    () -> java.util.ServiceLoader.load(ExporterProviderRegistry.class)
+                            .findFirst()
+                            .orElseThrow(),
+                    SlicerRegistry::new);
             try {
-                assertTrue(resources.exporters.contains("document-probe"));
+                assertEquals(
+                        "document-probe",
+                        resources
+                                .exporters
+                                .require("document-probe")
+                                .descriptor()
+                                .id());
             } finally {
                 resources.close();
                 resources.whenClosed().toCompletableFuture().get(10, TimeUnit.SECONDS);
@@ -43,7 +53,12 @@ class WindowResourcesTest {
 
     @Test
     void shutdownSignalsCompletionOnlyAfterCapturedWorkHasDrained() throws Exception {
-        var resources = new WindowResources(directory, ExporterRegistry::new, SlicerRegistry::new);
+        var resources = new WindowResources(
+                directory,
+                () -> java.util.ServiceLoader.load(ExporterProviderRegistry.class)
+                        .findFirst()
+                        .orElseThrow(),
+                SlicerRegistry::new);
         var entered = new CountDownLatch(1);
         var release = new CountDownLatch(1);
         var disposal = resources.whenClosed().toCompletableFuture();

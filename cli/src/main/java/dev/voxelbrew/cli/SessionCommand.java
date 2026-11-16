@@ -2,7 +2,6 @@ package dev.voxelbrew.cli;
 
 import com.google.gson.Gson;
 import dev.voxelbrew.engine.model.CadDocument;
-import dev.voxelbrew.exporter.DocumentOutput;
 import dev.voxelbrew.importer.api.DocumentSource;
 import dev.voxelbrew.importer.api.GcodeSource;
 import java.io.*;
@@ -22,7 +21,7 @@ import picocli.CommandLine.*;
 @RequiredArgsConstructor(onConstructor_ = @Inject)
 final class SessionCommand implements Callable<Integer> {
     private final DocumentSource source;
-    private final DocumentOutput sink;
+    private final DocumentSave sink;
     private final GcodeSource gcode;
 
     @Option(names = "--script")

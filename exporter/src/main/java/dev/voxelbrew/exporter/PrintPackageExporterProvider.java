@@ -1,18 +1,18 @@
 package dev.voxelbrew.exporter;
 
-import dev.voxelbrew.exporter.api.*;
-import java.util.concurrent.Executor;
+import dev.voxelbrew.api.exporter.*;
 
-public final class PrintPackageExporterProvider implements ExporterProvider {
+public final class PrintPackageExporterProvider implements ExporterProvider<FileExportDialog.Destination> {
     @Override
     public ExporterDescriptor descriptor() {
-        return new ExporterDescriptor("gcode-package", "Sliced printer package");
+        return new ExporterDescriptor(
+                "gcode-package", "Sliced printer package", dev.voxelbrew.util.update.BuildVersion.current());
     }
 
     @Override
-    public Exporter<?> create(Executor worker) {
+    public Exporter<FileExportDialog.Destination> create() {
         return new FileExporter(
-                "gcode.3mf", "Sliced printer package (*.gcode.3mf)", worker, (document, path, overwrite) -> {
+                "gcode.3mf", "Sliced printer package (*.gcode.3mf)", (document, path, overwrite, window) -> {
                     var artifact =
                             document.printArtifacts().get(document.printSetup().activePlateId());
                     if (artifact == null || !artifact.format().equals("gcode.3mf"))

@@ -1,8 +1,9 @@
 package dev.voxelbrew.slicer;
 
+import dev.voxelbrew.api.exporter.ExporterProviderRegistry;
+import dev.voxelbrew.api.exporter.FileExportDialog;
 import dev.voxelbrew.engine.mesh.MeshOptions;
 import dev.voxelbrew.exporter.*;
-import dev.voxelbrew.exporter.api.FileExportDialog;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Map;
@@ -12,7 +13,7 @@ public final class FormatTestSupport {
     private FormatTestSupport() {}
 
     public static void write(
-            ExporterRegistry registry,
+            ExporterProviderRegistry registry,
             String format,
             ModelView view,
             MeshOptions mesh,
@@ -20,7 +21,7 @@ public final class FormatTestSupport {
             Path target,
             boolean overwrite)
             throws IOException {
-        var exporter = (MeshExporter) registry.require(format).provider().create(Runnable::run, registry.directory());
+        var exporter = (MeshExporter) registry.require(format).create();
         exporter.writeFile(
                 view,
                 new MeshExportDialog.Settings(

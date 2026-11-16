@@ -17,7 +17,7 @@ dependencies {
     implementation("dev.voxelbrew.api:slicer")
     implementation("dev.voxelbrew.api:printer")
     runtimeOnly(project(":importer-impl"))
-    runtimeOnly(project(":exporter-impl"))
+    implementation(project(":exporter-impl"))
     runtimeOnly(project(":slicer-impl"))
     runtimeOnly(project(":printer-impl"))
     testImplementation(project(":importer-impl"))

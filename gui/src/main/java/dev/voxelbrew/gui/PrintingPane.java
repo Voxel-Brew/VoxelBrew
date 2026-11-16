@@ -1,12 +1,12 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.exporter.ExporterProviderRegistry;
 import dev.voxelbrew.engine.mesh.*;
 import dev.voxelbrew.engine.model.BodyInstance;
 import dev.voxelbrew.engine.model.Transform;
 import dev.voxelbrew.engine.parameters.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import dev.voxelbrew.engine.printing.*;
-import dev.voxelbrew.exporter.api.ExporterCatalog;
 import dev.voxelbrew.slicer.api.PrinterProfileCatalog;
 import dev.voxelbrew.slicer.api.SlicerBackend;
 import dev.voxelbrew.slicer.api.SlicerCatalog;
@@ -186,7 +186,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
             SlicerCatalog slicers,
             SlicerSettings slicerSettings,
             SlicerAvailability availability,
-            ExporterCatalog exporters,
+            ExporterProviderRegistry exporters,
             javafx.stage.Stage owner,
             @javax.inject.Named("validation") ExecutorService validator,
             dev.voxelbrew.util.i18n.Translations translations,

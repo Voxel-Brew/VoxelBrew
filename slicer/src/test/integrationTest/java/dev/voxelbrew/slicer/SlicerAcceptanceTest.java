@@ -7,7 +7,6 @@ import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.exporter.DocumentWriter;
 import dev.voxelbrew.exporter.ExportSelection;
-import dev.voxelbrew.exporter.ExporterRegistry;
 import dev.voxelbrew.exporter.ModelViews;
 import dev.voxelbrew.exporter.printing.*;
 import dev.voxelbrew.importer.DocumentReader;
@@ -257,7 +256,8 @@ class SlicerAcceptanceTest {
         Path roof = artifacts.resolve("handoff-model.stl"),
                 leg = artifacts.resolve("handoff-leg.stl"),
                 pillar = artifacts.resolve("handoff-supports.stl");
-        try (var registry = new ExporterRegistry(artifacts.resolve("no-plugins"))) {
+        try (var registry =
+                new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(artifacts.resolve("no-plugins"))) {
             FormatTestSupport.write(
                     registry,
                     "stl",
@@ -364,7 +364,8 @@ class SlicerAcceptanceTest {
                                 Transform.translation(150, 30, 0).compose(Transform.rotation(0, 0, 90))))));
         var model = dev.voxelbrew.engine.printing.ManufacturingModels.evaluate(session.document(), MeshOptions.DEFAULT);
         Path core = artifacts.resolve("portable-two-instances.3mf");
-        try (var registry = new ExporterRegistry(artifacts.resolve("no-plugins"))) {
+        try (var registry =
+                new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(artifacts.resolve("no-plugins"))) {
             FormatTestSupport.write(registry, "3mf", ModelViews.from(model), MeshOptions.DEFAULT, Map.of(), core, true);
         }
         Path config = artifacts.resolve("portable.ini");

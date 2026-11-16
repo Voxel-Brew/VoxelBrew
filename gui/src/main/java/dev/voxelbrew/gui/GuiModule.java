@@ -2,8 +2,8 @@ package dev.voxelbrew.gui;
 
 import dagger.Module;
 import dagger.Provides;
+import dev.voxelbrew.api.exporter.ExporterProviderRegistry;
 import dev.voxelbrew.engine.model.CadDocument;
-import dev.voxelbrew.exporter.api.ExporterCatalog;
 import dev.voxelbrew.slicer.api.SlicerCatalog;
 import java.util.concurrent.ExecutorService;
 import java.util.function.*;
@@ -59,7 +59,7 @@ final class GuiModule {
     }
 
     @Provides
-    static ExporterCatalog exporters(WindowResources resources) {
+    static ExporterProviderRegistry exporters(WindowResources resources) {
         return resources.exporters;
     }
 

@@ -3,7 +3,6 @@ package dev.voxelbrew.cli;
 import dev.voxelbrew.engine.construction.ConstructionGeometry.Vector;
 import dev.voxelbrew.engine.construction.ConstructionTools;
 import dev.voxelbrew.engine.model.*;
-import dev.voxelbrew.exporter.DocumentOutput;
 import dev.voxelbrew.importer.api.DocumentSource;
 import java.nio.file.Path;
 import java.util.*;
@@ -17,7 +16,7 @@ import picocli.CommandLine.Model.*;
 @RequiredArgsConstructor(onConstructor_ = @Inject)
 final class WorkspaceEdits {
     private final DocumentSource documents;
-    private final DocumentOutput writer;
+    private final DocumentSave writer;
 
     static void register(CommandLine root) {
         try {

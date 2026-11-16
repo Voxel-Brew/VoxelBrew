@@ -2,9 +2,10 @@ package dev.voxelbrew.exporter;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import dev.voxelbrew.api.exporter.*;
 import dev.voxelbrew.engine.mesh.MeshOptions;
 import dev.voxelbrew.engine.model.CadDocument;
-import dev.voxelbrew.exporter.api.*;
+import dev.voxelbrew.engine.printing.ManufacturingModels;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -28,20 +29,9 @@ class UnifiedExportTest {
                         "placed", "thickness.body", dev.voxelbrew.engine.model.Transform.translation(25, 35, 0))));
         var document = new CadDocument(base.id(), base.features(), base.cursor(), setup);
         Path target = directory.resolve("native-project.3mf");
-        var parent = new ExportDialogs()
-                .register(
-                        MeshExportDialog.class,
-                        request -> Optional.of(new MeshExportDialog.Settings(
-                                ExportSelection.design(null),
-                                MeshOptions.DEFAULT,
-                                Map.of(),
-                                new FileExportDialog.Destination(target, false))));
-        try (var registry = new ExporterRegistry(directory)) {
-            registry.require("prusa-project")
-                    .provider()
-                    .create(Runnable::run, directory)
-                    .export(document, parent)
-                    .get();
+        var parent = window(target, false);
+        try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory)) {
+            registry.require("prusa-project").create().export(document, parent);
         }
         try (var zip = new java.util.zip.ZipFile(target.toFile())) {
             String config;
@@ -85,15 +75,8 @@ class UnifiedExportTest {
                 .withWorkspaceSettings(Map.of("print-output", "custom.gcode"));
         var document = new CadDocument(base.id(), base.features(), base.cursor(), setup);
         Path target = directory.resolve("plate.3mf");
-        var parent = new ExportDialogs()
-                .register(
-                        MeshExportDialog.class,
-                        request -> Optional.of(new MeshExportDialog.Settings(
-                                ExportSelection.design(null),
-                                MeshOptions.DEFAULT,
-                                Map.of(),
-                                new FileExportDialog.Destination(target, false))));
-        new ThreeMfExporter(Runnable::run, directory).export(document, parent).get();
+        var parent = window(target, false);
+        new ThreeMfExporter(directory).export(document, parent);
         try (var zip = new java.util.zip.ZipFile(target.toFile());
                 var input = zip.getInputStream(zip.getEntry("3D/3dmodel.model"))) {
             var factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
@@ -109,20 +92,9 @@ class UnifiedExportTest {
             assertEquals(25, proto.getInstances(0).getTransform(3));
         }
         Path obj = directory.resolve("design.obj");
-        var objParent = new ExportDialogs()
-                .register(
-                        MeshExportDialog.class,
-                        request -> Optional.of(new MeshExportDialog.Settings(
-                                ExportSelection.design(null),
-                                MeshOptions.DEFAULT,
-                                Map.of(),
-                                new FileExportDialog.Destination(obj, false))));
-        try (var registry = new ExporterRegistry(directory)) {
-            registry.require("obj")
-                    .provider()
-                    .create(Runnable::run, directory)
-                    .export(document, objParent)
-                    .get();
+        var objParent = window(obj, false);
+        try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory)) {
+            registry.require("obj").create().export(document, objParent);
         }
         var xs = Files.readAllLines(obj).stream()
                 .filter(line -> line.startsWith("v "))
@@ -135,28 +107,20 @@ class UnifiedExportTest {
     @Test
     void builtInGeometryUsesTheSameProviderContractAndRejectsRollback() throws Exception {
         var document = ExportTest.reference();
-        try (var registry = new ExporterRegistry(directory)) {
+        try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory)) {
             for (String id : List.of("stl", "3mf", "obj", "step")) {
                 Path target = directory.resolve("unified." + id);
-                var parent = new ExportDialogs()
-                        .register(
-                                FileExportDialog.class,
-                                request -> Optional.of(new FileExportDialog.Destination(target, true)))
-                        .register(
-                                MeshExportDialog.class,
-                                request -> Optional.of(new MeshExportDialog.Settings(
-                                        ExportSelection.design(null),
-                                        MeshOptions.DEFAULT,
-                                        Map.of(),
-                                        new FileExportDialog.Destination(target, true))));
-                var exporter = registry.require(id).provider().create(Runnable::run, directory);
-                assertEquals(target, exporter.export(document, parent).get());
+                var parent = window(target, true);
+                var exporter = registry.require(id).create();
+                var accepted = exporter.export(document, parent).orElseThrow();
+                var destination = accepted instanceof FileExportDialog.Destination file
+                        ? file
+                        : ((MeshExportDialog.Settings) accepted).destination();
+                assertEquals(target, destination.path());
                 byte[] original = Files.readAllBytes(target);
                 assertTrue(original.length > 100);
                 var rollback = new CadDocument(document.id(), document.features(), document.cursor() - 1);
-                assertThrows(
-                        ExecutionException.class,
-                        () -> exporter.export(rollback, parent).get());
+                assertThrows(Exception.class, () -> exporter.export(rollback, parent));
                 assertArrayEquals(original, Files.readAllBytes(target));
             }
         }
@@ -164,16 +128,51 @@ class UnifiedExportTest {
 
     @Test
     void cancelledMeshDialogDoesNotScheduleOrEvaluateAnything() throws Exception {
-        try (var registry = new ExporterRegistry(directory)) {
+        try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory)) {
             for (String id : List.of("stl", "3mf", "obj", "prusa-project")) {
-                var exporter = registry.require(id)
-                        .provider()
-                        .create(task -> fail("Cancelled export scheduled work"), directory);
-                var parent = new ExportDialogs().register(MeshExportDialog.class, request -> Optional.empty());
-                assertThrows(
-                        CancellationException.class,
-                        () -> exporter.export(CadDocument.empty(), parent).join());
+                var exporter = registry.require(id).create();
+                ExportWindow parent = new ExportWindow() {
+                    @Override
+                    public <R> Optional<R> show(ExportDialog<R> dialog) {
+                        return Optional.empty();
+                    }
+                };
+                assertEquals(Optional.empty(), exporter.export(CadDocument.empty(), parent));
             }
         }
+    }
+
+    @Test
+    void snapshotFromAnotherDocumentIsRejectedBeforeWriting() throws Exception {
+        var source = ExportTest.reference();
+        var snapshot = ManufacturingModels.evaluate(source, MeshOptions.DEFAULT);
+        var target = directory.resolve("mismatched.stl");
+        var settings = new MeshExportDialog.Settings(
+                new ExportSelection(ExportSelection.Space.BUILD_PLATE, ExportSelection.Contents.MODEL, null, null),
+                MeshOptions.DEFAULT,
+                Map.of(),
+                new FileExportDialog.Destination(target, false),
+                snapshot);
+        ExportWindow window = new ExportWindow() {
+            @Override
+            @SuppressWarnings("unchecked")
+            public <R> Optional<R> show(ExportDialog<R> dialog) {
+                if (!(dialog instanceof MeshExportDialog)) throw new AssertionError("Unexpected dialog");
+                return (Optional<R>) Optional.of(settings);
+            }
+        };
+
+        assertThrows(IllegalArgumentException.class, () -> new BinaryStlExporter().export(CadDocument.empty(), window));
+        assertFalse(Files.exists(target));
+    }
+
+    private static ExportWindow window(Path target, boolean overwrite) {
+        return new ExportWindow() {
+            @Override
+            public <R> Optional<R> show(ExportDialog<R> dialog) {
+                return Optional.of(dialog.buildSettings(
+                        Map.of("destination", target.toString(), "overwrite", Boolean.toString(overwrite))));
+            }
+        };
     }
 }

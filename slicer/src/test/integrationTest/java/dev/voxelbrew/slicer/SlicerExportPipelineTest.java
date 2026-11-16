@@ -2,10 +2,10 @@ package dev.voxelbrew.slicer;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import dev.voxelbrew.api.exporter.*;
 import dev.voxelbrew.engine.mesh.MeshOptions;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.exporter.*;
-import dev.voxelbrew.exporter.api.*;
 import dev.voxelbrew.exporter.printing.*;
 import dev.voxelbrew.slicer.api.SlicerBackend;
 import dev.voxelbrew.slicer.prusa.PrusaSlicerBackend;
@@ -27,20 +27,21 @@ class SlicerExportPipelineTest {
         var model = ManufacturingModels.evaluate(document, MeshOptions.DEFAULT);
         Path output = directory.resolve("preserved.gcode");
         Files.writeString(output, "original");
-        try (var builtins = new ExporterRegistry(directory)) {
+        try (var builtins = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory)) {
             for (String format : List.of("stl", "3mf", "prusa-project")) {
                 var exports = new AtomicInteger();
                 var runs = new AtomicInteger();
-                var original = builtins.require(format).provider();
-                ExporterProvider tracked =
-                        new GeometryExporterProvider(original.descriptor(), (worker, plugins) -> (doc, parent) -> {
+                var original = builtins.require(format);
+                if (!(original instanceof GeometryExporterProvider geometry))
+                    throw new AssertionError("Expected geometry exporter");
+                ExporterProvider<?> tracked =
+                        new GeometryExporterProvider(original.descriptor(), plugins -> (doc, window) -> {
                             assertSame(document, doc);
                             exports.incrementAndGet();
-                            return original.create(worker, plugins)
-                                    .export(doc, parent)
-                                    .thenApply(value -> (Object) value);
+                            return geometry.create().export(doc, window);
                         });
-                try (var registry = new ExporterRegistry(directory, List.of(tracked))) {
+                try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(
+                        directory, List.of(tracked))) {
                     var backend = backend(format, request -> {
                         assertEquals(1, exports.get());
                         assertTrue(Files.size(request.input()) > 100);
@@ -56,6 +57,7 @@ class SlicerExportPipelineTest {
                                     document,
                                     model,
                                     registry,
+                                    directory,
                                     Path.of("unused"),
                                     output,
                                     true,
@@ -80,11 +82,16 @@ class SlicerExportPipelineTest {
         Path output = directory.resolve("preserved.gcode");
         Files.writeString(output, "original");
         for (boolean cancel : List.of(false, true)) {
-            ExporterProvider provider = new GeometryExporterProvider(
-                    new ExporterDescriptor("input", "Failing input"),
-                    (worker, plugins) -> (doc, parent) -> CompletableFuture.failedFuture(
-                            cancel ? new CancellationException() : new IOException("Export failed")));
-            try (var registry = new ExporterRegistry(directory, List.of(provider))) {
+            ExporterProvider<?> provider = new GeometryExporterProvider(
+                    new ExporterDescriptor("input", "Failing input", "1.0"), plugins -> (doc, window) -> {
+                        if (window.show(new MeshExportDialog(
+                                        new MeshFormat("input", "Input", List.of("stl"), false, List.of())))
+                                .isEmpty()) return Optional.empty();
+                        if (cancel) return Optional.empty();
+                        throw new IOException("Export failed");
+                    });
+            try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(
+                    directory, List.of(provider))) {
                 var backend = backend("input", request -> {
                     fail("Backend started before a successful export");
                     return null;
@@ -96,6 +103,7 @@ class SlicerExportPipelineTest {
                                 document,
                                 model,
                                 registry,
+                                directory,
                                 Path.of("unused"),
                                 output,
                                 true,

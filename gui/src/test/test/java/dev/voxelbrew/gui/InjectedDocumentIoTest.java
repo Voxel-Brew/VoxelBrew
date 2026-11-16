@@ -19,6 +19,66 @@ class InjectedDocumentIoTest {
     private final Queue<Runnable> callbacks = new ConcurrentLinkedQueue<>();
 
     @Test
+    void exportRunsOnFileWorkerAndShowsDialogOnOwnerThread() throws Exception {
+        var owner = Thread.currentThread();
+        var exportThread = new AtomicReference<Thread>();
+        var dialogThread = new AtomicReference<Thread>();
+        var controller =
+                new DocumentController(callbacks::add, doc -> new DocumentController.Build(List.of(), List.of(), true));
+        try {
+            dev.voxelbrew.api.exporter.ExporterProvider<String> provider =
+                    new dev.voxelbrew.api.exporter.ExporterProvider<>() {
+                        @Override
+                        public dev.voxelbrew.api.exporter.ExporterDescriptor descriptor() {
+                            return new dev.voxelbrew.api.exporter.ExporterDescriptor(
+                                    "thread-probe", "Thread probe", "1.0");
+                        }
+
+                        @Override
+                        public dev.voxelbrew.api.exporter.Exporter<String> create() {
+                            return (document, window) -> {
+                                exportThread.set(Thread.currentThread());
+                                return window.show(new dev.voxelbrew.api.exporter.ExportDialog<>() {
+                                    @Override
+                                    public String title() {
+                                        return "Thread probe";
+                                    }
+
+                                    @Override
+                                    public dev.voxelbrew.api.exporter.component.ExportDialogLayout layout() {
+                                        return new dev.voxelbrew.api.exporter.component.VerticalLayout();
+                                    }
+
+                                    @Override
+                                    public Map<String, String> validate(Map<String, String> values) {
+                                        return Map.of();
+                                    }
+
+                                    @Override
+                                    public String buildSettings(Map<String, String> values) {
+                                        return "accepted";
+                                    }
+                                });
+                            };
+                        }
+                    };
+            var export = controller.exportDocument(provider, new dev.voxelbrew.api.exporter.ExportWindow() {
+                @Override
+                public <R> Optional<R> show(dev.voxelbrew.api.exporter.ExportDialog<R> dialog) {
+                    dialogThread.set(Thread.currentThread());
+                    return Optional.of(dialog.buildSettings(Map.of()));
+                }
+            });
+            await(export::isDone);
+            export.join();
+            assertNotSame(owner, exportThread.get());
+            assertSame(owner, dialogThread.get());
+        } finally {
+            controller.close();
+        }
+    }
+
+    @Test
     void saveAndJsonExportCapturePendingSlicerFields() throws Exception {
         var controller =
                 new DocumentController(callbacks::add, doc -> new DocumentController.Build(List.of(), List.of(), true));
@@ -39,7 +99,7 @@ class InjectedDocumentIoTest {
             var json = directory.resolve("settings.json");
             var export = controller.exportDocument(
                     new dev.voxelbrew.exporter.JsonExporterProvider(),
-                    dev.voxelbrew.exporter.api.FileExportDialog.destination(json, false));
+                    dev.voxelbrew.util.testing.FileExportWindows.destination(json, false));
             await(export::isDone);
             export.join();
             assertEquals(
@@ -59,22 +119,26 @@ class InjectedDocumentIoTest {
         var used = new ArrayList<Path>();
         controller.onFileUsed(used::add);
         try {
-            var cancelled = controller.saveAs(new dev.voxelbrew.exporter.api.ExportDialogs()
-                    .register(dev.voxelbrew.exporter.api.FileExportDialog.class, request -> Optional.empty()));
+            var cancelled = controller.saveAs(new dev.voxelbrew.api.exporter.ExportWindow() {
+                @Override
+                public <R> Optional<R> show(dev.voxelbrew.api.exporter.ExportDialog<R> dialog) {
+                    return Optional.empty();
+                }
+            });
             await(cancelled::isDone);
             assertTrue(cancelled.isCancelled());
             assertFalse(controller.ioBusy());
             assertNull(controller.path());
             var json = controller.exportDocument(
                     new dev.voxelbrew.exporter.JsonExporterProvider(),
-                    dev.voxelbrew.exporter.api.FileExportDialog.destination(directory.resolve("copy.json"), false));
+                    dev.voxelbrew.util.testing.FileExportWindows.destination(directory.resolve("copy.json"), false));
             await(json::isDone);
             json.join();
             assertNull(controller.path());
             assertTrue(Files.exists(directory.resolve("copy.json")));
             assertTrue(used.isEmpty());
             Path saved = directory.resolve("saved.vxb");
-            var vxb = controller.saveAs(dev.voxelbrew.exporter.api.FileExportDialog.destination(saved, false));
+            var vxb = controller.saveAs(dev.voxelbrew.util.testing.FileExportWindows.destination(saved, false));
             await(vxb::isDone);
             vxb.join();
             assertEquals(saved, controller.path());

@@ -16,7 +16,7 @@ import picocli.CommandLine.Model.CommandSpec;
 final class DeviceCommands {
     private final PrinterRuntime runtime;
     private final DocumentSource documents;
-    private final dev.voxelbrew.exporter.DocumentOutput writer;
+    private final DocumentSave writer;
     private final dev.voxelbrew.slicer.api.PrinterProfileCatalog printers;
 
     private Path directory() {

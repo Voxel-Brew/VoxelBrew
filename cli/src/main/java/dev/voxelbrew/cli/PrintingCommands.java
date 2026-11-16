@@ -3,7 +3,6 @@ package dev.voxelbrew.cli;
 import dev.voxelbrew.engine.mesh.MeshOptions;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.printing.*;
-import dev.voxelbrew.exporter.DocumentOutput;
 import dev.voxelbrew.importer.api.DocumentSource;
 import dev.voxelbrew.slicer.api.PrinterProfileCatalog;
 import dev.voxelbrew.slicer.api.SlicerCatalog;
@@ -43,7 +42,7 @@ final class PrintingCommands {
     static final class Split extends VoxelBrew.AddFeature {
 
         @javax.inject.Inject
-        Split(DocumentSource documents, DocumentOutput documentWriter) {
+        Split(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 
@@ -85,7 +84,7 @@ final class PrintingCommands {
     static final class Place extends VoxelBrew.FileCommand {
 
         @javax.inject.Inject
-        Place(DocumentSource documents, DocumentOutput documentWriter) {
+        Place(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 
@@ -133,7 +132,7 @@ final class PrintingCommands {
     static final class Duplicate extends VoxelBrew.FileCommand {
 
         @javax.inject.Inject
-        Duplicate(DocumentSource documents, DocumentOutput documentWriter) {
+        Duplicate(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 
@@ -185,7 +184,7 @@ final class PrintingCommands {
     static final class LayOnFace extends VoxelBrew.FileCommand {
 
         @javax.inject.Inject
-        LayOnFace(DocumentSource documents, DocumentOutput documentWriter) {
+        LayOnFace(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 
@@ -217,7 +216,7 @@ final class PrintingCommands {
     static final class Settings extends VoxelBrew.FileCommand {
 
         @javax.inject.Inject
-        Settings(DocumentSource documents, DocumentOutput documentWriter, PrinterProfileCatalog printers) {
+        Settings(DocumentSource documents, DocumentSave documentWriter, PrinterProfileCatalog printers) {
             super(documents, documentWriter);
             this.printers = printers;
         }
@@ -304,7 +303,7 @@ final class PrintingCommands {
     static final class Support extends VoxelBrew.FileCommand {
 
         @javax.inject.Inject
-        Support(DocumentSource documents, DocumentOutput documentWriter) {
+        Support(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 
@@ -354,7 +353,7 @@ final class PrintingCommands {
     static final class RemoveInstance extends VoxelBrew.FileCommand {
 
         @javax.inject.Inject
-        RemoveInstance(DocumentSource documents, DocumentOutput documentWriter) {
+        RemoveInstance(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 
@@ -379,7 +378,7 @@ final class PrintingCommands {
     static final class RemoveSupport extends VoxelBrew.FileCommand {
 
         @javax.inject.Inject
-        RemoveSupport(DocumentSource documents, DocumentOutput documentWriter) {
+        RemoveSupport(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 
@@ -405,7 +404,7 @@ final class PrintingCommands {
     static final class Setup extends VoxelBrew.FileCommand {
 
         @javax.inject.Inject
-        Setup(DocumentSource documents, DocumentOutput documentWriter) {
+        Setup(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 
@@ -433,7 +432,7 @@ final class PrintingCommands {
     static final class Validate extends VoxelBrew.FileCommand {
 
         @javax.inject.Inject
-        Validate(DocumentSource documents, DocumentOutput documentWriter) {
+        Validate(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
 
@@ -512,14 +511,14 @@ final class PrintingCommands {
                     "Slice the complete persisted build setup with its explicit profiles; publish text G-code atomically.")
     static final class Slice extends VoxelBrew.FileCommand {
         private final SlicerCatalog.Factory slicers;
-        private final dev.voxelbrew.exporter.api.ExporterCatalog.Factory exporters;
+        private final java.util.function.Supplier<dev.voxelbrew.api.exporter.ExporterProviderRegistry> exporters;
 
         @javax.inject.Inject
         Slice(
                 DocumentSource documents,
-                DocumentOutput documentWriter,
+                DocumentSave documentWriter,
                 SlicerCatalog.Factory slicers,
-                dev.voxelbrew.exporter.api.ExporterCatalog.Factory exporters,
+                java.util.function.Supplier<dev.voxelbrew.api.exporter.ExporterProviderRegistry> exporters,
                 Slicing slicing,
                 @javax.inject.Named("slicerExecutable") Path defaultExecutable) {
             super(documents, documentWriter);
@@ -619,7 +618,7 @@ final class PrintingCommands {
                     "voxelbrew-slice-cancel");
             Runtime.getRuntime().addShutdownHook(shutdown);
             try (var registry = slicers.open(pluginDirectory);
-                    var exportRegistry = exporters.open(pluginDirectory)) {
+                    var exportRegistry = exporters.get().withDirectory(pluginDirectory)) {
                 String selectedPrinterId =
                         document.printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID);
                 if (printerConnection != null) {
@@ -642,6 +641,7 @@ final class PrintingCommands {
                         document,
                         model,
                         exportRegistry,
+                        pluginDirectory,
                         executable,
                         output,
                         overwrite,

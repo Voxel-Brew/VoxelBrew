@@ -2,14 +2,13 @@ package dev.voxelbrew.exporter;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import dev.voxelbrew.api.exporter.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
-import dev.voxelbrew.exporter.api.*;
 import dev.voxelbrew.importer.*;
 import dev.voxelbrew.importer.api.ImportResult;
 import java.nio.file.*;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -22,23 +21,19 @@ class GcodePersistenceTest {
         var artifact =
                 dev.voxelbrew.engine.printing.PrintArtifact.of("gcode.3mf", bytes, Map.of("model", "Bambu Lab A1"));
         var document = base.withGcode(Map.of(plate, LINES)).withPrintArtifacts(Map.of(plate, artifact));
-        try (var exports = new ExporterRegistry(directory);
+        try (var exports = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory);
                 var imports = new ImporterRegistry(directory)) {
             for (String format : List.of("vxb", "json")) {
                 Path file = directory.resolve("packaged." + format);
                 exports.require(format)
-                        .provider()
-                        .create(Runnable::run)
-                        .export(document, FileExportDialog.destination(file, false))
-                        .get();
+                        .create()
+                        .export(document, dev.voxelbrew.util.testing.FileExportWindows.destination(file, false));
                 var loaded = ((ImportResult.Document) ImportService.read(imports, format, file, Map.of())).document();
                 assertEquals(document.printArtifacts(), loaded.printArtifacts());
                 Path output = directory.resolve(format + ".gcode.3mf");
                 exports.require("gcode-package")
-                        .provider()
-                        .create(Runnable::run)
-                        .export(loaded, FileExportDialog.destination(output, false))
-                        .get();
+                        .create()
+                        .export(loaded, dev.voxelbrew.util.testing.FileExportWindows.destination(output, false));
                 assertArrayEquals(bytes, Files.readAllBytes(output));
             }
         }
@@ -65,23 +60,19 @@ class GcodePersistenceTest {
         var document =
                 base.withGcode(Map.of(base.printSetup().activePlateId(), LINES, "plate-2", List.of("; other plate")));
         assertEquals(DocumentCodec.fingerprint(base), DocumentCodec.fingerprint(document));
-        try (var exports = new ExporterRegistry(directory);
+        try (var exports = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory);
                 var imports = new ImporterRegistry(directory)) {
             for (String format : List.of("vxb", "json")) {
                 Path file = directory.resolve("part." + format);
                 exports.require(format)
-                        .provider()
-                        .create(Runnable::run)
-                        .export(document, FileExportDialog.destination(file, false))
-                        .get();
+                        .create()
+                        .export(document, dev.voxelbrew.util.testing.FileExportWindows.destination(file, false));
                 var loaded = ((ImportResult.Document) ImportService.read(imports, format, file, Map.of())).document();
                 assertEquals(document.gcode(), loaded.gcode());
                 Path output = directory.resolve(format + ".gcode");
                 exports.require("gcode")
-                        .provider()
-                        .create(Runnable::run)
-                        .export(loaded, FileExportDialog.destination(output, false))
-                        .get();
+                        .create()
+                        .export(loaded, dev.voxelbrew.util.testing.FileExportWindows.destination(output, false));
                 assertEquals(LINES, Files.readAllLines(output));
                 var inspected = new DefaultImportRuntime().gcode().read(output);
                 assertEquals(LINES, inspected.lines());
@@ -97,17 +88,16 @@ class GcodePersistenceTest {
         var document = base.withGcode(Map.of(base.printSetup().activePlateId(), LINES));
         Path output = directory.resolve("existing.gcode");
         Files.writeString(output, "preserved");
-        var exporter = new GcodeExporterProvider().create(Runnable::run);
+        var exporter = new GcodeExporterProvider().create();
         assertThrows(
-                ExecutionException.class,
-                () -> exporter.export(base, FileExportDialog.destination(output, true))
-                        .get());
+                java.io.IOException.class,
+                () -> exporter.export(base, dev.voxelbrew.util.testing.FileExportWindows.destination(output, true)));
         assertThrows(
-                ExecutionException.class,
-                () -> exporter.export(document, FileExportDialog.destination(output, false))
-                        .get());
+                IllegalArgumentException.class,
+                () -> exporter.export(
+                        document, dev.voxelbrew.util.testing.FileExportWindows.destination(output, false)));
         assertEquals("preserved", Files.readString(output));
-        exporter.export(document, FileExportDialog.destination(output, true)).get();
+        exporter.export(document, dev.voxelbrew.util.testing.FileExportWindows.destination(output, true));
         assertEquals(LINES, Files.readAllLines(output));
     }
 }

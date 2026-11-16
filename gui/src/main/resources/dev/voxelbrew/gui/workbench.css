@@ -19,6 +19,101 @@
   -fx-background-color: #2b2d30;
   -fx-border-color: #50545e;
 }
+.export-toast {
+  -fx-padding: 13 14;
+  -fx-background-radius: 10;
+  -fx-border-radius: 10;
+  -fx-border-width: 1;
+  -fx-effect: dropshadow(gaussian, rgba(12, 18, 32, 0.22), 18, 0.12, 0, 6);
+}
+.light.export-toast {
+  -fx-background-color: #ffffff;
+  -fx-border-color: #dfe3eb;
+}
+.dark.export-toast {
+  -fx-background-color: #2b2d30;
+  -fx-border-color: #50545e;
+}
+.export-toast-title {
+  -fx-font-size: 13px;
+  -fx-font-weight: bold;
+}
+.light.export-toast .export-toast-title {
+  -fx-text-fill: #27282e;
+}
+.dark.export-toast .export-toast-title {
+  -fx-text-fill: #f1f2f5;
+}
+.export-toast-detail {
+  -fx-font-size: 12px;
+}
+.light.export-toast .export-toast-detail {
+  -fx-text-fill: #626d7e;
+}
+.dark.export-toast .export-toast-detail {
+  -fx-text-fill: #b9c1cf;
+}
+.export-toast-icon {
+  -fx-min-width: 34;
+  -fx-pref-width: 34;
+  -fx-max-width: 34;
+  -fx-min-height: 34;
+  -fx-pref-height: 34;
+  -fx-max-height: 34;
+  -fx-background-radius: 9;
+}
+.light.export-toast.success .export-toast-icon {
+  -fx-background-color: #e8f5ee;
+}
+.dark.export-toast.success .export-toast-icon {
+  -fx-background-color: #244536;
+}
+.light.export-toast.failure .export-toast-icon {
+  -fx-background-color: #fcebed;
+}
+.dark.export-toast.failure .export-toast-icon {
+  -fx-background-color: #513034;
+}
+.export-toast-symbol {
+  -fx-fill: transparent;
+  -fx-stroke-width: 2;
+  -fx-stroke-line-cap: round;
+  -fx-stroke-line-join: round;
+}
+.light.export-toast.success .export-toast-symbol {
+  -fx-stroke: #27805b;
+}
+.dark.export-toast.success .export-toast-symbol {
+  -fx-stroke: #78d9aa;
+}
+.light.export-toast.failure .export-toast-symbol {
+  -fx-stroke: #b8434d;
+}
+.dark.export-toast.failure .export-toast-symbol {
+  -fx-stroke: #ff9ca5;
+}
+.export-toast-close {
+  -fx-background-color: transparent;
+  -fx-background-radius: 6;
+  -fx-border-color: transparent;
+  -fx-padding: 0;
+  -fx-min-width: 26;
+  -fx-pref-width: 26;
+  -fx-min-height: 26;
+  -fx-pref-height: 26;
+  -fx-font-size: 18px;
+  -fx-cursor: hand;
+}
+.light.export-toast .export-toast-close {
+  -fx-text-fill: #697488;
+}
+.dark.export-toast .export-toast-close {
+  -fx-text-fill: #aeb7c7;
+}
+.export-toast-close:hover {
+  -fx-background-color: -fx-selection-bar;
+  -fx-text-fill: -fx-text-background-color;
+}
 .quick-menu-heading {
   -fx-font-size: 10px;
   -fx-font-weight: bold;
@@ -557,6 +652,49 @@
   -fx-background-radius: 8;
   -fx-border-color: derive(-fx-base, -20%);
   -fx-border-radius: 8;
+}
+.export-dialog-content {
+  -fx-padding: 2 0 4 0;
+}
+.export-dialog-field-label {
+  -fx-font-weight: bold;
+}
+.export-dialog-inline-error,
+.export-dialog-invalid-label,
+.check-box.export-dialog-invalid {
+  -fx-text-fill: #d65c46;
+}
+.dark .export-dialog-inline-error,
+.dark .export-dialog-invalid-label,
+.dark .check-box.export-dialog-invalid {
+  -fx-text-fill: #ff897a;
+}
+.text-field.export-dialog-invalid,
+.text-area.export-dialog-invalid,
+.combo-box.export-dialog-invalid,
+.slider.export-dialog-invalid,
+.check-box.export-dialog-invalid,
+.vbox.export-dialog-invalid {
+  -fx-border-color: #d65c46;
+  -fx-border-radius: 4;
+}
+.dark .export-dialog-invalid {
+  -fx-border-color: #ff897a;
+}
+.export-dialog-choice {
+  -fx-padding: 5 6;
+  -fx-background-radius: 5;
+}
+.export-dialog-choice:hover {
+  -fx-background-color: -fx-base;
+}
+.export-dialog-scroll {
+  -fx-background-color: transparent;
+  -fx-background-insets: 0;
+  -fx-padding: 0;
+}
+.export-dialog-scroll > .viewport {
+  -fx-background-color: transparent;
 }
 .menu-bar {
   -fx-background-color: transparent;

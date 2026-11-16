@@ -1,43 +1,34 @@
 package dev.voxelbrew.exporter;
 
+import dev.voxelbrew.api.exporter.ExportWindow;
+import dev.voxelbrew.api.exporter.Exporter;
+import dev.voxelbrew.api.exporter.FileExportDialog;
 import dev.voxelbrew.engine.model.CadDocument;
-import dev.voxelbrew.exporter.api.ExportWindow;
-import dev.voxelbrew.exporter.api.Exporter;
-import dev.voxelbrew.exporter.api.FileExportDialog;
+import java.io.IOException;
 import java.nio.file.Path;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 
-/** Shared destination dialog and asynchronous publication for document exporters. */
+/** Shared destination dialog and publication for document exporters. */
 @RequiredArgsConstructor
-abstract class FileExporter implements Exporter<Path> {
+abstract class FileExporter implements Exporter<FileExportDialog.Destination> {
+    @FunctionalInterface
+    interface Writer {
+        void save(CadDocument document, Path path, boolean overwrite, ExportWindow window) throws IOException;
+    }
+
     private final String extension;
     private final String title;
-    private final Executor worker;
-    private final DocumentOutput writer;
+    private final Writer writer;
 
     @Override
-    public final CompletableFuture<Path> export(CadDocument document, ExportWindow parent) {
-        var dialog = new FileExportDialog(title, extension);
-        if (parent.show(dialog).isEmpty()) return CompletableFuture.failedFuture(new CancellationException());
-        var settings = dialog.getSettings();
+    public final Optional<FileExportDialog.Destination> export(CadDocument document, ExportWindow window)
+            throws IOException {
+        var selected = window.show(new FileExportDialog(title, extension));
+        if (selected.isEmpty()) return Optional.empty();
+        var settings = selected.get();
         Path target = settings.path().toAbsolutePath().normalize();
-        boolean overwrite = settings.overwrite();
-        var result = new CompletableFuture<Path>();
-        try {
-            worker.execute(() -> {
-                try {
-                    writer.save(document, target, overwrite);
-                    result.complete(target);
-                } catch (Exception | LinkageError failure) {
-                    result.completeExceptionally(failure);
-                }
-            });
-        } catch (RuntimeException failure) {
-            result.completeExceptionally(failure);
-        }
-        return result;
+        writer.save(document, target, settings.overwrite(), window);
+        return selected;
     }
 }

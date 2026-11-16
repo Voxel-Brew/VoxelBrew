@@ -1,10 +1,10 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.exporter.ExporterProviderRegistry;
 import dev.voxelbrew.engine.feature.FeatureRegistry;
 import dev.voxelbrew.engine.mesh.MeshData;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.parameters.*;
-import dev.voxelbrew.exporter.api.ExporterCatalog;
 import dev.voxelbrew.util.i18n.Translations;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -12,11 +12,18 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import javafx.animation.FadeTransition;
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.input.*;
 import javafx.scene.layout.*;
+import javafx.scene.shape.SVGPath;
+import javafx.stage.Popup;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import lombok.Getter;
 import lombok.experimental.Accessors;
 
@@ -24,6 +31,9 @@ import lombok.experimental.Accessors;
 @javax.inject.Singleton
 @lombok.extern.slf4j.Slf4j
 public final class Workbench extends BorderPane implements AutoCloseable {
+    private static final String EXPORT_NOTIFICATION_DURATION_KEY = "export.notification.duration-ms";
+    private static final int DEFAULT_EXPORT_NOTIFICATION_DURATION_MS = 3000;
+
     private record Entry(String id, String label, boolean body) {
         @Override
         public String toString() {
@@ -267,7 +277,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     private final DocumentController controller;
 
     private final Path pluginDirectory;
-    private final ExporterCatalog registry;
+    private final ExporterProviderRegistry registry;
     private final dev.voxelbrew.importer.api.ImporterCatalog.Factory importers;
 
     @Getter
@@ -316,6 +326,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     private Appearance.Choice appearanceChoice;
     private long appearanceRequest;
     private boolean closed, refreshing;
+    private Popup exportNotification;
+    private int exportNotificationDurationMillis = DEFAULT_EXPORT_NOTIFICATION_DURATION_MS;
     private Tool tool = Tool.NONE;
     private final McpServerHost mcpServer;
     private String modification;
@@ -388,7 +400,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             @javax.inject.Named("plugins") Path pluginDirectory,
             DocumentController controller,
             McpServerHost mcpServer,
-            ExporterCatalog registry,
+            ExporterProviderRegistry registry,
             dev.voxelbrew.importer.api.ImporterCatalog.Factory importers,
             PrintingPane printing,
             PrinterPane printer,
@@ -420,6 +432,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         this.preferencesWorker = preferencesWorker;
         this.translations = translations;
         this.configurationStore = configurationStore;
+        exportNotificationDurationMillis = loadNotificationDuration(configurationStore);
         this.recentFiles = recentFiles;
         this.viewport = new Viewport(translations);
         this.viewport.setRendering(rendering.load());
@@ -605,6 +618,11 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                                 false,
                                 () -> LanguageDialog.show(stage, translations, configurationStore, preferencesWorker)),
                         menuItem(translations.text("saveFolder.title"), "save-folder", false, this::saveFolder),
+                        menuItem(
+                                translations.text("exportNotification.duration.title"),
+                                "export-notification-duration",
+                                false,
+                                this::configureExportNotificationDuration),
                         menuItem(translations.text("action.updates"), "updates", false, this::updates),
                         menuItem(
                                 translations.text("action.report-bug"),
@@ -965,7 +983,6 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         });
         applyAppearance();
         refresh();
-        if (!registry.diagnostics().isEmpty()) status.setText(String.join(" | ", registry.diagnostics()));
     }
 
     private Stage stage() {
@@ -976,7 +993,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         return new javafx.scene.Scene(window, width, height);
     }
 
-    private ExporterCatalog registry() {
+    private ExporterProviderRegistry registry() {
         return registry;
     }
 
@@ -2299,19 +2316,180 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     }
 
     private CompletableFuture<Void> exportDocument(String format) {
-        return controller.exportDocument(registry.require(format).provider(), exportWindow(format));
+        var export = controller.exportDocument(registry.require(format), exportWindow(format));
+        export.whenComplete((ignored, failure) -> {
+            if (export.isCancelled() || failure instanceof java.util.concurrent.CancellationException) return;
+            Platform.runLater(() -> {
+                if (closed || stage.getScene() == null || !stage.isShowing()) return;
+                if (failure == null) {
+                    showExportNotification(
+                            translations.text("gui.export_success_title"),
+                            translations.text("gui.export_success", format),
+                            true);
+                } else {
+                    var cause = failure instanceof java.util.concurrent.CompletionException completion
+                                    && completion.getCause() != null
+                            ? completion.getCause()
+                            : failure;
+                    String message = cause.getMessage() == null ? cause.toString() : cause.getMessage();
+                    showExportNotification(
+                            translations.text("gui.export_failed_title"),
+                            translations.text("gui.export_failed", message),
+                            false);
+                }
+            });
+        });
+        return export;
+    }
+
+    private void showExportNotification(String title, String message, boolean success) {
+        if (exportNotification != null) exportNotification.hide();
+        var symbol = new SVGPath();
+        symbol.setContent(success ? "M3 9 L7 13 L15 4" : "M4 4 L14 14 M14 4 L4 14");
+        symbol.getStyleClass().add("export-toast-symbol");
+        var icon = new StackPane(symbol);
+        icon.getStyleClass().add("export-toast-icon");
+        var heading = new Label(title);
+        heading.getStyleClass().add("export-toast-title");
+        var detail = new Label(message);
+        detail.setId("export-notification-message");
+        detail.getStyleClass().add("export-toast-detail");
+        detail.setWrapText(true);
+        detail.setMaxHeight(80);
+        if (!success) detail.setTooltip(new Tooltip(message));
+        var copy = new VBox(4, heading, detail);
+        copy.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(copy, Priority.ALWAYS);
+        var close = new Button("×");
+        close.setId("export-notification-close");
+        close.getStyleClass().add("export-toast-close");
+        close.setFocusTraversable(false);
+        close.setTooltip(new Tooltip(translations.text("dialog.close")));
+        var card = new HBox(12, icon, copy, close);
+        card.setAlignment(Pos.CENTER_LEFT);
+        card.setPrefWidth(Math.min(380, Math.max(280, stage.getWidth() - 32)));
+        card.getStyleClass()
+                .addAll(
+                        "root",
+                        "export-toast",
+                        getStyleClass().contains("dark") ? "dark" : "light",
+                        success ? "success" : "failure");
+        card.getStylesheets()
+                .add(Objects.requireNonNull(Workbench.class.getResource("workbench.css"))
+                        .toExternalForm());
+        var popup = new Popup();
+        popup.setAutoHide(true);
+        popup.setHideOnEscape(true);
+        popup.getContent().add(card);
+        close.setOnAction(event -> popup.hide());
+        ChangeListener<Number> followWindow = (observable, before, after) -> positionExportNotification(popup, card);
+        stage.xProperty().addListener(followWindow);
+        stage.yProperty().addListener(followWindow);
+        stage.widthProperty().addListener(followWindow);
+        stage.heightProperty().addListener(followWindow);
+        popup.setOnHidden(event -> {
+            stage.xProperty().removeListener(followWindow);
+            stage.yProperty().removeListener(followWindow);
+            stage.widthProperty().removeListener(followWindow);
+            stage.heightProperty().removeListener(followWindow);
+            if (exportNotification == popup) exportNotification = null;
+        });
+        card.setOpacity(0);
+        popup.show(stage, stage.getX() + stage.getWidth() - card.getPrefWidth() - 24, stage.getY() + 70);
+        positionExportNotification(popup, card);
+        exportNotification = popup;
+        long fadeMillis = Math.min(180, exportNotificationDurationMillis / 4);
+        var enter = new FadeTransition(Duration.millis(fadeMillis), card);
+        enter.setToValue(1);
+        enter.play();
+        var dismiss = new PauseTransition(Duration.millis(exportNotificationDurationMillis - fadeMillis));
+        dismiss.setOnFinished(event -> {
+            var exit = new FadeTransition(Duration.millis(fadeMillis), card);
+            exit.setToValue(0);
+            exit.setOnFinished(done -> popup.hide());
+            exit.play();
+        });
+        dismiss.play();
+    }
+
+    private void positionExportNotification(Popup popup, Region card) {
+        popup.setX(stage.getX() + stage.getWidth() - card.getPrefWidth() - 24);
+        popup.setY(stage.getY() + 70);
+    }
+
+    static int parseNotificationDuration(String value) {
+        int millis = Integer.parseInt(value.strip());
+        if (millis <= 0) throw new IllegalArgumentException("Notification duration must be positive");
+        return millis;
+    }
+
+    static int loadNotificationDuration(dev.voxelbrew.util.config.UserConfiguration configuration) {
+        try {
+            return parseNotificationDuration(configuration.get(
+                    EXPORT_NOTIFICATION_DURATION_KEY, Integer.toString(DEFAULT_EXPORT_NOTIFICATION_DURATION_MS)));
+        } catch (IOException | IllegalArgumentException failure) {
+            log.warn("Could not load export notification duration; using 3000 ms", failure);
+            return DEFAULT_EXPORT_NOTIFICATION_DURATION_MS;
+        }
+    }
+
+    private void configureExportNotificationDuration() {
+        var dialog = new Dialog<Integer>();
+        dialog.setTitle(translations.text("exportNotification.duration.title"));
+        var input = new TextField(Integer.toString(exportNotificationDurationMillis));
+        input.setId("export-notification-duration-ms");
+        var hint = new Label(translations.text("exportNotification.duration.hint"));
+        hint.setWrapText(true);
+        var error = new Label();
+        error.setId("export-notification-duration-error");
+        error.getStyleClass().add("error");
+        error.setVisible(false);
+        error.managedProperty().bind(error.visibleProperty());
+        dialog.getDialogPane().setContent(new VBox(10, hint, input, error));
+        var save = new ButtonType(translations.text("action.save"), ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().setAll(save, ButtonType.CANCEL);
+        var selected = new int[1];
+        dialog.getDialogPane().lookupButton(save).addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+            try {
+                selected[0] = parseNotificationDuration(input.getText());
+            } catch (IllegalArgumentException failure) {
+                error.setText(translations.text("exportNotification.duration.invalid"));
+                error.setVisible(true);
+                event.consume();
+            }
+        });
+        dialog.setResultConverter(button -> button == save ? selected[0] : null);
+        Dialogs.show(dialog, stage, translations)
+                .ifPresent(millis -> preferencesWorker.execute(() -> {
+                    try {
+                        configurationStore.set(EXPORT_NOTIFICATION_DURATION_KEY, Integer.toString(millis));
+                        Platform.runLater(() -> exportNotificationDurationMillis = millis);
+                    } catch (IOException failure) {
+                        log.error("Could not save export notification duration", failure);
+                        Platform.runLater(() -> Dialogs.show(
+                                new Alert(Alert.AlertType.ERROR, failure.getMessage(), ButtonType.OK),
+                                stage,
+                                translations));
+                    }
+                }));
     }
 
     private DesktopExportWindow exportWindow(String format) {
-        return new DesktopExportWindow(
-                        stage,
-                        format.equals("vxb") ? controller.path() : null,
-                        formulaParameters(),
-                        translations,
-                        configurationStore)
-                .register(
-                        dev.voxelbrew.exporter.MeshExportDialog.class,
-                        (owner, request) -> ExportDialog.options(owner, controller, translations, request.format()));
+        Path saveFolder;
+        try {
+            saveFolder = configurationStore.defaultSaveFolder();
+        } catch (IOException | IllegalArgumentException failure) {
+            log.warn("Could not load default save folder for export", failure);
+            saveFolder = Path.of(System.getProperty("user.home"), "VoxelBrew");
+        }
+        return new DesktopExportWindow(stage, format.equals("vxb") ? controller.path() : null, translations)
+                .exporterVersion(registry.require(format).descriptor().version())
+                .suggestDestination(exportSuggestion(saveFolder, controller.path()));
+    }
+
+    static Path exportSuggestion(Path saveFolder, Path projectPath) {
+        return saveFolder.resolve(
+                projectPath == null ? "Untitled.vxb" : projectPath.getFileName().toString());
     }
 
     private void saveFolder() {
@@ -2428,6 +2606,11 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         getStyleClass().add(dark ? "dark" : "light");
         window.getStyleClass().removeAll("light", "dark");
         window.getStyleClass().add(dark ? "dark" : "light");
+        if (exportNotification != null && exportNotification.isShowing()) {
+            var toast = exportNotification.getContent().getFirst();
+            toast.getStyleClass().removeAll("light", "dark");
+            toast.getStyleClass().add(dark ? "dark" : "light");
+        }
         viewport.setDark(dark);
         printing.setDark(dark);
     }
@@ -2444,6 +2627,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     public void close() {
         if (closed) return;
         closed = true;
+        if (exportNotification != null) exportNotification.hide();
         quickMenus.forEach(QuickMenu::close);
         if (mcpServer != null) mcpServer.close();
         if (constructionEditor != null) constructionEditor.close();

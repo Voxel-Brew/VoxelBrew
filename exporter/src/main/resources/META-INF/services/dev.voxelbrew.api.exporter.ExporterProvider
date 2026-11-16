@@ -1,0 +1,9 @@
+dev.voxelbrew.exporter.VoxelBrewExporterProvider
+dev.voxelbrew.exporter.JsonExporterProvider
+dev.voxelbrew.exporter.GcodeExporterProvider
+dev.voxelbrew.exporter.PrintPackageExporterProvider
+dev.voxelbrew.exporter.StepExporterProvider
+dev.voxelbrew.exporter.StlExporterProvider
+dev.voxelbrew.exporter.ThreeMfExporterProvider
+dev.voxelbrew.exporter.ObjExporterProvider
+dev.voxelbrew.exporter.PrusaProjectExporterProvider

@@ -49,7 +49,7 @@ public final class PrintController implements AutoCloseable {
         return completedGcode;
     }
 
-    private final dev.voxelbrew.exporter.api.ExporterCatalog.Factory exporters;
+    private final java.util.function.Supplier<dev.voxelbrew.api.exporter.ExporterProviderRegistry> exporters;
 
     @Getter
     @Accessors(fluent = true)
@@ -89,7 +89,9 @@ public final class PrintController implements AutoCloseable {
                 current,
                 pluginDirectory,
                 WindowResources.worker("slicer"),
-                dev.voxelbrew.exporter.api.ExportRuntime.load().exporters(),
+                () -> java.util.ServiceLoader.load(dev.voxelbrew.api.exporter.ExporterProviderRegistry.class)
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException("No ExporterProviderRegistry service found")),
                 dev.voxelbrew.slicer.api.SlicerRuntime.load().slicing());
     }
 
@@ -98,7 +100,7 @@ public final class PrintController implements AutoCloseable {
             @NonNull Supplier<CadDocument> current,
             @NonNull @javax.inject.Named("plugins") Path pluginDirectory,
             @NonNull @javax.inject.Named("slicing") ExecutorService worker,
-            dev.voxelbrew.exporter.api.ExporterCatalog.Factory exporters,
+            java.util.function.Supplier<dev.voxelbrew.api.exporter.ExporterProviderRegistry> exporters,
             Slicing slicing) {
         this(
                 dispatch,
@@ -116,7 +118,7 @@ public final class PrintController implements AutoCloseable {
             Supplier<CadDocument> current,
             @javax.inject.Named("plugins") Path pluginDirectory,
             @javax.inject.Named("slicing") ExecutorService worker,
-            dev.voxelbrew.exporter.api.ExporterCatalog.Factory exporters,
+            java.util.function.Supplier<dev.voxelbrew.api.exporter.ExporterProviderRegistry> exporters,
             Slicing slicing,
             dev.voxelbrew.importer.api.GcodeSource gcodeReader) {
         this.dispatch = dispatch;
@@ -297,7 +299,7 @@ public final class PrintController implements AutoCloseable {
         var future = new CompletableFuture<Slicing.Result>();
         onChanged.run();
         worker.execute(() -> {
-            try (var exportRegistry = exporters.open(pluginDirectory)) {
+            try (var exportRegistry = exporters.get().withDirectory(pluginDirectory)) {
                 var models = new ArrayList<ManufacturingModel>();
                 // Preflight every plate before publishing any output.
                 for (var request : requests) {
@@ -326,6 +328,7 @@ public final class PrintController implements AutoCloseable {
                                 request.document(),
                                 models.get(i),
                                 exportRegistry,
+                                pluginDirectory,
                                 executable,
                                 request.destination(),
                                 overwrite,

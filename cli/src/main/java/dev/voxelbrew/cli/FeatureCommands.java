@@ -1,7 +1,6 @@
 package dev.voxelbrew.cli;
 
 import dev.voxelbrew.engine.feature.*;
-import dev.voxelbrew.exporter.DocumentOutput;
 import dev.voxelbrew.importer.api.DocumentSource;
 import java.nio.file.Path;
 import java.util.*;
@@ -59,7 +58,7 @@ final class FeatureCommands {
         private final FeatureRegistry.Factory features;
 
         @javax.inject.Inject
-        Custom(DocumentSource documents, DocumentOutput documentWriter, FeatureRegistry.Factory features) {
+        Custom(DocumentSource documents, DocumentSave documentWriter, FeatureRegistry.Factory features) {
             super(documents, documentWriter);
             this.features = features;
         }

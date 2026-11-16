@@ -1,8 +1,8 @@
 package dev.voxelbrew.exporter;
 
+import dev.voxelbrew.api.exporter.*;
 import dev.voxelbrew.engine.mesh.MeshOptions;
 import dev.voxelbrew.engine.mesh.MeshValidation;
-import dev.voxelbrew.exporter.api.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -14,8 +14,8 @@ public final class ObjExporter extends MeshExporter {
         super();
     }
 
-    public ObjExporter(java.util.concurrent.Executor worker, java.nio.file.Path plugins) {
-        super(worker, plugins);
+    public ObjExporter(java.nio.file.Path plugins) {
+        super(plugins);
     }
 
     @Override

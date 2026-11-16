@@ -15,8 +15,8 @@ public final class BinaryStlExporter extends MeshExporter {
         super();
     }
 
-    public BinaryStlExporter(java.util.concurrent.Executor worker, java.nio.file.Path plugins) {
-        super(worker, plugins);
+    public BinaryStlExporter(java.nio.file.Path plugins) {
+        super(plugins);
     }
 
     @Override

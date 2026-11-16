@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.exporter.api.ExporterCatalog;
+import dev.voxelbrew.api.exporter.ExporterProviderRegistry;
 import dev.voxelbrew.slicer.api.SlicerCatalog;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -14,7 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 @Singleton
 @Slf4j
 final class WindowResources implements AutoCloseable {
-    final ExporterCatalog exporters;
+    final ExporterProviderRegistry exporters;
     final SlicerCatalog slicers;
     final ExecutorService rebuild, files, slicing, validation, appearance, printer;
     private boolean closed;
@@ -23,11 +23,11 @@ final class WindowResources implements AutoCloseable {
     @Inject
     WindowResources(
             @Named("plugins") Path plugins,
-            ExporterCatalog.Factory exporterFactory,
+            java.util.function.Supplier<ExporterProviderRegistry> exporterSupplier,
             SlicerCatalog.Factory slicerFactory) {
-        ExporterCatalog opened = null;
+        ExporterProviderRegistry opened = null;
         try {
-            opened = exporterFactory.open(plugins);
+            opened = exporterSupplier.get().withDirectory(plugins);
             slicers = slicerFactory.open(plugins);
             exporters = opened;
         } catch (IOException | RuntimeException | Error failure) {

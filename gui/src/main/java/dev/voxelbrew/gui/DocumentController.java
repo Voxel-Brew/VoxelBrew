@@ -2,10 +2,6 @@ package dev.voxelbrew.gui;
 
 import dev.voxelbrew.engine.mesh.*;
 import dev.voxelbrew.engine.model.*;
-import dev.voxelbrew.exporter.ExportSelection;
-import dev.voxelbrew.exporter.MeshExportDialog;
-import dev.voxelbrew.exporter.api.ExportRuntime;
-import dev.voxelbrew.exporter.api.ExporterCatalog;
 import dev.voxelbrew.importer.api.ImportRuntime;
 import java.nio.file.Path;
 import java.util.*;
@@ -126,10 +122,7 @@ public final class DocumentController implements AutoCloseable {
     private final dev.voxelbrew.importer.api.DocumentSource documents;
 
     @NonNull
-    private final dev.voxelbrew.exporter.DocumentOutput documentWriter;
-
-    @NonNull
-    private final ExportRuntime.DocumentExporterFactory documentExporters;
+    private final DocumentSave documentWriter;
 
     private final Object queueLock = new Object();
     private Request pending;
@@ -197,26 +190,7 @@ public final class DocumentController implements AutoCloseable {
                 WindowResources.worker("rebuild"),
                 WindowResources.worker("file-io"),
                 ImportRuntime.load().documents(),
-                ExportRuntime.load().documents());
-    }
-
-    DocumentController(
-            Consumer<Runnable> dispatch,
-            Function<CadDocument, Build> evaluator,
-            Path pluginDirectory,
-            ExecutorService worker,
-            ExecutorService io,
-            dev.voxelbrew.importer.api.DocumentSource documents,
-            dev.voxelbrew.exporter.DocumentOutput documentWriter) {
-        this(
-                dispatch,
-                evaluator,
-                pluginDirectory,
-                worker,
-                io,
-                documents,
-                documentWriter,
-                ExportRuntime.load()::documentExporter);
+                dev.voxelbrew.exporter.DocumentWriter::save);
     }
 
     @javax.inject.Inject
@@ -226,8 +200,7 @@ public final class DocumentController implements AutoCloseable {
             @javax.inject.Named("rebuild") ExecutorService worker,
             @javax.inject.Named("files") ExecutorService io,
             dev.voxelbrew.importer.api.DocumentSource documents,
-            dev.voxelbrew.exporter.DocumentOutput documentWriter,
-            ExportRuntime.DocumentExporterFactory documentExporters) {
+            DocumentSave documentWriter) {
         this(
                 dispatch,
                 document -> evaluate(document, pluginDirectory),
@@ -235,8 +208,7 @@ public final class DocumentController implements AutoCloseable {
                 worker,
                 io,
                 documents,
-                documentWriter,
-                documentExporters);
+                documentWriter);
     }
 
     public ModelSession.Snapshot snapshot() {
@@ -565,21 +537,32 @@ public final class DocumentController implements AutoCloseable {
         return result;
     }
 
-    /** Exporters select destinations on the UI thread and write on this window's file worker. */
-    public CompletableFuture<Void> saveAs(dev.voxelbrew.exporter.api.ExportWindow parent) {
-        return exportDocument(documentExporters.create(io, documentWriter), true, parent);
+    /** Runs export on the file worker and shows its dialog on the UI thread. */
+    public CompletableFuture<Void> saveAs(dev.voxelbrew.api.exporter.ExportWindow parent) {
+        dev.voxelbrew.api.exporter.Exporter<dev.voxelbrew.api.exporter.FileExportDialog.Destination> exporter =
+                (document, window) -> {
+                    var selected = window.show(
+                            new dev.voxelbrew.api.exporter.FileExportDialog("VoxelBrew design (*.vxb)", "vxb"));
+                    if (selected.isEmpty()) return java.util.Optional.empty();
+                    var destination = selected.get();
+                    documentWriter.save(
+                            document, destination.path().toAbsolutePath().normalize(), destination.overwrite());
+                    return selected;
+                };
+        return exportDocument(exporter, "vxb", true, parent);
     }
 
     public CompletableFuture<Void> exportDocument(
-            dev.voxelbrew.exporter.api.ExporterProvider provider, dev.voxelbrew.exporter.api.ExportWindow parent) {
-        return exportDocument(
-                provider.create(io, pluginDirectory), provider.descriptor().id().equals("vxb"), parent);
+            dev.voxelbrew.api.exporter.ExporterProvider<?> provider, dev.voxelbrew.api.exporter.ExportWindow parent) {
+        String id = provider.descriptor().id();
+        return exportDocument(provider.create(), id, id.equals("vxb"), parent);
     }
 
     private CompletableFuture<Void> exportDocument(
-            dev.voxelbrew.exporter.api.Exporter<?> exporter,
+            dev.voxelbrew.api.exporter.Exporter<?> exporter,
+            String exporterId,
             boolean savesDocument,
-            dev.voxelbrew.exporter.api.ExportWindow parent) {
+            dev.voxelbrew.api.exporter.ExportWindow parent) {
         requireIdleIo();
 
         capturePrintWorkspace();
@@ -588,39 +571,89 @@ public final class DocumentController implements AutoCloseable {
         ioBusy = true;
         onChanged.run();
         var result = new CompletableFuture<Void>();
-        try {
-            exporter.export(captured, parent).whenComplete((destination, failure) -> {
-                if (failure != null) {
-                    if (failure instanceof CancellationException) {
-                        dispatch.accept(() -> {
-                            ioBusy = false;
-                            onChanged.run();
-                            result.cancel(false);
-                        });
-                    } else
-                        finishIo(
-                                result,
-                                failure instanceof Exception exception ? exception : new RuntimeException(failure));
-                    return;
-                }
+        var selectedPath = new java.util.concurrent.atomic.AtomicReference<Path>();
+        class TrackingWindow
+                implements dev.voxelbrew.api.exporter.ExportWindow, dev.voxelbrew.util.config.PluginDirectorySource {
+            @Override
+            public Path pluginDirectory() {
+                return pluginDirectory;
+            }
+
+            @Override
+            public <R> java.util.Optional<R> show(dev.voxelbrew.api.exporter.ExportDialog<R> dialog) {
+                var selection = new CompletableFuture<java.util.Optional<R>>();
                 dispatch.accept(() -> {
-                    if (closed) {
-                        result.cancel(false);
-                        return;
+                    try {
+                        var value = parent.show(dialog);
+                        if (savesDocument)
+                            value.ifPresent(settings -> {
+                                if (settings
+                                        instanceof dev.voxelbrew.api.exporter.FileExportDialog.Destination destination)
+                                    selectedPath.set(
+                                            destination.path().toAbsolutePath().normalize());
+                            });
+                        selection.complete(value);
+                    } catch (RuntimeException | LinkageError failure) {
+                        selection.completeExceptionally(failure);
                     }
-                    ioBusy = false;
-                    if (savesDocument && destination instanceof Path savedPath && documentGeneration == generation) {
-                        saved = captured;
-                        unsavedImport = false;
-                        path = savedPath;
-                        onFileUsed.accept(savedPath);
-                    }
-                    onChanged.run();
-                    result.complete(null);
                 });
-            });
-        } catch (RuntimeException failure) {
-            finishIo(result, failure);
+                return selection.join();
+            }
+        }
+        dev.voxelbrew.api.exporter.ExportWindow trackingWindow = new TrackingWindow();
+        try {
+            CompletableFuture.supplyAsync(
+                            () -> {
+                                try {
+                                    return exporter.export(captured, trackingWindow);
+                                } catch (Exception failure) {
+                                    throw new CompletionException(failure);
+                                }
+                            },
+                            io)
+                    .whenComplete((settings, failure) -> {
+                        if (failure != null || settings.isEmpty()) {
+                            Throwable cause =
+                                    failure instanceof CompletionException completion && completion.getCause() != null
+                                            ? completion.getCause()
+                                            : failure;
+                            if (cause == null || cause instanceof CancellationException) {
+                                log.info("Export {} cancelled", exporterId);
+                                dispatch.accept(() -> {
+                                    ioBusy = false;
+                                    onChanged.run();
+                                    result.cancel(false);
+                                });
+                            } else {
+                                log.error("Export {} failed", exporterId, cause);
+                                finishIo(
+                                        result,
+                                        cause instanceof Exception exception ? exception : new RuntimeException(cause),
+                                        false);
+                            }
+                            return;
+                        }
+                        log.info("Export {} succeeded", exporterId);
+                        dispatch.accept(() -> {
+                            if (closed) {
+                                result.cancel(false);
+                                return;
+                            }
+                            ioBusy = false;
+                            Path savedPath = selectedPath.get();
+                            if (savesDocument && savedPath != null && documentGeneration == generation) {
+                                saved = captured;
+                                unsavedImport = false;
+                                path = savedPath;
+                                onFileUsed.accept(savedPath);
+                            }
+                            onChanged.run();
+                            result.complete(null);
+                        });
+                    });
+        } catch (RuntimeException | LinkageError failure) {
+            log.error("Export {} failed", exporterId, failure);
+            finishIo(result, failure instanceof Exception exception ? exception : new RuntimeException(failure), false);
         }
         return result;
     }
@@ -695,42 +728,12 @@ public final class DocumentController implements AutoCloseable {
         return result;
     }
 
-    public CompletableFuture<Void> export(
-            ExporterCatalog registry,
-            String format,
-            String body,
-            MeshOptions options,
-            Map<String, String> values,
-            Path destination,
-            boolean overwrite) {
-        return export(registry, format, ExportSelection.design(body), options, values, destination, overwrite);
-    }
-
-    public CompletableFuture<Void> export(
-            ExporterCatalog registry,
-            String format,
-            ExportSelection selection,
-            MeshOptions options,
-            Map<String, String> values,
-            Path destination,
-            boolean overwrite) {
-        if (!canExport())
-            throw new IllegalStateException("Export requires the current complete, successfully rebuilt document");
-        return exportDocument(
-                registry.require(format).provider(),
-                new dev.voxelbrew.exporter.api.ExportDialogs()
-                        .register(
-                                MeshExportDialog.class,
-                                request -> Optional.of(new MeshExportDialog.Settings(
-                                        selection,
-                                        options,
-                                        values,
-                                        new dev.voxelbrew.exporter.api.FileExportDialog.Destination(
-                                                destination, overwrite)))));
-    }
-
     private void finishIo(CompletableFuture<Void> future, Exception failure) {
-        if (failure != null) log.error("Document file operation failed", failure);
+        finishIo(future, failure, true);
+    }
+
+    private void finishIo(CompletableFuture<Void> future, Exception failure, boolean logFailure) {
+        if (logFailure && failure != null) log.error("Document file operation failed", failure);
         dispatch.accept(() -> {
             if (closed) {
                 future.cancel(false);

@@ -7,7 +7,6 @@ import dev.voxelbrew.engine.model.BodyInstance;
 import dev.voxelbrew.engine.model.Transform;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.exporter.ExportSelection;
-import dev.voxelbrew.exporter.ExporterRegistry;
 import dev.voxelbrew.exporter.ModelView;
 import dev.voxelbrew.exporter.ModelViews;
 import dev.voxelbrew.exporter.printing.*;
@@ -42,7 +41,7 @@ class ManufacturingTest {
                     MeshOptions.DEFAULT);
         }
         // Export after the evaluation closes: the build-plate adapter owns detached meshes.
-        try (var registry = new ExporterRegistry(directory)) {
+        try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory)) {
             for (boolean includeSolids : List.of(false, true)) {
                 var output = directory.resolve("project-" + includeSolids + ".3mf");
                 FormatTestSupport.write(
@@ -86,7 +85,7 @@ class ManufacturingTest {
         var view = ModelViews.from(model);
         var output = directory.resolve("original.3mf");
         Files.writeString(output, "original project");
-        try (var registry = new ExporterRegistry(directory)) {
+        try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory)) {
             for (var filtered : List.of(
                     ModelViews.select(view, "thickness.body"),
                     ModelViews.selectInstance(view, "part"),
@@ -168,7 +167,7 @@ class ManufacturingTest {
         var report = PrintValidation.validate(model);
         assertEquals(3, report.meshes().get("open").boundaryEdges());
         assertEquals(1, report.meshes().get("degenerate").degenerateTriangles());
-        try (var registry = new ExporterRegistry(directory)) {
+        try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory)) {
             Path file = directory.resolve("bad.stl");
             Files.writeString(file, "original");
             assertThrows(
@@ -222,7 +221,7 @@ class ManufacturingTest {
                 ModelViews.from(model, ExportSelection.Contents.SUPPORTS)
                         .bodies()
                         .size());
-        try (var registry = new ExporterRegistry(directory)) {
+        try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory)) {
             Path file = directory.resolve("supports.stl");
             FormatTestSupport.write(
                     registry,

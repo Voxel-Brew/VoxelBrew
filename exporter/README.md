@@ -39,7 +39,8 @@ Built-in STL, 3MF, OBJ and Prusa project exporters share `MeshExporter`, an
 implementation helper in this module. They request a `MeshExportDialog` containing
 format-specific options. Desktop and CLI handlers return a destination, tolerance,
 body/instance selection and coordinate space. Evaluation and serialization happen
-on the provider's worker; `AtomicExport` publishes the completed file atomically.
+on the calling thread; GUI callers run exports on their file worker, while the CLI
+and slicer invoke them directly. `AtomicExport` publishes the completed file atomically.
 
 `ModelView`, `ManufacturingView`, `MeshFormat` and `MeshExportOption` are implementation
 helpers, not plugin contracts in `export-api`. The public `ModelExporter` SPI and its

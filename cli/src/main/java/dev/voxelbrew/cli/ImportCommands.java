@@ -1,6 +1,5 @@
 package dev.voxelbrew.cli;
 
-import dev.voxelbrew.exporter.DocumentOutput;
 import dev.voxelbrew.importer.api.*;
 import dev.voxelbrew.importer.api.ImportResult;
 import java.nio.file.Path;
@@ -48,7 +47,7 @@ final class ImportCommands {
     @RequiredArgsConstructor(access = AccessLevel.PACKAGE, onConstructor_ = @javax.inject.Inject)
     static final class ImportFile implements Callable<Integer> {
         private final ImporterCatalog.Factory importers;
-        private final DocumentOutput documents;
+        private final DocumentSave documents;
 
         @Parameters(index = "0")
         Path source;

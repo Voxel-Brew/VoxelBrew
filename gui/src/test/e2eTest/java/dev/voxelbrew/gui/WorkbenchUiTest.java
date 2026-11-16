@@ -830,13 +830,16 @@ class WorkbenchUiTest {
                         .result()
                         .job()
                         .lines()));
-        try (var registry = new dev.voxelbrew.exporter.ExporterRegistry(directory)) {
+        try (var registry = java.util.ServiceLoader.load(dev.voxelbrew.api.exporter.ExporterProviderRegistry.class)
+                .findFirst()
+                .orElseThrow()
+                .withDirectory(directory)) {
             Path output = directory.resolve("exported.gcode");
             fx(() -> workbench
                             .controller()
                             .exportDocument(
-                                    registry.require("gcode").provider(),
-                                    dev.voxelbrew.exporter.api.FileExportDialog.destination(output, false)))
+                                    registry.require("gcode"),
+                                    dev.voxelbrew.util.testing.FileExportWindows.destination(output, false)))
                     .get(20, TimeUnit.SECONDS);
             assertEquals(lines, Files.readAllLines(output));
         }
@@ -4399,13 +4402,31 @@ class WorkbenchUiTest {
         int index = fx(() -> {
             var choices = ((ComboBox<?>) node("#export-format")).getItems();
             for (int i = 0; i < choices.size(); i++) {
-                if (choices.get(i) instanceof dev.voxelbrew.exporter.api.ExporterDescriptor choice
+                if (choices.get(i) instanceof dev.voxelbrew.api.exporter.ExporterDescriptor choice
                         && choice.id().equals(id)) return i;
             }
             throw new AssertionError("Missing exporter " + id);
         });
         choice("export-format", index);
         click("export-confirm");
+    }
+
+    @Test
+    void exportValidationMarksAndClearsInvalidDestination() throws Exception {
+        ready();
+        rectangle(0);
+        click("export");
+        chooseExporter("json");
+        text("export-path", "");
+        click("export-confirm");
+
+        assertTrue(fx(() -> node("#export-path").getStyleClass().contains("export-dialog-invalid")));
+        assertTrue(fx(() -> node(".export-dialog-inline-error").isVisible()));
+        assertEquals("Choose a destination", fx(() -> ((Label) node(".export-dialog-inline-error")).getText()));
+
+        text("export-path", directory.resolve("valid.json").toString());
+        assertFalse(fx(() -> node("#export-path").getStyleClass().contains("export-dialog-invalid")));
+        key(KeyCode.ESCAPE);
     }
 
     private void assertDesignRejectsMeshExport(String diagnostic) throws Exception {
@@ -7172,12 +7193,15 @@ class WorkbenchUiTest {
                 PrintController.State.SUCCEEDED,
                 fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()),
                 fx(() -> ((Label) node("#print-status")).getText()));
-        try (var registry = new dev.voxelbrew.exporter.ExporterRegistry(directory)) {
+        try (var registry = java.util.ServiceLoader.load(dev.voxelbrew.api.exporter.ExporterProviderRegistry.class)
+                .findFirst()
+                .orElseThrow()
+                .withDirectory(directory)) {
             fx(() -> workbench
                             .controller()
                             .exportDocument(
-                                    registry.require("gcode").provider(),
-                                    dev.voxelbrew.exporter.api.FileExportDialog.destination(job, false)))
+                                    registry.require("gcode"),
+                                    dev.voxelbrew.util.testing.FileExportWindows.destination(job, false)))
                     .get(20, TimeUnit.SECONDS);
         }
         var actual = GcodeReader.read(job);

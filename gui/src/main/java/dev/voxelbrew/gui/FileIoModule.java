@@ -2,8 +2,7 @@ package dev.voxelbrew.gui;
 
 import dagger.Module;
 import dagger.Provides;
-import dev.voxelbrew.exporter.DocumentOutput;
-import dev.voxelbrew.exporter.api.*;
+import dev.voxelbrew.api.exporter.*;
 import dev.voxelbrew.importer.api.*;
 import dev.voxelbrew.slicer.api.SlicerCatalog;
 import dev.voxelbrew.slicer.api.SlicerRuntime;
@@ -17,7 +16,7 @@ public final class FileIoModule {
     private final DocumentSource source;
 
     @lombok.NonNull
-    private final DocumentOutput sink;
+    private final DocumentSave sink;
 
     @lombok.NonNull
     private final GcodeSource gcode;
@@ -26,21 +25,18 @@ public final class FileIoModule {
     private final ImportRuntime imports;
 
     @lombok.NonNull
-    private final ExportRuntime exports;
-
-    @lombok.NonNull
     private final SlicerRuntime slicerRuntime;
 
     public FileIoModule() {
-        this(ImportRuntime.load(), ExportRuntime.load(), SlicerRuntime.load());
+        this(ImportRuntime.load(), dev.voxelbrew.exporter.DocumentWriter::save, SlicerRuntime.load());
     }
 
-    private FileIoModule(ImportRuntime imports, ExportRuntime exports, SlicerRuntime slicerRuntime) {
-        this(imports.documents(), exports.documents(), imports.gcode(), imports, exports, slicerRuntime);
+    private FileIoModule(ImportRuntime imports, DocumentSave sink, SlicerRuntime slicerRuntime) {
+        this(imports.documents(), sink, imports.gcode(), imports, slicerRuntime);
     }
 
-    public FileIoModule(DocumentSource source, DocumentOutput sink, GcodeSource gcode) {
-        this(source, sink, gcode, ImportRuntime.load(), ExportRuntime.load(), SlicerRuntime.load());
+    public FileIoModule(DocumentSource source, DocumentSave sink, GcodeSource gcode) {
+        this(source, sink, gcode, ImportRuntime.load(), SlicerRuntime.load());
     }
 
     @Provides
@@ -51,7 +47,7 @@ public final class FileIoModule {
 
     @Provides
     @Singleton
-    DocumentOutput sink() {
+    DocumentSave sink() {
         return sink;
     }
 
@@ -62,8 +58,10 @@ public final class FileIoModule {
     }
 
     @Provides
-    ExporterCatalog.Factory exporters() {
-        return exports.exporters();
+    java.util.function.Supplier<ExporterProviderRegistry> exporters() {
+        return () -> java.util.ServiceLoader.load(ExporterProviderRegistry.class)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No ExporterProviderRegistry service found"));
     }
 
     @Provides
@@ -74,11 +72,6 @@ public final class FileIoModule {
     @Provides
     SlicerCatalog.Factory slicers() {
         return slicerRuntime.slicers();
-    }
-
-    @Provides
-    ExportRuntime.DocumentExporterFactory documentExporters() {
-        return exports::documentExporter;
     }
 
     @Provides

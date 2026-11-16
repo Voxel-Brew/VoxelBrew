@@ -77,7 +77,8 @@ final class Dialogs {
         panel.getStyleClass().add("dialog-overlay");
         panel.getStylesheets().setAll(content.getStylesheets());
         panel.getStyleClass().addAll(content.getStyleClass());
-        panel.setPrefWidth(Math.min(650, scene.getWidth() - 64));
+        double preferredWidth = pane.getPrefWidth() > 0 ? pane.getPrefWidth() : 650;
+        panel.setPrefWidth(Math.min(preferredWidth, scene.getWidth() - 64));
         panel.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
         var shade = new Region();
         shade.setStyle("-fx-background-color: rgba(0,0,0,0.38);");

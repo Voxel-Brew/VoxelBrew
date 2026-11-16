@@ -1,10 +1,10 @@
 package dev.voxelbrew.slicer;
 
+import dev.voxelbrew.api.exporter.*;
 import dev.voxelbrew.engine.mesh.MeshOptions;
 import dev.voxelbrew.engine.model.CadDocument;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.exporter.*;
-import dev.voxelbrew.exporter.api.*;
 import dev.voxelbrew.importer.GcodeReader;
 import dev.voxelbrew.slicer.api.SlicerBackend;
 import dev.voxelbrew.slicer.api.Slicing.*;
@@ -31,12 +31,17 @@ public final class SliceService {
             Consumer<String> diagnostics,
             PublicationGuard guard)
             throws IOException {
-        try (var exporters = new ExporterRegistry(ExporterRegistry.defaultDirectory())) {
+        var pluginDirectory = dev.voxelbrew.util.config.ApplicationPaths.plugins();
+        try (var exporters = ServiceLoader.load(ExporterProviderRegistry.class)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No ExporterProviderRegistry service found"))
+                .withDirectory(pluginDirectory)) {
             return slice(
                     backend,
                     document,
                     model,
                     exporters,
+                    pluginDirectory,
                     executable,
                     destination,
                     overwrite,
@@ -50,7 +55,8 @@ public final class SliceService {
             SlicerBackend backend,
             CadDocument document,
             ManufacturingModel model,
-            ExporterCatalog exporters,
+            ExporterProviderRegistry exporters,
+            Path pluginDirectory,
             Path executable,
             Path destination,
             boolean overwrite,
@@ -100,32 +106,39 @@ public final class SliceService {
             Path raw = work.resolve("sliced.gcode"), complete = work.resolve("complete.gcode");
             var format = backend.inputFormat();
             Path input = work.resolve("input." + format.extension());
-            var parent = new ExportDialogs()
-                    .register(
-                            FileExportDialog.class,
-                            request -> Optional.of(new FileExportDialog.Destination(input, false)))
-                    .register(
-                            MeshExportDialog.class,
-                            request -> Optional.of(new MeshExportDialog.Settings(
-                                    new ExportSelection(
-                                            ExportSelection.Space.BUILD_PLATE,
-                                            ExportSelection.Contents.MODEL,
-                                            null,
-                                            null),
-                                    MeshOptions.DEFAULT,
-                                    format.options(),
-                                    new FileExportDialog.Destination(input, false),
-                                    model)));
+            class SlicerExportWindow implements ExportWindow, dev.voxelbrew.util.config.PluginDirectorySource {
+                @Override
+                public Path pluginDirectory() {
+                    return pluginDirectory;
+                }
+
+                @Override
+                @SuppressWarnings("unchecked")
+                public <R> Optional<R> show(ExportDialog<R> dialog) {
+                    if (dialog instanceof FileExportDialog)
+                        return (Optional<R>) Optional.of(new FileExportDialog.Destination(input, false));
+                    if (dialog instanceof MeshExportDialog)
+                        return (Optional<R>) Optional.of(new MeshExportDialog.Settings(
+                                new ExportSelection(
+                                        ExportSelection.Space.BUILD_PLATE, ExportSelection.Contents.MODEL, null, null),
+                                MeshOptions.DEFAULT,
+                                format.options(),
+                                new FileExportDialog.Destination(input, false),
+                                model));
+                    throw new UnsupportedOperationException("Unsupported export dialog: " + dialog.getClass());
+                }
+            }
+            ExportWindow parent = new SlicerExportWindow();
             try {
                 exporters
                         .require(format.exporterId())
-                        .provider()
-                        .create(Runnable::run, exporters.directory())
+                        .create()
                         .export(document, parent)
-                        .join();
-            } catch (java.util.concurrent.CompletionException failure) {
-                if (failure.getCause() instanceof java.util.concurrent.CancellationException cancelled) throw cancelled;
-                throw new IOException("Slicer input export failed: " + format.exporterId(), failure.getCause());
+                        .orElseThrow(java.util.concurrent.CancellationException::new);
+            } catch (java.util.concurrent.CancellationException cancelled) {
+                throw cancelled;
+            } catch (Exception failure) {
+                throw new IOException("Slicer input export failed: " + format.exporterId(), failure);
             }
             cancellation.check();
             if (!Files.isRegularFile(input)) throw new IOException("Exporter did not create slicer input: " + input);

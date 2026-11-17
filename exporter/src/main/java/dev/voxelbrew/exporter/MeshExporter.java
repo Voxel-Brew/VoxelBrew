@@ -8,6 +8,7 @@ import dev.voxelbrew.util.config.PluginDirectorySource;
 import java.io.*;
 import java.nio.file.Path;
 import java.util.*;
+import lombok.NonNull;
 
 /** Implementation helper for built-in mesh formats; all entry points use Exporter. */
 public abstract class MeshExporter implements Exporter<MeshExportDialog.Settings> {
@@ -17,8 +18,8 @@ public abstract class MeshExporter implements Exporter<MeshExportDialog.Settings
         this(dev.voxelbrew.util.config.ApplicationPaths.plugins());
     }
 
-    protected MeshExporter(Path plugins) {
-        this.plugins = Objects.requireNonNull(plugins);
+    protected MeshExporter(@NonNull Path plugins) {
+        this.plugins = plugins;
     }
 
     public abstract MeshFormat format();

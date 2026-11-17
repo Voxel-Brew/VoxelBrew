@@ -3,8 +3,8 @@ package dev.voxelbrew.exporter;
 import dev.voxelbrew.engine.mesh.MeshOptions;
 import dev.voxelbrew.engine.model.*;
 
-public final class ExportSelections {
-    private ExportSelections() {}
+@lombok.experimental.UtilityClass
+public class ExportSelections {
 
     public static ModelView view(
             ExportSelection selection, CadDocument document, Evaluation evaluation, MeshOptions options) {

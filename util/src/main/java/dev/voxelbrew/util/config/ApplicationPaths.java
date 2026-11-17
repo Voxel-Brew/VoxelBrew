@@ -3,8 +3,8 @@ package dev.voxelbrew.util.config;
 import java.nio.file.Path;
 
 /** User-local application files, independent of documents and installation directories. */
-public final class ApplicationPaths {
-    private ApplicationPaths() {}
+@lombok.experimental.UtilityClass
+public class ApplicationPaths {
 
     public static Path home() {
         String override = System.getProperty("voxelbrew.home");

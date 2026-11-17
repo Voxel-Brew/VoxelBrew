@@ -4,8 +4,8 @@ import java.io.IOException;
 import java.util.Properties;
 
 /** Shared build identity, generated from projectVersion for both frontends. */
-public final class BuildVersion {
-    private BuildVersion() {}
+@lombok.experimental.UtilityClass
+public class BuildVersion {
 
     public static String current() {
         try (var input = BuildVersion.class.getResourceAsStream("/voxelbrew-util-version.properties")) {

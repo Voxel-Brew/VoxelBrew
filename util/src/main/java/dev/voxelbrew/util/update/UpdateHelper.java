@@ -6,8 +6,8 @@ import java.time.Instant;
 import java.util.Properties;
 
 /** JDK-only helper, launched with an independent runtime so Windows can move the old JVM. */
-public final class UpdateHelper {
-    private UpdateHelper() {}
+@lombok.experimental.UtilityClass
+public class UpdateHelper {
 
     public static void main(String[] args) {
         if (args.length != 1) {

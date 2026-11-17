@@ -7,10 +7,9 @@ import java.util.Map;
 import java.util.concurrent.*;
 
 /** Compatibility entry points for standalone implementation consumers. */
-public final class ImportService {
+@lombok.experimental.UtilityClass
+public class ImportService {
     public static final long MAX_INPUT_BYTES = ImportInput.MAX_INPUT_BYTES;
-
-    private ImportService() {}
 
     public static CompletableFuture<ImportResult> importFrom(
             ImporterCatalog.Entry entry, Executor worker, ImportWindow parent) {

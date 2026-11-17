@@ -143,15 +143,15 @@ final class FormulaField extends TextField {
     }
 
     /** Display-only unit for quantities such as percentages whose stored values are unitless. */
-    FormulaField displayUnit(String label) {
+    FormulaField displayUnit(@NonNull String label) {
         if (unit == null) throw new IllegalStateException("This is a text field");
-        displayUnit = Objects.requireNonNull(label);
+        displayUnit = label;
         refreshFormula();
         return this;
     }
 
-    void validateWith(java.util.function.DoubleConsumer validation) {
-        this.validation = Objects.requireNonNull(validation);
+    void validateWith(@NonNull java.util.function.DoubleConsumer validation) {
+        this.validation = validation;
         refreshFormula();
     }
 

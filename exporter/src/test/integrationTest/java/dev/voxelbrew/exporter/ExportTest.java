@@ -86,7 +86,7 @@ class ExportTest {
                 double[] normal = {buffer.getFloat(), buffer.getFloat(), buffer.getFloat()};
                 var points = new double[3][3];
                 for (var point : points) for (int axis = 0; axis < 3; axis++) point[axis] = buffer.getFloat();
-                assertThat(buffer.getShort()).isEqualTo(0);
+                assertThat(buffer.getShort()).isZero();
                 var cross = cross(points);
                 assertThat(dot(normal, cross) > 0)
                         .as("outward normal agrees with winding")

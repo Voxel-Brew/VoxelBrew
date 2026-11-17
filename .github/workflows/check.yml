@@ -20,10 +20,10 @@ jobs:
         with:
           fetch-depth: 0
       - uses: actions/checkout@v4
-        if: github.head_ref == 'feat/export-workflow-update' || github.ref == 'refs/heads/feat/export-workflow-update'
+        if: github.head_ref == 'docs/lombok-guidance' || github.ref == 'refs/heads/docs/lombok-guidance'
         with:
           repository: Voxel-Brew/api-slicer
-          ref: 88cce461ed8165727d086bb0a185ed73d0ef5d98
+          ref: 38a8b5631bae6be31f58b9f70fe1c4c20793f85a
           path: .tools/api-slicer
       - uses: actions/setup-java@v4
         with:

@@ -4,10 +4,9 @@ import java.io.*;
 import java.nio.file.*;
 
 /** Bounded local reads owned by built-in importers. */
-public final class ImportInput {
+@lombok.experimental.UtilityClass
+public class ImportInput {
     public static final long MAX_INPUT_BYTES = 256L * 1024 * 1024;
-
-    private ImportInput() {}
 
     public static InputStream open(Path source) throws IOException {
         if (Files.size(source) > MAX_INPUT_BYTES) throw new IOException("Import exceeds 256 MiB input limit");

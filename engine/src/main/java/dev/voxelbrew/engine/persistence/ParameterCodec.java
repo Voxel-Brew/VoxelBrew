@@ -3,8 +3,8 @@ package dev.voxelbrew.engine.persistence;
 import dev.voxelbrew.engine.parameters.*;
 import dev.voxelbrew.engine.persistence.proto.DocumentProto;
 
-final class ParameterCodec {
-    private ParameterCodec() {}
+@lombok.experimental.UtilityClass
+class ParameterCodec {
 
     static ParameterSet fromProto(DocumentProto.ParameterSet message) {
         return new ParameterSet(

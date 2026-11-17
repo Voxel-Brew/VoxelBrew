@@ -13,8 +13,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
+import lombok.NonNull;
 
 /** Resolves exporter inputs from namespaced CLI arguments and optional terminal prompts. */
 final class CliExportWindow implements ExportWindow, PluginDirectorySource {
@@ -31,23 +31,23 @@ final class CliExportWindow implements ExportWindow, PluginDirectorySource {
     private Map<String, String> values = Map.of();
 
     CliExportWindow(
-            String exporterId,
-            Path pluginDirectory,
+            @NonNull String exporterId,
+            @NonNull Path pluginDirectory,
             Map<String, String> supplied,
             String[] arguments,
-            PrintWriter out,
-            PrintWriter err,
-            BufferedReader in,
+            @NonNull PrintWriter out,
+            @NonNull PrintWriter err,
+            @NonNull BufferedReader in,
             boolean promptForMissing,
             boolean failOnMissing,
             boolean meshFlagsProvided) {
-        this.exporterId = Objects.requireNonNull(exporterId);
-        this.pluginDirectory = Objects.requireNonNull(pluginDirectory);
+        this.exporterId = exporterId;
+        this.pluginDirectory = pluginDirectory;
         this.supplied = Map.copyOf(supplied);
         this.arguments = arguments.clone();
-        this.out = Objects.requireNonNull(out);
-        this.err = Objects.requireNonNull(err);
-        this.in = Objects.requireNonNull(in);
+        this.out = out;
+        this.err = err;
+        this.in = in;
         this.promptForMissing = promptForMissing;
         this.failOnMissing = failOnMissing;
         this.meshFlagsProvided = meshFlagsProvided;

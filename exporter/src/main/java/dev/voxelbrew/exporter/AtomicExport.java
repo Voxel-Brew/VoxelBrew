@@ -6,8 +6,8 @@ import java.nio.channels.*;
 import java.nio.file.*;
 
 /** Durable atomic publication shared by built-in format serializers. */
-public final class AtomicExport {
-    private AtomicExport() {}
+@lombok.experimental.UtilityClass
+public class AtomicExport {
 
     @FunctionalInterface
     public interface Writer {

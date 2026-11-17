@@ -117,7 +117,7 @@ jobs:
         run: ./scripts/bootstrap-slicer.ps1
       - name: Integration tests (headless Ubuntu)
         if: inputs.suite == 'integrationTest'
-        run: ./gradlew integrationTest
+        run: ./gradlew --refresh-dependencies integrationTest
       - name: Platform checks (Ubuntu)
         if: (inputs.suite == 'platformCheck' || inputs.suite == 'check' || inputs.suite == ':gui:e2eTest') && runner.os == 'Linux'
         env:
@@ -125,18 +125,18 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb xauth openbox libgtk-3-0t64 libgl1-mesa-dri
-          bash scripts/with-virtual-desktop.sh ./gradlew "$GRADLE_SUITE"
+          bash scripts/with-virtual-desktop.sh ./gradlew --refresh-dependencies "$GRADLE_SUITE"
       - name: Platform checks (Windows, v142 toolchain)
         if: (inputs.suite == 'platformCheck' || inputs.suite == 'check' || inputs.suite == ':gui:e2eTest') && runner.os == 'Windows'
         env:
           GRADLE_SUITE: ${{ inputs.suite }}
         shell: pwsh
-        run: ./gradlew.bat $env:GRADLE_SUITE '-PvsGenerator=Visual Studio 17 2022'
+        run: ./gradlew.bat --refresh-dependencies $env:GRADLE_SUITE '-PvsGenerator=Visual Studio 17 2022'
       - name: Headless platform checks (macOS; GUI qualification deferred)
         if: (inputs.suite == 'headlessPlatformCheck' || inputs.suite == 'headlessWorkflowCheck' || inputs.suite == 'headlessPackageCheck') && runner.os == 'macOS'
         env:
           GRADLE_SUITE: ${{ inputs.suite }}
-        run: ./gradlew "$GRADLE_SUITE"
+        run: ./gradlew --refresh-dependencies "$GRADLE_SUITE"
       - name: Archive app images
         if: inputs.archive
         shell: bash

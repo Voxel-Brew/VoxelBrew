@@ -8,11 +8,10 @@ import java.util.*;
 import java.util.zip.CRC32;
 import org.apache.commons.compress.archivers.zip.ZipFile;
 
-final class UpdateArchive {
+@lombok.experimental.UtilityClass
+class UpdateArchive {
     static final long MAX_ARCHIVE_BYTES = 1024L * 1024 * 1024;
     private static final long MAX_EXPANDED_BYTES = 4L * 1024 * 1024 * 1024;
-
-    private UpdateArchive() {}
 
     static void verify(Path archive, Path checksums, String name, UpdateCancellation cancellation) throws IOException {
         if (Files.size(archive) == 0 || Files.size(archive) > MAX_ARCHIVE_BYTES || Files.size(checksums) > 1024 * 1024)

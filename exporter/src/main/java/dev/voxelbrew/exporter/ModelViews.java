@@ -8,8 +8,8 @@ import dev.voxelbrew.engine.printing.*;
 import java.util.*;
 import lombok.NonNull;
 
-public final class ModelViews {
-    private ModelViews() {}
+@lombok.experimental.UtilityClass
+public class ModelViews {
 
     /** The caller must keep the evaluation open until the synchronous export finishes. */
     public static ModelView from(Evaluation evaluation) {

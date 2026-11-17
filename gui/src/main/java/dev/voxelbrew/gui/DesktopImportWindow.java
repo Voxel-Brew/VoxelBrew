@@ -5,6 +5,7 @@ import dev.voxelbrew.importer.api.*;
 import dev.voxelbrew.util.i18n.Translations;
 import java.util.Optional;
 import javafx.stage.Window;
+import lombok.NonNull;
 
 /** Window-local rendering for importer-owned interactions. */
 @lombok.RequiredArgsConstructor
@@ -24,8 +25,7 @@ public final class DesktopImportWindow implements ImportWindow {
     }
 
     public <R, D extends dev.voxelbrew.importer.api.ImportDialog<R>> DesktopImportWindow register(
-            Class<D> type, java.util.function.BiFunction<Window, ? super D, Optional<R>> handler) {
-        java.util.Objects.requireNonNull(handler);
+            Class<D> type, @NonNull java.util.function.BiFunction<Window, ? super D, Optional<R>> handler) {
         dialogs.register(type, request -> handler.apply(owner, request));
         return this;
     }

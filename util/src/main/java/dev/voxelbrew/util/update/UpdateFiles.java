@@ -5,8 +5,8 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.EnumSet;
 
-final class UpdateFiles {
-    private UpdateFiles() {}
+@lombok.experimental.UtilityClass
+class UpdateFiles {
 
     static void copyTree(Path source, Path target, UpdateCancellation cancellation) throws IOException {
         Path realSource = source.toRealPath();

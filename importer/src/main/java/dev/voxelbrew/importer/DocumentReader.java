@@ -8,8 +8,8 @@ import java.nio.file.Path;
 
 /** Bounded .vxb loading; unknown schemas and corrupt data remain protected from writes. */
 @lombok.extern.slf4j.Slf4j
-public final class DocumentReader {
-    private DocumentReader() {}
+@lombok.experimental.UtilityClass
+public class DocumentReader {
 
     public static CadDocument load(Path path) throws IOException {
         log.debug("Reading document {}", path);

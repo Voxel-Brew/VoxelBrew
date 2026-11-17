@@ -5,8 +5,8 @@ import dev.voxelbrew.engine.sketch.SketchGeometry;
 import dev.voxelbrew.engine.sketch.SketchText;
 
 /** Protobuf remains an implementation detail; enum names are the compatibility contract. */
-final class SketchCodec {
-    private SketchCodec() {}
+@lombok.experimental.UtilityClass
+class SketchCodec {
 
     static SketchGeometry fromProto(DocumentProto.ConstrainedSketch message) {
         return new SketchGeometry(

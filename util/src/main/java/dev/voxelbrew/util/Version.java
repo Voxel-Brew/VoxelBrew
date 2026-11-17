@@ -1,8 +1,8 @@
 package dev.voxelbrew.util;
 
 /** Application version embedded by Gradle, or {@code 0.0.0} for IDE/class-directory runs. */
-public final class Version {
-    private Version() {}
+@lombok.experimental.UtilityClass
+public class Version {
 
     public static String version() {
         String version = Version.class.getPackage().getImplementationVersion();

@@ -17,13 +17,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import lombok.NonNull;
 
 /** Options request owned by the built-in geometry exporters, not a plugin SPI. */
 @lombok.Getter
 @lombok.experimental.Accessors(fluent = true)
 public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Settings> {
-    public MeshExportDialog(MeshFormat format) {
-        this.format = Objects.requireNonNull(format);
+    public MeshExportDialog(@NonNull MeshFormat format) {
+        this.format = format;
     }
 
     @Override

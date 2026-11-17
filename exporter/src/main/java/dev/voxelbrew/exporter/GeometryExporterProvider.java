@@ -3,6 +3,7 @@ package dev.voxelbrew.exporter;
 import dev.voxelbrew.api.exporter.*;
 import java.nio.file.Path;
 import java.util.function.Function;
+import lombok.NonNull;
 
 /** Shared implementation for registered geometry format providers. */
 public class GeometryExporterProvider implements ExporterProvider<MeshExportDialog.Settings> {
@@ -10,9 +11,10 @@ public class GeometryExporterProvider implements ExporterProvider<MeshExportDial
     private final Function<Path, ? extends Exporter<MeshExportDialog.Settings>> factory;
 
     public GeometryExporterProvider(
-            ExporterDescriptor descriptor, Function<Path, ? extends Exporter<MeshExportDialog.Settings>> factory) {
-        this.descriptor = java.util.Objects.requireNonNull(descriptor);
-        this.factory = java.util.Objects.requireNonNull(factory);
+            @NonNull ExporterDescriptor descriptor,
+            @NonNull Function<Path, ? extends Exporter<MeshExportDialog.Settings>> factory) {
+        this.descriptor = descriptor;
+        this.factory = factory;
     }
 
     @Override

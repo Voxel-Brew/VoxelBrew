@@ -10,8 +10,8 @@ import java.nio.file.*;
 
 /** Atomic publication of editable .vxb documents, preserving unsupported existing files. */
 @lombok.extern.slf4j.Slf4j
-public final class DocumentWriter {
-    private DocumentWriter() {}
+@lombok.experimental.UtilityClass
+public class DocumentWriter {
 
     /**
      * Existing destinations require explicit overwrite; unsupported files are never overwritten.

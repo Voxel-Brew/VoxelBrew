@@ -1,49 +1,87 @@
 package consumer;
 
+import dev.voxelbrew.api.importer.*;
+import dev.voxelbrew.api.importer.component.*;
 import dev.voxelbrew.engine.model.*;
-import dev.voxelbrew.importer.api.*;
-import java.io.*;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 
-/** A separate consumer compiled only against published import-api/export-api artifacts. */
+/** Separate plugin compiled only against published import and model API artifacts. */
 public class ProbeImporter implements ImporterProvider {
+    @Override
     public ImporterDescriptor descriptor() {
-        return new ImporterDescriptor("plate", "External plate", API_VERSION, ImportResult.Kind.DOCUMENT);
+        return new ImporterDescriptor("plate", "External plate", "1.0.0");
     }
 
-    public Importer<ImportResult> create(java.util.concurrent.Executor worker) {
-        return parent -> {
-            var request = new FileImportDialog(
-                    "External plate",
-                    List.of("vbplate"),
-                    descriptor().id().equals("plate")
-                            ? List.of(new ImportOption("scale", "Scale", ImportOption.Type.DECIMAL, "1", List.of()))
-                            : List.of());
-            if (parent.show(request).isEmpty())
-                return java.util.concurrent.CompletableFuture.failedFuture(
-                        new java.util.concurrent.CancellationException());
-            var settings = request.getSettings();
-            return java.util.concurrent.CompletableFuture.supplyAsync(
-                    () -> {
-                        try (var input = java.nio.file.Files.newInputStream(settings.path())) {
-                            return read(input, settings.options());
-                        } catch (IOException failure) {
-                            throw new java.util.concurrent.CompletionException(failure);
-                        }
-                    },
-                    worker);
+    @Override
+    public Importer create() {
+        return window -> {
+            var accepted = window.show(new PlateDialog());
+            if (accepted.isEmpty()) return Optional.empty();
+            var settings = accepted.orElseThrow();
+            return Optional.of(read(settings.path(), settings.scale()));
         };
     }
 
-    public ImportResult read(InputStream input, Map<String, String> options) throws IOException {
-        double scale = Double.parseDouble(options.get("scale"));
-        if (scale <= 0) throw new IOException("Scale must be positive");
-        String[] dimensions =
-                new String(input.readAllBytes(), StandardCharsets.UTF_8).strip().split(",");
+    public record PlateSettings(Path path, double scale) {}
+
+    public static final class PlateDialog implements ImportDialog<PlateSettings> {
+        private final FileSource source = new FileSource("source", "vbplate");
+        private final TextField scale = new TextField("scale", "Scale", "1");
+
+        @Override
+        public String title() {
+            return "External plate";
+        }
+
+        @Override
+        public ImportDialogLayout layout() {
+            return new VerticalLayout(source, scale);
+        }
+
+        @Override
+        public Map<String, String> validate(Map<String, String> values) {
+            var errors = new LinkedHashMap<String, String>();
+            String path = values.get("source");
+            if (path == null || path.isBlank()) errors.put("source", "Choose a source");
+            else {
+                try {
+                    var file = Path.of(path);
+                    if (!Files.isRegularFile(file) || !Files.isReadable(file))
+                        errors.put("source", "Source must be a readable file");
+                } catch (java.nio.file.InvalidPathException failure) {
+                    errors.put("source", "Invalid source path");
+                }
+            }
+            try {
+                double value = Double.parseDouble(values.getOrDefault("scale", "1"));
+                if (!Double.isFinite(value) || value <= 0) errors.put("scale", "Scale must be positive");
+            } catch (NumberFormatException failure) {
+                errors.put("scale", "Scale must be numeric");
+            }
+            return Map.copyOf(errors);
+        }
+
+        @Override
+        public PlateSettings buildSettings(Map<String, String> values) {
+            var errors = validate(values);
+            if (!errors.isEmpty()) throw new IllegalArgumentException(errors.toString());
+            return new PlateSettings(
+                    Path.of(values.get("source")), Double.parseDouble(values.getOrDefault("scale", "1")));
+        }
+    }
+
+    public CadDocument read(Path source, double scale) throws IOException {
+        byte[] bytes;
+        try (var input = Files.newInputStream(source)) {
+            bytes = input.readNBytes(4097);
+        }
+        if (bytes.length > 4096) throw new IOException("Plate input exceeds 4 KiB");
+        String[] dimensions = new String(bytes, StandardCharsets.UTF_8).strip().split(",");
         if (dimensions.length != 3) throw new IOException("Expected width,height,thickness");
-        // Closing a borrowed stream must not take ownership away from the host.
-        input.close();
         var sketch = new Feature.Sketch(
                 "plate",
                 "profile",
@@ -52,17 +90,10 @@ public class ProbeImporter implements ImporterProvider {
                         0, 0, Double.parseDouble(dimensions[0]) * scale, Double.parseDouble(dimensions[1]) * scale));
         var extrude = new Feature.Extrude(
                 "thickness", new Feature.ProfileRef("plate", "profile"), Double.parseDouble(dimensions[2]) * scale);
-        return new ImportResult.Document(new CadDocument("imported-plate", List.of(sketch, extrude), 2));
+        return new CadDocument("imported-plate", List.of(sketch, extrude), 2);
     }
 
     public static final class Duplicate extends ProbeImporter {}
-
-    public static final class Incompatible extends ProbeImporter {
-        @Override
-        public ImporterDescriptor descriptor() {
-            return new ImporterDescriptor("future", "Future", 999, ImportResult.Kind.DOCUMENT);
-        }
-    }
 
     public static final class Broken extends ProbeImporter {
         @Override
@@ -74,12 +105,11 @@ public class ProbeImporter implements ImporterProvider {
     public static class Failing extends ProbeImporter {
         @Override
         public ImporterDescriptor descriptor() {
-            return new ImporterDescriptor("failing", "Failing reader", API_VERSION, ImportResult.Kind.DOCUMENT);
+            return new ImporterDescriptor("failing", "Failing reader", "1.0.0");
         }
 
         @Override
-        public ImportResult read(InputStream input, Map<String, String> options) throws IOException {
-            input.read();
+        public CadDocument read(Path source, double scale) throws IOException {
             throw new IOException("Deliberate importer failure");
         }
     }

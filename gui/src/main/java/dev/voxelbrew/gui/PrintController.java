@@ -34,7 +34,7 @@ public final class PrintController implements AutoCloseable {
     private final Supplier<CadDocument> current;
     private final Path pluginDirectory;
     private final Slicing slicing;
-    private final dev.voxelbrew.importer.api.GcodeSource gcodeReader;
+    private final dev.voxelbrew.importer.GcodeSource gcodeReader;
     private Map<String, List<String>> completedGcode = Map.of();
     private Map<String, dev.voxelbrew.engine.printing.PrintArtifact> completedArtifacts = Map.of();
 
@@ -109,7 +109,7 @@ public final class PrintController implements AutoCloseable {
                 worker,
                 exporters,
                 slicing,
-                dev.voxelbrew.importer.api.ImportRuntime.load().gcode());
+                dev.voxelbrew.importer.ImportRuntime.load().gcode());
     }
 
     @javax.inject.Inject
@@ -120,7 +120,7 @@ public final class PrintController implements AutoCloseable {
             @javax.inject.Named("slicing") ExecutorService worker,
             java.util.function.Supplier<dev.voxelbrew.api.exporter.ExporterProviderRegistry> exporters,
             Slicing slicing,
-            dev.voxelbrew.importer.api.GcodeSource gcodeReader) {
+            dev.voxelbrew.importer.GcodeSource gcodeReader) {
         this.dispatch = dispatch;
         this.current = current;
         this.pluginDirectory = pluginDirectory;

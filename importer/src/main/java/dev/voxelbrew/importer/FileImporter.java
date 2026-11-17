@@ -1,36 +1,24 @@
 package dev.voxelbrew.importer;
 
-import dev.voxelbrew.importer.api.*;
+import dev.voxelbrew.api.importer.*;
+import dev.voxelbrew.engine.model.CadDocument;
 import java.io.*;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.Optional;
 
-/** Shared file interaction and bounded asynchronous reading for built-ins. */
+/** Shared synchronous file interaction and bounded reading for built-ins. */
 @lombok.RequiredArgsConstructor
-abstract class FileImporter implements Importer<ImportResult> {
-    private final Executor worker;
+abstract class FileImporter implements Importer {
     private final String title;
-    private final List<String> extensions;
+    private final String extension;
 
     @Override
-    public final CompletableFuture<ImportResult> importFrom(ImportWindow parent) {
-        var result = new CompletableFuture<ImportResult>();
-        try {
-            var dialog = new FileImportDialog(title, extensions, List.of());
-            if (parent.show(dialog).isEmpty()) return CompletableFuture.failedFuture(new CancellationException());
-            var source = dialog.getSettings().path();
-            worker.execute(() -> {
-                try (var input = ImportInput.open(source)) {
-                    result.complete(read(input));
-                } catch (Exception | LinkageError | AssertionError failure) {
-                    result.completeExceptionally(failure);
-                }
-            });
-        } catch (RuntimeException failure) {
-            result.completeExceptionally(failure);
+    public final Optional<CadDocument> importFrom(ImportWindow window) throws IOException {
+        var selected = window.show(new FileImportDialog(title, extension));
+        if (selected.isEmpty()) return Optional.empty();
+        try (var input = ImportInput.open(selected.orElseThrow().path())) {
+            return Optional.of(read(input));
         }
-        return result;
     }
 
-    protected abstract ImportResult read(InputStream input) throws IOException;
+    protected abstract CadDocument read(InputStream input) throws IOException;
 }

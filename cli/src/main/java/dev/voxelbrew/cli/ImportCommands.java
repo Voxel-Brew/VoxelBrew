@@ -1,7 +1,6 @@
 package dev.voxelbrew.cli;
 
-import dev.voxelbrew.importer.api.*;
-import dev.voxelbrew.importer.api.ImportResult;
+import dev.voxelbrew.api.importer.*;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.Callable;
@@ -21,7 +20,7 @@ final class ImportCommands {
     @Command(name = "importers", mixinStandardHelpOptions = true, description = "List built-in and external importers")
     @RequiredArgsConstructor(access = AccessLevel.PACKAGE, onConstructor_ = @javax.inject.Inject)
     static final class Importers implements Callable<Integer> {
-        private final ImporterCatalog.Factory importers;
+        private final java.util.function.Supplier<ImporterProviderRegistry> importers;
 
         @Option(names = "--plugin-dir")
         Path plugins = dev.voxelbrew.util.config.ApplicationPaths.plugins();
@@ -31,12 +30,11 @@ final class ImportCommands {
 
         @Override
         public Integer call() throws Exception {
-            try (var registry = importers.open(plugins)) {
-                registry.diagnostics().forEach(spec.commandLine().getErr()::println);
+            try (var registry = importers.get().withDirectory(plugins)) {
                 for (var descriptor : registry.descriptors()) {
                     spec.commandLine()
                             .getOut()
-                            .println(descriptor.id() + "\t" + descriptor.name() + "\t" + descriptor.resultKind());
+                            .println(descriptor.id() + "\t" + descriptor.name() + "\t" + descriptor.version());
                 }
             }
             return 0;
@@ -46,7 +44,7 @@ final class ImportCommands {
     @Command(name = "import", mixinStandardHelpOptions = true, description = "Import a document to .vxb")
     @RequiredArgsConstructor(access = AccessLevel.PACKAGE, onConstructor_ = @javax.inject.Inject)
     static final class ImportFile implements Callable<Integer> {
-        private final ImporterCatalog.Factory importers;
+        private final java.util.function.Supplier<ImporterProviderRegistry> importers;
         private final DocumentSave documents;
 
         @Parameters(index = "0")
@@ -72,8 +70,7 @@ final class ImportCommands {
 
         @Override
         public Integer call() throws Exception {
-            try (var registry = importers.open(plugins)) {
-                registry.diagnostics().forEach(spec.commandLine().getErr()::println);
+            try (var registry = importers.get().withDirectory(plugins)) {
                 if (output == null) throw new IllegalArgumentException("Document import requires --output");
                 if (output != null
                         && (source.toAbsolutePath()
@@ -82,12 +79,11 @@ final class ImportCommands {
                                 || java.nio.file.Files.exists(output)
                                         && java.nio.file.Files.isSameFile(source, output)))
                     throw new IllegalArgumentException("Import destination must differ from its source");
-                var result = ImportInvocation.read(registry, format, source, options);
-                if (result instanceof ImportResult.Document document) {
-                    documents.save(document.document(), output, overwrite);
-                    spec.commandLine()
-                            .getOut()
-                            .println("Imported " + document.document().id() + " to " + output);
+                var imported = registry.require(format).create().importFrom(new CliImportWindow(source, options));
+                if (imported.isPresent()) {
+                    var document = imported.orElseThrow();
+                    documents.save(document, output, overwrite);
+                    spec.commandLine().getOut().println("Imported " + document.id() + " to " + output);
                 }
             }
             return 0;

@@ -16,6 +16,7 @@ dependencies {
     testFixturesImplementation("org.assertj:assertj-core")
     testFixturesImplementation("org.slf4j:slf4j-api")
     testFixturesImplementation("dev.voxelbrew.api:export")
+    testFixturesImplementation("dev.voxelbrew.api:import")
     testImplementation("org.junit.platform:junit-platform-testkit")
 }
 

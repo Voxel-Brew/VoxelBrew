@@ -3,12 +3,12 @@ package dev.voxelbrew.exporter;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.exporter.*;
+import dev.voxelbrew.api.importer.ServiceLoaderImporterProviderRegistry;
 import dev.voxelbrew.engine.mesh.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.persistence.proto.DocumentProto;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.importer.*;
-import dev.voxelbrew.importer.api.ImportResult;
 import java.nio.file.*;
 import java.util.*;
 import java.util.zip.ZipFile;
@@ -50,7 +50,7 @@ class SlicerSettingsIoTest {
         var expected = setup();
         var document = new CadDocument("settings", List.of(), 0, expected);
         try (var exporters = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory);
-                var importers = new ImporterRegistry(directory)) {
+                var importers = new ServiceLoaderImporterProviderRegistry(directory)) {
             for (String format : List.of("vxb", "json")) {
                 Path file = directory.resolve("settings." + format);
                 exporters
@@ -58,9 +58,11 @@ class SlicerSettingsIoTest {
                         .create()
                         .export(document, dev.voxelbrew.util.testing.FileExportWindows.destination(file, false));
                 byte[] before = Files.readAllBytes(file);
-                var result = ImportService.read(importers, format, file, Map.of());
-                assertThat(result).isInstanceOf(ImportResult.Document.class);
-                var imported = ((ImportResult.Document) result).document();
+                var imported = importers
+                        .require(format)
+                        .create()
+                        .importFrom(dev.voxelbrew.util.testing.FileImportWindows.source(file))
+                        .orElseThrow();
                 assertThat(imported.printSetup()).isEqualTo(expected);
                 assertThat(Files.readAllBytes(file)).containsExactly(before);
                 Path copy = directory.resolve("copy-" + format + ".vxb");

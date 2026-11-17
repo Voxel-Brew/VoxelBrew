@@ -1,5 +1,4 @@
 consumer.ProbeImporter$Broken
 consumer.ProbeImporter
 consumer.ProbeImporter$Duplicate
-consumer.ProbeImporter$Incompatible
 consumer.ProbeImporter$Failing

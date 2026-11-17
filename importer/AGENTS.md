@@ -3,13 +3,16 @@
 ## Module Scope
 
 Follow the root `AGENTS.md` in addition to this guide. This module implements file readers,
-provider discovery, and import invocation under `dev.voxelbrew.importer` (`import` is a Java
+and synchronous built-in importers under `dev.voxelbrew.importer` (`import` is a Java
 keyword). Public contracts remain in the independent `api-import` artifact; document codecs and
-editable history belong in `engine`.
+editable history belong in `engine`. Direct `DocumentSource`, `GcodeSource`, and `ImportRuntime`
+reader ports are application-only types in this module, not public plugin contracts.
 
 ## Import Rules
 
-Readers must be headless, bounded, and independent of exporter, CLI, and JavaFX code. Never modify
+Readers must be headless, bounded, and independent of exporter, CLI, and JavaFX code. Provider
+discovery belongs to the public `ImporterProviderRegistry`; register built-ins through its
+ServiceLoader resource. Never modify
 an input file. Return detached model values, propagate cancellation and read failures, and preserve
 clear diagnostics for corrupt or newer-schema documents. Keep ServiceLoader registrations in
 `src/main/resources/META-INF/services/`. Do not represent mesh-only imports as editable parametric

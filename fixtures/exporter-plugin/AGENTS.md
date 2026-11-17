@@ -8,7 +8,7 @@
 - Preserve the JAR task's dependency-boundary assertion and ServiceLoader entries.
 - Build through `:engine:buildExporterFixture` from the application root so required
   fixture artifacts are published first; follow root instructions for formatting.
-- Validate provider discovery, compatibility and failure handling with relevant
+- Validate provider discovery, duplicate handling and failure handling with relevant
   host tests. Compilation alone does not verify plugin loading or native behavior.
 
 ## Lombok in Java code

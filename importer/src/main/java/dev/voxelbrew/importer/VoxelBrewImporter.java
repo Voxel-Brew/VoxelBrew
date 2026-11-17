@@ -1,18 +1,16 @@
 package dev.voxelbrew.importer;
 
-import dev.voxelbrew.importer.api.*;
+import dev.voxelbrew.api.importer.*;
 import java.io.*;
-import java.util.List;
-import java.util.concurrent.Executor;
 
 public final class VoxelBrewImporter extends FileImporter {
-    public VoxelBrewImporter(Executor worker) {
-        super(worker, "VoxelBrew document", List.of("vxb"));
+    public VoxelBrewImporter() {
+        super("VoxelBrew document", "vxb");
     }
 
     @Override
-    protected ImportResult read(InputStream input) throws IOException {
-        return new ImportResult.Document(dev.voxelbrew.engine.persistence.DocumentCodec.decode(
-                input.readNBytes(dev.voxelbrew.engine.persistence.DocumentCodec.MAX_ENCODED_BYTES + 1)));
+    protected dev.voxelbrew.engine.model.CadDocument read(InputStream input) throws IOException {
+        return dev.voxelbrew.engine.persistence.DocumentCodec.decode(
+                input.readNBytes(dev.voxelbrew.engine.persistence.DocumentCodec.MAX_ENCODED_BYTES + 1));
     }
 }

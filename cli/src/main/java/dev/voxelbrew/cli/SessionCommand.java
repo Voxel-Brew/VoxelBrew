@@ -2,8 +2,8 @@ package dev.voxelbrew.cli;
 
 import com.google.gson.Gson;
 import dev.voxelbrew.engine.model.CadDocument;
-import dev.voxelbrew.importer.api.DocumentSource;
-import dev.voxelbrew.importer.api.GcodeSource;
+import dev.voxelbrew.importer.DocumentSource;
+import dev.voxelbrew.importer.GcodeSource;
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;

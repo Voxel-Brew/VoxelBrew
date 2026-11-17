@@ -2,7 +2,7 @@ package dev.voxelbrew.gui;
 
 import dev.voxelbrew.engine.mesh.*;
 import dev.voxelbrew.engine.model.*;
-import dev.voxelbrew.importer.api.ImportRuntime;
+import dev.voxelbrew.importer.ImportRuntime;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
@@ -119,7 +119,7 @@ public final class DocumentController implements AutoCloseable {
     private final ExecutorService io;
 
     @NonNull
-    private final dev.voxelbrew.importer.api.DocumentSource documents;
+    private final dev.voxelbrew.importer.DocumentSource documents;
 
     @NonNull
     private final DocumentSave documentWriter;
@@ -199,7 +199,7 @@ public final class DocumentController implements AutoCloseable {
             @javax.inject.Named("plugins") Path pluginDirectory,
             @javax.inject.Named("rebuild") ExecutorService worker,
             @javax.inject.Named("files") ExecutorService io,
-            dev.voxelbrew.importer.api.DocumentSource documents,
+            dev.voxelbrew.importer.DocumentSource documents,
             DocumentSave documentWriter) {
         this(
                 dispatch,
@@ -660,23 +660,35 @@ public final class DocumentController implements AutoCloseable {
 
     /** Headless convenience path; the loader stays alive through asynchronous completion. */
     public CompletableFuture<Void> importFile(
-            dev.voxelbrew.importer.api.ImporterCatalog.Factory importers,
+            java.util.function.Supplier<dev.voxelbrew.api.importer.ImporterProviderRegistry> importers,
             String format,
             Path source,
             Map<String, String> options) {
         try {
-            var registry = importers.open(pluginDirectory);
+            var registry = importers.get().withDirectory(pluginDirectory);
             try {
-                return importDocument(
-                                registry.require(format),
-                                dev.voxelbrew.importer.api.FileImportDialog.source(source, options))
-                        .whenComplete((value, failure) -> {
-                            try {
-                                registry.close();
-                            } catch (java.io.IOException closeFailure) {
-                                log.warn("Closing importer registry", closeFailure);
-                            }
-                        });
+                dev.voxelbrew.api.importer.ImportWindow window = new dev.voxelbrew.api.importer.ImportWindow() {
+                    @Override
+                    public <R> java.util.Optional<R> show(dev.voxelbrew.api.importer.ImportDialog<R> dialog) {
+                        if (dialog instanceof dev.voxelbrew.api.importer.FileImportDialog file) {
+                            if (!options.isEmpty())
+                                throw new IllegalArgumentException("Unknown import options: " + options.keySet());
+                            @SuppressWarnings("unchecked")
+                            R settings = (R)
+                                    file.buildSettings(Map.of(file.sourceInput().id(), source.toString()));
+                            return java.util.Optional.of(settings);
+                        }
+                        throw new UnsupportedOperationException("Unsupported import dialog: "
+                                + dialog.getClass().getName());
+                    }
+                };
+                return importDocument(registry.require(format), window).whenComplete((value, failure) -> {
+                    try {
+                        registry.close();
+                    } catch (java.io.IOException closeFailure) {
+                        log.warn("Closing importer registry", closeFailure);
+                    }
+                });
             } catch (RuntimeException failure) {
                 registry.close();
                 throw failure;
@@ -686,45 +698,67 @@ public final class DocumentController implements AutoCloseable {
         }
     }
 
-    /** Collects provider settings on the UI thread and reads on the window-owned file worker. */
+    /** Runs import on the file worker and dispatches dialog interactions to the UI thread. */
     public CompletableFuture<Void> importDocument(
-            dev.voxelbrew.importer.api.ImporterCatalog.Entry entry, dev.voxelbrew.importer.api.ImportWindow parent) {
+            dev.voxelbrew.api.importer.ImporterProvider provider, dev.voxelbrew.api.importer.ImportWindow parent) {
         requireIdleIo();
         long generation = documentGeneration;
         ioBusy = true;
         onChanged.run();
         var result = new CompletableFuture<Void>();
-        dev.voxelbrew.importer.api.ImportInvocation.importFrom(entry, io, parent)
-                .whenComplete((imported, failure) -> {
-                    if (failure != null) {
-                        while (failure instanceof CompletionException && failure.getCause() != null)
-                            failure = failure.getCause();
-                        if (failure instanceof CancellationException) {
-                            dispatch.accept(() -> {
-                                ioBusy = false;
-                                onChanged.run();
-                                result.cancel(false);
-                            });
-                        } else
+        dev.voxelbrew.api.importer.ImportWindow interaction = new dev.voxelbrew.api.importer.ImportWindow() {
+            @Override
+            public <R> java.util.Optional<R> show(dev.voxelbrew.api.importer.ImportDialog<R> dialog) {
+                var selection = new CompletableFuture<java.util.Optional<R>>();
+                dispatch.accept(() -> {
+                    try {
+                        selection.complete(parent.show(dialog));
+                    } catch (RuntimeException | LinkageError failure) {
+                        selection.completeExceptionally(failure);
+                    }
+                });
+                return selection.join();
+            }
+        };
+        try {
+            CompletableFuture.supplyAsync(
+                            () -> {
+                                try {
+                                    return provider.create().importFrom(interaction);
+                                } catch (Exception failure) {
+                                    throw new CompletionException(failure);
+                                }
+                            },
+                            io)
+                    .whenComplete((imported, failure) -> {
+                        Throwable cause =
+                                failure instanceof CompletionException completion && completion.getCause() != null
+                                        ? completion.getCause()
+                                        : failure;
+                        if (cause != null) {
                             finishIo(
                                     result,
-                                    failure instanceof Exception exception ? exception : new RuntimeException(failure));
-                        return;
-                    }
-                    dispatch.accept(() -> {
-                        if (closed || documentGeneration != generation) {
-                            result.cancel(false);
+                                    cause instanceof Exception exception ? exception : new RuntimeException(cause));
                             return;
                         }
-                        ioBusy = false;
-                        if (imported instanceof dev.voxelbrew.importer.api.ImportResult.Document loaded) {
-                            replace(loaded.document(), null);
-                        }
-                        unsavedImport = true;
-                        onChanged.run();
-                        result.complete(null);
+                        dispatch.accept(() -> {
+                            if (closed || documentGeneration != generation) {
+                                result.cancel(false);
+                                return;
+                            }
+                            ioBusy = false;
+                            if (imported.isPresent()) {
+                                replace(imported.orElseThrow(), null);
+                                unsavedImport = true;
+                            }
+                            onChanged.run();
+                            if (imported.isEmpty()) result.cancel(false);
+                            else result.complete(null);
+                        });
                     });
-                });
+        } catch (RuntimeException | LinkageError failure) {
+            finishIo(result, failure instanceof Exception exception ? exception : new RuntimeException(failure));
+        }
         return result;
     }
 

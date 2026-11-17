@@ -19,6 +19,94 @@ class InjectedDocumentIoTest {
     private final Queue<Runnable> callbacks = new ConcurrentLinkedQueue<>();
 
     @Test
+    void importRunsOnFileWorkerShowsDialogOnOwnerThreadAndKeepsDocumentOnCancelOrFailure() throws Exception {
+        var owner = Thread.currentThread();
+        var importThread = new AtomicReference<Thread>();
+        var dialogThread = new AtomicReference<Thread>();
+        var controller =
+                new DocumentController(callbacks::add, doc -> new DocumentController.Build(List.of(), List.of(), true));
+        try {
+            var before = controller.snapshot().document();
+            dev.voxelbrew.api.importer.ImporterProvider provider = new dev.voxelbrew.api.importer.ImporterProvider() {
+                @Override
+                public dev.voxelbrew.api.importer.ImporterDescriptor descriptor() {
+                    return new dev.voxelbrew.api.importer.ImporterDescriptor("thread-probe", "Thread probe", "1.0");
+                }
+
+                @Override
+                public dev.voxelbrew.api.importer.Importer create() {
+                    return window -> {
+                        importThread.set(Thread.currentThread());
+                        return window.show(new dev.voxelbrew.api.importer.ImportDialog<CadDocument>() {
+                            @Override
+                            public String title() {
+                                return "Thread probe";
+                            }
+
+                            @Override
+                            public dev.voxelbrew.api.importer.component.ImportDialogLayout layout() {
+                                return new dev.voxelbrew.api.importer.component.VerticalLayout();
+                            }
+
+                            @Override
+                            public Map<String, String> validate(Map<String, String> values) {
+                                return Map.of();
+                            }
+
+                            @Override
+                            public CadDocument buildSettings(Map<String, String> values) {
+                                return CadDocument.empty();
+                            }
+                        });
+                    };
+                }
+            };
+            var cancelled = controller.importDocument(provider, new dev.voxelbrew.api.importer.ImportWindow() {
+                @Override
+                public <R> Optional<R> show(dev.voxelbrew.api.importer.ImportDialog<R> dialog) {
+                    dialogThread.set(Thread.currentThread());
+                    return Optional.empty();
+                }
+            });
+            await(cancelled::isDone);
+            org.assertj.core.api.Assertions.assertThat(cancelled).isCancelled();
+            org.assertj.core.api.Assertions.assertThat(importThread.get()).isNotSameAs(owner);
+            org.assertj.core.api.Assertions.assertThat(dialogThread.get()).isSameAs(owner);
+            org.assertj.core.api.Assertions.assertThat(controller.snapshot().document())
+                    .isEqualTo(before);
+            org.assertj.core.api.Assertions.assertThat(controller.ioBusy()).isFalse();
+
+            var failed = controller.importDocument(
+                    new dev.voxelbrew.api.importer.ImporterProvider() {
+                        @Override
+                        public dev.voxelbrew.api.importer.ImporterDescriptor descriptor() {
+                            return new dev.voxelbrew.api.importer.ImporterDescriptor("failure", "Failure", "1.0");
+                        }
+
+                        @Override
+                        public dev.voxelbrew.api.importer.Importer create() {
+                            return window -> {
+                                throw new IOException("Injected import failure");
+                            };
+                        }
+                    },
+                    new dev.voxelbrew.api.importer.ImportWindow() {
+                        @Override
+                        public <R> Optional<R> show(dev.voxelbrew.api.importer.ImportDialog<R> dialog) {
+                            return Optional.empty();
+                        }
+                    });
+            await(failed::isDone);
+            org.assertj.core.api.Assertions.assertThat(failed).isCompletedExceptionally();
+            org.assertj.core.api.Assertions.assertThat(controller.snapshot().document())
+                    .isEqualTo(before);
+            org.assertj.core.api.Assertions.assertThat(controller.ioBusy()).isFalse();
+        } finally {
+            controller.close();
+        }
+    }
+
+    @Test
     void exportRunsOnFileWorkerAndShowsDialogOnOwnerThread() throws Exception {
         var owner = Thread.currentThread();
         var exportThread = new AtomicReference<Thread>();

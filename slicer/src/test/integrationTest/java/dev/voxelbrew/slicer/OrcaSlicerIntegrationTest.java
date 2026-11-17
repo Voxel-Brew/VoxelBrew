@@ -1,6 +1,6 @@
 package dev.voxelbrew.slicer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.mesh.MeshOptions;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
@@ -46,20 +46,19 @@ class OrcaSlicerIntegrationTest {
                 new Cancellation(),
                 System.out::println,
                 dev.voxelbrew.slicer.api.Slicing.DIRECT);
-        assertNotNull(result.artifact());
-        assertFalse(result.job().modelLayers().isEmpty());
-        assertEquals("Bambu Lab A1", result.artifact().metadata().get("model"));
+        assertThat(result.artifact()).isNotNull();
+        assertThat(result.job().modelLayers().isEmpty()).isFalse();
+        assertThat(result.artifact().metadata().get("model")).isEqualTo("Bambu Lab A1");
         Path packageFile = directory.resolve("plate.gcode.3mf");
         Files.write(packageFile, result.artifact().bytes());
         try (var zip = new ZipFile(packageFile.toFile())) {
-            assertNotNull(zip.getEntry("Metadata/plate_1.gcode"));
+            assertThat(zip.getEntry("Metadata/plate_1.gcode")).isNotNull();
         }
         var document = session.document()
                 .withGcode(Map.of(setup.activePlateId(), result.job().lines()))
                 .withPrintArtifacts(Map.of(setup.activePlateId(), result.artifact()));
         var reopened = DocumentCodec.decode(DocumentCodec.encode(document));
-        assertArrayEquals(
-                result.artifact().bytes(),
-                reopened.printArtifacts().get(setup.activePlateId()).bytes());
+        assertThat(reopened.printArtifacts().get(setup.activePlateId()).bytes())
+                .containsExactly(result.artifact().bytes());
     }
 }

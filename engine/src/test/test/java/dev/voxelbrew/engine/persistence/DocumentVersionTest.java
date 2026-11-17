@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine.persistence;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.CadDocument;
 import dev.voxelbrew.engine.persistence.proto.DocumentProto;
@@ -12,18 +12,21 @@ import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("deprecation")
 class DocumentVersionTest {
     @Test
     void usesTheCurrentMagicAndRejectsThePreviousSignature() throws Exception {
         var document = CadDocument.empty();
         byte[] bytes = DocumentCodec.encode(document);
-        assertArrayEquals(new byte[] {'J', 'C', 'A', 'D', 13, 37, 13, 37}, Arrays.copyOf(bytes, 8));
-        assertEquals(document, DocumentCodec.decode(bytes));
+        assertThat(Arrays.copyOf(bytes, 8)).containsExactly(new byte[] {'J', 'C', 'A', 'D', 13, 37, 13, 37});
+        assertThat(DocumentCodec.decode(bytes)).isEqualTo(document);
         byte[] previous = {'J', 'C', 'A', 'D', 13, 10, 26, 10};
         System.arraycopy(previous, 0, bytes, 0, previous.length);
-        assertTrue(assertThrows(DocumentFormatException.class, () -> DocumentCodec.decode(bytes))
-                .getMessage()
-                .contains("magic mismatch"));
+        assertThat(org.assertj.core.api.Assertions.catchThrowableOfType(
+                                () -> DocumentCodec.decode(bytes), DocumentFormatException.class)
+                        .getMessage()
+                        .contains("magic mismatch"))
+                .isTrue();
     }
 
     @Test
@@ -31,20 +34,21 @@ class DocumentVersionTest {
         var document = CadDocument.empty();
         byte[] bytes = DocumentCodec.encode(document);
         var message = message(bytes);
-        assertEquals(Version.version(), message.getApplicationVersion());
-        assertEquals(document, DocumentCodec.decode(bytes));
-        assertEquals(
-                java.util.HexFormat.of()
+        assertThat(message.getApplicationVersion()).isEqualTo(Version.version());
+        assertThat(DocumentCodec.decode(bytes)).isEqualTo(document);
+        assertThat(DocumentCodec.fingerprint(document))
+                .isEqualTo(java.util.HexFormat.of()
                         .formatHex(MessageDigest.getInstance("SHA-256")
                                 .digest(message.toBuilder()
                                         .clearApplicationVersion()
                                         .build()
-                                        .toByteArray())),
-                DocumentCodec.fingerprint(document));
+                                        .toByteArray())));
         bytes[bytes.length - 1] ^= 1;
-        assertTrue(assertThrows(DocumentFormatException.class, () -> DocumentCodec.decode(bytes))
-                .getMessage()
-                .contains("checksum"));
+        assertThat(org.assertj.core.api.Assertions.catchThrowableOfType(
+                                () -> DocumentCodec.decode(bytes), DocumentFormatException.class)
+                        .getMessage()
+                        .contains("checksum"))
+                .isTrue();
     }
 
     @Test
@@ -59,16 +63,16 @@ class DocumentVersionTest {
                         .build());
                 byte[] before = old.clone();
                 if (schema != DocumentCodec.SCHEMA_VERSION) {
-                    assertThrows(DocumentFormatException.class, () -> DocumentCodec.decode(old));
+                    assertThatThrownBy(() -> DocumentCodec.decode(old)).isInstanceOf(DocumentFormatException.class);
                     continue;
                 }
                 var document = DocumentCodec.decode(old);
-                assertEquals(original, document);
-                assertArrayEquals(before, old);
+                assertThat(document).isEqualTo(original);
+                assertThat(old).containsExactly(before);
                 var upgraded = message(DocumentCodec.encode(document));
-                assertEquals(DocumentCodec.SCHEMA_VERSION, upgraded.getSchemaVersion());
-                assertEquals(Version.version(), upgraded.getApplicationVersion());
-                assertEquals(DocumentCodec.fingerprint(original), DocumentCodec.fingerprint(document));
+                assertThat(upgraded.getSchemaVersion()).isEqualTo(DocumentCodec.SCHEMA_VERSION);
+                assertThat(upgraded.getApplicationVersion()).isEqualTo(Version.version());
+                assertThat(DocumentCodec.fingerprint(document)).isEqualTo(DocumentCodec.fingerprint(original));
             }
         }
     }
@@ -85,10 +89,12 @@ class DocumentVersionTest {
         for (String version : future) {
             byte[] bytes =
                     envelope(message.toBuilder().setApplicationVersion(version).build());
-            var error = assertThrows(DocumentFormatException.class, () -> DocumentCodec.decode(bytes));
-            assertTrue(error.getMessage().contains("VoxelBrew " + version));
-            assertTrue(error.getMessage().contains("supported version " + Version.version()));
-            assertTrue(error.getMessage().contains("Update VoxelBrew"));
+            var error = org.assertj.core.api.Assertions.catchThrowableOfType(
+                    () -> DocumentCodec.decode(bytes), DocumentFormatException.class);
+            assertThat(error.getMessage().contains("VoxelBrew " + version)).isTrue();
+            assertThat(error.getMessage().contains("supported version " + Version.version()))
+                    .isTrue();
+            assertThat(error.getMessage().contains("Update VoxelBrew")).isTrue();
         }
     }
 
@@ -98,10 +104,11 @@ class DocumentVersionTest {
         for (String version : List.of(" ", "1.2", "v1.2.3", "01.2.3", "-1.0.0", "1.2.3-rc1", "65535.0.0")) {
             byte[] bytes =
                     envelope(message.toBuilder().setApplicationVersion(version).build());
-            var error = assertThrows(DocumentFormatException.class, () -> DocumentCodec.decode(bytes));
-            assertTrue(
-                    error.getMessage().contains("Invalid .vxb application version"),
-                    () -> "Unexpected diagnostic for writer version '" + version + "': " + error.getMessage());
+            var error = org.assertj.core.api.Assertions.catchThrowableOfType(
+                    () -> DocumentCodec.decode(bytes), DocumentFormatException.class);
+            assertThat(error.getMessage().contains("Invalid .vxb application version"))
+                    .as(() -> "Unexpected diagnostic for writer version '" + version + "': " + error.getMessage())
+                    .isTrue();
         }
     }
 

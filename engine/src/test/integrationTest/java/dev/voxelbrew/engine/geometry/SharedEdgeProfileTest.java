@@ -1,7 +1,7 @@
 package dev.voxelbrew.engine.geometry;
 
 import static dev.voxelbrew.engine.sketch.SketchGeometry.*;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.sketch.*;
 import java.util.*;
@@ -26,7 +26,7 @@ class SharedEdgeProfileTest {
     @Test
     void individualFacesKeepSharedEdgeAndStableReferences() throws Exception {
         var original = SketchProfiles.selectableRegions(geometry(house()));
-        assertEquals(2, original.size());
+        assertThat(original.size()).isEqualTo(2);
         for (int seed = 0; seed < 12; seed++) {
             var entities = new ArrayList<>(house());
             Collections.shuffle(entities, new Random(seed));
@@ -49,11 +49,12 @@ class SharedEdgeProfileTest {
                         dev.voxelbrew.engine.persistence.DocumentCodec.encode(session.document()));
                 try (var evaluation = new dev.voxelbrew.engine.model.ModelSession(reopened).evaluate()) {
                     evaluation.requireCompleteDocument();
-                    assertEquals(1, evaluation.bodies().size());
+                    assertThat(evaluation.bodies().size()).isEqualTo(1);
                     var solid = evaluation.bodies().getFirst().solid();
-                    assertEquals(i == 0 ? 1000 : 500, solid.volume(), 1e-6);
-                    assertEquals(i == 0, solid.contains(10, 5, 2));
-                    assertEquals(i != 0, solid.contains(10, 15, 2));
+                    assertThat(solid.volume())
+                            .isCloseTo(i == 0 ? 1000 : 500, org.assertj.core.data.Offset.offset(1e-6));
+                    assertThat(solid.contains(10, 5, 2)).isEqualTo(i == 0);
+                    assertThat(solid.contains(10, 15, 2)).isEqualTo(i != 0);
                 }
             }
         }
@@ -65,19 +66,19 @@ class SharedEdgeProfileTest {
         entities.add(Sketches.entity("hole", Kind.CIRCLE, false, 10, 5, 2));
         var g = geometry(entities);
         var regions = SketchProfiles.selectableRegions(g);
-        assertEquals(2, regions.size());
+        assertThat(regions.size()).isEqualTo(2);
         try (var solid = Solid.profilePrism(regions.getFirst().profile(), 0, 5)) {
-            assertEquals(1000 - 20 * Math.PI, solid.volume(), 1e-6);
-            assertFalse(solid.contains(10, 5, 2));
-            assertFalse(solid.contains(10, 15, 2));
+            assertThat(solid.volume()).isCloseTo(1000 - 20 * Math.PI, org.assertj.core.data.Offset.offset(1e-6));
+            assertThat(solid.contains(10, 5, 2)).isFalse();
+            assertThat(solid.contains(10, 15, 2)).isFalse();
         }
         var sketch = new dev.voxelbrew.engine.model.Feature.Sketch(
                 "s",
                 "p",
                 new dev.voxelbrew.engine.model.Feature.Plane("origin-xy", 0),
                 new dev.voxelbrew.engine.model.Feature.Constrained(g));
-        assertThrows(
-                IllegalArgumentException.class, () -> SketchProfiles.referencedRegions(sketch, "p/region/missing"));
+        assertThatThrownBy(() -> SketchProfiles.referencedRegions(sketch, "p/region/missing"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -89,13 +90,13 @@ class SharedEdgeProfileTest {
                 entities.replaceAll(
                         e -> Sketches.entity(e.id(), Kind.LINE, false, e.value(2), e.value(3), e.value(0), e.value(1)));
             var g = geometry(entities);
-            assertTrue(SketchProfiles.hasProfile(g));
-            assertEquals(1, SketchProfiles.regions(g).size());
+            assertThat(SketchProfiles.hasProfile(g)).isTrue();
+            assertThat(SketchProfiles.regions(g).size()).isEqualTo(1);
             try (var solid = Solid.profilePrism(SketchProfiles.profile(g), 0, 5)) {
-                assertEquals(1500, solid.volume(), 1e-6);
-                assertTrue(solid.contains(10, 5, 2));
-                assertTrue(solid.contains(10, 15, 2));
-                assertTrue(solid.contains(10, 10, 2));
+                assertThat(solid.volume()).isCloseTo(1500, org.assertj.core.data.Offset.offset(1e-6));
+                assertThat(solid.contains(10, 5, 2)).isTrue();
+                assertThat(solid.contains(10, 15, 2)).isTrue();
+                assertThat(solid.contains(10, 10, 2)).isTrue();
             }
         }
     }
@@ -106,22 +107,22 @@ class SharedEdgeProfileTest {
         entities.add(Sketches.entity("hole", Kind.CIRCLE, false, 10, 5, 2));
         entities.add(Sketches.entity("separate", Kind.CIRCLE, false, 40, 5, 2));
         var regions = SketchProfiles.regions(geometry(entities));
-        assertEquals(2, regions.size());
-        assertEquals("bottom", regions.getFirst().id());
+        assertThat(regions.size()).isEqualTo(2);
+        assertThat(regions.getFirst().id()).isEqualTo("bottom");
         double volume = 0;
         for (var region : regions) {
             try (var solid = Solid.profilePrism(region.profile(), 0, 5)) {
                 volume += solid.volume();
-                assertFalse(solid.contains(10, 5, 2));
+                assertThat(solid.contains(10, 5, 2)).isFalse();
             }
         }
-        assertEquals(1500, volume, 1e-6);
+        assertThat(volume).isCloseTo(1500, org.assertj.core.data.Offset.offset(1e-6));
     }
 
     @Test
     void danglingEdgeStillRejectsExtrusion() {
         var entities = new ArrayList<>(house());
         entities.add(Sketches.entity("open", Kind.LINE, false, 10, 20, 10, 25));
-        assertFalse(SketchProfiles.hasProfile(geometry(entities)));
+        assertThat(SketchProfiles.hasProfile(geometry(entities))).isFalse();
     }
 }

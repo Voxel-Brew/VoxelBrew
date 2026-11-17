@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -18,7 +18,7 @@ class SlicerWorkspaceTest {
         workspace.restore(document, saved, workspace.pending(document));
         field.set("6");
         workspace.restore(document, saved, Map.of());
-        assertEquals(Map.of("walls", "6", "future-setting", "preserved"), workspace.capture());
+        assertThat(workspace.capture()).isEqualTo(Map.of("walls", "6", "future-setting", "preserved"));
     }
 
     @Test
@@ -29,21 +29,21 @@ class SlicerWorkspaceTest {
         workspace.initialize();
         var first = new Object();
         workspace.restore(first, Map.of(), workspace.pending(first));
-        assertEquals(Map.of(), workspace.capture());
+        assertThat(workspace.capture()).isEqualTo(Map.of());
         field.set("custom.gcode");
         var pending = workspace.pending(first);
         field.set("generated.gcode");
         workspace.restore(first, Map.of(), pending);
-        assertEquals("custom.gcode", field.get());
+        assertThat(field.get()).isEqualTo("custom.gcode");
         var saved = workspace.capture();
         workspace.restore(first, saved, Map.of());
-        assertEquals(saved, workspace.capture());
+        assertThat(workspace.capture()).isEqualTo(saved);
         var second = new Object();
         workspace.restore(second, Map.of(), workspace.pending(second));
-        assertEquals("default", field.get());
-        assertEquals(Map.of(), workspace.capture());
+        assertThat(field.get()).isEqualTo("default");
+        assertThat(workspace.capture()).isEqualTo(Map.of());
         var reopened = new Object();
         workspace.restore(reopened, saved, workspace.pending(reopened));
-        assertEquals("custom.gcode", field.get());
+        assertThat(field.get()).isEqualTo("custom.gcode");
     }
 }

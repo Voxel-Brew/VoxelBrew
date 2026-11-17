@@ -1,16 +1,19 @@
 package dev.voxelbrew.util.concurrent;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("deprecation")
 class CpuWorkTest {
     private static void await(CountDownLatch latch) {
         try {
-            assertTrue(latch.await(10, TimeUnit.SECONDS), "worker rendezvous timed out");
+            assertThat(latch.await(10, TimeUnit.SECONDS))
+                    .as("worker rendezvous timed out")
+                    .isTrue();
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
             throw new AssertionError(failure);
@@ -36,15 +39,15 @@ class CpuWorkTest {
             }));
             try {
                 await(started);
-                assertEquals(3, active.get());
+                assertThat(active.get()).isEqualTo(3);
             } finally {
                 release.countDown();
             }
             result.get(10, TimeUnit.SECONDS);
-            assertEquals(3, peak.get());
-            for (int i = 0; i < 48; i++) assertEquals(2, visits.get(i));
+            assertThat(peak.get()).isEqualTo(3);
+            for (int i = 0; i < 48; i++) assertThat(visits.get(i)).isEqualTo(2);
         }
-        assertEquals(List.of(9, 4, 1), CpuWork.map(List.of(3, 2, 1), n -> n * n));
+        assertThat(CpuWork.map(List.of(3, 2, 1), n -> n * n)).isEqualTo(List.of(9, 4, 1));
     }
 
     @Test
@@ -66,14 +69,14 @@ class CpuWorkTest {
             }));
             try {
                 await(failed);
-                assertThrows(TimeoutException.class, () -> result.get(100, TimeUnit.MILLISECONDS));
+                assertThatThrownBy(() -> result.get(100, TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);
             } finally {
                 release.countDown();
             }
-            assertSame(
-                    exception,
-                    assertThrows(ExecutionException.class, () -> result.get(10, TimeUnit.SECONDS))
-                            .getCause());
+            assertThat(org.assertj.core.api.Assertions.catchThrowableOfType(
+                                    () -> result.get(10, TimeUnit.SECONDS), ExecutionException.class)
+                            .getCause())
+                    .isSameAs(exception);
         }
     }
 
@@ -101,13 +104,13 @@ class CpuWorkTest {
             try {
                 await(started);
                 caller.interrupt();
-                assertFalse(returned.await(100, TimeUnit.MILLISECONDS));
+                assertThat(returned.await(100, TimeUnit.MILLISECONDS)).isFalse();
             } finally {
                 release.countDown();
             }
-            assertTrue(caller.join(java.time.Duration.ofSeconds(10)));
-            assertInstanceOf(CancellationException.class, failure.get());
-            assertTrue(interrupted.get());
+            assertThat(caller.join(java.time.Duration.ofSeconds(10))).isTrue();
+            assertThat(failure.get()).isInstanceOf(CancellationException.class);
+            assertThat(interrupted.get()).isTrue();
         }
     }
 
@@ -115,9 +118,9 @@ class CpuWorkTest {
     void serialModeHasNoWorkersAndRejectsInvalidBudgets() {
         try (var pool = new CpuWork.WorkPool(1)) {
             var caller = Thread.currentThread();
-            pool.forEach(10, index -> assertSame(caller, Thread.currentThread()));
+            pool.forEach(10, index -> assertThat(Thread.currentThread()).isSameAs(caller));
         }
-        assertThrows(IllegalArgumentException.class, () -> new CpuWork.WorkPool(0));
-        assertThrows(IllegalArgumentException.class, () -> new CpuWork.WorkPool(33));
+        assertThatThrownBy(() -> new CpuWork.WorkPool(0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new CpuWork.WorkPool(33)).isInstanceOf(IllegalArgumentException.class);
     }
 }

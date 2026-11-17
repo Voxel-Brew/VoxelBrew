@@ -1,11 +1,12 @@
 package dev.voxelbrew.engine.geometry;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+@SuppressWarnings("deprecation")
 class NativeKernelTest {
     @Test
     void bearingMountFilletsAndSubsequentCutsProducePrintableMeshes() {
@@ -21,14 +22,15 @@ class NativeKernelTest {
             for (var solid : java.util.List.of(rounded, cut1, cut2, cut3, cut4, bored)) {
                 var mesh = solid.tessellate(dev.voxelbrew.engine.mesh.MeshOptions.DEFAULT);
                 var report = dev.voxelbrew.engine.mesh.MeshValidation.inspect(mesh);
-                assertTrue(report.closed(), report.toString());
+                assertThat(report.closed()).as(report.toString()).isTrue();
                 for (int t = 0; t < mesh.triangleCount(); t++) {
-                    assertTrue(mesh.faceIndex(t) >= 0);
+                    assertThat(mesh.faceIndex(t) >= 0).isTrue();
                 }
             }
-            assertEquals(20786.053208586636, bored.volume(), VOLUME_TOLERANCE_MM3);
+            assertThat(bored.volume())
+                    .isCloseTo(20786.053208586636, org.assertj.core.data.Offset.offset(VOLUME_TOLERANCE_MM3));
         }
-        assertEquals(before, NativeKernel.liveHandles());
+        assertThat(NativeKernel.liveHandles()).isEqualTo(before);
     }
 
     private static final double VOLUME_TOLERANCE_MM3 = 0.01;
@@ -41,33 +43,38 @@ class NativeKernelTest {
                 Solid fillet = box.edgeFinish(true, 1, new int[] {1});
                 Solid chamfer = box.edgeFinish(false, 1, new int[] {1});
                 Solid shell = box.shell(1, 1)) {
-            assertTrue(fillet.volume() < box.volume());
-            assertTrue(chamfer.volume() < box.volume());
-            assertTrue(shell.volume() < box.volume());
-            assertTrue(shell.volume() > 0);
-            assertEquals(4000, box.volume(), VOLUME_TOLERANCE_MM3);
-            assertTrue(box.faceEdges().length >= 2);
-            assertEquals(0, box.faceEdges().length % 2);
-            assertEquals(0, box.edgeSamples().length % 4);
+            assertThat(fillet.volume() < box.volume()).isTrue();
+            assertThat(chamfer.volume() < box.volume()).isTrue();
+            assertThat(shell.volume() < box.volume()).isTrue();
+            assertThat(shell.volume() > 0).isTrue();
+            assertThat(box.volume()).isCloseTo(4000, org.assertj.core.data.Offset.offset(VOLUME_TOLERANCE_MM3));
+            assertThat(box.faceEdges().length >= 2).isTrue();
+            assertThat(box.faceEdges().length % 2).isEqualTo(0);
+            assertThat(box.edgeSamples().length % 4).isEqualTo(0);
         }
-        assertEquals(before, NativeKernel.liveHandles());
+        assertThat(NativeKernel.liveHandles()).isEqualTo(before);
     }
 
     @ParameterizedTest
     @ValueSource(doubles = {5, 8})
     void referencePlateUsesRealKernel(double thickness) {
-        assertEquals("7.9.0", Solid.kernelVersion());
+        assertThat(Solid.kernelVersion()).isEqualTo("7.9.0");
         int before = NativeKernel.liveHandles();
         try (Solid plate = Solid.rectanglePrism(0, 0, 0, 60, 40, thickness);
                 Solid drilled = plate.cutThroughCircle(10, 10, 4)) {
             double expected = (60 * 40 - 4 * Math.PI) * thickness;
-            assertEquals(expected, drilled.volume(), VOLUME_TOLERANCE_MM3);
+            assertThat(drilled.volume()).isCloseTo(expected, org.assertj.core.data.Offset.offset(VOLUME_TOLERANCE_MM3));
             assertBounds(new Bounds(0, 0, 0, 60, 40, thickness), drilled.bounds());
             for (double fraction : new double[] {0.01, 0.5, 0.99}) {
-                assertFalse(drilled.contains(10, 10, thickness * fraction), "hole must be open throughout");
-                assertTrue(drilled.contains(13, 10, thickness * fraction), "surrounding material must remain");
+                assertThat(drilled.contains(10, 10, thickness * fraction))
+                        .as("hole must be open throughout")
+                        .isFalse();
+                assertThat(drilled.contains(13, 10, thickness * fraction))
+                        .as("surrounding material must remain")
+                        .isTrue();
             }
-            assertEquals(2400 * thickness, plate.volume(), VOLUME_TOLERANCE_MM3);
+            assertThat(plate.volume())
+                    .isCloseTo(2400 * thickness, org.assertj.core.data.Offset.offset(VOLUME_TOLERANCE_MM3));
             System.out.printf(
                     java.util.Locale.ROOT,
                     "OCCT %s thickness=%.1f mm volume=%.12f mm^3 expected=%.12f bounds=%s%n",
@@ -77,7 +84,7 @@ class NativeKernelTest {
                     expected,
                     drilled.bounds());
         }
-        assertEquals(before, NativeKernel.liveHandles(), "all native owners released");
+        assertThat(NativeKernel.liveHandles()).as("all native owners released").isEqualTo(before);
     }
 
     @Test
@@ -86,7 +93,7 @@ class NativeKernelTest {
                 Solid negative = Solid.rectanglePrism(0, 0, 12, 60, 40, -3)) {
             assertBounds(new Bounds(0, 0, 12, 60, 40, 17), positive.bounds());
             assertBounds(new Bounds(0, 0, 9, 60, 40, 12), negative.bounds());
-            assertEquals(7200, negative.volume(), VOLUME_TOLERANCE_MM3);
+            assertThat(negative.volume()).isCloseTo(7200, org.assertj.core.data.Offset.offset(VOLUME_TOLERANCE_MM3));
         }
     }
 
@@ -98,38 +105,45 @@ class NativeKernelTest {
             result = source.cutThroughCircle(10, 10, 4);
         }
         try (result) {
-            assertEquals((2400 - 4 * Math.PI) * 8, result.volume(), VOLUME_TOLERANCE_MM3);
+            assertThat(result.volume())
+                    .isCloseTo((2400 - 4 * Math.PI) * 8, org.assertj.core.data.Offset.offset(VOLUME_TOLERANCE_MM3));
         }
         result.close();
-        assertThrows(IllegalStateException.class, result::volume);
-        assertEquals(before, NativeKernel.liveHandles());
+        assertThatThrownBy(result::volume).isInstanceOf(IllegalStateException.class);
+        assertThat(NativeKernel.liveHandles()).isEqualTo(before);
     }
 
     @Test
     void invalidDimensionsAreRejectedBeforeAllocating() {
         int before = NativeKernel.liveHandles();
         for (double bad : new double[] {0, -1, Double.NaN, Double.POSITIVE_INFINITY}) {
-            assertThrows(IllegalArgumentException.class, () -> Solid.rectanglePrism(0, 0, 0, bad, 40, 5));
+            assertThatThrownBy(() -> Solid.rectanglePrism(0, 0, 0, bad, 40, 5))
+                    .isInstanceOf(IllegalArgumentException.class);
             try (Solid plate = Solid.rectanglePrism(0, 0, 0, 60, 40, 5)) {
-                assertThrows(IllegalArgumentException.class, () -> plate.cutThroughCircle(10, 10, bad));
+                assertThatThrownBy(() -> plate.cutThroughCircle(10, 10, bad))
+                        .isInstanceOf(IllegalArgumentException.class);
             }
         }
-        assertEquals(before, NativeKernel.liveHandles());
+        assertThat(NativeKernel.liveHandles()).isEqualTo(before);
     }
 
     @Test
     void nativeFailuresBecomeJavaDiagnostics() {
-        GeometryException error = assertThrows(GeometryException.class, () -> NativeKernel.volume(Long.MAX_VALUE));
-        assertTrue(error.getMessage().contains("volume: unknown or closed solid handle"));
-        error = assertThrows(GeometryException.class, () -> NativeKernel.rectanglePrism(0, 0, 0, -1, 40, 5));
-        assertTrue(error.getMessage().contains("rectangle extrusion"));
+        GeometryException error = org.assertj.core.api.Assertions.catchThrowableOfType(
+                () -> NativeKernel.volume(Long.MAX_VALUE), GeometryException.class);
+        assertThat(error.getMessage().contains("volume: unknown or closed solid handle"))
+                .isTrue();
+        error = org.assertj.core.api.Assertions.catchThrowableOfType(
+                () -> NativeKernel.rectanglePrism(0, 0, 0, -1, 40, 5), GeometryException.class);
+        assertThat(error.getMessage().contains("rectangle extrusion")).isTrue();
         int before = NativeKernel.liveHandles();
         try (Solid plate = Solid.rectanglePrism(0, 0, 0, 60, 40, 5)) {
-            error = assertThrows(GeometryException.class, () -> plate.cutThroughCircle(30, 20, 1000));
-            assertTrue(error.getMessage().contains("exactly one solid"));
-            assertEquals(12000, plate.volume(), VOLUME_TOLERANCE_MM3);
+            error = org.assertj.core.api.Assertions.catchThrowableOfType(
+                    () -> plate.cutThroughCircle(30, 20, 1000), GeometryException.class);
+            assertThat(error.getMessage().contains("exactly one solid")).isTrue();
+            assertThat(plate.volume()).isCloseTo(12000, org.assertj.core.data.Offset.offset(VOLUME_TOLERANCE_MM3));
         }
-        assertEquals(before, NativeKernel.liveHandles());
+        assertThat(NativeKernel.liveHandles()).isEqualTo(before);
     }
 
     @Test
@@ -143,7 +157,10 @@ class NativeKernelTest {
                         double thickness = 5 + revision;
                         try (Solid plate = Solid.rectanglePrism(0, 0, 0, 60, 40, thickness);
                                 Solid drilled = plate.cutThroughCircle(10, 10, 4)) {
-                            assertEquals((2400 - 4 * Math.PI) * thickness, drilled.volume(), VOLUME_TOLERANCE_MM3);
+                            assertThat(drilled.volume())
+                                    .isCloseTo(
+                                            (2400 - 4 * Math.PI) * thickness,
+                                            org.assertj.core.data.Offset.offset(VOLUME_TOLERANCE_MM3));
                         }
                     }
                     return null;
@@ -153,15 +170,16 @@ class NativeKernelTest {
                 future.get();
             }
         }
-        assertEquals(before, NativeKernel.liveHandles());
+        assertThat(NativeKernel.liveHandles()).isEqualTo(before);
     }
 
     private static void assertBounds(Bounds expected, Bounds actual) {
-        assertArrayEquals(
-                new double[] {
+        assertThat(new double[] {
+                    actual.minX(), actual.minY(), actual.minZ(), actual.maxX(), actual.maxY(), actual.maxZ()
+                })
+                .usingComparatorWithPrecision(BOUNDS_TOLERANCE_MM)
+                .containsExactly(new double[] {
                     expected.minX(), expected.minY(), expected.minZ(), expected.maxX(), expected.maxY(), expected.maxZ()
-                },
-                new double[] {actual.minX(), actual.minY(), actual.minZ(), actual.maxX(), actual.maxY(), actual.maxZ()},
-                BOUNDS_TOLERANCE_MM);
+                });
     }
 }

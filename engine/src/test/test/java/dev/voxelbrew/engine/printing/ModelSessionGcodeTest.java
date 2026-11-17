@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine.printing;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.*;
 import java.util.*;
@@ -13,16 +13,16 @@ class ModelSessionGcodeTest {
         var jobs = Map.of("plate-1", List.of("G90"), "second", List.of("G21"));
         var session = new ModelSession(new CadDocument("doc", List.of(), 0, setup).withGcode(jobs));
         session.setPrintSetup(setup.selectPlate("second"));
-        assertEquals(jobs, session.document().gcode());
-        assertEquals(List.of("G21"), session.document().activeGcode());
+        assertThat(session.document().gcode()).isEqualTo(jobs);
+        assertThat(session.document().activeGcode()).isEqualTo(List.of("G21"));
         session.setPrintSetup(session.document()
                 .printSetup()
                 .withInstances(List.of(new BodyInstance("part", "body", Transform.translation(10, 20, 0)))));
-        assertTrue(session.document().gcode().isEmpty());
-        assertTrue(session.undo());
+        assertThat(session.document().gcode().isEmpty()).isTrue();
+        assertThat(session.undo()).isTrue();
         session.setGcode(jobs);
-        assertTrue(session.redo());
-        assertTrue(session.document().gcode().isEmpty());
+        assertThat(session.redo()).isTrue();
+        assertThat(session.document().gcode().isEmpty()).isTrue();
     }
 
     @Test
@@ -30,17 +30,18 @@ class ModelSessionGcodeTest {
         var base = CadDocument.empty();
         var document = base.withGcode(Map.of(base.printSetup().activePlateId(), List.of("G90")));
         var session = new ModelSession(document);
-        assertEquals(List.of("G90"), session.document().activeGcode());
+        assertThat(session.document().activeGcode()).isEqualTo(List.of("G90"));
         session.add(new Feature.Sketch(
                 "plate", "profile", new Feature.Plane("xy", 0), new Feature.Rectangle(0, 0, 20, 20)));
-        assertTrue(session.document().gcode().isEmpty());
+        assertThat(session.document().gcode().isEmpty()).isTrue();
         session.undo();
-        assertTrue(session.document().gcode().isEmpty());
+        assertThat(session.document().gcode().isEmpty()).isTrue();
         session.setGcode(document.gcode());
         session.setPrintSetup(session.document().printSetup().addPlate("second"));
-        assertTrue(session.document().gcode().isEmpty());
+        assertThat(session.document().gcode().isEmpty()).isTrue();
         session.undo();
-        assertTrue(session.document().gcode().isEmpty());
-        assertThrows(IllegalArgumentException.class, () -> base.withGcode(Map.of("plate-1", List.of("G90\nG21"))));
+        assertThat(session.document().gcode().isEmpty()).isTrue();
+        assertThatThrownBy(() -> base.withGcode(Map.of("plate-1", List.of("G90\nG21"))))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

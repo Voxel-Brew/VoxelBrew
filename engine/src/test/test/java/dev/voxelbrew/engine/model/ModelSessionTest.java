@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine.model;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import org.junit.jupiter.api.Test;
 
@@ -14,21 +14,21 @@ class ModelSessionTest {
         var original = session.document().features();
         session.setCursor(2);
         session.deleteFeatures(0, 2);
-        assertEquals(0, session.document().cursor());
-        assertEquals(original.subList(2, 4), session.document().features());
+        assertThat(session.document().cursor()).isEqualTo(0);
+        assertThat(session.document().features()).isEqualTo(original.subList(2, 4));
         session.undo();
-        assertEquals(original, session.document().features());
+        assertThat(session.document().features()).isEqualTo(original);
         session.redo();
-        assertEquals(original.subList(2, 4), session.document().features());
+        assertThat(session.document().features()).isEqualTo(original.subList(2, 4));
         session.setCursor(2);
         session.deleteFeatures(1, 2);
-        assertEquals(1, session.document().cursor());
+        assertThat(session.document().cursor()).isEqualTo(1);
         session.undo();
         session.deleteFeatures(1, 2);
-        assertEquals(1, session.document().features().size());
+        assertThat(session.document().features().size()).isEqualTo(1);
         var before = session.snapshot();
-        assertThrows(IndexOutOfBoundsException.class, () -> session.deleteFeatures(0, 2));
-        assertEquals(before, session.snapshot());
+        assertThatThrownBy(() -> session.deleteFeatures(0, 2)).isInstanceOf(IndexOutOfBoundsException.class);
+        assertThat(session.snapshot()).isEqualTo(before);
     }
 
     @Test
@@ -39,17 +39,18 @@ class ModelSessionTest {
         session.add(new Feature.Sketch("two", "two.profile", plane, new Feature.Circle(10, 10, 4)));
         session.editDimension("one", "offsetZ", 15);
         for (var feature : session.document().features()) {
-            assertEquals(15, ((Feature.Sketch) feature).plane().offsetZ());
+            assertThat(((Feature.Sketch) feature).plane().offsetZ()).isEqualTo(15);
         }
         session.undo();
         for (var feature : session.document().features()) {
-            assertEquals(12, ((Feature.Sketch) feature).plane().offsetZ());
+            assertThat(((Feature.Sketch) feature).plane().offsetZ()).isEqualTo(12);
         }
         var reference = new ModelSession(CadDocument.empty());
         reference.add(new Feature.Sketch(
                 "plate", "profile", new Feature.Plane("origin-xy", 0), new Feature.Rectangle(0, 0, 60, 40)));
         var before = reference.document();
-        assertThrows(ModelException.class, () -> reference.editDimension("plate", "offsetZ", 12));
-        assertEquals(before, reference.document());
+        assertThatThrownBy(() -> reference.editDimension("plate", "offsetZ", 12))
+                .isInstanceOf(ModelException.class);
+        assertThat(reference.document()).isEqualTo(before);
     }
 }

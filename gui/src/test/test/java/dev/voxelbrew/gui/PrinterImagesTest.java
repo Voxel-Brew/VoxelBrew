@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,18 +18,18 @@ class PrinterImagesTest {
             Files.copy(source, path);
         }
         var image = PrinterImages.load(path.toUri().toString());
-        assertNotNull(image);
-        assertFalse(image.isError());
-        assertEquals(1, image.getWidth());
-        assertEquals(1, image.getHeight());
-        assertNotNull(image.getPixelReader());
+        assertThat(image).isNotNull();
+        assertThat(image.isError()).isFalse();
+        assertThat(image.getWidth()).isEqualTo(1);
+        assertThat(image.getHeight()).isEqualTo(1);
+        assertThat(image.getPixelReader()).isNotNull();
     }
 
     @Test
     void preservesLosslessWebpTransparency() {
         var image = PrinterImages.load(
                 getClass().getResource("webp/lossless.transparent.webp").toExternalForm());
-        assertNotNull(image);
+        assertThat(image).isNotNull();
         boolean transparent = false;
         boolean visible = false;
         for (int y = 0; y < image.getHeight(); y++) {
@@ -39,15 +39,16 @@ class PrinterImagesTest {
                 visible |= alpha > 0;
             }
         }
-        assertTrue(transparent);
-        assertTrue(visible);
+        assertThat(transparent).isTrue();
+        assertThat(visible).isTrue();
     }
 
     @Test
     void corruptAndMissingWebpAllowTheDefaultIllustration() throws Exception {
         var path = directory.resolve("broken.webp");
         Files.writeString(path, "not an image");
-        assertNull(PrinterImages.load(path.toUri().toString()));
-        assertNull(PrinterImages.load(directory.resolve("missing.webp").toUri().toString()));
+        assertThat(PrinterImages.load(path.toUri().toString())).isNull();
+        assertThat(PrinterImages.load(directory.resolve("missing.webp").toUri().toString()))
+                .isNull();
     }
 }

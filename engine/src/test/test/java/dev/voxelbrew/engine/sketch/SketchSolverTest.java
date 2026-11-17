@@ -1,7 +1,7 @@
 package dev.voxelbrew.engine.sketch;
 
 import static dev.voxelbrew.engine.sketch.SketchGeometry.*;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -14,17 +14,21 @@ class SketchSolverTest {
         var g = add(geometry(a, free), "anchor", Type.FIX, 0, a.ref(Part.START));
         g = add(g, "length", Type.LENGTH, 20, a.ref());
         var rotating = SketchSolver.solve(g);
-        assertTrue(rotating.solved());
-        assertTrue(rotating.fullyConstrainedReferences().contains(a.ref(Part.START)));
-        assertFalse(rotating.fullyConstrainedReferences().contains(a.ref(Part.END)));
-        assertFalse(rotating.fullyConstrainedReferences().contains(a.ref()));
+        assertThat(rotating.solved()).isTrue();
+        assertThat(rotating.fullyConstrainedReferences().contains(a.ref(Part.START)))
+                .isTrue();
+        assertThat(rotating.fullyConstrainedReferences().contains(a.ref(Part.END)))
+                .isFalse();
+        assertThat(rotating.fullyConstrainedReferences().contains(a.ref())).isFalse();
         g = add(g, "horizontal", Type.HORIZONTAL, 0, a.ref());
         var fixed = SketchSolver.solve(g);
-        assertTrue(fixed.solved());
-        assertTrue(fixed.degreesOfFreedom() > 0, "Unrelated geometry remains free");
-        assertTrue(
-                fixed.fullyConstrainedReferences().containsAll(List.of(a.ref(), a.ref(Part.START), a.ref(Part.END))));
-        assertFalse(fixed.fullyConstrainedReferences().contains(free.ref()));
+        assertThat(fixed.solved()).isTrue();
+        assertThat(fixed.degreesOfFreedom() > 0)
+                .as("Unrelated geometry remains free")
+                .isTrue();
+        assertThat(fixed.fullyConstrainedReferences().containsAll(List.of(a.ref(), a.ref(Part.START), a.ref(Part.END))))
+                .isTrue();
+        assertThat(fixed.fullyConstrainedReferences().contains(free.ref())).isFalse();
     }
 
     @Test
@@ -33,12 +37,14 @@ class SketchSolverTest {
         var b = Sketches.entity("b", Kind.POINT, false, 10, 20);
         var g = add(geometry(a, b), "x", Type.DISTANCE_X, 10, ORIGIN, a.ref(Part.POINT));
         g = add(g, "coincident", Type.COINCIDENT, 0, a.ref(Part.POINT), b.ref(Part.POINT));
-        assertFalse(SketchSolver.solve(g).fullyConstrainedReferences().contains(a.ref(Part.POINT)));
+        assertThat(SketchSolver.solve(g).fullyConstrainedReferences().contains(a.ref(Part.POINT)))
+                .isFalse();
         g = add(g, "y", Type.DISTANCE_Y, 20, ORIGIN, a.ref(Part.POINT));
         var result = SketchSolver.solve(g);
-        assertTrue(result.solved());
-        assertTrue(result.fullyConstrainedReferences()
-                .containsAll(List.of(a.ref(), b.ref(), a.ref(Part.POINT), b.ref(Part.POINT))));
+        assertThat(result.solved()).isTrue();
+        assertThat(result.fullyConstrainedReferences()
+                        .containsAll(List.of(a.ref(), b.ref(), a.ref(Part.POINT), b.ref(Part.POINT))))
+                .isTrue();
     }
 
     @Test
@@ -48,10 +54,11 @@ class SketchSolverTest {
         var g = add(geometry(a, b), "fixed", Type.FIX, 0, a.ref());
         g = add(g, "distance", Type.DISTANCE, 80, a.ref(), b.ref());
         var solved = solve(g);
-        assertEquals(80, Math.abs(solved.entity("b").at(0).x()), 1e-6);
-        assertEquals(solved.entity("b").at(0).x(), solved.entity("b").at(1).x(), 1e-6);
+        assertThat(Math.abs(solved.entity("b").at(0).x())).isCloseTo(80, org.assertj.core.data.Offset.offset(1e-6));
+        assertThat(solved.entity("b").at(1).x())
+                .isCloseTo(solved.entity("b").at(0).x(), org.assertj.core.data.Offset.offset(1e-6));
         var edited = Sketches.editDimension(solved, "distance", 25);
-        assertEquals(25, Math.abs(edited.entity("b").at(0).x()), 1e-6);
+        assertThat(Math.abs(edited.entity("b").at(0).x())).isCloseTo(25, org.assertj.core.data.Offset.offset(1e-6));
     }
 
     private static Entity line(String id, double x, double y, double xx, double yy) {
@@ -72,14 +79,14 @@ class SketchSolverTest {
 
     private static SketchGeometry solve(SketchGeometry g) {
         var result = SketchSolver.solve(g);
-        assertTrue(result.solved(), result.problems().toString());
+        assertThat(result.solved()).as(result.problems().toString()).isTrue();
         SketchConstraints.requireSatisfied(result.geometry());
         return result.geometry();
     }
 
     private static void point(Vec actual, double x, double y) {
-        assertEquals(x, actual.x(), 1e-6);
-        assertEquals(y, actual.y(), 1e-6);
+        assertThat(actual.x()).isCloseTo(x, org.assertj.core.data.Offset.offset(1e-6));
+        assertThat(actual.y()).isCloseTo(y, org.assertj.core.data.Offset.offset(1e-6));
     }
 
     @Test
@@ -94,8 +101,8 @@ class SketchSolverTest {
         g = add(g, "length", Type.LENGTH, 10, a.ref());
         g = add(g, "equal", Type.EQUAL, 0, a.ref(), b.ref());
         var result = SketchSolver.solve(g);
-        assertTrue(result.solved(), result.problems().toString());
-        assertEquals(0, result.degreesOfFreedom());
+        assertThat(result.solved()).as(result.problems().toString()).isTrue();
+        assertThat(result.degreesOfFreedom()).isEqualTo(0);
         point(result.geometry().entity("a").at(1), 10, 0);
         point(result.geometry().entity("b").at(1), 20, 10);
         var edited = Sketches.editDimension(result.geometry(), "length", 20);
@@ -111,10 +118,12 @@ class SketchSolverTest {
         g = add(g, "parallel", Type.PARALLEL, 0, a.ref(), b.ref());
         g = add(g, "perpendicular", Type.PERPENDICULAR, 0, a.ref(), c.ref());
         g = solve(g);
-        assertEquals(g.entity("b").at(0).y(), g.entity("b").at(1).y(), 1e-6);
-        assertEquals(g.entity("c").at(0).x(), g.entity("c").at(1).x(), 1e-6);
+        assertThat(g.entity("b").at(1).y())
+                .isCloseTo(g.entity("b").at(0).y(), org.assertj.core.data.Offset.offset(1e-6));
+        assertThat(g.entity("c").at(1).x())
+                .isCloseTo(g.entity("c").at(0).x(), org.assertj.core.data.Offset.offset(1e-6));
         g = solve(add(g, "collinear", Type.COLLINEAR, 0, a.ref(), b.ref()));
-        assertEquals(0, g.entity("b").at(0).y(), 1e-6);
+        assertThat(g.entity("b").at(0).y()).isCloseTo(0, org.assertj.core.data.Offset.offset(1e-6));
         point(g.entity("a").at(0), 0, 0);
         point(g.entity("a").at(1), 10, 0);
     }
@@ -147,9 +156,9 @@ class SketchSolverTest {
         g = add(g, "radius", Type.RADIUS, 3, a.ref());
         g = solve(g);
         point(g.entity("b").point(Part.CENTER), 0, 0);
-        assertEquals(3, g.entity("b").value(2), 1e-6);
+        assertThat(g.entity("b").value(2)).isCloseTo(3, org.assertj.core.data.Offset.offset(1e-6));
         var edited = Sketches.editDimension(g, "radius", 8);
-        assertEquals(8, edited.entity("b").value(2), 1e-6);
+        assertThat(edited.entity("b").value(2)).isCloseTo(8, org.assertj.core.data.Offset.offset(1e-6));
     }
 
     @Test
@@ -159,17 +168,15 @@ class SketchSolverTest {
         var g = add(geometry(a, c), "anchor", Type.FIX, 0, a.ref());
         g = add(g, "radius", Type.RADIUS, 2, c.ref());
         g = solve(add(g, "tangent", Type.TANGENT, 0, a.ref(), c.ref()));
-        assertEquals(2, g.entity("circle").value(1), 1e-6);
+        assertThat(g.entity("circle").value(1)).isCloseTo(2, org.assertj.core.data.Offset.offset(1e-6));
         for (double distance : new double[] {13, 7}) {
             var outer = circle("outer", 0, 0, 10);
             var inner = circle("inner", distance, 0, 2);
             var circles = add(geometry(outer, inner), "fixed", Type.FIX, 0, outer.ref());
             circles = add(circles, "radius", Type.RADIUS, 2, inner.ref());
             circles = solve(add(circles, "tangent", Type.TANGENT, 0, outer.ref(), inner.ref()));
-            assertEquals(
-                    distance > 10 ? 12 : 8,
-                    circles.entity("inner").point(Part.CENTER).length(),
-                    1e-6);
+            assertThat(circles.entity("inner").point(Part.CENTER).length())
+                    .isCloseTo(distance > 10 ? 12 : 8, org.assertj.core.data.Offset.offset(1e-6));
         }
     }
 
@@ -182,7 +189,7 @@ class SketchSolverTest {
         g = add(g, "a-fixed", Type.FIX, 0, a.ref());
         g = solve(add(g, "symmetry", Type.SYMMETRY, 0, a.ref(), b.ref(), axis.ref()));
         point(g.entity("b").point(Part.CENTER), 7, 3);
-        assertEquals(2, g.entity("b").value(2), 1e-6);
+        assertThat(g.entity("b").value(2)).isCloseTo(2, org.assertj.core.data.Offset.offset(1e-6));
     }
 
     @Test
@@ -193,13 +200,15 @@ class SketchSolverTest {
         values.set(0, values.get(0) + 1.2);
         g = g.replace(distorted.withValues(values));
         var result = SketchSolver.solve(g);
-        assertTrue(result.solved(), result.problems().toString());
-        assertEquals(4, result.degreesOfFreedom());
+        assertThat(result.solved()).as(result.problems().toString()).isTrue();
+        assertThat(result.degreesOfFreedom()).isEqualTo(4);
         var lines = result.geometry().entities();
         double length = lines.getFirst().at(0).distance(lines.getFirst().at(1));
         for (int i = 0; i < 6; i++) {
-            assertEquals(length, lines.get(i).at(0).distance(lines.get(i).at(1)), 1e-6);
-            assertEquals(0, lines.get(i).at(1).distance(lines.get((i + 1) % 6).at(0)), 1e-6);
+            assertThat(lines.get(i).at(0).distance(lines.get(i).at(1)))
+                    .isCloseTo(length, org.assertj.core.data.Offset.offset(1e-6));
+            assertThat(lines.get(i).at(1).distance(lines.get((i + 1) % 6).at(0)))
+                    .isCloseTo(0, org.assertj.core.data.Offset.offset(1e-6));
         }
     }
 
@@ -211,9 +220,10 @@ class SketchSolverTest {
         g = solve(add(g, "smooth", Type.CURVATURE, 0, arc.ref(Part.END), spline.ref(Part.START)));
         var a = g.entity("arc");
         var b = g.entity("spline");
-        assertEquals(0, a.at(1).distance(b.at(0)), 1e-6);
-        assertEquals(1, a.derivative(1).unit().dot(b.derivative(0).unit()), 1e-6);
-        assertEquals(0.1, b.curvature(0), 1e-8);
+        assertThat(a.at(1).distance(b.at(0))).isCloseTo(0, org.assertj.core.data.Offset.offset(1e-6));
+        assertThat(a.derivative(1).unit().dot(b.derivative(0).unit()))
+                .isCloseTo(1, org.assertj.core.data.Offset.offset(1e-6));
+        assertThat(b.curvature(0)).isCloseTo(0.1, org.assertj.core.data.Offset.offset(1e-8));
     }
 
     @Test
@@ -223,8 +233,8 @@ class SketchSolverTest {
         var g = add(geometry(a, b), "line-fixed", Type.FIX, 0, a.ref());
         g = solve(add(g, "tangent", Type.TANGENT, 0, a.ref(Part.END), b.ref(Part.START)));
         point(g.entity("spline").at(0), 0, 0);
-        assertEquals(0, g.entity("spline").derivative(0).y(), 1e-6);
-        assertTrue(g.entity("spline").derivative(0).x() > 0);
+        assertThat(g.entity("spline").derivative(0).y()).isCloseTo(0, org.assertj.core.data.Offset.offset(1e-6));
+        assertThat(g.entity("spline").derivative(0).x() > 0).isTrue();
     }
 
     @Test
@@ -239,32 +249,33 @@ class SketchSolverTest {
     @Test
     void conflictsAreDiagnosedWithoutMutatingTheDefinitionAndRemovalRepairsIt() {
         var g = Sketches.rectangle("plate", 0, 0, 60, 40, true);
-        assertEquals(0, SketchSolver.solve(g).degreesOfFreedom());
+        assertThat(SketchSolver.solve(g).degreesOfFreedom()).isEqualTo(0);
         var inconsistent =
                 add(g, "wrong-width", Type.LENGTH, 80, g.entities().getFirst().ref());
         var result = SketchSolver.solve(inconsistent);
-        assertFalse(result.solved());
-        assertTrue(result.problems().stream().anyMatch(p -> p.constraintId().equals("wrong-width")));
-        assertEquals(60, g.entities().getFirst().at(1).x());
-        assertThrows(IllegalArgumentException.class, result::requireSolved);
-        assertTrue(SketchSolver.solve(g).solved());
+        assertThat(result.solved()).isFalse();
+        assertThat(result.problems().stream().anyMatch(p -> p.constraintId().equals("wrong-width")))
+                .isTrue();
+        assertThat(g.entities().getFirst().at(1).x()).isEqualTo(60);
+        assertThatThrownBy(result::requireSolved).isInstanceOf(IllegalArgumentException.class);
+        assertThat(SketchSolver.solve(g).solved()).isTrue();
         var invalid = new Constraint("missing", Type.FIX, List.of(new Ref("missing", Part.START)), List.of(0.0, 0.0));
-        assertFalse(SketchSolver.solve(g.add(invalid)).solved());
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> SketchConstraints.create(
-                        g, "bad", Type.RADIUS, List.of(g.entities().getFirst().ref()), -1));
+        assertThat(SketchSolver.solve(g.add(invalid)).solved()).isFalse();
+        assertThatThrownBy(() -> SketchConstraints.create(
+                        g, "bad", Type.RADIUS, List.of(g.entities().getFirst().ref()), -1))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void draggingRespectsConstraintsAndFixedGeometry() {
         var g = Sketches.rectangle("plate", 0, 0, 60, 40, false);
         var result = Sketches.drag(g, g.entities().getFirst().ref(Part.START), new Vec(4, 5));
-        assertTrue(result.solved(), result.problems().toString());
+        assertThat(result.solved()).as(result.problems().toString()).isTrue();
         point(result.geometry().entities().getFirst().at(0), 4, 5);
-        assertEquals(g.constraints(), result.geometry().constraints());
+        assertThat(result.geometry().constraints()).isEqualTo(g.constraints());
         var fixed = Sketches.rectangle("plate", 0, 0, 60, 40, true);
-        assertFalse(Sketches.drag(fixed, fixed.entities().getFirst().ref(Part.START), new Vec(4, 5))
-                .solved());
+        assertThat(Sketches.drag(fixed, fixed.entities().getFirst().ref(Part.START), new Vec(4, 5))
+                        .solved())
+                .isFalse();
     }
 }

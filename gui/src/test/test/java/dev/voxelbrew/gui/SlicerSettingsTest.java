@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.slicer.api.SlicerRuntime;
 import dev.voxelbrew.util.config.UserConfiguration;
@@ -32,25 +32,23 @@ class SlicerSettingsTest {
                             "process.properties")));
             var captured = settings.backend("prusa-slicer");
             settings.save(Map.of("prusa-slicer", Map.of("executable", "second-prusa")));
-            assertEquals(Path.of("first-prusa"), captured.executable());
-            assertEquals(
-                    Path.of("second-prusa"), settings.backend("prusa-slicer").executable());
-            assertEquals(Path.of("cura-engine"), settings.backend("cura").executable());
-            assertEquals("machine.json", settings.options("cura").get("definition"));
-            assertEquals("preserved", configuration.get("external.setting", ""));
-            assertEquals(Map.of("external.setting", "preserved"), configuration.read());
-            assertEquals(
-                    "second-prusa",
-                    new UserConfiguration(directory.resolve("slicers/prusa-slicer.properties")).get("executable", ""));
-            assertEquals(
-                    "cura-engine",
-                    new UserConfiguration(directory.resolve("slicers/cura.properties")).get("executable", ""));
-            assertEquals(settings.options("cura"), new SlicerSettings(catalog, configuration).options("cura"));
+            assertThat(captured.executable()).isEqualTo(Path.of("first-prusa"));
+            assertThat(settings.backend("prusa-slicer").executable()).isEqualTo(Path.of("second-prusa"));
+            assertThat(settings.backend("cura").executable()).isEqualTo(Path.of("cura-engine"));
+            assertThat(settings.options("cura").get("definition")).isEqualTo("machine.json");
+            assertThat(configuration.get("external.setting", "")).isEqualTo("preserved");
+            assertThat(configuration.read()).isEqualTo(Map.of("external.setting", "preserved"));
+            assertThat(new UserConfiguration(directory.resolve("slicers/prusa-slicer.properties"))
+                            .get("executable", ""))
+                    .isEqualTo("second-prusa");
+            assertThat(new UserConfiguration(directory.resolve("slicers/cura.properties")).get("executable", ""))
+                    .isEqualTo("cura-engine");
+            assertThat(new SlicerSettings(catalog, configuration).options("cura"))
+                    .isEqualTo(settings.options("cura"));
             var before = configuration.read();
-            assertThrows(
-                    IllegalArgumentException.class,
-                    () -> settings.save(Map.of("cura", Map.of("unknown-option", "bad"))));
-            assertEquals(before, configuration.read());
+            assertThatThrownBy(() -> settings.save(Map.of("cura", Map.of("unknown-option", "bad"))))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThat(configuration.read()).isEqualTo(before);
         }
     }
 }

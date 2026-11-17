@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine.model;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.geometry.Solid;
 import dev.voxelbrew.engine.mesh.MeshOptions;
@@ -40,15 +40,20 @@ class SketchPlaneTest {
                 var file = directory.resolve(plane.id() + distance + ".vxb");
                 DocumentWriter.save(session.document(), file, false);
                 var reopened = new ModelSession(DocumentReader.load(file));
-                assertEquals(session.document(), reopened.document());
+                assertThat(reopened.document()).isEqualTo(session.document());
                 try (var result = reopened.evaluate()) {
-                    assertTrue(result.valid(), result.diagnostics().toString());
+                    assertThat(result.valid())
+                            .as(result.diagnostics().toString())
+                            .isTrue();
                     var solid = result.bodies().getFirst().solid();
-                    assertEquals((2400 - Math.PI * 4) * Math.abs(distance), solid.volume(), .01);
+                    assertThat(solid.volume())
+                            .isCloseTo(
+                                    (2400 - Math.PI * 4) * Math.abs(distance),
+                                    org.assertj.core.data.Offset.offset(.01));
                     var inside = plane.placement().apply(30, 20, distance / 2);
                     var hole = plane.placement().apply(10, 10, distance / 2);
-                    assertTrue(solid.contains(inside[0], inside[1], inside[2]));
-                    assertFalse(solid.contains(hole[0], hole[1], hole[2]));
+                    assertThat(solid.contains(inside[0], inside[1], inside[2])).isTrue();
+                    assertThat(solid.contains(hole[0], hole[1], hole[2])).isFalse();
                     var bounds = solid.bounds();
                     double[] low = {Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY};
                     double[] high = {-Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE};
@@ -61,8 +66,12 @@ class SketchPlaneTest {
                                     high[a] = Math.max(high[a], p[a]);
                                 }
                             }
-                    assertArrayEquals(low, new double[] {bounds.minX(), bounds.minY(), bounds.minZ()}, .001);
-                    assertArrayEquals(high, new double[] {bounds.maxX(), bounds.maxY(), bounds.maxZ()}, .001);
+                    assertThat(new double[] {bounds.minX(), bounds.minY(), bounds.minZ()})
+                            .usingComparatorWithPrecision(.001)
+                            .containsExactly(low);
+                    assertThat(new double[] {bounds.maxX(), bounds.maxY(), bounds.maxZ()})
+                            .usingComparatorWithPrecision(.001)
+                            .containsExactly(high);
                 }
             }
     }
@@ -88,15 +97,15 @@ class SketchPlaneTest {
         session = new ModelSession(DocumentReader.load(file));
         session.editDimension("thickness", "distance", 8);
         try (var result = session.evaluate()) {
-            assertTrue(result.valid(), result.diagnostics().toString());
+            assertThat(result.valid()).as(result.diagnostics().toString()).isTrue();
             var boss = result.bodies().stream()
                     .filter(b -> b.id().equals("boss.body"))
                     .findFirst()
                     .orElseThrow()
                     .solid();
-            assertEquals(8, boss.bounds().minZ(), .001);
-            assertEquals(11, boss.bounds().maxZ(), .001);
-            assertEquals(240, boss.volume(), .001);
+            assertThat(boss.bounds().minZ()).isCloseTo(8, org.assertj.core.data.Offset.offset(.001));
+            assertThat(boss.bounds().maxZ()).isCloseTo(11, org.assertj.core.data.Offset.offset(.001));
+            assertThat(boss.volume()).isCloseTo(240, org.assertj.core.data.Offset.offset(.001));
         }
         var old = (Feature.Sketch) session.document().features().get(2);
         var broken = new FaceSupport(new Feature.BodyRef("missing", "body"), 0, 0, 1, 0, 1);
@@ -106,18 +115,18 @@ class SketchPlaneTest {
                 new Feature.Plane(attachment.id(), 0, attachment.frame(), broken),
                 old.profile()));
         try (var result = session.evaluate()) {
-            assertFalse(result.valid());
+            assertThat(result.valid()).isFalse();
         }
         var invalid = session.document();
         session.replace(old);
         try (var result = session.evaluate()) {
-            assertTrue(result.valid());
+            assertThat(result.valid()).isTrue();
         }
         session.undo();
-        assertEquals(invalid, session.document());
+        assertThat(session.document()).isEqualTo(invalid);
         session.redo();
         try (var result = session.evaluate()) {
-            assertTrue(result.valid());
+            assertThat(result.valid()).isTrue();
         }
     }
 
@@ -126,11 +135,13 @@ class SketchPlaneTest {
         var frame = Transform.translation(3, -7, 11).compose(Transform.rotation(21, 33, 47));
         try (var source = Solid.circlePrism(0, 0, 0, 20, 7);
                 var moved = source.transformed(frame)) {
-            assertEquals(0, source.bounds().minZ(), .001);
-            assertEquals(7, source.bounds().maxZ(), .001);
-            assertEquals(source.volume(), moved.volume(), .001);
+            assertThat(source.bounds().minZ()).isCloseTo(0, org.assertj.core.data.Offset.offset(.001));
+            assertThat(source.bounds().maxZ()).isCloseTo(7, org.assertj.core.data.Offset.offset(.001));
+            assertThat(moved.volume()).isCloseTo(source.volume(), org.assertj.core.data.Offset.offset(.001));
             var faces = moved.planarFaces();
-            assertEquals(2, faces.size(), "A cylinder side must not be offered as a sketch plane");
+            assertThat(faces.size())
+                    .as("A cylinder side must not be offered as a sketch plane")
+                    .isEqualTo(2);
             var mesh = moved.tessellate(MeshOptions.DEFAULT);
             for (var face : faces) {
                 int triangles = 0;
@@ -139,22 +150,23 @@ class SketchPlaneTest {
                         triangles++;
                         for (int c = 0; c < 3; c++) {
                             int v = mesh.vertexIndex(t, c);
-                            assertEquals(
-                                    face.offset(),
-                                    face.nx() * mesh.coordinate(v, 0)
+                            assertThat(face.nx() * mesh.coordinate(v, 0)
                                             + face.ny() * mesh.coordinate(v, 1)
-                                            + face.nz() * mesh.coordinate(v, 2),
-                                    1e-7);
+                                            + face.nz() * mesh.coordinate(v, 2))
+                                    .isCloseTo(face.offset(), org.assertj.core.data.Offset.offset(1e-7));
                         }
                     }
-                assertTrue(triangles > 0);
+                assertThat(triangles > 0).isTrue();
                 var p = face.frame().apply(2, 3, 0);
-                assertEquals(face.offset(), face.nx() * p[0] + face.ny() * p[1] + face.nz() * p[2], 1e-9);
+                assertThat(face.nx() * p[0] + face.ny() * p[1] + face.nz() * p[2])
+                        .isCloseTo(face.offset(), org.assertj.core.data.Offset.offset(1e-9));
             }
             try (var restored = moved.transformed(frame.inverse())) {
-                assertEquals(source.volume(), restored.volume(), .001);
-                assertEquals(source.bounds().maxX(), restored.bounds().maxX(), .001);
-                assertEquals(source.bounds().maxZ(), restored.bounds().maxZ(), .001);
+                assertThat(restored.volume()).isCloseTo(source.volume(), org.assertj.core.data.Offset.offset(.001));
+                assertThat(restored.bounds().maxX())
+                        .isCloseTo(source.bounds().maxX(), org.assertj.core.data.Offset.offset(.001));
+                assertThat(restored.bounds().maxZ())
+                        .isCloseTo(source.bounds().maxZ(), org.assertj.core.data.Offset.offset(.001));
             }
         }
     }

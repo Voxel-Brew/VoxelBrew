@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine.geometry;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.feature.*;
 import dev.voxelbrew.engine.model.*;
@@ -55,13 +55,15 @@ class FeatureProviderTest {
     void descriptorAssertionDoesNotPreventDiscoveringAHealthyExternalProvider() throws Exception {
         var plugins = providers("consumer.BrokenFeatureProviders$Descriptor", "consumer.SpacerProvider");
         try (var registry = new FeatureRegistry(plugins)) {
-            assertEquals(
-                    List.of("example.spacer/spacer"),
-                    registry.descriptors().stream().map(FeatureDescriptor::key).toList());
-            assertTrue(registry.diagnostics().stream().anyMatch(d -> d.contains("Descriptor assertion")));
+            assertThat(registry.descriptors().stream()
+                            .map(FeatureDescriptor::key)
+                            .toList())
+                    .isEqualTo(List.of("example.spacer/spacer"));
+            assertThat(registry.diagnostics().stream().anyMatch(d -> d.contains("Descriptor assertion")))
+                    .isTrue();
             var spacer = registry.create("spacer", "example.spacer", "spacer", Map.of());
             try (var solid = registry.evaluate(spacer)) {
-                assertEquals(expected(8), solid.volume(), .01);
+                assertThat(solid.volume()).isCloseTo(expected(8), org.assertj.core.data.Offset.offset(.01));
             }
         }
     }
@@ -77,17 +79,16 @@ class FeatureProviderTest {
                 "consumer.BrokenFeatureProviders$NestedServices");
         try (var registry = new FeatureRegistry(plugins)) {
             var good = registry.create("good", "example.spacer", "spacer", Map.of());
-            assertThrows(
-                    ModelException.class,
-                    () -> registry.create("new-feature", "example.assert.encode", "spacer", Map.of()));
+            assertThatThrownBy(() -> registry.create("new-feature", "example.assert.encode", "spacer", Map.of()))
+                    .isInstanceOf(ModelException.class);
             var encoder = new Feature.Custom("encoder", "example.assert.encode", "spacer", 1, good.payload());
             var session = new ModelSession(new CadDocument("codec-errors", List.of(encoder), 1));
             var before = session.snapshot();
-            var editFailure =
-                    assertThrows(ModelException.class, () -> session.editDimension("encoder", "height", 12, plugins));
-            assertTrue(editFailure.getMessage().contains("encoder"));
-            assertEquals(before, session.snapshot());
-            assertFalse(session.canUndo());
+            var editFailure = catchThrowable(() -> session.editDimension("encoder", "height", 12, plugins));
+            assertThat(editFailure).isInstanceOf(ModelException.class);
+            assertThat(editFailure.getMessage().contains("encoder")).isTrue();
+            assertThat(session.snapshot()).isEqualTo(before);
+            assertThat(session.canUndo()).isFalse();
             for (String provider :
                     List.of("example.assert.decode", "example.assert.evaluate", "example.service.evaluate")) {
                 var broken = new Feature.Custom("broken", provider, "spacer", 1, good.payload());
@@ -95,25 +96,25 @@ class FeatureProviderTest {
                         "dependent", new Feature.BodyRef("broken", "body"), new Feature.SplitPlane(1, 0, 0, 0));
                 var document = new CadDocument("provider-errors", List.of(good, broken, split), 3);
                 try (var result = Evaluator.evaluate(document, plugins)) {
-                    assertEquals(
-                            List.of(Evaluation.State.OK, Evaluation.State.FAILED, Evaluation.State.BLOCKED),
-                            result.diagnostics().stream()
+                    assertThat(result.diagnostics().stream()
                                     .map(Evaluation.Diagnostic::state)
-                                    .toList());
-                    assertEquals("broken", result.diagnostics().get(1).featureId());
-                    assertThrows(IllegalStateException.class, result::bodies);
-                    assertThrows(IllegalStateException.class, result::requireCompleteDocument);
+                                    .toList())
+                            .isEqualTo(List.of(Evaluation.State.OK, Evaluation.State.FAILED, Evaluation.State.BLOCKED));
+                    assertThat(result.diagnostics().get(1).featureId()).isEqualTo("broken");
+                    assertThatThrownBy(result::bodies).isInstanceOf(IllegalStateException.class);
+                    assertThatThrownBy(result::requireCompleteDocument).isInstanceOf(IllegalStateException.class);
                 }
                 Path file = directory.resolve(provider + ".vxb");
                 DocumentWriter.save(document, file, false);
-                assertEquals(document, DocumentReader.load(file));
-                assertArrayEquals(
-                        good.payload(),
-                        ((Feature.Custom) DocumentReader.load(file).features().get(1)).payload());
-                assertEquals(handles, NativeKernel.liveHandles());
+                assertThat(DocumentReader.load(file)).isEqualTo(document);
+                assertThat(((Feature.Custom)
+                                        DocumentReader.load(file).features().get(1))
+                                .payload())
+                        .containsExactly(good.payload());
+                assertThat(NativeKernel.liveHandles()).isEqualTo(handles);
             }
         }
-        assertEquals(handles, NativeKernel.liveHandles());
+        assertThat(NativeKernel.liveHandles()).isEqualTo(handles);
     }
 
     @Test
@@ -126,11 +127,11 @@ class FeatureProviderTest {
         }
         try (var result = session.evaluate(plugins)) {
             var body = result.bodies().getFirst();
-            assertEquals("spacer.body", body.id());
-            assertEquals(expected(8), body.solid().volume(), 0.01);
-            assertEquals(new Bounds(-10, -10, 0, 10, 10, 8), body.solid().bounds());
-            assertFalse(body.solid().contains(0, 0, 4));
-            assertTrue(body.solid().contains(5, 0, 4));
+            assertThat(body.id()).isEqualTo("spacer.body");
+            assertThat(body.solid().volume()).isCloseTo(expected(8), org.assertj.core.data.Offset.offset(0.01));
+            assertThat(body.solid().bounds()).isEqualTo(new Bounds(-10, -10, 0, 10, 10, 8));
+            assertThat(body.solid().contains(0, 0, 4)).isFalse();
+            assertThat(body.solid().contains(5, 0, 4)).isTrue();
         }
         Path file = directory.resolve("spacer.vxb");
         DocumentWriter.save(session.document(), file, false);
@@ -138,28 +139,27 @@ class FeatureProviderTest {
         var original = session.document();
         session.editDimension("spacer", "height", 12, plugins);
         try (var result = session.evaluate(plugins)) {
-            assertEquals(expected(12), result.bodies().getFirst().solid().volume(), 0.01);
+            assertThat(result.bodies().getFirst().solid().volume())
+                    .isCloseTo(expected(12), org.assertj.core.data.Offset.offset(0.01));
         }
-        assertTrue(session.undo());
-        assertEquals(original, session.document());
-        assertTrue(session.redo());
+        assertThat(session.undo()).isTrue();
+        assertThat(session.document()).isEqualTo(original);
+        assertThat(session.redo()).isTrue();
         session.add(new Feature.SplitBody(
                 "split", new Feature.BodyRef("spacer", "body"), new Feature.SplitPlane(1, 0, 0, 0)));
         try (var result = session.evaluate(plugins)) {
-            assertEquals(2, result.bodies().size());
-            assertEquals(
-                    expected(12),
-                    result.bodies().stream()
+            assertThat(result.bodies().size()).isEqualTo(2);
+            assertThat(result.bodies().stream()
                             .mapToDouble(b -> b.solid().volume())
-                            .sum(),
-                    0.01);
+                            .sum())
+                    .isCloseTo(expected(12), org.assertj.core.data.Offset.offset(0.01));
         }
         session.setCursor(0);
         try (var result = session.evaluate(plugins)) {
-            assertTrue(result.bodies().isEmpty());
-            assertThrows(IllegalStateException.class, result::requireCompleteDocument);
+            assertThat(result.bodies().isEmpty()).isTrue();
+            assertThatThrownBy(result::requireCompleteDocument).isInstanceOf(IllegalStateException.class);
         }
-        assertEquals(handles, NativeKernel.liveHandles());
+        assertThat(NativeKernel.liveHandles()).isEqualTo(handles);
     }
 
     @Test
@@ -179,33 +179,29 @@ class FeatureProviderTest {
         Files.move(jar, hidden);
         var missing = DocumentReader.load(file);
         try (var result = Evaluator.evaluate(missing, plugins)) {
-            assertEquals(
-                    List.of(Evaluation.State.FAILED, Evaluation.State.BLOCKED),
-                    result.diagnostics().stream()
+            assertThat(result.diagnostics().stream()
                             .map(Evaluation.Diagnostic::state)
-                            .toList());
-            assertTrue(result.diagnostics().getFirst().message().contains("Missing feature provider"));
-            assertThrows(IllegalStateException.class, result::bodies);
-            assertThrows(IllegalStateException.class, result::requireCompleteDocument);
+                            .toList())
+                    .isEqualTo(List.of(Evaluation.State.FAILED, Evaluation.State.BLOCKED));
+            assertThat(result.diagnostics().getFirst().message().contains("Missing feature provider"))
+                    .isTrue();
+            assertThatThrownBy(result::bodies).isInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(result::requireCompleteDocument).isInstanceOf(IllegalStateException.class);
         }
         DocumentWriter.save(missing, file, true);
         var preserved = DocumentReader.load(file);
-        assertEquals(before, preserved);
-        assertArrayEquals(
-                ((Feature.Custom) before.features().getFirst()).payload(),
-                ((Feature.Custom) preserved.features().getFirst()).payload());
+        assertThat(preserved).isEqualTo(before);
+        assertThat(((Feature.Custom) preserved.features().getFirst()).payload())
+                .containsExactly(((Feature.Custom) before.features().getFirst()).payload());
         Files.move(hidden, jar);
         try (var result = Evaluator.evaluate(preserved, plugins)) {
             result.requireCompleteDocument();
-            assertEquals(
-                    List.of("split.negative", "split.positive"),
-                    result.bodies().stream().map(Evaluation.Body::id).toList());
-            assertEquals(
-                    expected(12),
-                    result.bodies().stream()
+            assertThat(result.bodies().stream().map(Evaluation.Body::id).toList())
+                    .isEqualTo(List.of("split.negative", "split.positive"));
+            assertThat(result.bodies().stream()
                             .mapToDouble(b -> b.solid().volume())
-                            .sum(),
-                    0.01);
+                            .sum())
+                    .isCloseTo(expected(12), org.assertj.core.data.Offset.offset(0.01));
         }
     }
 
@@ -214,27 +210,26 @@ class FeatureProviderTest {
         int handles = NativeKernel.liveHandles();
         var plugins = plugins();
         try (var registry = new FeatureRegistry(plugins)) {
-            assertEquals(2, registry.descriptors().size());
+            assertThat(registry.descriptors().size()).isEqualTo(2);
             for (var word : List.of("Duplicate", "Incompatible", "MissingFeatureProvider"))
-                assertTrue(
-                        registry.diagnostics().stream().anyMatch(d -> d.contains(word)),
-                        registry.diagnostics().toString());
+                assertThat(registry.diagnostics().stream().anyMatch(d -> d.contains(word)))
+                        .as(registry.diagnostics().toString())
+                        .isTrue();
             var session = new ModelSession(CadDocument.empty());
             session.add(registry.create("good", "example.spacer", "spacer", Map.of()));
             var before = session.snapshot();
-            assertThrows(ModelException.class, () -> session.editDimension("good", "innerDiameter", 30, plugins));
-            assertEquals(before, session.snapshot());
-            assertThrows(
-                    ModelException.class,
-                    () -> registry.create("bad", "example.spacer", "spacer", Map.of("unknown", 3.0)));
+            assertThatThrownBy(() -> session.editDimension("good", "innerDiameter", 30, plugins))
+                    .isInstanceOf(ModelException.class);
+            assertThat(session.snapshot()).isEqualTo(before);
+            assertThatThrownBy(() -> registry.create("bad", "example.spacer", "spacer", Map.of("unknown", 3.0)))
+                    .isInstanceOf(ModelException.class);
             session.add(registry.create("failed", "example.failed", "spacer", Map.of()));
             try (var result = session.evaluate(plugins)) {
-                assertEquals(
-                        Evaluation.State.OK, result.diagnostics().getFirst().state());
-                assertEquals(
-                        Evaluation.State.FAILED, result.diagnostics().getLast().state());
-                assertTrue(result.diagnostics().getLast().message().contains("Deliberate"));
-                assertThrows(IllegalStateException.class, result::bodies);
+                assertThat(result.diagnostics().getFirst().state()).isEqualTo(Evaluation.State.OK);
+                assertThat(result.diagnostics().getLast().state()).isEqualTo(Evaluation.State.FAILED);
+                assertThat(result.diagnostics().getLast().message().contains("Deliberate"))
+                        .isTrue();
+                assertThatThrownBy(result::bodies).isInstanceOf(IllegalStateException.class);
             }
         }
         for (int version : new int[] {1, 999}) {
@@ -243,11 +238,11 @@ class FeatureProviderTest {
             Path file = directory.resolve("payload-" + version + ".vxb");
             DocumentWriter.save(document, file, false);
             try (var result = Evaluator.evaluate(DocumentReader.load(file), plugins)) {
-                assertFalse(result.valid());
+                assertThat(result.valid()).isFalse();
             }
             DocumentWriter.save(DocumentReader.load(file), file, true);
-            assertEquals(document, DocumentReader.load(file));
+            assertThat(DocumentReader.load(file)).isEqualTo(document);
         }
-        assertEquals(handles, NativeKernel.liveHandles());
+        assertThat(NativeKernel.liveHandles()).isEqualTo(handles);
     }
 }

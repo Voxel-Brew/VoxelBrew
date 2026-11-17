@@ -1,6 +1,6 @@
 package dev.voxelbrew.exporter;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.mesh.MeshData;
 import dev.voxelbrew.engine.mesh.MeshOptions;
@@ -43,50 +43,45 @@ class ModelViewsTest {
         };
 
         var body = ModelViews.select(source, "a");
-        assertEquals(
-                List.of("a"), body.bodies().stream().map(ModelView.Body::id).toList());
-        assertEquals(
-                List.of("a1", "a2"),
-                body.instances().stream().map(BodyInstance::id).toList());
-        assertThrows(IllegalArgumentException.class, () -> body.tessellate("b", MeshOptions.DEFAULT));
-        assertNull(body.tessellate("a", MeshOptions.DEFAULT));
+        assertThat(body.bodies().stream().map(ModelView.Body::id).toList()).isEqualTo(List.of("a"));
+        assertThat(body.instances().stream().map(BodyInstance::id).toList()).isEqualTo(List.of("a1", "a2"));
+        assertThatThrownBy(() -> body.tessellate("b", MeshOptions.DEFAULT))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(body.tessellate("a", MeshOptions.DEFAULT)).isNull();
 
         var instance = ModelViews.selectInstance(source, "a2");
-        assertEquals(
-                List.of("a"), instance.bodies().stream().map(ModelView.Body::id).toList());
-        assertEquals(
-                List.of("a2"),
-                instance.instances().stream().map(BodyInstance::id).toList());
-        assertThrows(IllegalArgumentException.class, () -> instance.tessellate("b", MeshOptions.DEFAULT));
-        assertNull(instance.tessellate("a", MeshOptions.DEFAULT));
-        assertEquals(2, tessellations.get());
+        assertThat(instance.bodies().stream().map(ModelView.Body::id).toList()).isEqualTo(List.of("a"));
+        assertThat(instance.instances().stream().map(BodyInstance::id).toList()).isEqualTo(List.of("a2"));
+        assertThatThrownBy(() -> instance.tessellate("b", MeshOptions.DEFAULT))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(instance.tessellate("a", MeshOptions.DEFAULT)).isNull();
+        assertThat(tessellations.get()).isEqualTo(2);
 
-        assertThrows(IllegalArgumentException.class, () -> ModelViews.select(source, "missing"));
-        assertThrows(IllegalArgumentException.class, () -> ModelViews.selectInstance(source, "missing"));
+        assertThatThrownBy(() -> ModelViews.select(source, "missing")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ModelViews.selectInstance(source, "missing"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void exportSelectionRejectsConflictingOrDesignSpaceOnlyRequests() {
         var document = CadDocument.empty();
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> ExportSelections.view(
+        assertThatThrownBy(() -> ExportSelections.view(
                         new ExportSelection(
                                 ExportSelection.Space.BUILD_PLATE, ExportSelection.Contents.MODEL, "body", "instance"),
                         document,
                         null,
-                        MeshOptions.DEFAULT));
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> ExportSelections.view(
+                        MeshOptions.DEFAULT))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ExportSelections.view(
                         new ExportSelection(
                                 ExportSelection.Space.DESIGN, ExportSelection.Contents.SUPPORTS, null, null),
                         document,
                         null,
-                        MeshOptions.DEFAULT));
-        assertEquals(
-                new ExportSelection(ExportSelection.Space.DESIGN, ExportSelection.Contents.MODEL, "body", null),
-                ExportSelection.design("body"));
+                        MeshOptions.DEFAULT))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(ExportSelection.design("body"))
+                .isEqualTo(new ExportSelection(
+                        ExportSelection.Space.DESIGN, ExportSelection.Contents.MODEL, "body", null));
     }
 
     @Test
@@ -98,22 +93,20 @@ class ModelViewsTest {
                 "doc", "revision", setup, PrintProfile.resolve(setup), Map.of("body", MeshGeometry.box(support)));
 
         var modelOnly = ModelViews.from(model, ExportSelection.Contents.MODEL);
-        assertEquals(
-                List.of("body"),
-                modelOnly.bodies().stream().map(ModelView.Body::id).toList());
-        assertSame(model, ((ManufacturingView) modelOnly).manufacturingModel());
+        assertThat(modelOnly.bodies().stream().map(ModelView.Body::id).toList()).isEqualTo(List.of("body"));
+        assertThat(((ManufacturingView) modelOnly).manufacturingModel()).isSameAs(model);
 
         var supports = ModelViews.from(model, ExportSelection.Contents.SUPPORTS);
-        assertEquals(
-                List.of("support.manual"),
-                supports.bodies().stream().map(ModelView.Body::id).toList());
-        assertEquals(ModelView.Role.SOLID_SUPPORT, supports.bodies().getFirst().role());
-        assertEquals(instance.transform(), supports.instances().getFirst().transform());
-        assertTrue(supports.tessellate("support.manual", MeshOptions.DEFAULT).triangleCount() > 0);
-        assertThrows(IllegalArgumentException.class, () -> supports.tessellate("body", MeshOptions.DEFAULT));
+        assertThat(supports.bodies().stream().map(ModelView.Body::id).toList()).isEqualTo(List.of("support.manual"));
+        assertThat(supports.bodies().getFirst().role()).isEqualTo(ModelView.Role.SOLID_SUPPORT);
+        assertThat(supports.instances().getFirst().transform()).isEqualTo(instance.transform());
+        assertThat(supports.tessellate("support.manual", MeshOptions.DEFAULT).triangleCount() > 0)
+                .isTrue();
+        assertThatThrownBy(() -> supports.tessellate("body", MeshOptions.DEFAULT))
+                .isInstanceOf(IllegalArgumentException.class);
 
         var all = ModelViews.from(model, ExportSelection.Contents.ALL);
-        assertEquals(2, all.bodies().size());
-        assertEquals(2, all.instances().size());
+        assertThat(all.bodies().size()).isEqualTo(2);
+        assertThat(all.instances().size()).isEqualTo(2);
     }
 }

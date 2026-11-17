@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.slicer.api.PrinterProfileCatalog;
 import dev.voxelbrew.slicer.api.SlicerRuntime;
@@ -23,7 +23,7 @@ class PrinterVisibilityTest {
         var catalog = SlicerRuntime.load().printers(directory.resolve("printers"));
         catalog.exportDefaults(Set.of("bambu-lab-a1-mini"));
         var entries = catalog.load().entries();
-        assertTrue(visibility.hidden().isEmpty());
+        assertThat(visibility.hidden().isEmpty()).isTrue();
         var visible = entries.stream()
                 .filter(PrinterProfileCatalog.Entry::bundled)
                 .map(e -> e.definition().printer().id())
@@ -31,14 +31,14 @@ class PrinterVisibilityTest {
         visible.remove("bambu-lab-a1-mini");
         visibility.saveVisible(entries, visible);
         var reopened = new PrinterVisibility(new UserConfiguration(configuration.path()));
-        assertEquals(Set.of("bambu-lab-a1-mini"), reopened.hidden());
-        assertEquals("pl", configuration.get("language", ""));
-        assertNotNull(catalog.load().require("bambu-lab-a1-mini"));
+        assertThat(reopened.hidden()).isEqualTo(Set.of("bambu-lab-a1-mini"));
+        assertThat(configuration.get("language", "")).isEqualTo("pl");
+        assertThat(catalog.load().require("bambu-lab-a1-mini")).isNotNull();
         visibility.saveVisible(entries, Set.of());
-        assertEquals(62, reopened.hidden().size());
-        assertFalse(reopened.hidden().contains("custom-bambu-lab-a1-mini"));
+        assertThat(reopened.hidden().size()).isEqualTo(62);
+        assertThat(reopened.hidden().contains("custom-bambu-lab-a1-mini")).isFalse();
         visible.add("bambu-lab-a1-mini");
         reopened.saveVisible(entries, visible);
-        assertTrue(visibility.hidden().isEmpty());
+        assertThat(visibility.hidden().isEmpty()).isTrue();
     }
 }

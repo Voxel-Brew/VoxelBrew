@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine.model;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.exporter.DocumentWriter;
 import dev.voxelbrew.importer.DocumentReader;
@@ -24,31 +24,30 @@ class SplitBodyTest {
         session = new ModelSession(DocumentReader.load(file));
         try (var evaluated = session.evaluate()) {
             var bodies = evaluated.requireCompleteDocument();
-            assertEquals(
-                    List.of("split.negative", "split.positive"),
-                    bodies.stream().map(Evaluation.Body::id).toList());
-            assertEquals(
-                    19099.469035085127,
-                    bodies.stream().mapToDouble(b -> b.solid().volume()).sum(),
-                    0.01);
-            assertEquals(30, bodies.get(0).solid().bounds().maxX(), 0.001);
-            assertEquals(30, bodies.get(1).solid().bounds().minX(), 0.001);
-            assertFalse(bodies.get(0).solid().contains(10, 10, 4));
+            assertThat(bodies.stream().map(Evaluation.Body::id).toList())
+                    .isEqualTo(List.of("split.negative", "split.positive"));
+            assertThat(bodies.stream().mapToDouble(b -> b.solid().volume()).sum())
+                    .isCloseTo(19099.469035085127, org.assertj.core.data.Offset.offset(0.01));
+            assertThat(bodies.get(0).solid().bounds().maxX()).isCloseTo(30, org.assertj.core.data.Offset.offset(0.001));
+            assertThat(bodies.get(1).solid().bounds().minX()).isCloseTo(30, org.assertj.core.data.Offset.offset(0.001));
+            assertThat(bodies.get(0).solid().contains(10, 10, 4)).isFalse();
         }
         session.editDimension("split", "offset", 20);
         try (var evaluated = session.evaluate()) {
-            assertEquals(20, evaluated.bodies().getFirst().solid().bounds().maxX(), 0.001);
+            assertThat(evaluated.bodies().getFirst().solid().bounds().maxX())
+                    .isCloseTo(20, org.assertj.core.data.Offset.offset(0.001));
         }
-        assertTrue(session.undo());
+        assertThat(session.undo()).isTrue();
         session.setCursor(4);
         try (var evaluated = session.evaluate()) {
-            assertEquals(1, evaluated.bodies().size());
-            assertEquals("thickness.body", evaluated.bodies().getFirst().id());
+            assertThat(evaluated.bodies().size()).isEqualTo(1);
+            assertThat(evaluated.bodies().getFirst().id()).isEqualTo("thickness.body");
         }
         session.setCursor(5);
-        assertTrue(session.redo());
+        assertThat(session.redo()).isTrue();
         try (var evaluated = session.evaluate()) {
-            assertEquals(20, evaluated.bodies().getFirst().solid().bounds().maxX(), 0.001);
+            assertThat(evaluated.bodies().getFirst().solid().bounds().maxX())
+                    .isCloseTo(20, org.assertj.core.data.Offset.offset(0.001));
         }
     }
 
@@ -60,20 +59,19 @@ class SplitBodyTest {
         session.add(new Feature.SplitBody(
                 "quarter", new Feature.BodyRef("split", "positive"), new Feature.SplitPlane(0, 1, 0, 20)));
         try (var failed = session.evaluate()) {
-            assertEquals(Evaluation.State.FAILED, failed.diagnostics().get(4).state());
-            assertTrue(failed.diagnostics().get(4).message().contains("does not intersect"));
-            assertEquals(Evaluation.State.BLOCKED, failed.diagnostics().get(5).state());
-            assertThrows(IllegalStateException.class, failed::requireCompleteDocument);
+            assertThat(failed.diagnostics().get(4).state()).isEqualTo(Evaluation.State.FAILED);
+            assertThat(failed.diagnostics().get(4).message().contains("does not intersect"))
+                    .isTrue();
+            assertThat(failed.diagnostics().get(5).state()).isEqualTo(Evaluation.State.BLOCKED);
+            assertThatThrownBy(failed::requireCompleteDocument).isInstanceOf(IllegalStateException.class);
         }
         session.editDimension("split", "offset", 30);
         try (var result = session.evaluate()) {
-            assertEquals(3, result.requireCompleteDocument().size());
-            assertEquals(
-                    (60 * 40 - 4 * Math.PI) * 5,
-                    result.bodies().stream()
+            assertThat(result.requireCompleteDocument().size()).isEqualTo(3);
+            assertThat(result.bodies().stream()
                             .mapToDouble(b -> b.solid().volume())
-                            .sum(),
-                    0.01);
+                            .sum())
+                    .isCloseTo((60 * 40 - 4 * Math.PI) * 5, org.assertj.core.data.Offset.offset(0.01));
         }
     }
 }

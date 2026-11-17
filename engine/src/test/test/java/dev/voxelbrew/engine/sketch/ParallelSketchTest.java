@@ -1,7 +1,7 @@
 package dev.voxelbrew.engine.sketch;
 
 import static dev.voxelbrew.engine.sketch.SketchGeometry.*;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -23,11 +23,11 @@ class ParallelSketchTest {
         }
         var serial = SketchSolver.solve(geometry, false);
         var parallel = SketchSolver.solve(geometry);
-        assertTrue(serial.solved());
-        assertEquals(serial, parallel);
-        assertEquals(0, parallel.degreesOfFreedom());
+        assertThat(serial.solved()).isTrue();
+        assertThat(parallel).isEqualTo(serial);
+        assertThat(parallel.degreesOfFreedom()).isEqualTo(0);
         var conflict = geometry.add(SketchConstraints.create(
                 geometry, "conflict", Type.LENGTH, List.of(entities.getFirst().ref()), 20));
-        assertEquals(SketchSolver.solve(conflict, false), SketchSolver.solve(conflict));
+        assertThat(SketchSolver.solve(conflict)).isEqualTo(SketchSolver.solve(conflict, false));
     }
 }

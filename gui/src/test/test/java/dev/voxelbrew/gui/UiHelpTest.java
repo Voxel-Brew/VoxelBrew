@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.util.i18n.Translations;
 import java.util.List;
@@ -20,7 +20,9 @@ class UiHelpTest {
                     "parameters-show-builtins",
                     "print-view-2d",
                     "print-view-3d")) {
-                assertFalse(UiHelp.description(translations, id).isBlank(), locale + ": " + id);
+                assertThat(UiHelp.description(translations, id).isBlank())
+                        .as(locale + ": " + id)
+                        .isFalse();
             }
         }
     }

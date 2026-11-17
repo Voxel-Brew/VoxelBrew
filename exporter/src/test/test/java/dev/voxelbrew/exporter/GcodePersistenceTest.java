@@ -1,6 +1,6 @@
 package dev.voxelbrew.exporter;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.exporter.*;
 import dev.voxelbrew.engine.model.*;
@@ -29,12 +29,12 @@ class GcodePersistenceTest {
                         .create()
                         .export(document, dev.voxelbrew.util.testing.FileExportWindows.destination(file, false));
                 var loaded = ((ImportResult.Document) ImportService.read(imports, format, file, Map.of())).document();
-                assertEquals(document.printArtifacts(), loaded.printArtifacts());
+                assertThat(loaded.printArtifacts()).isEqualTo(document.printArtifacts());
                 Path output = directory.resolve(format + ".gcode.3mf");
                 exports.require("gcode-package")
                         .create()
                         .export(loaded, dev.voxelbrew.util.testing.FileExportWindows.destination(output, false));
-                assertArrayEquals(bytes, Files.readAllBytes(output));
+                assertThat(Files.readAllBytes(output)).containsExactly(bytes);
             }
         }
     }
@@ -59,7 +59,7 @@ class GcodePersistenceTest {
         var base = CadDocument.empty();
         var document =
                 base.withGcode(Map.of(base.printSetup().activePlateId(), LINES, "plate-2", List.of("; other plate")));
-        assertEquals(DocumentCodec.fingerprint(base), DocumentCodec.fingerprint(document));
+        assertThat(DocumentCodec.fingerprint(document)).isEqualTo(DocumentCodec.fingerprint(base));
         try (var exports = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory);
                 var imports = new ImporterRegistry(directory)) {
             for (String format : List.of("vxb", "json")) {
@@ -68,16 +68,16 @@ class GcodePersistenceTest {
                         .create()
                         .export(document, dev.voxelbrew.util.testing.FileExportWindows.destination(file, false));
                 var loaded = ((ImportResult.Document) ImportService.read(imports, format, file, Map.of())).document();
-                assertEquals(document.gcode(), loaded.gcode());
+                assertThat(loaded.gcode()).isEqualTo(document.gcode());
                 Path output = directory.resolve(format + ".gcode");
                 exports.require("gcode")
                         .create()
                         .export(loaded, dev.voxelbrew.util.testing.FileExportWindows.destination(output, false));
-                assertEquals(LINES, Files.readAllLines(output));
+                assertThat(Files.readAllLines(output)).isEqualTo(LINES);
                 var inspected = new DefaultImportRuntime().gcode().read(output);
-                assertEquals(LINES, inspected.lines());
-                assertEquals(List.of(0.2), inspected.modelLayers());
-                assertEquals(inspected, new DefaultImportRuntime().gcode().readLines(LINES));
+                assertThat(inspected.lines()).isEqualTo(LINES);
+                assertThat(inspected.modelLayers()).isEqualTo(List.of(0.2));
+                assertThat(new DefaultImportRuntime().gcode().readLines(LINES)).isEqualTo(inspected);
             }
         }
     }
@@ -89,15 +89,14 @@ class GcodePersistenceTest {
         Path output = directory.resolve("existing.gcode");
         Files.writeString(output, "preserved");
         var exporter = new GcodeExporterProvider().create();
-        assertThrows(
-                java.io.IOException.class,
-                () -> exporter.export(base, dev.voxelbrew.util.testing.FileExportWindows.destination(output, true)));
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> exporter.export(
-                        document, dev.voxelbrew.util.testing.FileExportWindows.destination(output, false)));
-        assertEquals("preserved", Files.readString(output));
+        assertThatThrownBy(() ->
+                        exporter.export(base, dev.voxelbrew.util.testing.FileExportWindows.destination(output, true)))
+                .isInstanceOf(java.io.IOException.class);
+        assertThatThrownBy(() -> exporter.export(
+                        document, dev.voxelbrew.util.testing.FileExportWindows.destination(output, false)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(Files.readString(output)).isEqualTo("preserved");
         exporter.export(document, dev.voxelbrew.util.testing.FileExportWindows.destination(output, true));
-        assertEquals(LINES, Files.readAllLines(output));
+        assertThat(Files.readAllLines(output)).isEqualTo(LINES);
     }
 }

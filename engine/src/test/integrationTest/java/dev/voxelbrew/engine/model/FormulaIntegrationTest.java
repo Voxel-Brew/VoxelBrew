@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine.model;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.parameters.*;
 import dev.voxelbrew.engine.sketch.*;
@@ -38,39 +38,41 @@ class FormulaIntegrationTest {
         verify(session, 30, "Width: 60");
         session.selectConfiguration("Wide");
         verify(session, 40, "Width: 80");
-        assertTrue(session.undo());
+        assertThat(session.undo()).isTrue();
         verify(session, 30, "Width: 60");
-        assertTrue(session.redo());
+        assertThat(session.redo()).isTrue();
         var path = directory.resolve("formula part.vxb");
         DocumentWriter.save(session.document(), path, false);
-        assertEquals(session.document(), DocumentReader.load(path));
+        assertThat(DocumentReader.load(path)).isEqualTo(session.document());
         var reopened = new ModelSession(DocumentReader.load(path));
         verify(reopened, 40, "Width: 80");
         reopened.setParameters(reopened.document().parameters().rename("width", "plateWidth"));
-        assertEquals(
-                "=\"Width: \" + $plateWidth",
-                reopened.document().parameters().binding(new ParameterSet.Target("annotation", "text:label:content")));
+        assertThat(reopened.document()
+                        .parameters()
+                        .binding(new ParameterSet.Target("annotation", "text:label:content")))
+                .isEqualTo("=\"Width: \" + $plateWidth");
         verify(reopened, 40, "Width: 80");
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> reopened.document().parameters().remove("plateWidth"));
-        assertThrows(IllegalArgumentException.class, () -> reopened.bindExpression("plate", "width", "=\"invalid\""));
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> reopened.bindExpression("annotation", "text:missing:content", "=\"invalid\""));
+        assertThatThrownBy(() -> reopened.document().parameters().remove("plateWidth"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> reopened.bindExpression("plate", "width", "=\"invalid\""))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> reopened.bindExpression("annotation", "text:missing:content", "=\"invalid\""))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     private static void verify(ModelSession session, double width, String label) {
         try (var evaluation = session.evaluate()) {
             var bodies = evaluation.requireCompleteDocument();
-            assertEquals(1, bodies.size());
-            assertEquals(width * 40 * (1 + 2.0 / 3), bodies.getFirst().solid().volume(), .001);
-            assertEquals(width, bodies.getFirst().solid().bounds().maxX(), .001);
+            assertThat(bodies.size()).isEqualTo(1);
+            assertThat(bodies.getFirst().solid().volume())
+                    .isCloseTo(width * 40 * (1 + 2.0 / 3), org.assertj.core.data.Offset.offset(.001));
+            assertThat(bodies.getFirst().solid().bounds().maxX())
+                    .isCloseTo(width, org.assertj.core.data.Offset.offset(.001));
             var sketch = (Feature.Sketch) evaluation.resolvedFeatures().get(2);
             var entity = ((Feature.Constrained) sketch.profile()).geometry().entity("label");
-            assertEquals(label, entity.text().content());
-            assertEquals("SansSerif", entity.text().font());
-            assertEquals("label", entity.id());
+            assertThat(entity.text().content()).isEqualTo(label);
+            assertThat(entity.text().font()).isEqualTo("SansSerif");
+            assertThat(entity.id()).isEqualTo("label");
         }
     }
 }

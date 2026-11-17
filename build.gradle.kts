@@ -189,6 +189,7 @@ configure(libraryProjects) {
             )
         )
         "testImplementation"("org.junit.jupiter:junit-jupiter")
+        "testImplementation"("org.assertj:assertj-core")
         "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
         if (project.name != "util") {
             "testImplementation"(testFixtures(project(":util")))

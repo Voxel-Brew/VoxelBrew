@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.CadDocument;
 import java.io.IOException;
@@ -71,8 +71,8 @@ class InjectedDocumentIoTest {
             });
             await(export::isDone);
             export.join();
-            assertNotSame(owner, exportThread.get());
-            assertSame(owner, dialogThread.get());
+            assertThat(exportThread.get()).isNotSameAs(owner);
+            assertThat(dialogThread.get()).isSameAs(owner);
         } finally {
             controller.close();
         }
@@ -85,28 +85,26 @@ class InjectedDocumentIoTest {
         try {
             var settings = Map.of("print-output", "custom.gcode", "print-walls", "4", "print-overwrite", "true");
             controller.printWorkspace(() -> settings);
-            assertTrue(controller.dirty());
+            assertThat(controller.dirty()).isTrue();
             var vxb = directory.resolve("settings.vxb");
             var save = controller.save(vxb, false);
             await(save::isDone);
             save.join();
-            assertEquals(
-                    settings,
-                    dev.voxelbrew.engine.persistence.DocumentCodec.decode(Files.readAllBytes(vxb))
+            assertThat(dev.voxelbrew.engine.persistence.DocumentCodec.decode(Files.readAllBytes(vxb))
                             .printSetup()
-                            .workspaceSettings());
-            assertFalse(controller.dirty());
+                            .workspaceSettings())
+                    .isEqualTo(settings);
+            assertThat(controller.dirty()).isFalse();
             var json = directory.resolve("settings.json");
             var export = controller.exportDocument(
                     new dev.voxelbrew.exporter.JsonExporterProvider(),
                     dev.voxelbrew.util.testing.FileExportWindows.destination(json, false));
             await(export::isDone);
             export.join();
-            assertEquals(
-                    settings,
-                    dev.voxelbrew.engine.persistence.DocumentCodec.decodeJson(Files.readString(json))
+            assertThat(dev.voxelbrew.engine.persistence.DocumentCodec.decodeJson(Files.readString(json))
                             .printSetup()
-                            .workspaceSettings());
+                            .workspaceSettings())
+                    .isEqualTo(settings);
         } finally {
             controller.close();
         }
@@ -126,24 +124,24 @@ class InjectedDocumentIoTest {
                 }
             });
             await(cancelled::isDone);
-            assertTrue(cancelled.isCancelled());
-            assertFalse(controller.ioBusy());
-            assertNull(controller.path());
+            assertThat(cancelled.isCancelled()).isTrue();
+            assertThat(controller.ioBusy()).isFalse();
+            assertThat(controller.path()).isNull();
             var json = controller.exportDocument(
                     new dev.voxelbrew.exporter.JsonExporterProvider(),
                     dev.voxelbrew.util.testing.FileExportWindows.destination(directory.resolve("copy.json"), false));
             await(json::isDone);
             json.join();
-            assertNull(controller.path());
-            assertTrue(Files.exists(directory.resolve("copy.json")));
-            assertTrue(used.isEmpty());
+            assertThat(controller.path()).isNull();
+            assertThat(Files.exists(directory.resolve("copy.json"))).isTrue();
+            assertThat(used.isEmpty()).isTrue();
             Path saved = directory.resolve("saved.vxb");
             var vxb = controller.saveAs(dev.voxelbrew.util.testing.FileExportWindows.destination(saved, false));
             await(vxb::isDone);
             vxb.join();
-            assertEquals(saved, controller.path());
-            assertFalse(controller.ioBusy());
-            assertEquals(List.of(saved), used);
+            assertThat(controller.path()).isEqualTo(saved);
+            assertThat(controller.ioBusy()).isFalse();
+            assertThat(used).isEqualTo(List.of(saved));
             Path second = directory.resolve("second.vxb");
             var save = controller.save(second, false);
             await(save::isDone);
@@ -153,8 +151,8 @@ class InjectedDocumentIoTest {
             open.join();
             var failed = controller.open(directory.resolve("missing.vxb"));
             await(failed::isDone);
-            assertTrue(failed.isCompletedExceptionally());
-            assertEquals(List.of(saved, second, saved), used);
+            assertThat(failed.isCompletedExceptionally()).isTrue();
+            assertThat(used).isEqualTo(List.of(saved, second, saved));
         } finally {
             controller.close();
         }
@@ -192,21 +190,23 @@ class InjectedDocumentIoTest {
             var open = controller.open(directory.resolve("virtual.vxb"));
             await(() -> open.isDone() && !controller.rebuilding());
             open.join();
-            assertEquals(loaded, controller.snapshot().document());
+            assertThat(controller.snapshot().document()).isEqualTo(loaded);
             var failed = controller.open(directory.resolve("bad.vxb"));
             await(failed::isDone);
-            assertTrue(failed.isCompletedExceptionally());
-            assertEquals(loaded, controller.snapshot().document());
+            assertThat(failed.isCompletedExceptionally()).isTrue();
+            assertThat(controller.snapshot().document()).isEqualTo(loaded);
             var save = controller.save(directory.resolve("saved.vxb"), false);
-            assertTrue(entered.await(10, TimeUnit.SECONDS));
+            assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
             controller.close();
             release.countDown();
-            assertTrue(files.awaitTermination(10, TimeUnit.SECONDS));
+            assertThat(files.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
             await(save::isDone);
-            assertEquals(loaded, written.get());
-            assertTrue(save.isCancelled(), "Closed window must not adopt the captured write as current state");
-            assertTrue(rebuild.isShutdown());
-            assertFalse(Files.exists(directory.resolve("saved.vxb")));
+            assertThat(written.get()).isEqualTo(loaded);
+            assertThat(save.isCancelled())
+                    .as("Closed window must not adopt the captured write as current state")
+                    .isTrue();
+            assertThat(rebuild.isShutdown()).isTrue();
+            assertThat(Files.exists(directory.resolve("saved.vxb"))).isFalse();
         } finally {
             release.countDown();
             controller.close();

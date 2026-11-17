@@ -1,6 +1,6 @@
 package dev.voxelbrew.exporter;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import com.google.protobuf.util.JsonFormat;
 import dev.voxelbrew.api.exporter.FileExportDialog;
@@ -15,6 +15,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+@SuppressWarnings("deprecation")
 class DocumentExportersTest {
     @TempDir
     Path directory;
@@ -28,11 +29,11 @@ class DocumentExportersTest {
             dev.voxelbrew.api.exporter.ExportWindow window = new dev.voxelbrew.api.exporter.ExportWindow() {
                 @Override
                 public <R> Optional<R> show(dev.voxelbrew.api.exporter.ExportDialog<R> dialog) {
-                    assertEquals(format, ((FileExportDialog) dialog).extension());
+                    assertThat(((FileExportDialog) dialog).extension()).isEqualTo(format);
                     return Optional.empty();
                 }
             };
-            assertEquals(Optional.empty(), exporter.export(CadDocument.empty(), window));
+            assertThat(exporter.export(CadDocument.empty(), window)).isEqualTo(Optional.empty());
         }
     }
 
@@ -42,14 +43,13 @@ class DocumentExportersTest {
         var exporter = new FileExporter("step", "STEP", (document, target, overwrite, window) -> {
             throw failure;
         }) {};
-        assertSame(
-                failure,
-                assertThrows(
-                        UnsatisfiedLinkError.class,
+        assertThat(org.assertj.core.api.Assertions.catchThrowableOfType(
                         () -> exporter.export(
                                 CadDocument.empty(),
                                 dev.voxelbrew.util.testing.FileExportWindows.destination(
-                                        directory.resolve("part.step"), false))));
+                                        directory.resolve("part.step"), false)),
+                        UnsatisfiedLinkError.class))
+                .isSameAs(failure);
     }
 
     @Test
@@ -57,17 +57,15 @@ class DocumentExportersTest {
         var document = CadDocument.empty();
         Path target = directory.resolve("editable.vxb");
         var exporter = new VoxelBrewExporter();
-        assertEquals(
-                Optional.of(new FileExportDialog.Destination(target, false)),
-                exporter.export(document, dev.voxelbrew.util.testing.FileExportWindows.destination(target, false)));
-        assertEquals(document.id(), DocumentReader.load(target).id());
+        assertThat(exporter.export(document, dev.voxelbrew.util.testing.FileExportWindows.destination(target, false)))
+                .isEqualTo(Optional.of(new FileExportDialog.Destination(target, false)));
+        assertThat(DocumentReader.load(target).id()).isEqualTo(document.id());
         byte[] original = Files.readAllBytes(target);
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> exporter.export(
-                        document, dev.voxelbrew.util.testing.FileExportWindows.destination(target, false)));
-        assertArrayEquals(original, Files.readAllBytes(target));
-        assertEquals(1, document.parameters().builtins().fileVersion());
+        assertThatThrownBy(() -> exporter.export(
+                        document, dev.voxelbrew.util.testing.FileExportWindows.destination(target, false)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(Files.readAllBytes(target)).containsExactly(original);
+        assertThat(document.parameters().builtins().fileVersion()).isEqualTo(1);
     }
 
     @Test
@@ -87,19 +85,18 @@ class DocumentExportersTest {
         exporter.export(document, dev.voxelbrew.util.testing.FileExportWindows.destination(target, false));
         var actual = DocumentProto.Document.newBuilder();
         JsonFormat.parser().merge(Files.readString(target), actual);
-        assertEquals(expected, actual.build());
-        assertEquals(previousVersion + 1, document.parameters().builtins().fileVersion());
-        assertEquals(project.toString(), document.parameters().text("=$vb.project.path"));
+        assertThat(actual.build()).isEqualTo(expected);
+        assertThat(document.parameters().builtins().fileVersion()).isEqualTo(previousVersion + 1);
+        assertThat(document.parameters().text("=$vb.project.path")).isEqualTo(project.toString());
         byte[] original = Files.readAllBytes(target);
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> exporter.export(
-                        document, dev.voxelbrew.util.testing.FileExportWindows.destination(target, false)));
-        assertArrayEquals(original, Files.readAllBytes(target));
+        assertThatThrownBy(() -> exporter.export(
+                        document, dev.voxelbrew.util.testing.FileExportWindows.destination(target, false)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(Files.readAllBytes(target)).containsExactly(original);
         exporter.export(document, dev.voxelbrew.util.testing.FileExportWindows.destination(target, true));
-        assertArrayEquals(original, Files.readAllBytes(target));
+        assertThat(Files.readAllBytes(target)).containsExactly(original);
         try (var files = Files.list(directory)) {
-            assertEquals(2, files.count());
+            assertThat(files.count()).isEqualTo(2);
         }
     }
 }

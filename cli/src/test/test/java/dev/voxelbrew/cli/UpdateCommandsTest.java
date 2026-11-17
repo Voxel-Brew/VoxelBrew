@@ -1,6 +1,6 @@
 package dev.voxelbrew.cli;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -14,10 +14,10 @@ class UpdateCommandsTest {
         }) {
             var output = new StringWriter();
             var command = VoxelBrew.commandLine().setOut(new PrintWriter(output));
-            assertEquals(0, command.execute(args));
-            assertTrue(output.toString().contains("--version=<version>"));
-            assertTrue(output.toString().contains("--force"));
-            assertFalse(output.toString().contains("requires gh"));
+            assertThat(command.execute(args)).isEqualTo(0);
+            assertThat(output.toString().contains("--version=<version>")).isTrue();
+            assertThat(output.toString().contains("--force")).isTrue();
+            assertThat(output.toString().contains("requires gh")).isFalse();
         }
     }
 
@@ -28,8 +28,8 @@ class UpdateCommandsTest {
                 .subcommand()
                 .subcommand()
                 .subcommand();
-        assertFalse(parsed.isVersionHelpRequested());
-        assertEquals("1.2.3", parsed.matchedOptionValue("--version", ""));
-        assertEquals(Boolean.TRUE, parsed.matchedOptionValue("--force", false));
+        assertThat(parsed.isVersionHelpRequested()).isFalse();
+        assertThat(parsed.matchedOptionValue("--version", "")).isEqualTo("1.2.3");
+        assertThat(parsed.matchedOptionValue("--force", false)).isEqualTo(Boolean.TRUE);
     }
 }

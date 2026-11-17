@@ -1,6 +1,6 @@
 package dev.voxelbrew.util.testing;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.junit.platform.engine.discovery.DiscoverySelectors.selectClass;
 
 import java.io.IOException;
@@ -28,8 +28,9 @@ class TestDirectoryFactoryTest {
                 .execute()
                 .testEvents()
                 .assertStatistics(stats -> stats.succeeded(1).failed(1));
-        assertEquals(2, paths.size());
-        for (Path path : paths) assertFalse(Files.exists(path), path.toString());
+        assertThat(paths.size()).isEqualTo(2);
+        for (Path path : paths)
+            assertThat(Files.exists(path)).as(path.toString()).isFalse();
     }
 
     @Test
@@ -59,19 +60,21 @@ class TestDirectoryFactoryTest {
                     .execute()
                     .testEvents()
                     .assertStatistics(stats -> stats.succeeded(1).failed(1));
-            assertEquals(2, paths.size());
-            assertTrue(paths.stream().allMatch(Files::exists));
-            assertTrue(records.stream()
-                    .anyMatch(record -> record.getLevel() == Level.SEVERE
-                            && record.getThrown() instanceof IOException
-                            && record.getMessage().contains("locked.txt")));
+            assertThat(paths.size()).isEqualTo(2);
+            assertThat(paths.stream().allMatch(Files::exists)).isTrue();
+            assertThat(records.stream()
+                            .anyMatch(record -> record.getLevel() == Level.SEVERE
+                                    && record.getThrown() instanceof IOException
+                                    && record.getMessage().contains("locked.txt")))
+                    .isTrue();
         } finally {
             DeniedFactory.deny = false;
             DeniedFactory.instances.forEach(TestDirectoryFactory::close);
             DeniedFactory.instances.clear();
             logger.removeHandler(handler);
         }
-        for (Path path : paths) assertFalse(Files.exists(path), path.toString());
+        for (Path path : paths)
+            assertThat(Files.exists(path)).as(path.toString()).isFalse();
     }
 
     public static class DeniedFactory extends TestDirectoryFactory {

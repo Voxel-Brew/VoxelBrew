@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.mesh.MeshData;
 import java.util.*;
@@ -23,12 +23,14 @@ class TechnicalEdgesTest {
         }
         var mesh = new MeshData(detached, indices, faces);
         var edges = TechnicalEdges.from(mesh).edges();
-        assertEquals(18, edges.size());
-        assertEquals(12, edges.stream().filter(TechnicalEdges.Edge::boundary).count());
+        assertThat(edges.size()).isEqualTo(18);
+        assertThat(edges.stream().filter(TechnicalEdges.Edge::boundary).count()).isEqualTo(12);
         for (var eye : List.of(new TechnicalEdges.Point(3, 4, 5), new TechnicalEdges.Point(-3, -4, -5)))
-            assertEquals(
-                    12, edges.stream().filter(edge -> edge.visibleFrom(eye)).count());
-        assertArrayEquals(detached, mesh.vertices(), "Rendering adjacency must not change exported geometry");
+            assertThat(edges.stream().filter(edge -> edge.visibleFrom(eye)).count())
+                    .isEqualTo(12);
+        assertThat(mesh.vertices())
+                .as("Rendering adjacency must not change exported geometry")
+                .containsExactly(detached);
     }
 
     @Test
@@ -51,16 +53,16 @@ class TechnicalEdgesTest {
         }
         points[points.length - 1] = 1;
         var edges = TechnicalEdges.from(new MeshData(points, triangles, faces)).edges();
-        assertEquals(2 * n, edges.stream().filter(TechnicalEdges.Edge::boundary).count());
+        assertThat(edges.stream().filter(TechnicalEdges.Edge::boundary).count()).isEqualTo(2 * n);
         var eye = new TechnicalEdges.Point(10, 3, 2);
         var silhouettes =
                 edges.stream().filter(e -> !e.boundary() && e.visibleFrom(eye)).toList();
-        assertEquals(2, silhouettes.size());
-        assertTrue(silhouettes.stream().allMatch(e -> e.a().x() == e.b().x() && e.a().y() == e.b().y()));
-        assertNotEquals(
-                silhouettes,
-                edges.stream()
+        assertThat(silhouettes.size()).isEqualTo(2);
+        assertThat(silhouettes.stream().allMatch(e -> e.a().x() == e.b().x() && e.a().y() == e.b().y()))
+                .isTrue();
+        assertThat(edges.stream()
                         .filter(e -> !e.boundary() && e.visibleFrom(new TechnicalEdges.Point(3, 10, 2)))
-                        .toList());
+                        .toList())
+                .isNotEqualTo(silhouettes);
     }
 }

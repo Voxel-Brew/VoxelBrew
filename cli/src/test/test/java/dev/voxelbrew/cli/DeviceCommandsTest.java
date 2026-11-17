@@ -1,6 +1,6 @@
 package dev.voxelbrew.cli;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.printing.*;
@@ -112,35 +112,34 @@ class DeviceCommandsTest {
     @Test
     void deviceListingAndDetailsNeverExposeSecretOrInternalIdentity() {
         runtime.devices.add(printer);
-        assertEquals(0, run("printer", "device", "list"));
-        assertTrue(output.contains("Workshop"));
-        assertFalse(output.contains(printer.secret()));
-        assertFalse(output.contains(printer.id()));
-        assertEquals(0, run("printer", "device", "show", "--device", " workshop "));
-        assertTrue(output.contains(printer.address()));
-        assertFalse(output.contains(printer.secret()));
-        assertFalse(output.contains(printer.id()));
-        assertTrue(runtime.calls.isEmpty());
+        assertThat(run("printer", "device", "list")).isEqualTo(0);
+        assertThat(output.contains("Workshop")).isTrue();
+        assertThat(output.contains(printer.secret())).isFalse();
+        assertThat(output.contains(printer.id())).isFalse();
+        assertThat(run("printer", "device", "show", "--device", " workshop ")).isEqualTo(0);
+        assertThat(output.contains(printer.address())).isTrue();
+        assertThat(output.contains(printer.secret())).isFalse();
+        assertThat(output.contains(printer.id())).isFalse();
+        assertThat(runtime.calls.isEmpty()).isTrue();
     }
 
     @Test
     void renamingPreservesIdentityProfileAndCredentials() {
         runtime.devices.add(printer);
-        assertEquals(0, run("printer", "device", "set", "--device", "WORKSHOP", "--name", "Renamed"));
+        assertThat(run("printer", "device", "set", "--device", "WORKSHOP", "--name", "Renamed"))
+                .isEqualTo(0);
         var saved = runtime.devices.getFirst();
-        assertEquals(printer.id(), saved.id());
-        assertEquals("Renamed", saved.name());
-        assertEquals(printer.secret(), saved.secret());
-        assertEquals(printer.profileId(), saved.profileId());
+        assertThat(saved.id()).isEqualTo(printer.id());
+        assertThat(saved.name()).isEqualTo("Renamed");
+        assertThat(saved.secret()).isEqualTo(printer.secret());
+        assertThat(saved.profileId()).isEqualTo(printer.profileId());
     }
 
     @Test
     void secretFileIsReadButInvalidDeviceIsNeverSaved() throws Exception {
         Path secret = directory.resolve("secret.txt");
         Files.writeString(secret, "replacement\n");
-        assertEquals(
-                0,
-                run(
+        assertThat(run(
                         "printer",
                         "device",
                         "add",
@@ -153,60 +152,69 @@ class DeviceCommandsTest {
                         "--address",
                         "http://machine.local",
                         "--secret-file",
-                        secret.toString()));
-        assertEquals("replacement", runtime.devices.getFirst().secret());
-        assertFalse(output.contains("replacement"));
-        assertEquals(1, run("printer", "device", "set", "--device", "New", "--address", "ftp://invalid"));
-        assertEquals("http://machine.local", runtime.devices.getFirst().address());
+                        secret.toString()))
+                .isEqualTo(0);
+        assertThat(runtime.devices.getFirst().secret()).isEqualTo("replacement");
+        assertThat(output.contains("replacement")).isFalse();
+        assertThat(run("printer", "device", "set", "--device", "New", "--address", "ftp://invalid"))
+                .isEqualTo(1);
+        assertThat(runtime.devices.getFirst().address()).isEqualTo("http://machine.local");
     }
 
     @Test
     void uploadDoesNotStartAndAlwaysRemovesItsTemporaryArtifact() {
         storedJob();
-        assertEquals(0, run("printer", "upload", "virtual.vxb", "--device", "Workshop"));
-        assertEquals(List.of("connect", "upload", "close"), runtime.calls);
-        assertArrayEquals(document.printArtifacts().get("plate-1").bytes(), runtime.uploaded);
-        assertFalse(Files.exists(runtime.temporary));
-        assertEquals(0, writes);
+        assertThat(run("printer", "upload", "virtual.vxb", "--device", "Workshop"))
+                .isEqualTo(0);
+        assertThat(runtime.calls).isEqualTo(List.of("connect", "upload", "close"));
+        assertThat(runtime.uploaded)
+                .containsExactly(document.printArtifacts().get("plate-1").bytes());
+        assertThat(Files.exists(runtime.temporary)).isFalse();
+        assertThat(writes).isEqualTo(0);
     }
 
     @Test
     void printChecksReadinessBeforeUploadAndNeverRetriesAnUncertainStart() {
         storedJob();
         runtime.state = PrinterStatus.State.PRINTING;
-        assertEquals(1, run("printer", "print", "virtual.vxb", "--device", "Workshop"));
-        assertEquals(List.of("connect", "status", "close"), runtime.calls);
+        assertThat(run("printer", "print", "virtual.vxb", "--device", "Workshop"))
+                .isEqualTo(1);
+        assertThat(runtime.calls).isEqualTo(List.of("connect", "status", "close"));
         runtime.calls.clear();
         runtime.state = PrinterStatus.State.IDLE;
         runtime.failStart = true;
-        assertEquals(1, run("printer", "print", "virtual.vxb", "--device", "Workshop"));
-        assertEquals(List.of("connect", "status", "upload", "start", "close"), runtime.calls);
-        assertFalse(Files.exists(runtime.temporary));
+        assertThat(run("printer", "print", "virtual.vxb", "--device", "Workshop"))
+                .isEqualTo(1);
+        assertThat(runtime.calls).isEqualTo(List.of("connect", "status", "upload", "start", "close"));
+        assertThat(Files.exists(runtime.temporary)).isFalse();
     }
 
     @Test
     void incompatibleOrMissingJobIsRejectedBeforeConnecting() {
         storedJob();
         document = document.withGcode(Map.of());
-        assertEquals(1, run("printer", "upload", "virtual.vxb", "--device", "Workshop"));
-        assertTrue(runtime.calls.isEmpty());
+        assertThat(run("printer", "upload", "virtual.vxb", "--device", "Workshop"))
+                .isEqualTo(1);
+        assertThat(runtime.calls.isEmpty()).isTrue();
         storedJob();
         var artifact = document.printArtifacts().get("plate-1");
         var metadata = new HashMap<>(artifact.metadata());
         metadata.put("target_id", "other-device");
         document =
                 document.withPrintArtifacts(Map.of("plate-1", PrintArtifact.of("gcode", artifact.bytes(), metadata)));
-        assertEquals(1, run("printer", "print", "virtual.vxb", "--device", "Workshop"));
-        assertTrue(runtime.calls.isEmpty());
+        assertThat(run("printer", "print", "virtual.vxb", "--device", "Workshop"))
+                .isEqualTo(1);
+        assertThat(runtime.calls.isEmpty()).isTrue();
     }
 
     @Test
     void failedUploadClosesConnectionDeletesTemporaryAndDoesNotStart() {
         storedJob();
         runtime.failUpload = true;
-        assertEquals(1, run("printer", "print", "virtual.vxb", "--device", "Workshop"));
-        assertEquals(List.of("connect", "status", "upload", "close"), runtime.calls);
-        assertFalse(Files.exists(runtime.temporary));
+        assertThat(run("printer", "print", "virtual.vxb", "--device", "Workshop"))
+                .isEqualTo(1);
+        assertThat(runtime.calls).isEqualTo(List.of("connect", "status", "upload", "close"));
+        assertThat(Files.exists(runtime.temporary)).isFalse();
     }
 
     @Test
@@ -214,25 +222,28 @@ class DeviceCommandsTest {
         runtime.devices.add(printer);
         for (String action : List.of("pause", "resume", "cancel")) {
             runtime.calls.clear();
-            assertEquals(0, run("printer", action, "--device", "Workshop"));
-            assertEquals(List.of("connect", action.toUpperCase(Locale.ROOT), "close"), runtime.calls);
+            assertThat(run("printer", action, "--device", "Workshop")).isEqualTo(0);
+            assertThat(runtime.calls).isEqualTo(List.of("connect", action.toUpperCase(Locale.ROOT), "close"));
         }
     }
 
     @Test
     void targetSelectionEmbedsHardwareAndClearRetainsItWithoutDeviceIdentity() {
         runtime.devices.add(printer);
-        assertEquals(0, run("slicer", "target", "set", "virtual.vxb", "--device", "Workshop"));
-        assertEquals(printer.id(), document.printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID));
+        assertThat(run("slicer", "target", "set", "virtual.vxb", "--device", "Workshop"))
+                .isEqualTo(0);
+        assertThat(document.printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID))
+                .isEqualTo(printer.id());
         var hardware = document.printSetup().printerSnapshot();
-        assertEquals(profile(), hardware);
-        assertEquals(0, run("slicer", "target", "clear", "virtual.vxb"));
-        assertEquals(hardware, document.printSetup().printerSnapshot());
-        assertFalse(document.printSetup().workspaceSettings().containsKey(PrintTarget.PRINTER_ID));
+        assertThat(hardware).isEqualTo(profile());
+        assertThat(run("slicer", "target", "clear", "virtual.vxb")).isEqualTo(0);
+        assertThat(document.printSetup().printerSnapshot()).isEqualTo(hardware);
+        assertThat(document.printSetup().workspaceSettings().containsKey(PrintTarget.PRINTER_ID))
+                .isFalse();
         int before = writes;
-        assertEquals(
-                1, run("slicer", "target", "set", "virtual.vxb", "--device", "Workshop", "--profile", "profile-one"));
-        assertEquals(before, writes);
+        assertThat(run("slicer", "target", "set", "virtual.vxb", "--device", "Workshop", "--profile", "profile-one"))
+                .isEqualTo(1);
+        assertThat(writes).isEqualTo(before);
     }
 
     private static final class FakeRuntime implements PrinterRuntime {

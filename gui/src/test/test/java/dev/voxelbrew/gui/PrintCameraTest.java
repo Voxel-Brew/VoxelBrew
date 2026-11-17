@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import org.junit.jupiter.api.Test;
 
@@ -9,27 +9,29 @@ class PrintCameraTest {
     void standardViewNavigationUpdatesProjectionAndKeepsTopViewPlanar() {
         var camera = new PrintCamera(true);
         camera.orient(ViewOrientation.named("Front"));
-        assertEquals(ViewOrientation.named("Front"), camera.orientation());
-        assertEquals(0, camera.y(0, 1, 0), 1e-9);
-        assertEquals(1, camera.y(0, 0, 1), 1e-9);
+        assertThat(camera.orientation()).isEqualTo(ViewOrientation.named("Front"));
+        assertThat(camera.y(0, 1, 0)).isCloseTo(0, org.assertj.core.data.Offset.offset(1e-9));
+        assertThat(camera.y(0, 0, 1)).isCloseTo(1, org.assertj.core.data.Offset.offset(1e-9));
         camera.orient(ViewOrientation.named("Right"));
-        assertEquals(1, camera.x(0, 1), 1e-9);
+        assertThat(camera.x(0, 1)).isCloseTo(1, org.assertj.core.data.Offset.offset(1e-9));
         var top = new PrintCamera(false);
         top.orient(ViewOrientation.HOME);
-        assertEquals(ViewOrientation.named("Top"), top.orientation());
+        assertThat(top.orientation()).isEqualTo(ViewOrientation.named("Top"));
     }
 
     @Test
     void threeDimensionalOrbitUsesDesignerOrientationAndBedMovementInvertsProjection() {
         var camera = new PrintCamera(true);
         camera.orbit(34, 18);
-        assertEquals(ViewOrientation.HOME.dragged(34, 18), camera.orientation());
+        assertThat(camera.orientation()).isEqualTo(ViewOrientation.HOME.dragged(34, 18));
         var delta = camera.bedDelta(camera.x(12, -7), camera.y(12, -7, 0));
-        assertNotNull(delta);
-        assertEquals(12, delta.getX(), 1e-9);
-        assertEquals(-7, delta.getY(), 1e-9);
+        assertThat(delta).isNotNull();
+        assertThat(delta.getX()).isCloseTo(12, org.assertj.core.data.Offset.offset(1e-9));
+        assertThat(delta.getY()).isCloseTo(-7, org.assertj.core.data.Offset.offset(1e-9));
         camera.orbit(0, -camera.orientation().tilt() * 2);
-        assertNull(camera.bedDelta(1, 1), "Edge-on movement must not produce infinite placements");
+        assertThat(camera.bedDelta(1, 1))
+                .as("Edge-on movement must not produce infinite placements")
+                .isNull();
     }
 
     @Test
@@ -37,21 +39,21 @@ class PrintCameraTest {
         var camera = new PrintCamera(false);
         camera.orbit(40, -30);
         camera.pan(10, 20);
-        assertEquals(50, camera.panX());
-        assertEquals(-10, camera.panY());
-        assertEquals(ViewOrientation.named("Top"), camera.orientation());
+        assertThat(camera.panX()).isEqualTo(50);
+        assertThat(camera.panY()).isEqualTo(-10);
+        assertThat(camera.orientation()).isEqualTo(ViewOrientation.named("Top"));
         var delta = camera.bedDelta(4, 7);
-        assertEquals(4, delta.getX(), 1e-9);
-        assertEquals(7, delta.getY(), 1e-9);
+        assertThat(delta.getX()).isCloseTo(4, org.assertj.core.data.Offset.offset(1e-9));
+        assertThat(delta.getY()).isCloseTo(7, org.assertj.core.data.Offset.offset(1e-9));
         camera.scroll(120);
-        assertEquals(Math.exp(120 * .0015), camera.zoom(), 1e-9);
+        assertThat(camera.zoom()).isCloseTo(Math.exp(120 * .0015), org.assertj.core.data.Offset.offset(1e-9));
         camera.scroll(Double.MAX_VALUE);
-        assertEquals(100, camera.zoom());
+        assertThat(camera.zoom()).isEqualTo(100);
         camera.scroll(-Double.MAX_VALUE);
-        assertEquals(.05, camera.zoom());
+        assertThat(camera.zoom()).isEqualTo(.05);
         camera.fit();
-        assertEquals(0, camera.panX());
-        assertEquals(0, camera.panY());
-        assertEquals(1, camera.zoom());
+        assertThat(camera.panX()).isEqualTo(0);
+        assertThat(camera.panY()).isEqualTo(0);
+        assertThat(camera.zoom()).isEqualTo(1);
     }
 }

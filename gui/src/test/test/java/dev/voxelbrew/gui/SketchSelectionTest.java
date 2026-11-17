@@ -1,7 +1,7 @@
 package dev.voxelbrew.gui;
 
 import static dev.voxelbrew.engine.sketch.SketchGeometry.*;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.sketch.SketchGeometry;
 import java.util.List;
@@ -15,18 +15,19 @@ class SketchSelectionTest {
         var outside = new Entity("outside", Kind.LINE, List.of(-5., 12., 15., 12.), false);
         var geometry = new SketchGeometry(List.of(inside, crossing, outside), List.of(), List.of());
         var window = SketchSelection.inBox(geometry, new Vec(0, 10), new Vec(10, 0), false);
-        assertEquals(java.util.Set.of(inside.ref()), window);
+        assertThat(window).isEqualTo(java.util.Set.of(inside.ref()));
         var crossed = SketchSelection.inBox(geometry, new Vec(10, 0), new Vec(0, 10), true);
-        assertEquals(java.util.Set.of(inside.ref(), crossing.ref()), crossed);
+        assertThat(crossed).isEqualTo(java.util.Set.of(inside.ref(), crossing.ref()));
     }
 
     @Test
     void partialWindowDoesNotSelectALineOrItsEndpoints() {
         var line = new Entity("line", Kind.LINE, List.of(2., 2., 20., 20.), false);
         var geometry = new SketchGeometry(List.of(line), List.of(), List.of());
-        assertEquals(java.util.Set.of(), SketchSelection.inBox(geometry, new Vec(0, 0), new Vec(10, 10), false));
-        assertEquals(
-                java.util.Set.of(line.ref()), SketchSelection.inBox(geometry, new Vec(10, 10), new Vec(0, 0), true));
+        assertThat(SketchSelection.inBox(geometry, new Vec(0, 0), new Vec(10, 10), false))
+                .isEqualTo(java.util.Set.of());
+        assertThat(SketchSelection.inBox(geometry, new Vec(10, 10), new Vec(0, 0), true))
+                .isEqualTo(java.util.Set.of(line.ref()));
     }
 
     @Test
@@ -34,8 +35,7 @@ class SketchSelectionTest {
         var point = new Entity("point", Kind.POINT, List.of(5., 5.), true);
         var circle = new Entity("circle", Kind.CIRCLE, List.of(5., 5., 20.), false);
         var geometry = new SketchGeometry(List.of(point, circle), List.of(), List.of());
-        assertEquals(
-                java.util.Set.of(point.ref(Part.POINT)),
-                SketchSelection.inBox(geometry, new Vec(0, 0), new Vec(10, 10), false));
+        assertThat(SketchSelection.inBox(geometry, new Vec(0, 0), new Vec(10, 10), false))
+                .isEqualTo(java.util.Set.of(point.ref(Part.POINT)));
     }
 }

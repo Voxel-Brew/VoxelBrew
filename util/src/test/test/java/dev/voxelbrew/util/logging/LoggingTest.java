@@ -1,6 +1,6 @@
 package dev.voxelbrew.util.logging;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.util.config.UserConfiguration;
 import java.io.ByteArrayOutputStream;
@@ -43,13 +43,13 @@ class LoggingTest {
         } finally {
             Logging.close();
         }
-        assertArrayEquals(rootHandlers, Logger.getLogger("").getHandlers());
+        assertThat(Logger.getLogger("").getHandlers()).containsExactly(rootHandlers);
         try (var files = Files.list(logs)) {
             var paths = files.filter(path -> path.toString().endsWith(".log")).toList();
-            assertEquals(3, paths.size());
+            assertThat(paths.size()).isEqualTo(3);
             boolean found = false;
             for (Path path : paths) found |= Files.readString(path).contains("Zażółć ☕ final marker");
-            assertTrue(found);
+            assertThat(found).isTrue();
         }
     }
 
@@ -68,8 +68,8 @@ class LoggingTest {
             System.setErr(err);
             try {
                 Logging.configure(config, logs, "gui");
-                assertTrue(log.isDebugEnabled());
-                assertFalse(log.isTraceEnabled());
+                assertThat(log.isDebugEnabled()).isTrue();
+                assertThat(log.isTraceEnabled()).isFalse();
                 log.trace("hidden trace");
                 log.debug("revision {}", 42);
                 log.warn("Cannot read {}", "plate.vxb", new IOException("file unavailable"));
@@ -80,22 +80,23 @@ class LoggingTest {
                 System.setErr(originalErr);
             }
         }
-        assertEquals("", stdout.toString(StandardCharsets.UTF_8));
+        assertThat(stdout.toString(StandardCharsets.UTF_8)).isEqualTo("");
         String console = stderr.toString(StandardCharsets.UTF_8);
-        assertFalse(console.contains("revision"));
-        assertFalse(console.contains("hidden trace"));
-        assertEquals(1, console.split("Cannot read plate.vxb", -1).length - 1);
-        assertTrue(console.contains("java.io.IOException: file unavailable"));
-        assertTrue(console.contains("Console UTF-8: Zażółć ☕"));
-        assertArrayEquals(rootHandlers, Logger.getLogger("").getHandlers());
+        assertThat(console.contains("revision")).isFalse();
+        assertThat(console.contains("hidden trace")).isFalse();
+        assertThat(console.split("Cannot read plate.vxb", -1).length - 1).isEqualTo(1);
+        assertThat(console.contains("java.io.IOException: file unavailable")).isTrue();
+        assertThat(console.contains("Console UTF-8: Zażółć ☕")).isTrue();
+        assertThat(Logger.getLogger("").getHandlers()).containsExactly(rootHandlers);
         try (var files = Files.list(logs)) {
             var paths = files.filter(path -> path.toString().endsWith(".log")).toList();
-            assertEquals(1, paths.size());
+            assertThat(paths.size()).isEqualTo(1);
             String content = Files.readString(paths.getFirst());
-            assertTrue(content.contains("revision 42"));
-            assertFalse(content.contains("hidden trace"));
-            assertEquals(1, content.split("Cannot read plate.vxb", -1).length - 1);
-            assertTrue(content.contains("java.io.IOException: file unavailable"));
+            assertThat(content.contains("revision 42")).isTrue();
+            assertThat(content.contains("hidden trace")).isFalse();
+            assertThat(content.split("Cannot read plate.vxb", -1).length - 1).isEqualTo(1);
+            assertThat(content.contains("java.io.IOException: file unavailable"))
+                    .isTrue();
         }
     }
 
@@ -103,8 +104,9 @@ class LoggingTest {
     void rejectsInvalidConfigurationBeforeOpeningLogFiles() throws Exception {
         var config = new UserConfiguration(directory.resolve("config.properties"));
         config.set("logging.file.count", "0");
-        assertThrows(IllegalArgumentException.class, () -> Logging.configure(config, directory.resolve("logs"), "cli"));
-        assertFalse(Files.exists(directory.resolve("logs")));
+        assertThatThrownBy(() -> Logging.configure(config, directory.resolve("logs"), "cli"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(Files.exists(directory.resolve("logs"))).isFalse();
     }
 
     @Test
@@ -122,14 +124,15 @@ class LoggingTest {
             Logging.close();
         }
         String active = Files.readString(logs.resolve("app.log"));
-        assertTrue(active.contains("second-session-marker"));
-        assertTrue(active.contains("INFO [cli:"));
-        assertFalse(active.contains("first-session-marker"));
+        assertThat(active.contains("second-session-marker")).isTrue();
+        assertThat(active.contains("INFO [cli:")).isTrue();
+        assertThat(active.contains("first-session-marker")).isFalse();
         try (var files = Files.list(logs)) {
             var archives = files.filter(p -> p.getFileName().toString().startsWith("app-"))
                     .toList();
-            assertEquals(1, archives.size());
-            assertTrue(Files.readString(archives.getFirst()).contains("first-session-marker"));
+            assertThat(archives.size()).isEqualTo(1);
+            assertThat(Files.readString(archives.getFirst()).contains("first-session-marker"))
+                    .isTrue();
         }
     }
 
@@ -147,16 +150,17 @@ class LoggingTest {
         }
         try (var files = Files.list(logs)) {
             var paths = files.filter(p -> p.toString().endsWith(".log")).toList();
-            assertEquals(2, paths.size());
-            for (var path : paths) assertTrue(Files.size(path) <= 20L * 1024 * 1024);
+            assertThat(paths.size()).isEqualTo(2);
+            for (var path : paths)
+                assertThat(Files.size(path) <= 20L * 1024 * 1024).isTrue();
             long archived = paths.stream()
                     .filter(p -> !p.getFileName().toString().equals("app.log"))
                     .mapToLong(p -> p.toFile().length())
                     .sum();
-            assertTrue(archived >= 19L * 1024 * 1024);
+            assertThat(archived >= 19L * 1024 * 1024).isTrue();
             String active = Files.readString(logs.resolve("app.log"));
-            assertTrue(active.contains("record-20 "));
-            assertFalse(active.contains("record-0 "));
+            assertThat(active.contains("record-20 ")).isTrue();
+            assertThat(active.contains("record-0 ")).isFalse();
         }
     }
 
@@ -184,15 +188,16 @@ class LoggingTest {
                 System.setErr(original);
             }
         }
-        assertTrue(stderr.toString(StandardCharsets.UTF_8).contains("console-only-marker"));
-        assertFalse(Files.readString(logs.resolve("app.log")).contains("console-only-marker"));
-        assertTrue(Files.readString(logs.resolve("app.log")).contains("ERROR"));
-        assertEquals("keep", Files.readString(unrelated));
+        assertThat(stderr.toString(StandardCharsets.UTF_8).contains("console-only-marker"))
+                .isTrue();
+        assertThat(Files.readString(logs.resolve("app.log")).contains("console-only-marker"))
+                .isFalse();
+        assertThat(Files.readString(logs.resolve("app.log")).contains("ERROR")).isTrue();
+        assertThat(Files.readString(unrelated)).isEqualTo("keep");
         try (var files = Files.list(logs)) {
-            assertEquals(
-                    1,
-                    files.filter(p -> p.getFileName().toString().matches("app-\\d.*\\.log"))
-                            .count());
+            assertThat(files.filter(p -> p.getFileName().toString().matches("app-\\d.*\\.log"))
+                            .count())
+                    .isEqualTo(1);
         }
     }
 }

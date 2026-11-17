@@ -1,6 +1,7 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import dev.voxelbrew.api.exporter.ExporterProviderRegistry;
 import dev.voxelbrew.slicer.SlicerRegistry;
@@ -33,13 +34,12 @@ class WindowResourcesTest {
                             .orElseThrow(),
                     SlicerRegistry::new);
             try {
-                assertEquals(
-                        "document-probe",
-                        resources
+                assertThat(resources
                                 .exporters
                                 .require("document-probe")
                                 .descriptor()
-                                .id());
+                                .id())
+                        .isEqualTo("document-probe");
             } finally {
                 resources.close();
                 resources.whenClosed().toCompletableFuture().get(10, TimeUnit.SECONDS);
@@ -65,25 +65,28 @@ class WindowResourcesTest {
         try {
             var write = resources.files.submit(() -> {
                 entered.countDown();
-                assertTrue(release.await(10, TimeUnit.SECONDS));
+                assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
                 return "published";
             });
-            assertTrue(entered.await(10, TimeUnit.SECONDS));
+            assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
             assertTimeoutPreemptively(
                     Duration.ofSeconds(2), resources::close, "Window close must not block the JavaFX thread");
             resources.close();
-            assertFalse(disposal.isDone(), "A draining writer still needs its plugin resources");
+            assertThat(disposal.isDone())
+                    .as("A draining writer still needs its plugin resources")
+                    .isFalse();
             release.countDown();
             disposal.get(10, TimeUnit.SECONDS);
-            assertEquals("published", write.get());
-            assertTrue(List.of(
-                            resources.rebuild,
-                            resources.files,
-                            resources.slicing,
-                            resources.validation,
-                            resources.appearance)
-                    .stream()
-                    .allMatch(ExecutorService::isTerminated));
+            assertThat(write.get()).isEqualTo("published");
+            assertThat(List.of(
+                                    resources.rebuild,
+                                    resources.files,
+                                    resources.slicing,
+                                    resources.validation,
+                                    resources.appearance)
+                            .stream()
+                            .allMatch(ExecutorService::isTerminated))
+                    .isTrue();
         } finally {
             release.countDown();
             resources.close();

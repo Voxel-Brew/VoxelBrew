@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine.model;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import java.util.List;
@@ -14,13 +14,15 @@ class FeatureNameTest {
         var initial = new CadDocument("named", List.of(sketch), 1);
         var session = new ModelSession(initial);
         session.renameFeature("sketch", "  Base profile  ");
-        assertEquals("Base profile", session.document().featureName("sketch", "Sketch"));
-        assertEquals(initial.features(), session.document().features());
-        assertEquals(session.document(), DocumentCodec.decode(DocumentCodec.encode(session.document())));
-        assertTrue(session.undo());
-        assertEquals(initial, session.document());
-        assertTrue(session.redo());
-        assertEquals("Base profile", session.document().featureNames().get("sketch"));
-        assertThrows(IllegalArgumentException.class, () -> session.renameFeature("missing", "Invalid"));
+        assertThat(session.document().featureName("sketch", "Sketch")).isEqualTo("Base profile");
+        assertThat(session.document().features()).isEqualTo(initial.features());
+        assertThat(DocumentCodec.decode(DocumentCodec.encode(session.document())))
+                .isEqualTo(session.document());
+        assertThat(session.undo()).isTrue();
+        assertThat(session.document()).isEqualTo(initial);
+        assertThat(session.redo()).isTrue();
+        assertThat(session.document().featureNames().get("sketch")).isEqualTo("Base profile");
+        assertThatThrownBy(() -> session.renameFeature("missing", "Invalid"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

@@ -1,6 +1,6 @@
 package dev.voxelbrew.exporter;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.exporter.*;
 import dev.voxelbrew.engine.mesh.*;
@@ -58,17 +58,17 @@ class SlicerSettingsIoTest {
                         .create()
                         .export(document, dev.voxelbrew.util.testing.FileExportWindows.destination(file, false));
                 byte[] before = Files.readAllBytes(file);
-                var imported = assertInstanceOf(
-                                ImportResult.Document.class, ImportService.read(importers, format, file, Map.of()))
-                        .document();
-                assertEquals(expected, imported.printSetup());
-                assertArrayEquals(before, Files.readAllBytes(file));
+                var result = ImportService.read(importers, format, file, Map.of());
+                assertThat(result).isInstanceOf(ImportResult.Document.class);
+                var imported = ((ImportResult.Document) result).document();
+                assertThat(imported.printSetup()).isEqualTo(expected);
+                assertThat(Files.readAllBytes(file)).containsExactly(before);
                 Path copy = directory.resolve("copy-" + format + ".vxb");
                 exporters
                         .require("vxb")
                         .create()
                         .export(imported, dev.voxelbrew.util.testing.FileExportWindows.destination(copy, false));
-                assertEquals(expected, DocumentReader.load(copy).printSetup());
+                assertThat(DocumentReader.load(copy).printSetup()).isEqualTo(expected);
             }
         }
     }
@@ -96,13 +96,13 @@ class SlicerSettingsIoTest {
             factory.setNamespaceAware(true);
             var xml = factory.newDocumentBuilder().parse(input);
             var metadata = xml.getElementsByTagNameNS("*", "metadata");
-            assertEquals(1, metadata.getLength());
+            assertThat(metadata.getLength()).isEqualTo(1);
             var saved = DocumentProto.PrintSetup.newBuilder();
             com.google.protobuf.util.JsonFormat.parser().merge(metadata.item(0).getTextContent(), saved);
-            assertEquals(setup.workspaceSettings(), saved.getWorkspaceSettingsMap());
-            assertEquals(4, saved.getProcess().getWalls());
-            assertEquals(2, saved.getPlatesCount());
-            assertEquals("plate-1", saved.getActivePlateId());
+            assertThat(saved.getWorkspaceSettingsMap()).isEqualTo(setup.workspaceSettings());
+            assertThat(saved.getProcess().getWalls()).isEqualTo(4);
+            assertThat(saved.getPlatesCount()).isEqualTo(2);
+            assertThat(saved.getActivePlateId()).isEqualTo("plate-1");
         }
     }
 }

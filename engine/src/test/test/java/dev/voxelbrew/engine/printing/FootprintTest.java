@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine.printing;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.mesh.MeshData;
 import dev.voxelbrew.engine.model.Transform;
@@ -43,20 +43,21 @@ class FootprintTest {
                 java.util.stream.IntStream.range(0, vertices.length / 3).toArray();
         var mesh = new MeshData(vertices, triangles, new int[triangles.length / 3]);
         var footprint = MeshGeometry.footprint(mesh);
-        assertFalse(footprint.contains(1.5, 1.5));
-        assertTrue(footprint.contains(.5, .5));
-        assertTrue(footprint.contains(5.2, .2));
+        assertThat(footprint.contains(1.5, 1.5)).isFalse();
+        assertThat(footprint.contains(.5, .5)).isTrue();
+        assertThat(footprint.contains(5.2, .2)).isTrue();
         var difference = triangleUnion(mesh);
         difference.exclusiveOr(footprint);
-        assertTrue(difference.isEmpty());
+        assertThat(difference.isEmpty()).isTrue();
         for (var transform : List.of(Transform.rotation(15, 30, 38), Transform.translation(-10, 17, 2))) {
             var placed = MeshGeometry.transform(mesh, transform);
             var expected = triangleUnion(placed);
             var actual = MeshGeometry.footprint(placed);
             for (double x = -12.13; x < 9; x += .37)
                 for (double y = -.17; y < 22; y += .43)
-                    assertEquals(
-                            expected.contains(x, y), actual.contains(x, y), "Projected occupancy at " + x + "," + y);
+                    assertThat(actual.contains(x, y))
+                            .as("Projected occupancy at " + x + "," + y)
+                            .isEqualTo(expected.contains(x, y));
         }
     }
 }

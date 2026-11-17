@@ -1,7 +1,7 @@
 package dev.voxelbrew.engine.units;
 
 import static dev.voxelbrew.engine.units.Measurements.*;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.mesh.MeshOptions;
 import dev.voxelbrew.engine.parameters.*;
@@ -16,51 +16,58 @@ class MeasurementsTest {
     @Test
     void standardQuantitiesInteroperateAcrossMetricImperialAndDerivedUnits() {
         Quantity<Length> length = quantity(20, CENTIMETRE).add(quantity(1, INCH));
-        assertEquals(225.4, length.to(MILLIMETRE).getValue().doubleValue(), 1e-10);
+        assertThat(length.to(MILLIMETRE).getValue().doubleValue())
+                .isCloseTo(225.4, org.assertj.core.data.Offset.offset(1e-10));
         Quantity<Area> area = quantity(1, INCH).multiply(quantity(1, INCH)).asType(Area.class);
-        assertEquals(645.16, value(area, SQUARE_MILLIMETRE), 1e-10);
-        assertEquals(1000, value(quantity(1, CUBIC_CENTIMETRE), CUBIC_MILLIMETRE), 1e-9);
+        assertThat(value(area, SQUARE_MILLIMETRE)).isCloseTo(645.16, org.assertj.core.data.Offset.offset(1e-10));
+        assertThat(value(quantity(1, CUBIC_CENTIMETRE), CUBIC_MILLIMETRE))
+                .isCloseTo(1000, org.assertj.core.data.Offset.offset(1e-9));
         Quantity<Speed> speed = quantity(1, FOOT).divide(quantity(1, SECOND)).asType(Speed.class);
-        assertEquals(304.8, value(speed, MILLIMETRES_PER_SECOND), 1e-10);
-        assertEquals(3600, value(quantity(1, HOUR), SECOND));
-        assertEquals(1000, value(quantity(1, KILOGRAM), GRAM));
-        assertEquals(.2, value(quantity(20, PERCENT), ONE), 1e-12);
-        assertThrows(IllegalArgumentException.class, () -> value(length, SECOND));
-        assertThrows(IllegalArgumentException.class, () -> quantity(Double.NaN, METRE));
+        assertThat(value(speed, MILLIMETRES_PER_SECOND)).isCloseTo(304.8, org.assertj.core.data.Offset.offset(1e-10));
+        assertThat(value(quantity(1, HOUR), SECOND)).isEqualTo(3600);
+        assertThat(value(quantity(1, KILOGRAM), GRAM)).isEqualTo(1000);
+        assertThat(value(quantity(20, PERCENT), ONE)).isCloseTo(.2, org.assertj.core.data.Offset.offset(1e-12));
+        assertThatThrownBy(() -> value(length, SECOND)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> quantity(Double.NaN, METRE)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void cadKeepsAngleKindWhileJsr385OwnsConversionAndAlgebra() {
-        assertEquals(Math.PI, value(quantity(180, DEGREE), RADIAN), 1e-12);
-        assertEquals(90, degrees(Math.PI / 2), 1e-12);
-        assertFalse(sameKind(DEGREE, ONE));
-        assertThrows(IllegalArgumentException.class, () -> value(quantity(1, RADIAN), ONE));
+        assertThat(value(quantity(180, DEGREE), RADIAN)).isCloseTo(Math.PI, org.assertj.core.data.Offset.offset(1e-12));
+        assertThat(degrees(Math.PI / 2)).isCloseTo(90, org.assertj.core.data.Offset.offset(1e-12));
+        assertThat(sameKind(DEGREE, ONE)).isFalse();
+        assertThatThrownBy(() -> value(quantity(1, RADIAN), ONE)).isInstanceOf(IllegalArgumentException.class);
         var p = ParameterSet.empty()
                 .put("angle", ParameterUnit.DEG, "90", "")
                 .put("width", ParameterUnit.MM, "2 in", "");
         Quantity<Angle> angle = p.values().get("angle").asType(Angle.class);
-        assertEquals(Math.PI / 2, angle.to(RADIAN).getValue().doubleValue(), 1e-12);
-        assertEquals(.5, p.value("angle / (180 deg)", ParameterUnit.NUMBER), 1e-12);
-        assertEquals(90, p.value("sqrt(angle^2)", ParameterUnit.DEG), 1e-12);
-        assertThrows(IllegalArgumentException.class, () -> p.value("angle + width", ParameterUnit.MM));
-        assertThrows(IllegalArgumentException.class, () -> p.value("sqrt(width)", ParameterUnit.MM));
-        assertThrows(IllegalArgumentException.class, () -> p.value("width^8 * width", ParameterUnit.MM));
+        assertThat(angle.to(RADIAN).getValue().doubleValue())
+                .isCloseTo(Math.PI / 2, org.assertj.core.data.Offset.offset(1e-12));
+        assertThat(p.value("angle / (180 deg)", ParameterUnit.NUMBER))
+                .isCloseTo(.5, org.assertj.core.data.Offset.offset(1e-12));
+        assertThat(p.value("sqrt(angle^2)", ParameterUnit.DEG))
+                .isCloseTo(90, org.assertj.core.data.Offset.offset(1e-12));
+        assertThatThrownBy(() -> p.value("angle + width", ParameterUnit.MM))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> p.value("sqrt(width)", ParameterUnit.MM)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> p.value("width^8 * width", ParameterUnit.MM))
+                .isInstanceOf(IllegalArgumentException.class);
         Map<String, Quantity<?>> foreign = Map.of("distance", quantity(2, METRE), "scale", quantity(50, PERCENT));
-        assertEquals(
-                1000,
-                value(Expressions.evaluate("distance * scale", ParameterUnit.MM, foreign::get), MILLIMETRE),
-                1e-9);
-        assertEquals(5.08, ParameterUnit.CM.displayValue(p.values().get("width")), 1e-12);
+        assertThat(value(Expressions.evaluate("distance * scale", ParameterUnit.MM, foreign::get), MILLIMETRE))
+                .isCloseTo(1000, org.assertj.core.data.Offset.offset(1e-9));
+        assertThat(ParameterUnit.CM.displayValue(p.values().get("width")))
+                .isCloseTo(5.08, org.assertj.core.data.Offset.offset(1e-12));
     }
 
     @Test
     void typedPrintSettingsConvertOffsetsPercentagesAndLengthAtTheBoundary() {
         var material = new PrintProfile.Material(
                 "PLA", quantity(.175, CENTIMETRE), quantity(483.15, KELVIN), quantity(333.15, KELVIN));
-        assertEquals(1.75, material.filamentDiameter(), 1e-12);
-        assertEquals(210, material.nozzleTemperature(), 1e-10);
-        assertEquals(333.15, value(material.bedTemperatureQuantity(), KELVIN), 1e-10);
-        assertEquals(273.15, value(quantity(0, CELSIUS), KELVIN), 1e-10);
+        assertThat(material.filamentDiameter()).isCloseTo(1.75, org.assertj.core.data.Offset.offset(1e-12));
+        assertThat(material.nozzleTemperature()).isCloseTo(210, org.assertj.core.data.Offset.offset(1e-10));
+        assertThat(value(material.bedTemperatureQuantity(), KELVIN))
+                .isCloseTo(333.15, org.assertj.core.data.Offset.offset(1e-10));
+        assertThat(value(quantity(0, CELSIUS), KELVIN)).isCloseTo(273.15, org.assertj.core.data.Offset.offset(1e-10));
         var process = new ProcessSettings(
                 quantity(200, MetricPrefix.MICRO(METRE)),
                 2,
@@ -72,23 +79,24 @@ class MeasurementsTest {
                 3,
                 quantity(.5, CENTIMETRE),
                 0);
-        assertEquals(.2, process.layerHeight(), 1e-12);
-        assertEquals(20, process.infillPercent(), 1e-12);
-        assertEquals(45, process.supportThreshold(), 1e-12);
-        assertEquals(5, process.brimWidth(), 1e-12);
+        assertThat(process.layerHeight()).isCloseTo(.2, org.assertj.core.data.Offset.offset(1e-12));
+        assertThat(process.infillPercent()).isCloseTo(20, org.assertj.core.data.Offset.offset(1e-12));
+        assertThat(process.supportThreshold()).isCloseTo(45, org.assertj.core.data.Offset.offset(1e-12));
+        assertThat(process.brimWidth()).isCloseTo(5, org.assertj.core.data.Offset.offset(1e-12));
         var mesh = new MeshOptions(quantity(20, MetricPrefix.MICRO(METRE)), quantity(Math.PI / 36, RADIAN));
-        assertEquals(MeshOptions.DEFAULT.chordToleranceMm(), mesh.chordToleranceMm(), 1e-12);
-        assertEquals(5, value(mesh.angularTolerance(), DEGREE), 1e-12);
+        assertThat(mesh.chordToleranceMm())
+                .isCloseTo(MeshOptions.DEFAULT.chordToleranceMm(), org.assertj.core.data.Offset.offset(1e-12));
+        assertThat(value(mesh.angularTolerance(), DEGREE)).isCloseTo(5, org.assertj.core.data.Offset.offset(1e-12));
     }
 
     @Test
     void unitCatalogueKeepsLegacyNamesAndDoesNotReserveAdditionalParameterNames() {
-        assertEquals("MM", ParameterUnit.MM.name());
-        assertSame(ParameterUnit.IN, ParameterUnit.parse("in"));
+        assertThat(ParameterUnit.MM.name()).isEqualTo("MM");
+        assertThat(ParameterUnit.parse("in")).isSameAs(ParameterUnit.IN);
         for (String name : new String[] {"s", "kg", "K", "mmSquared", "degC"}) {
             var p = ParameterSet.empty().put(name, ParameterUnit.MM, "2", "");
             p.validate();
-            assertEquals(2, p.value(name, ParameterUnit.MM));
+            assertThat(p.value(name, ParameterUnit.MM)).isEqualTo(2);
         }
     }
 }

@@ -1,6 +1,6 @@
 package dev.voxelbrew.util.logging;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.util.config.UserConfiguration;
 import java.nio.file.*;
@@ -34,48 +34,52 @@ class LoggingProcessTest {
         try {
             processes.add(start(home, "gui"));
             awaitReady(home, "gui", processes.getFirst());
-            assertTrue(Files.exists(home.resolve("log/app.log")));
+            assertThat(Files.exists(home.resolve("log/app.log"))).isTrue();
             try (var files = Files.list(home.resolve("log"))) {
-                assertEquals(
-                        0,
-                        files.filter(p -> p.getFileName().toString().startsWith("app-"))
-                                .count(),
-                        "initialize twice must not rotate twice");
+                assertThat(files.filter(p -> p.getFileName().toString().startsWith("app-"))
+                                .count())
+                        .as("initialize twice must not rotate twice")
+                        .isEqualTo(0);
             }
             processes.add(start(home, "cli"));
             awaitReady(home, "cli", processes.getLast());
             try (var files = Files.list(home.resolve("log"))) {
-                assertEquals(
-                        1,
-                        files.filter(p -> p.getFileName().toString().startsWith("app-"))
-                                .count());
+                assertThat(files.filter(p -> p.getFileName().toString().startsWith("app-"))
+                                .count())
+                        .isEqualTo(1);
             }
             for (var process : processes) {
                 process.getOutputStream().write('\n');
                 process.getOutputStream().flush();
             }
             for (var process : processes) {
-                assertTrue(process.waitFor(30, TimeUnit.SECONDS));
-                assertEquals(0, process.exitValue());
+                assertThat(process.waitFor(30, TimeUnit.SECONDS)).isTrue();
+                assertThat(process.exitValue()).isEqualTo(0);
             }
             var content = new StringBuilder();
             try (var files = Files.list(home.resolve("log"))) {
                 var logs = files.filter(p -> p.toString().endsWith(".log")).toList();
-                assertTrue(logs.size() > 2, "Concurrent writes must exercise size rotation");
+                assertThat(logs.size() > 2)
+                        .as("Concurrent writes must exercise size rotation")
+                        .isTrue();
                 for (var path : logs) {
-                    assertTrue(Files.size(path) <= 4096);
+                    assertThat(Files.size(path) <= 4096).isTrue();
                     content.append(Files.readString(path));
                 }
             }
             String text = content.toString();
             for (String component : List.of("gui", "cli")) {
-                assertEquals("", Files.readString(directory.resolve(component + ".out")));
-                assertEquals("", Files.readString(directory.resolve(component + ".err")));
-                assertTrue(text.contains("[" + component + ":"));
-                assertTrue(text.contains("uncaught-worker-" + component));
+                assertThat(Files.readString(directory.resolve(component + ".out")))
+                        .isEqualTo("");
+                assertThat(Files.readString(directory.resolve(component + ".err")))
+                        .isEqualTo("");
+                assertThat(text.contains("[" + component + ":")).isTrue();
+                assertThat(text.contains("uncaught-worker-" + component)).isTrue();
                 for (int i = 0; i < 100; i++) {
                     String marker = "event-" + component + "-" + i + ";";
-                    assertEquals(1, text.split(java.util.regex.Pattern.quote(marker), -1).length - 1, marker);
+                    assertThat(text.split(java.util.regex.Pattern.quote(marker), -1).length - 1)
+                            .as(marker)
+                            .isEqualTo(1);
                 }
             }
         } finally {
@@ -96,14 +100,14 @@ class LoggingProcessTest {
             awaitReady(home, "cli", process);
             process.getOutputStream().write('\n');
             process.getOutputStream().flush();
-            assertTrue(process.waitFor(20, TimeUnit.SECONDS));
-            assertEquals(0, process.exitValue());
-            assertEquals("", Files.readString(directory.resolve("cli.out")));
+            assertThat(process.waitFor(20, TimeUnit.SECONDS)).isTrue();
+            assertThat(process.exitValue()).isEqualTo(0);
+            assertThat(Files.readString(directory.resolve("cli.out"))).isEqualTo("");
             String errors = Files.readString(directory.resolve("cli.err"));
-            assertTrue(errors.contains("Cannot configure file logging"));
-            assertTrue(errors.contains("uncaught-worker-cli Zażółć ☕"));
-            assertFalse(errors.contains("Starting cli version"));
-            assertEquals("existing regular file", Files.readString(home.resolve("log")));
+            assertThat(errors.contains("Cannot configure file logging")).isTrue();
+            assertThat(errors.contains("uncaught-worker-cli Zażółć ☕")).isTrue();
+            assertThat(errors.contains("Starting cli version")).isFalse();
+            assertThat(Files.readString(home.resolve("log"))).isEqualTo("existing regular file");
         } finally {
             if (process.isAlive()) process.destroyForcibly();
             process.waitFor(5, TimeUnit.SECONDS);
@@ -138,8 +142,12 @@ class LoggingProcessTest {
     private void awaitReady(Path home, String component, Process process) throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
         while (!Files.exists(home.resolve(component + ".ready"))) {
-            assertTrue(process.isAlive(), Files.readString(directory.resolve(component + ".err")));
-            assertTrue(System.nanoTime() < deadline, "Logging process did not initialize");
+            assertThat(process.isAlive())
+                    .as(Files.readString(directory.resolve(component + ".err")))
+                    .isTrue();
+            assertThat(System.nanoTime() < deadline)
+                    .as("Logging process did not initialize")
+                    .isTrue();
             Thread.sleep(20);
         }
     }

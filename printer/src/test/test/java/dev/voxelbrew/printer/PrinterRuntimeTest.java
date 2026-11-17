@@ -1,6 +1,6 @@
 package dev.voxelbrew.printer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.printer.api.*;
 import java.nio.file.*;
@@ -24,23 +24,21 @@ class PrinterRuntimeTest {
                 "",
                 "secret-key");
         runtime.save(directory, device);
-        assertEquals(device, runtime.devices(directory).getFirst());
+        assertThat(runtime.devices(directory).getFirst()).isEqualTo(device);
         var file = directory.resolve("test.properties");
-        assertFalse(Files.readString(file).contains("nozzle_mm"));
+        assertThat(Files.readString(file).contains("nozzle_mm")).isFalse();
         Files.writeString(file, "extra=ignored\n", StandardOpenOption.APPEND);
-        assertEquals(device, runtime.devices(directory).getFirst());
-        assertFalse(device.toString().contains("secret-key"));
+        assertThat(runtime.devices(directory).getFirst()).isEqualTo(device);
+        assertThat(device.toString().contains("secret-key")).isFalse();
         runtime.remove(directory, device.id());
-        assertTrue(runtime.devices(directory).isEmpty());
+        assertThat(runtime.devices(directory).isEmpty()).isTrue();
     }
 
     @Test
     void rejectsTraversalAndEmbeddedCredentials() {
         var runtime = new DefaultPrinterRuntime();
-        assertThrows(IllegalArgumentException.class, () -> runtime.remove(directory, "../other"));
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> new Printer(
+        assertThatThrownBy(() -> runtime.remove(directory, "../other")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Printer(
                         "test",
                         "test",
                         Printer.Kind.MOONRAKER,
@@ -48,7 +46,8 @@ class PrinterRuntimeTest {
                         "http://user:pass@host",
                         "",
                         "",
-                        ""));
+                        ""))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -73,8 +72,8 @@ class PrinterRuntimeTest {
                 "",
                 "",
                 "key");
-        assertThrows(java.io.IOException.class, () -> runtime.save(directory, duplicate));
-        assertEquals(java.util.List.of(original), runtime.devices(directory));
+        assertThatThrownBy(() -> runtime.save(directory, duplicate)).isInstanceOf(java.io.IOException.class);
+        assertThat(runtime.devices(directory)).isEqualTo(java.util.List.of(original));
 
         var renamed = new Printer(
                 original.id(),
@@ -86,14 +85,14 @@ class PrinterRuntimeTest {
                 "",
                 "key");
         runtime.save(directory, renamed);
-        assertEquals(original.id(), runtime.devices(directory).getFirst().id());
-        assertEquals("Workshop Printer", runtime.devices(directory).getFirst().name());
+        assertThat(runtime.devices(directory).getFirst().id()).isEqualTo(original.id());
+        assertThat(runtime.devices(directory).getFirst().name()).isEqualTo("Workshop Printer");
         runtime.save(directory, duplicate);
-        assertEquals(2, runtime.devices(directory).size());
+        assertThat(runtime.devices(directory).size()).isEqualTo(2);
     }
 
     @Test
     void runtimeIsDiscoverable() {
-        assertInstanceOf(DefaultPrinterRuntime.class, PrinterRuntime.load());
+        assertThat(PrinterRuntime.load()).isInstanceOf(DefaultPrinterRuntime.class);
     }
 }

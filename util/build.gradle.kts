@@ -13,6 +13,7 @@ dependencies {
         platform("dev.voxelbrew:bom:${providers.gradleProperty("bomVersion").get()}")
     )
     testFixturesImplementation("org.junit.jupiter:junit-jupiter-api")
+    testFixturesImplementation("org.assertj:assertj-core")
     testFixturesImplementation("org.slf4j:slf4j-api")
     testFixturesImplementation("dev.voxelbrew.api:export")
     testImplementation("org.junit.platform:junit-platform-testkit")

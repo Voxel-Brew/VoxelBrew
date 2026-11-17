@@ -1,6 +1,6 @@
 package dev.voxelbrew.cli;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.exporter.ExportDialog;
 import dev.voxelbrew.api.exporter.FileExportDialog;
@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("deprecation")
 class CliExportWindowTest {
     @Test
     void promptsForMissingInputsUsingLabelAndId() {
@@ -33,9 +34,9 @@ class CliExportWindowTest {
 
         var settings = window.show(new FileExportDialog("JSON", "json")).orElseThrow();
 
-        assertEquals(Path.of("report.json"), settings.path());
-        assertFalse(settings.overwrite());
-        assertEquals("Destination[destination]: Overwrite[overwrite]: ", output.toString());
+        assertThat(settings.path()).isEqualTo(Path.of("report.json"));
+        assertThat(settings.overwrite()).isFalse();
+        assertThat(output.toString()).isEqualTo("Destination[destination]: Overwrite[overwrite]: ");
     }
 
     @Test
@@ -55,9 +56,9 @@ class CliExportWindowTest {
 
         var settings = window.show(new FileExportDialog("JSON", "json")).orElseThrow();
 
-        assertEquals(Path.of("new.json"), settings.path());
-        assertTrue(settings.overwrite());
-        assertEquals("", output.toString());
+        assertThat(settings.path()).isEqualTo(Path.of("new.json"));
+        assertThat(settings.overwrite()).isTrue();
+        assertThat(output.toString()).isEqualTo("");
     }
 
     @Test
@@ -74,7 +75,7 @@ class CliExportWindowTest {
                 false,
                 false);
 
-        assertTrue(window.show(new FileExportDialog("JSON", "json")).isEmpty());
+        assertThat(window.show(new FileExportDialog("JSON", "json")).isEmpty()).isTrue();
     }
 
     @Test
@@ -113,12 +114,13 @@ class CliExportWindowTest {
             }
         };
 
-        var failure = assertThrows(IllegalArgumentException.class, () -> window.show(dialog));
+        var failure = org.assertj.core.api.Assertions.catchThrowableOfType(
+                () -> window.show(dialog), IllegalArgumentException.class);
 
-        assertEquals(
-                "Missing export inputs: --export.bundle.model (Destination), --export.bundle.preview (Destination)",
-                failure.getMessage());
-        assertEquals("", output.toString());
+        assertThat(failure.getMessage())
+                .isEqualTo(
+                        "Missing export inputs: --export.bundle.model (Destination), --export.bundle.preview (Destination)");
+        assertThat(output.toString()).isEqualTo("");
     }
 
     @Test
@@ -156,7 +158,7 @@ class CliExportWindowTest {
             }
         };
 
-        assertEquals("report.txt", window.show(dialog).orElseThrow().get("destination"));
+        assertThat(window.show(dialog).orElseThrow().get("destination")).isEqualTo("report.txt");
     }
 
     @Test
@@ -175,11 +177,14 @@ class CliExportWindowTest {
                 false,
                 false);
 
-        assertEquals(
-                Path.of("report.json"),
-                window.show(new FileExportDialog("JSON", "json")).orElseThrow().path());
-        assertTrue(errors.toString().contains("Destination[destination]: Invalid destination path"));
-        assertEquals("Destination[destination]: Destination[destination]: Overwrite[overwrite]: ", output.toString());
+        assertThat(window.show(new FileExportDialog("JSON", "json"))
+                        .orElseThrow()
+                        .path())
+                .isEqualTo(Path.of("report.json"));
+        assertThat(errors.toString().contains("Destination[destination]: Invalid destination path"))
+                .isTrue();
+        assertThat(output.toString())
+                .isEqualTo("Destination[destination]: Destination[destination]: Overwrite[overwrite]: ");
     }
 
     @Test
@@ -197,12 +202,14 @@ class CliExportWindowTest {
                 false,
                 false);
 
-        var failure =
-                assertThrows(IllegalArgumentException.class, () -> window.show(new FileExportDialog("JSON", "json")));
-        assertTrue(failure.getMessage().contains("--export.json.destination (Destination): Choose a destination"));
-        assertTrue(
-                failure.getMessage().contains("--export.json.overwrite (Overwrite): Overwrite must be true or false"));
-        assertEquals("", output.toString());
+        var failure = catchThrowable(() -> window.show(new FileExportDialog("JSON", "json")));
+        assertThat(failure).isInstanceOf(IllegalArgumentException.class);
+        assertThat(failure.getMessage().contains("--export.json.destination (Destination): Choose a destination"))
+                .isTrue();
+        assertThat(failure.getMessage()
+                        .contains("--export.json.overwrite (Overwrite): Overwrite must be true or false"))
+                .isTrue();
+        assertThat(output.toString()).isEqualTo("");
     }
 
     @Test
@@ -219,10 +226,12 @@ class CliExportWindowTest {
                 true,
                 false);
 
-        var failure =
-                assertThrows(IllegalArgumentException.class, () -> window.show(new FileExportDialog("JSON", "json")));
-        assertTrue(failure.getMessage().contains("--export.json.destination (Destination): Choose a destination"));
-        assertTrue(
-                failure.getMessage().contains("--export.json.overwrite (Overwrite): Overwrite must be true or false"));
+        var failure = catchThrowable(() -> window.show(new FileExportDialog("JSON", "json")));
+        assertThat(failure).isInstanceOf(IllegalArgumentException.class);
+        assertThat(failure.getMessage().contains("--export.json.destination (Destination): Choose a destination"))
+                .isTrue();
+        assertThat(failure.getMessage()
+                        .contains("--export.json.overwrite (Overwrite): Overwrite must be true or false"))
+                .isTrue();
     }
 }

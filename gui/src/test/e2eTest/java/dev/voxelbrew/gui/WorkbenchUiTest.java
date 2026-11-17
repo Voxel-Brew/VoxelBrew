@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.parameters.*;
@@ -52,7 +52,7 @@ class WorkbenchUiTest {
         click("view-cube-home");
         click("constrained-sketch");
         ready();
-        assertNotNull(fx(() -> node("#sketch-plane-hint")));
+        assertThat(fx(() -> node("#sketch-plane-hint"))).isNotNull();
         readmeScreenshot("sketch-plane");
         standardView(1);
         modelClick(12, 12, 0);
@@ -66,10 +66,11 @@ class WorkbenchUiTest {
         click("sketch-tool-select");
         sketchReady();
         readmeScreenshot("sketch-drawing");
-        assertTrue(fx(() -> ((SketchEditor) node("#sketch-editor")).controller().canFinish()));
+        assertThat(fx(() -> ((SketchEditor) node("#sketch-editor")).controller().canFinish()))
+                .isTrue();
         click("constraint-finish");
         ready();
-        assertEquals(1, document().features().size());
+        assertThat(document().features().size()).isEqualTo(1);
     }
 
     @Test
@@ -98,17 +99,16 @@ class WorkbenchUiTest {
         deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(45);
         while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().running()) && System.nanoTime() < deadline)
             Thread.sleep(25);
-        assertEquals(
-                PrintController.State.SUCCEEDED,
-                fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()));
-        assertFalse(document().activeGcode().isEmpty());
+        assertThat(fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()))
+                .isEqualTo(PrintController.State.SUCCEEDED);
+        assertThat(document().activeGcode().isEmpty()).isFalse();
         ready();
         click("print-view-3d");
         ready();
         readmeScreenshot("slicer");
         click("workspace-printer");
         ready();
-        assertEquals("workspace-printer", selectedWorkspace());
+        assertThat(selectedWorkspace()).isEqualTo("workspace-printer");
         readmeScreenshot("printer");
     }
 
@@ -131,34 +131,35 @@ class WorkbenchUiTest {
         var orientation = fx(() -> workbench.viewport().orientationProperty().get());
         var projection = fx(() -> workbench.viewport().modelToScreen(new Point3D(30, 20, 5)));
         openQuickMenu("viewport-scene");
-        assertEquals(
-                orientation, fx(() -> workbench.viewport().orientationProperty().get()));
-        assertEquals(projection, fx(() -> workbench.viewport().modelToScreen(new Point3D(30, 20, 5))));
-        assertNotNull(fx(() -> node("#quick-extrude")));
-        assertTrue(fx(() -> node("#quick-undo").isDisabled()));
+        assertThat(fx(() -> workbench.viewport().orientationProperty().get())).isEqualTo(orientation);
+        assertThat(fx(() -> workbench.viewport().modelToScreen(new Point3D(30, 20, 5))))
+                .isEqualTo(projection);
+        assertThat(fx(() -> node("#quick-extrude"))).isNotNull();
+        assertThat(fx(() -> node("#quick-undo").isDisabled())).isTrue();
         fx(() -> {
             var popup = node("#quick-menu").getScene().getWindow();
             var screen = Screen.getScreensForRectangle(popup.getX(), popup.getY(), 1, 1)
                     .getFirst()
                     .getVisualBounds();
-            assertTrue(popup.getX() >= screen.getMinX());
-            assertTrue(popup.getY() >= screen.getMinY());
-            assertTrue(popup.getX() + popup.getWidth() <= screen.getMaxX() + 1);
-            assertTrue(popup.getY() + popup.getHeight() <= screen.getMaxY() + 1);
+            assertThat(popup.getX() >= screen.getMinX()).isTrue();
+            assertThat(popup.getY() >= screen.getMinY()).isTrue();
+            assertThat(popup.getX() + popup.getWidth() <= screen.getMaxX() + 1).isTrue();
+            assertThat(popup.getY() + popup.getHeight() <= screen.getMaxY() + 1).isTrue();
             Screenshot.save(
                     popup.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "quick-menu-designer.png"));
             return null;
         });
         click("quick-workspaces");
-        assertTrue(quickWorkspaceDisabled("workspace-printer"));
+        assertThat(quickWorkspaceDisabled("workspace-printer")).isTrue();
         click("quick-workspace-print");
         ready();
-        assertEquals("workspace-print", selectedWorkspace());
+        assertThat(selectedWorkspace()).isEqualTo("workspace-print");
         openQuickMenu("print-canvas");
-        assertNotNull(fx(() -> node("#quick-print-slice")));
+        assertThat(fx(() -> node("#quick-print-slice"))).isNotNull();
         click("quick-print-view-3d");
-        assertTrue(fx(() -> ((RadioButton) node("#print-view-3d")).isSelected()));
-        assertEquals(initial, document());
+        assertThat(fx(() -> ((RadioButton) node("#print-view-3d")).isSelected()))
+                .isTrue();
+        assertThat(document()).isEqualTo(initial);
         openQuickMenu("print-canvas");
         click("quick-workspaces");
         click("quick-workspace-design");
@@ -166,14 +167,14 @@ class WorkbenchUiTest {
         click("choose-plane-xy");
         sketchReady();
         openQuickMenu("sketch-canvas");
-        assertNotNull(fx(() -> node("#quick-sketch-tool-line")));
+        assertThat(fx(() -> node("#quick-sketch-tool-line"))).isNotNull();
         click("quick-workspaces");
-        assertTrue(quickWorkspaceDisabled("workspace-print"));
+        assertThat(quickWorkspaceDisabled("workspace-print")).isTrue();
         key(KeyCode.ESCAPE);
         key(KeyCode.ESCAPE);
         openQuickMenu("sketch-canvas");
         click("quick-constraint-cancel");
-        assertEquals(initial, document());
+        assertThat(document()).isEqualTo(initial);
         fx(() -> {
             var plate =
                     workbench.controller().snapshot().document().printSetup().activePlateId();
@@ -183,16 +184,17 @@ class WorkbenchUiTest {
         openQuickMenu("viewport-scene");
         click("quick-workspaces");
         click("quick-workspace-printer");
-        assertEquals("workspace-printer", selectedWorkspace());
+        assertThat(selectedWorkspace()).isEqualTo("workspace-printer");
         openQuickMenu("printer-heading");
-        assertNotNull(fx(() -> node("#quick-printer-configure")));
-        assertEquals(
-                fx(() -> node("#printer-print").isDisabled()),
-                fx(() -> node("#quick-printer-print").isDisabled()));
+        assertThat(fx(() -> node("#quick-printer-configure"))).isNotNull();
+        assertThat(fx(() -> node("#quick-printer-print").isDisabled()))
+                .isEqualTo(fx(() -> node("#printer-print").isDisabled()));
         key(KeyCode.ESCAPE);
-        assertFalse(fx(() -> Window.getWindows().stream()
-                .anyMatch(w ->
-                        w.isShowing() && w.getScene() != null && w.getScene().lookup("#quick-menu") != null)));
+        assertThat(fx(() -> Window.getWindows().stream()
+                        .anyMatch(w -> w.isShowing()
+                                && w.getScene() != null
+                                && w.getScene().lookup("#quick-menu") != null)))
+                .isFalse();
     }
 
     private boolean quickWorkspaceDisabled(String id) throws Exception {
@@ -212,10 +214,10 @@ class WorkbenchUiTest {
         var orientation = fx(() -> workbench.viewport().orientationProperty().get());
         var before = fx(() -> workbench.viewport().modelToScreen(new Point3D(30, 20, 5)));
         navigate(false);
-        assertEquals(
-                orientation, fx(() -> workbench.viewport().orientationProperty().get()));
-        assertTrue(before.distance(fx(() -> workbench.viewport().modelToScreen(new Point3D(30, 20, 5)))) > 2);
-        assertFalse(quickMenuShowing());
+        assertThat(fx(() -> workbench.viewport().orientationProperty().get())).isEqualTo(orientation);
+        assertThat(before.distance(fx(() -> workbench.viewport().modelToScreen(new Point3D(30, 20, 5)))) > 2)
+                .isTrue();
+        assertThat(quickMenuShowing()).isFalse();
         for (int appearance : List.of(1, 2)) {
             choice("appearance", appearance);
             fx(() -> {
@@ -228,13 +230,15 @@ class WorkbenchUiTest {
             Thread.sleep(200);
             fx(() -> {
                 var root = node("#quick-menu");
-                assertTrue(root.getStyleClass().contains(appearance == 1 ? "light" : "dark"));
-                assertEquals("Obszar roboczy", ((MenuButton) node("#quick-workspaces")).getText());
+                assertThat(root.getStyleClass().contains(appearance == 1 ? "light" : "dark"))
+                        .isTrue();
+                assertThat(((MenuButton) node("#quick-workspaces")).getText()).isEqualTo("Obszar roboczy");
                 var popup = root.getScene().getWindow();
                 var screen = Screen.getScreensForRectangle(popup.getX(), popup.getY(), 1, 1)
                         .getFirst()
                         .getVisualBounds();
-                assertTrue(popup.getY() + popup.getHeight() <= screen.getMaxY() + 1);
+                assertThat(popup.getY() + popup.getHeight() <= screen.getMaxY() + 1)
+                        .isTrue();
                 Screenshot.save(
                         root.getScene(),
                         Path.of(
@@ -243,15 +247,15 @@ class WorkbenchUiTest {
                 return null;
             });
             key(KeyCode.ENTER);
-            assertNotNull(fx(() -> node("#quick-workspace-design")));
+            assertThat(fx(() -> node("#quick-workspace-design"))).isNotNull();
             key(KeyCode.ESCAPE);
             key(KeyCode.ESCAPE);
-            assertFalse(quickMenuShowing());
+            assertThat(quickMenuShowing()).isFalse();
         }
         openQuickMenu("viewport-scene");
         click("workspace-design");
-        assertFalse(quickMenuShowing());
-        assertEquals(initial, document());
+        assertThat(quickMenuShowing()).isFalse();
+        assertThat(document()).isEqualTo(initial);
     }
 
     private boolean quickMenuShowing() throws Exception {
@@ -268,7 +272,7 @@ class WorkbenchUiTest {
             return null;
         });
         Thread.sleep(200);
-        assertNotNull(fx(() -> node("#quick-menu")));
+        assertThat(fx(() -> node("#quick-menu"))).isNotNull();
     }
 
     @Test
@@ -281,43 +285,45 @@ class WorkbenchUiTest {
         fx(() -> {
             ((TabPane) node("#workspaces")).getSelectionModel().select(1);
             var target = (ComboBox<?>) node("#print-target");
-            assertEquals("No device — G-code only", target.getButtonCell().getText());
+            assertThat(target.getButtonCell().getText()).isEqualTo("No device — G-code only");
             var configure = (Button) node("#print-configure-devices");
-            assertEquals("Configure devices…", configure.getText());
-            assertSame(target.getParent(), configure.getParent());
-            assertNull(stage.getScene().lookup("#print-reload-printers"));
+            assertThat(configure.getText()).isEqualTo("Configure devices…");
+            assertThat(configure.getParent()).isSameAs(target.getParent());
+            assertThat(stage.getScene().lookup("#print-reload-printers")).isNull();
             var printersMenu = ((MenuBar) node("#main-menu"))
                     .getMenus().stream()
                             .filter(menu -> "menu-printers".equals(menu.getId()))
                             .findFirst()
                             .orElseThrow();
-            assertEquals(
-                    "Reload printers profiles",
-                    printersMenu.getItems().stream()
+            assertThat(printersMenu.getItems().stream()
                             .filter(item -> "printers-reload".equals(item.getId()))
                             .findFirst()
                             .orElseThrow()
-                            .getText());
+                            .getText())
+                    .isEqualTo("Reload printers profiles");
             return null;
         });
         Platform.runLater(() -> ((Button) node("#print-configure-devices")).fire());
         fx(() -> {
             var kind = (ComboBox<?>) node("#device-config-kind");
             var dialog = (VBox) node("#device-config-content");
-            assertEquals(Printer.Kind.MOONRAKER, kind.getValue());
-            assertEquals("Klipper / Moonraker", selectedText(kind));
-            assertNull(dialog.lookup("#device-config-serial"));
-            assertTrue(dialog.lookupAll(".label").stream()
-                    .filter(Label.class::isInstance)
-                    .map(Label.class::cast)
-                    .noneMatch(label -> label.getText().contains("Nozzle")));
-            assertEquals("Moonraker server URL", ((Label) node("#device-config-address-label")).getText());
+            assertThat(kind.getValue()).isEqualTo(Printer.Kind.MOONRAKER);
+            assertThat(selectedText(kind)).isEqualTo("Klipper / Moonraker");
+            assertThat(dialog.lookup("#device-config-serial")).isNull();
+            assertThat(dialog.lookupAll(".label").stream()
+                            .filter(Label.class::isInstance)
+                            .map(Label.class::cast)
+                            .noneMatch(label -> label.getText().contains("Nozzle")))
+                    .isTrue();
+            assertThat(((Label) node("#device-config-address-label")).getText()).isEqualTo("Moonraker server URL");
             ((TextField) node("#device-config-address")).setText("moonraker.local");
-            assertTrue(((Label) node("#device-config-address-error")).getText().contains("Moonraker"));
+            assertThat(((Label) node("#device-config-address-error")).getText().contains("Moonraker"))
+                    .isTrue();
             ((TextField) node("#device-config-address")).setText("http://moonraker.local");
-            assertEquals("", ((Label) dialog.lookup("#device-config-address-error")).getText());
-            assertEquals("Slicer preset ID (optional)", ((Label) node("#device-config-model-label")).getText());
-            assertEquals("API key (optional)", ((Label) node("#device-config-secret-label")).getText());
+            assertThat(((Label) dialog.lookup("#device-config-address-error")).getText())
+                    .isEqualTo("");
+            assertThat(((Label) node("#device-config-model-label")).getText()).isEqualTo("Slicer preset ID (optional)");
+            assertThat(((Label) node("#device-config-secret-label")).getText()).isEqualTo("API key (optional)");
             Screenshot.save(
                     dialog.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "device-moonraker.png"));
             ((TextField) node("#device-config-address")).setText("http://moonraker.local");
@@ -333,16 +339,17 @@ class WorkbenchUiTest {
         fx(() -> {
             var kind = (ComboBox<?>) node("#device-config-kind");
             var dialog = (VBox) node("#device-config-content");
-            assertEquals("Bambu Lab", selectedText(kind));
-            assertNotNull(dialog.lookup("#device-config-serial"));
-            assertEquals("Printer IP / host", ((Label) node("#device-config-address-label")).getText());
+            assertThat(selectedText(kind)).isEqualTo("Bambu Lab");
+            assertThat(dialog.lookup("#device-config-serial")).isNotNull();
+            assertThat(((Label) node("#device-config-address-label")).getText()).isEqualTo("Printer IP / host");
             ((TextField) node("#device-config-address")).setText("256.0.0.1");
-            assertTrue(((Label) node("#device-config-address-error")).getText().contains("printer IP"));
+            assertThat(((Label) node("#device-config-address-error")).getText().contains("printer IP"))
+                    .isTrue();
             ((TextField) node("#device-config-address")).clear();
-            assertEquals("Printer model", ((Label) node("#device-config-model-label")).getText());
-            assertEquals("Access code", ((Label) node("#device-config-secret-label")).getText());
-            assertEquals("", ((TextField) node("#device-config-address")).getText());
-            assertEquals("", ((TextField) node("#device-config-secret")).getText());
+            assertThat(((Label) node("#device-config-model-label")).getText()).isEqualTo("Printer model");
+            assertThat(((Label) node("#device-config-secret-label")).getText()).isEqualTo("Access code");
+            assertThat(((TextField) node("#device-config-address")).getText()).isEqualTo("");
+            assertThat(((TextField) node("#device-config-secret")).getText()).isEqualTo("");
             Screenshot.save(
                     dialog.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "device-bambu.png"));
             ((TextField) node("#device-config-address")).setText("192.0.2.2");
@@ -359,16 +366,16 @@ class WorkbenchUiTest {
         fx(() -> {
             var kind = (ComboBox<?>) node("#device-config-kind");
             var dialog = (VBox) node("#device-config-content");
-            assertNull(dialog.lookup("#device-config-serial"));
-            assertEquals("Moonraker server URL", ((Label) node("#device-config-address-label")).getText());
-            assertEquals("http://moonraker.local", ((TextField) node("#device-config-address")).getText());
-            assertEquals("klipper-preset", ((TextField) node("#device-config-model")).getText());
-            assertEquals("moon-key", ((TextField) node("#device-config-secret")).getText());
+            assertThat(dialog.lookup("#device-config-serial")).isNull();
+            assertThat(((Label) node("#device-config-address-label")).getText()).isEqualTo("Moonraker server URL");
+            assertThat(((TextField) node("#device-config-address")).getText()).isEqualTo("http://moonraker.local");
+            assertThat(((TextField) node("#device-config-model")).getText()).isEqualTo("klipper-preset");
+            assertThat(((TextField) node("#device-config-secret")).getText()).isEqualTo("moon-key");
             kind.getSelectionModel().select(kind.getItems().indexOf(Printer.Kind.BAMBU));
-            assertEquals("192.0.2.2", ((TextField) node("#device-config-address")).getText());
-            assertEquals("BAMBU123", ((TextField) node("#device-config-serial")).getText());
-            assertEquals("Bambu Lab A1", ((TextField) node("#device-config-model")).getText());
-            assertEquals("bambu-code", ((TextField) node("#device-config-secret")).getText());
+            assertThat(((TextField) node("#device-config-address")).getText()).isEqualTo("192.0.2.2");
+            assertThat(((TextField) node("#device-config-serial")).getText()).isEqualTo("BAMBU123");
+            assertThat(((TextField) node("#device-config-model")).getText()).isEqualTo("Bambu Lab A1");
+            assertThat(((TextField) node("#device-config-secret")).getText()).isEqualTo("bambu-code");
             ((Button) node("#device-config-cancel")).fire();
             return null;
         });
@@ -401,7 +408,9 @@ class WorkbenchUiTest {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         var devices = directory.resolve("devices");
         while (System.nanoTime() < deadline && !Files.isDirectory(devices)) Thread.sleep(25);
-        assertTrue(Files.isDirectory(devices), "Saving should create the device directory");
+        assertThat(Files.isDirectory(devices))
+                .as("Saving should create the device directory")
+                .isTrue();
         while (System.nanoTime() < deadline) {
             try (var files = Files.list(devices)) {
                 if (files.anyMatch(path -> path.toString().endsWith(".properties"))) break;
@@ -417,36 +426,42 @@ class WorkbenchUiTest {
             try (var input = Files.newInputStream(saved)) {
                 properties.load(input);
             }
-            assertEquals("Lab Klipper", properties.getProperty("name"));
+            assertThat(properties.getProperty("name")).isEqualTo("Lab Klipper");
             deviceProfile = properties.getProperty("profile_id");
-            assertNotEquals(activeProfile, deviceProfile);
+            assertThat(deviceProfile).isNotEqualTo(activeProfile);
         }
-        assertNull(fx(() -> stage.getScene().getRoot().lookup("#device-config-content")));
+        assertThat(fx(() -> stage.getScene().getRoot().lookup("#device-config-content")))
+                .isNull();
         var selectedDevice = fx(() -> {
             var target = (ComboBox<?>) node("#print-target");
-            assertEquals(2, target.getItems().size());
+            assertThat(target.getItems().size()).isEqualTo(2);
             target.getSelectionModel().select(1);
-            assertEquals("Lab Klipper", target.getButtonCell().getText());
+            assertThat(target.getButtonCell().getText()).isEqualTo("Lab Klipper");
             return (String) target.getValue();
         });
         ready();
-        assertEquals(deviceProfile, document().printSetup().printerId());
-        assertEquals(selectedDevice, document().printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID));
-        assertEquals(selectedDevice, fx(() -> ((ComboBox<?>) node("#print-target")).getValue()));
-        assertEquals(
-                "Lab Klipper",
-                fx(() -> ((ComboBox<?>) node("#print-target")).getButtonCell().getText()));
+        assertThat(document().printSetup().printerId()).isEqualTo(deviceProfile);
+        assertThat(document().printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID))
+                .isEqualTo(selectedDevice);
+        assertThat(fx(() -> ((ComboBox<?>) node("#print-target")).getValue())).isEqualTo(selectedDevice);
+        assertThat(fx(() ->
+                        ((ComboBox<?>) node("#print-target")).getButtonCell().getText()))
+                .isEqualTo("Lab Klipper");
         fx(() -> {
-            assertTrue(((Button) node("#print-printer")).isDisabled());
+            assertThat(((Button) node("#print-printer")).isDisabled()).isTrue();
             ((TabPane) node("#print-controls")).getSelectionModel().select(1);
             var nozzle = (FormulaField) node("#print-nozzle");
-            assertFalse(nozzle.isDisabled());
-            assertNotNull(((ScrollPane)
-                            ((TabPane) node("#print-controls")).getTabs().get(1).getContent())
-                    .getContent()
-                    .lookup("#print-nozzle"));
-            assertTrue(((Label) node("#print-plate-size")).isDisabled());
-            assertEquals("Printer profile (set by device)", ((Label) node("#print-printer-profile-label")).getText());
+            assertThat(nozzle.isDisabled()).isFalse();
+            assertThat(((ScrollPane) ((TabPane) node("#print-controls"))
+                                    .getTabs()
+                                    .get(1)
+                                    .getContent())
+                            .getContent()
+                            .lookup("#print-nozzle"))
+                    .isNotNull();
+            assertThat(((Label) node("#print-plate-size")).isDisabled()).isTrue();
+            assertThat(((Label) node("#print-printer-profile-label")).getText())
+                    .isEqualTo("Printer profile (set by device)");
             Screenshot.save(
                     stage.getScene(),
                     Path.of(System.getProperty("voxelbrew.ui.artifacts"), "slicer-device-profile.png"));
@@ -455,19 +470,22 @@ class WorkbenchUiTest {
             return null;
         });
         ready();
-        assertEquals(deviceProfile, document().printSetup().printerId());
-        assertEquals(selectedDevice, document().printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID));
-        assertEquals(0.6, document().printSetup().printerSnapshot().printer().nozzleMm(), 0.0001);
+        assertThat(document().printSetup().printerId()).isEqualTo(deviceProfile);
+        assertThat(document().printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID))
+                .isEqualTo(selectedDevice);
+        assertThat(document().printSetup().printerSnapshot().printer().nozzleMm())
+                .isCloseTo(0.6, org.assertj.core.data.Offset.offset(0.0001));
         fx(() -> {
             ((ComboBox<?>) node("#print-target")).getSelectionModel().selectFirst();
             return null;
         });
         ready();
-        assertNull(document().printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID));
+        assertThat(document().printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID))
+                .isNull();
         fx(() -> {
-            assertFalse(((Button) node("#print-printer")).isDisabled());
-            assertFalse(((FormulaField) node("#print-nozzle")).isDisabled());
-            assertFalse(((Label) node("#print-plate-size")).isDisabled());
+            assertThat(((Button) node("#print-printer")).isDisabled()).isFalse();
+            assertThat(((FormulaField) node("#print-nozzle")).isDisabled()).isFalse();
+            assertThat(((Label) node("#print-plate-size")).isDisabled()).isFalse();
             return null;
         });
     }
@@ -482,7 +500,7 @@ class WorkbenchUiTest {
             ((TabPane) node("#workspaces")).getSelectionModel().select(1);
             ((TabPane) node("#print-controls")).getSelectionModel().select(1);
             var nozzle = (FormulaField) node("#print-nozzle");
-            assertEquals("0.4", nozzle.getText());
+            assertThat(nozzle.getText()).isEqualTo("0.4");
             var plate =
                     workbench.controller().snapshot().document().printSetup().activePlateId();
             workbench.controller().gcode(Map.of(plate, List.of("G28")));
@@ -491,8 +509,11 @@ class WorkbenchUiTest {
             return null;
         });
         ready();
-        assertEquals(0.6, document().printSetup().printerSnapshot().printer().nozzleMm(), 0.0001);
-        assertTrue(document().gcode().isEmpty(), "Changing the slicing nozzle invalidates stored jobs");
+        assertThat(document().printSetup().printerSnapshot().printer().nozzleMm())
+                .isCloseTo(0.6, org.assertj.core.data.Offset.offset(0.0001));
+        assertThat(document().gcode().isEmpty())
+                .as("Changing the slicing nozzle invalidates stored jobs")
+                .isTrue();
         fx(() -> {
             Screenshot.save(
                     stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "slicer-nozzle.png"));
@@ -502,13 +523,14 @@ class WorkbenchUiTest {
         fx(() -> workbench.controller().save(saved, false)).get(20, TimeUnit.SECONDS);
         fx(() -> workbench.controller().open(saved)).get(20, TimeUnit.SECONDS);
         ready();
-        assertEquals(0.6, document().printSetup().printerSnapshot().printer().nozzleMm(), 0.0001);
+        assertThat(document().printSetup().printerSnapshot().printer().nozzleMm())
+                .isCloseTo(0.6, org.assertj.core.data.Offset.offset(0.0001));
         fx(() -> {
             ((TabPane) node("#workspaces")).getSelectionModel().select(1);
             ((TabPane) node("#print-controls")).getSelectionModel().select(1);
             return null;
         });
-        assertEquals("0.6", fx(() -> ((FormulaField) node("#print-nozzle")).getText()));
+        assertThat(fx(() -> ((FormulaField) node("#print-nozzle")).getText())).isEqualTo("0.6");
     }
 
     @Test
@@ -516,13 +538,13 @@ class WorkbenchUiTest {
         ready();
         openPrepared("plate-5mm.vxb");
         shortcut(KeyCode.DIGIT3, false);
-        assertEquals("workspace-design", selectedWorkspace());
+        assertThat(selectedWorkspace()).isEqualTo("workspace-design");
         shortcut(KeyCode.RIGHT, false);
-        assertEquals("workspace-print", selectedWorkspace());
+        assertThat(selectedWorkspace()).isEqualTo("workspace-print");
         shortcut(KeyCode.RIGHT, false);
-        assertEquals("workspace-print", selectedWorkspace());
+        assertThat(selectedWorkspace()).isEqualTo("workspace-print");
         shortcut(KeyCode.LEFT, false);
-        assertEquals("workspace-design", selectedWorkspace());
+        assertThat(selectedWorkspace()).isEqualTo("workspace-design");
         fx(() -> {
             var plate =
                     workbench.controller().snapshot().document().printSetup().activePlateId();
@@ -531,19 +553,19 @@ class WorkbenchUiTest {
             return null;
         });
         shortcut(KeyCode.DIGIT3, false);
-        assertEquals("workspace-printer", selectedWorkspace());
+        assertThat(selectedWorkspace()).isEqualTo("workspace-printer");
         shortcut(KeyCode.LEFT, false);
         ready();
-        assertEquals("workspace-print", selectedWorkspace());
+        assertThat(selectedWorkspace()).isEqualTo("workspace-print");
         shortcut(KeyCode.RIGHT, false);
-        assertEquals("workspace-printer", selectedWorkspace());
+        assertThat(selectedWorkspace()).isEqualTo("workspace-printer");
         shortcut(KeyCode.DIGIT1, false);
-        assertEquals("workspace-design", selectedWorkspace());
+        assertThat(selectedWorkspace()).isEqualTo("workspace-design");
         shortcut(KeyCode.RIGHT, false);
         ready();
-        assertEquals("workspace-print", selectedWorkspace());
+        assertThat(selectedWorkspace()).isEqualTo("workspace-print");
         shortcut(KeyCode.RIGHT, false);
-        assertEquals("workspace-printer", selectedWorkspace());
+        assertThat(selectedWorkspace()).isEqualTo("workspace-printer");
         fx(() -> {
             var extra = new Tab("Future workspace");
             extra.setId("workspace-future");
@@ -551,11 +573,11 @@ class WorkbenchUiTest {
             return null;
         });
         shortcut(KeyCode.DIGIT4, false);
-        assertEquals("workspace-future", selectedWorkspace());
+        assertThat(selectedWorkspace()).isEqualTo("workspace-future");
         shortcut(KeyCode.LEFT, false);
-        assertEquals("workspace-printer", selectedWorkspace());
+        assertThat(selectedWorkspace()).isEqualTo("workspace-printer");
         shortcut(KeyCode.RIGHT, false);
-        assertEquals("workspace-future", selectedWorkspace());
+        assertThat(selectedWorkspace()).isEqualTo("workspace-future");
     }
 
     private String selectedWorkspace() throws Exception {
@@ -571,37 +593,43 @@ class WorkbenchUiTest {
         openPrepared("plate-5mm.vxb");
         fx(() -> {
             var tabs = (TabPane) node("#workspaces");
-            assertEquals(3, tabs.getTabs().size());
-            assertTrue(tabs.getTabs().get(2).isDisable());
+            assertThat(tabs.getTabs().size()).isEqualTo(3);
+            assertThat(tabs.getTabs().get(2).isDisable()).isTrue();
             var plate =
                     workbench.controller().snapshot().document().printSetup().activePlateId();
             workbench.controller().gcode(Map.of(plate, List.of("G28", "G1 X10")));
-            assertFalse(tabs.getTabs().get(2).isDisable());
+            assertThat(tabs.getTabs().get(2).isDisable()).isFalse();
             tabs.getSelectionModel().select(2);
-            assertEquals(1, ((ComboBox<?>) node("#printer-plate")).getItems().size());
-            assertTrue(((Button) node("#printer-print")).isDisable());
+            assertThat(((ComboBox<?>) node("#printer-plate")).getItems().size()).isEqualTo(1);
+            assertThat(((Button) node("#printer-print")).isDisable()).isTrue();
             workbench.applyCss();
             workbench.layout();
             var selector = (ComboBox<?>) node("#printer-plate");
-            assertNotNull(selector.getValue(), "Sliced plate is selected when the workspace opens");
-            assertTrue(selector.getWidth() <= 820, "Printer form stays readable at wide window sizes");
-            assertTrue(selector.getWidth() >= 400, "Printer form has room for device names");
+            assertThat(selector.getValue())
+                    .as("Sliced plate is selected when the workspace opens")
+                    .isNotNull();
+            assertThat(selector.getWidth() <= 820)
+                    .as("Printer form stays readable at wide window sizes")
+                    .isTrue();
+            assertThat(selector.getWidth() >= 400)
+                    .as("Printer form has room for device names")
+                    .isTrue();
             return null;
         });
         ready();
         fx(() -> {
             var selectedPlate = (ComboBox<?>) node("#printer-plate");
-            assertEquals(
-                    selectedPlate.getValue().toString(),
-                    selectedPlate.getButtonCell().getText());
-            assertFalse(selectedPlate.getButtonCell().getText().isBlank(), "Selected plate needs a readable name");
-            assertEquals("Plate 1", selectedPlate.getButtonCell().getText());
-            assertEquals(
-                    selectedPlate.getValue(), selectedPlate.getSelectionModel().getSelectedItem());
-            assertTrue(
-                    selectedPlate.getButtonCell().isVisible()
-                            && selectedPlate.getButtonCell().getWidth() > 50,
-                    "Selected plate label must have visible layout space");
+            assertThat(selectedPlate.getButtonCell().getText())
+                    .isEqualTo(selectedPlate.getValue().toString());
+            assertThat(selectedPlate.getButtonCell().getText().isBlank())
+                    .as("Selected plate needs a readable name")
+                    .isFalse();
+            assertThat(selectedPlate.getButtonCell().getText()).isEqualTo("Plate 1");
+            assertThat(selectedPlate.getSelectionModel().getSelectedItem()).isEqualTo(selectedPlate.getValue());
+            assertThat(selectedPlate.getButtonCell().isVisible()
+                            && selectedPlate.getButtonCell().getWidth() > 50)
+                    .as("Selected plate label must have visible layout space")
+                    .isTrue();
             Screenshot.save(
                     stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "printer-workspace.png"));
             return null;
@@ -612,10 +640,12 @@ class WorkbenchUiTest {
         ready();
         fx(() -> {
             var tabs = (TabPane) node("#workspaces");
-            assertFalse(tabs.getTabs().get(2).isDisable(), "Saved sliced plate enables Printer after reopen");
+            assertThat(tabs.getTabs().get(2).isDisable())
+                    .as("Saved sliced plate enables Printer after reopen")
+                    .isFalse();
             workbench.controller().invalidateGcode();
-            assertTrue(tabs.getTabs().get(2).isDisable());
-            assertNotEquals(2, tabs.getSelectionModel().getSelectedIndex());
+            assertThat(tabs.getTabs().get(2).isDisable()).isTrue();
+            assertThat(tabs.getSelectionModel().getSelectedIndex()).isNotEqualTo(2);
             return null;
         });
     }
@@ -640,22 +670,23 @@ class WorkbenchUiTest {
             var minimum = (Label) field.lookup(".formula-minimum");
             var maximum = (Label) field.lookup(".formula-maximum");
             var unitLabel = (Label) field.lookup(".formula-unit");
-            assertEquals("%", unitLabel.getText());
-            assertEquals(1, field.dragStep());
-            assertTrue(unitLabel.isMouseTransparent());
-            assertEquals("0 ≤", minimum.getText());
-            assertEquals("≤ 100", maximum.getText());
+            assertThat(unitLabel.getText()).isEqualTo("%");
+            assertThat(field.dragStep()).isEqualTo(1);
+            assertThat(unitLabel.isMouseTransparent()).isTrue();
+            assertThat(minimum.getText()).isEqualTo("0 ≤");
+            assertThat(maximum.getText()).isEqualTo("≤ 100");
             var layer = (FormulaField) node("#print-layer-height");
-            assertEquals(0.01, layer.dragStep());
-            assertEquals(1, ((FormulaField) node("#print-walls")).dragStep());
-            assertEquals(0.01, ((FormulaField) node("#print-gap")).dragStep());
-            assertEquals(1, ((FormulaField) node("#print-threshold")).dragStep());
-            assertEquals(1, ((FormulaField) node("#print-interfaces")).dragStep());
-            assertEquals(1, ((FormulaField) node("#print-raft")).dragStep());
-            assertEquals("mm", ((Label) layer.lookup(".formula-unit")).getText());
-            assertEquals("", ((Label) node("#print-walls").lookup(".formula-unit")).getText());
-            assertEquals("0.05 ≤", ((Label) layer.lookup(".formula-minimum")).getText());
-            assertEquals("≤ 0.3", ((Label) layer.lookup(".formula-maximum")).getText());
+            assertThat(layer.dragStep()).isEqualTo(0.01);
+            assertThat(((FormulaField) node("#print-walls")).dragStep()).isEqualTo(1);
+            assertThat(((FormulaField) node("#print-gap")).dragStep()).isEqualTo(0.01);
+            assertThat(((FormulaField) node("#print-threshold")).dragStep()).isEqualTo(1);
+            assertThat(((FormulaField) node("#print-interfaces")).dragStep()).isEqualTo(1);
+            assertThat(((FormulaField) node("#print-raft")).dragStep()).isEqualTo(1);
+            assertThat(((Label) layer.lookup(".formula-unit")).getText()).isEqualTo("mm");
+            assertThat(((Label) node("#print-walls").lookup(".formula-unit")).getText())
+                    .isEqualTo("");
+            assertThat(((Label) layer.lookup(".formula-minimum")).getText()).isEqualTo("0.05 ≤");
+            assertThat(((Label) layer.lookup(".formula-maximum")).getText()).isEqualTo("≤ 0.3");
             var invalid = javafx.css.PseudoClass.getPseudoClass("formula-invalid");
             for (String palette : List.of("light", "dark")) {
                 command(workbench, "appearance-" + palette).fire();
@@ -664,28 +695,33 @@ class WorkbenchUiTest {
                     workbench.applyCss();
                     workbench.layout();
                     boolean outside = !value.equals("50");
-                    assertEquals(outside, field.getPseudoClassStates().contains(invalid));
+                    assertThat(field.getPseudoClassStates().contains(invalid)).isEqualTo(outside);
                     var text = (javafx.scene.text.Text) field.lookup(".text");
                     field.selectAll();
-                    assertEquals(value, field.getSelectedText(), "Unit is not part of editable or copied text");
+                    assertThat(field.getSelectedText())
+                            .as("Unit is not part of editable or copied text")
+                            .isEqualTo(value);
                     field.deselect();
-                    if (outside) assertEquals(javafx.scene.paint.Color.web("#d65c46"), text.getFill());
-                    else assertNotEquals(javafx.scene.paint.Color.web("#d65c46"), text.getFill());
-                    assertEquals(
-                            javafx.scene.paint.Color.web(palette.equals("light") ? "#777777" : "#aaaaaa"),
-                            minimum.getTextFill());
-                    assertTrue(minimum.localToScene(minimum.getBoundsInLocal()).getMaxX()
-                            < maximum.localToScene(maximum.getBoundsInLocal()).getMinX());
+                    if (outside) assertThat(text.getFill()).isEqualTo(javafx.scene.paint.Color.web("#d65c46"));
+                    else assertThat(text.getFill()).isNotEqualTo(javafx.scene.paint.Color.web("#d65c46"));
+                    assertThat(minimum.getTextFill())
+                            .isEqualTo(javafx.scene.paint.Color.web(palette.equals("light") ? "#777777" : "#aaaaaa"));
+                    assertThat(minimum.localToScene(minimum.getBoundsInLocal()).getMaxX()
+                                    < maximum.localToScene(maximum.getBoundsInLocal())
+                                            .getMinX())
+                            .isTrue();
                     double suffixGap =
                             unitLabel.localToScene(unitLabel.getBoundsInLocal()).getMinX()
                                     - text.localToScene(text.getLayoutBounds()).getMaxX();
-                    assertTrue(suffixGap >= 4 && suffixGap <= 12, "Unit follows the text: " + suffixGap);
+                    assertThat(suffixGap >= 4 && suffixGap <= 12)
+                            .as("Unit follows the text: " + suffixGap)
+                            .isTrue();
                     double maximumGap =
                             maximum.localToScene(maximum.getBoundsInLocal()).getMinX()
                                     - unitLabel
                                             .localToScene(unitLabel.getBoundsInLocal())
                                             .getMaxX();
-                    assertEquals(6, maximumGap, 1, "Maximum follows the unit");
+                    assertThat(maximumGap).isCloseTo(6, org.assertj.core.data.Offset.offset(1.0));
                     Screenshot.save(
                             stage.getScene(),
                             Path.of(
@@ -709,22 +745,23 @@ class WorkbenchUiTest {
             var label = (Label) field.lookup(".formula-unit");
             for (var unit : ParameterUnit.values()) {
                 selected.set(unit);
-                assertEquals(unit == ParameterUnit.DEG ? 1 : unit == ParameterUnit.RAD ? 0.01 : 0.1, field.dragStep());
-                assertEquals(
-                        unit == ParameterUnit.NUMBER ? "" : unit == ParameterUnit.DEG ? "°" : unit.toString(),
-                        label.getText());
-                assertEquals("5", field.getText());
+                assertThat(field.dragStep())
+                        .isEqualTo(unit == ParameterUnit.DEG ? 1 : unit == ParameterUnit.RAD ? 0.01 : 0.1);
+                assertThat(label.getText())
+                        .isEqualTo(
+                                unit == ParameterUnit.NUMBER ? "" : unit == ParameterUnit.DEG ? "°" : unit.toString());
+                assertThat(field.getText()).isEqualTo("5");
             }
             field.displayUnit("%");
             field.selectAll();
             field.replaceSelection("25");
-            assertEquals("%", label.getText());
-            assertEquals("25", field.getText());
-            assertEquals(25, field.value(), 1e-9);
+            assertThat(label.getText()).isEqualTo("%");
+            assertThat(field.getText()).isEqualTo("25");
+            assertThat(field.value()).isCloseTo(25, org.assertj.core.data.Offset.offset(1e-9));
             var text = FormulaField.text("name", ParameterSet::empty);
             text.setSkin(text.createDefaultSkin());
             text.refreshFormula();
-            assertEquals("", ((Label) text.lookup(".formula-unit")).getText());
+            assertThat(((Label) text.lookup(".formula-unit")).getText()).isEqualTo("");
             return null;
         });
     }
@@ -735,20 +772,20 @@ class WorkbenchUiTest {
             var invalid = javafx.css.PseudoClass.getPseudoClass("formula-invalid");
             var field = FormulaField.number("1", ParameterSet::empty, ParameterUnit.CM)
                     .bounds(1, false, 2, true);
-            assertTrue(field.getPseudoClassStates().contains(invalid));
+            assertThat(field.getPseudoClassStates().contains(invalid)).isTrue();
             field.setText("=15 mm");
-            assertEquals(15, field.value(), 1e-9);
-            assertFalse(field.getPseudoClassStates().contains(invalid));
+            assertThat(field.value()).isCloseTo(15, org.assertj.core.data.Offset.offset(1e-9));
+            assertThat(field.getPseudoClassStates().contains(invalid)).isFalse();
             field.setText("2");
-            assertEquals(20, field.value(), 1e-9);
+            assertThat(field.value()).isCloseTo(20, org.assertj.core.data.Offset.offset(1e-9));
             field.bounds(1, true, 2, false);
-            assertTrue(field.getPseudoClassStates().contains(invalid));
-            assertThrows(IllegalArgumentException.class, field::value);
+            assertThat(field.getPseudoClassStates().contains(invalid)).isTrue();
+            assertThatThrownBy(field::value).isInstanceOf(IllegalArgumentException.class);
             field.setText("1");
-            assertFalse(field.getPseudoClassStates().contains(invalid));
+            assertThat(field.getPseudoClassStates().contains(invalid)).isFalse();
             field.bounds(Double.NEGATIVE_INFINITY, false, Double.POSITIVE_INFINITY, false);
             field.setText("-1000");
-            assertFalse(field.getPseudoClassStates().contains(invalid));
+            assertThat(field.getPseudoClassStates().contains(invalid)).isFalse();
             return null;
         });
     }
@@ -764,26 +801,27 @@ class WorkbenchUiTest {
             text("print-infill", input);
             fx(() -> {
                 var field = (FormulaField) node("#print-infill");
-                assertThrows(IllegalArgumentException.class, field::value);
-                assertTrue(field.getPseudoClassStates()
-                        .contains(javafx.css.PseudoClass.getPseudoClass("formula-invalid")));
+                assertThatThrownBy(field::value).isInstanceOf(IllegalArgumentException.class);
+                assertThat(field.getPseudoClassStates()
+                                .contains(javafx.css.PseudoClass.getPseudoClass("formula-invalid")))
+                        .isTrue();
                 return null;
             });
-            assertEquals(20, document().printSetup().process().infillPercent());
+            assertThat(document().printSetup().process().infillPercent()).isEqualTo(20);
         }
         for (String input : List.of("0", "100", "=25*2")) {
             text("print-infill", input);
             key(KeyCode.TAB);
-            assertEquals(
-                    input.startsWith("=") ? 50 : Double.parseDouble(input),
-                    document().printSetup().process().infillPercent());
+            assertThat(document().printSetup().process().infillPercent())
+                    .isEqualTo(input.startsWith("=") ? 50 : Double.parseDouble(input));
         }
         text("print-walls", "2.5");
         fx(() -> {
-            assertThrows(IllegalArgumentException.class, () -> ((FormulaField) node("#print-walls")).value());
+            assertThatThrownBy(() -> ((FormulaField) node("#print-walls")).value())
+                    .isInstanceOf(IllegalArgumentException.class);
             return null;
         });
-        assertEquals(2, document().printSetup().process().walls());
+        assertThat(document().printSetup().process().walls()).isEqualTo(2);
     }
 
     @Test
@@ -795,41 +833,40 @@ class WorkbenchUiTest {
         click("print-add");
         ready();
         click("print-tab-job");
-        assertNull(fx(() -> workbench.lookup("#print-output")));
-        assertNull(fx(() -> workbench.lookup("#print-overwrite")));
-        assertTrue(fx(() -> node("#print-clean-slicing").isDisabled()));
+        assertThat(fx(() -> workbench.lookup("#print-output"))).isNull();
+        assertThat(fx(() -> workbench.lookup("#print-overwrite"))).isNull();
+        assertThat(fx(() -> node("#print-clean-slicing").isDisabled())).isTrue();
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
         while (fx(() -> node("#print-slice").isDisabled()) && System.nanoTime() < deadline) Thread.sleep(25);
         click("print-slice");
         deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
         while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().running()) && System.nanoTime() < deadline)
             Thread.sleep(25);
-        assertEquals(
-                PrintController.State.SUCCEEDED,
-                fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()));
+        assertThat(fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()))
+                .isEqualTo(PrintController.State.SUCCEEDED);
         var lines = document().activeGcode();
-        assertFalse(lines.isEmpty());
-        assertTrue(fx(() -> ((TabPane) node("#print-controls"))
-                .getTabs().subList(0, 3).stream().allMatch(Tab::isDisable)));
-        assertEquals(
-                3,
-                fx(() -> ((TabPane) node("#print-controls")).getSelectionModel().getSelectedIndex()));
+        assertThat(lines.isEmpty()).isFalse();
+        assertThat(fx(() -> ((TabPane) node("#print-controls"))
+                        .getTabs().subList(0, 3).stream().allMatch(Tab::isDisable)))
+                .isTrue();
+        assertThat(fx(() ->
+                        ((TabPane) node("#print-controls")).getSelectionModel().getSelectedIndex()))
+                .isEqualTo(3);
         Path saved = directory.resolve("sliced.vxb");
         fx(() -> workbench.controller().save(saved, false)).get(20, TimeUnit.SECONDS);
-        assertEquals(lines, DocumentReader.load(saved).activeGcode());
+        assertThat(DocumentReader.load(saved).activeGcode()).isEqualTo(lines);
         fx(() -> workbench.controller().open(saved)).get(20, TimeUnit.SECONDS);
         ready();
         click("workspace-print");
         deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
         while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().result()) == null
                 && System.nanoTime() < deadline) Thread.sleep(25);
-        assertEquals(
-                lines,
-                fx(() -> ((PrintingPane) node("#printing-workspace"))
+        assertThat(fx(() -> ((PrintingPane) node("#printing-workspace"))
                         .jobs()
                         .result()
                         .job()
-                        .lines()));
+                        .lines()))
+                .isEqualTo(lines);
         try (var registry = java.util.ServiceLoader.load(dev.voxelbrew.api.exporter.ExporterProviderRegistry.class)
                 .findFirst()
                 .orElseThrow()
@@ -841,24 +878,26 @@ class WorkbenchUiTest {
                                     registry.require("gcode"),
                                     dev.voxelbrew.util.testing.FileExportWindows.destination(output, false)))
                     .get(20, TimeUnit.SECONDS);
-            assertEquals(lines, Files.readAllLines(output));
+            assertThat(Files.readAllLines(output)).isEqualTo(lines);
         }
-        assertTrue(fx(() -> ((TabPane) node("#print-controls"))
-                .getTabs().subList(0, 3).stream().allMatch(Tab::isDisable)));
+        assertThat(fx(() -> ((TabPane) node("#print-controls"))
+                        .getTabs().subList(0, 3).stream().allMatch(Tab::isDisable)))
+                .isTrue();
         var setupBeforeClean = document().printSetup();
         click("print-clean-slicing");
-        assertEquals(setupBeforeClean, document().printSetup());
-        assertTrue(document().gcode().isEmpty());
-        assertTrue(fx(() -> node("#print-clean-slicing").isDisabled()));
-        assertTrue(
-                fx(() -> ((TabPane) node("#print-controls")).getTabs().stream().noneMatch(Tab::isDisable)));
-        assertEquals(
-                PrintController.State.IDLE,
-                fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()));
+        assertThat(document().printSetup()).isEqualTo(setupBeforeClean);
+        assertThat(document().gcode().isEmpty()).isTrue();
+        assertThat(fx(() -> node("#print-clean-slicing").isDisabled())).isTrue();
+        assertThat(fx(() ->
+                        ((TabPane) node("#print-controls")).getTabs().stream().noneMatch(Tab::isDisable)))
+                .isTrue();
+        assertThat(fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()))
+                .isEqualTo(PrintController.State.IDLE);
         click("print-tab-process");
         text("print-layer-height", "0.25");
-        assertTrue(document().gcode().isEmpty());
-        assertNull(fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().result()));
+        assertThat(document().gcode().isEmpty()).isTrue();
+        assertThat(fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().result()))
+                .isNull();
     }
 
     @Test
@@ -892,9 +931,9 @@ class WorkbenchUiTest {
         click("print-tab-supports");
         click("print-supports-enabled");
         ready();
-        assertTrue(document().printSetup().supportsDisabled());
-        assertEquals(enabled.supports(), document().printSetup().supports());
-        assertTrue(fx(() -> node("#print-support-apply").isDisabled()));
+        assertThat(document().printSetup().supportsDisabled()).isTrue();
+        assertThat(document().printSetup().supports()).isEqualTo(enabled.supports());
+        assertThat(fx(() -> node("#print-support-apply").isDisabled())).isTrue();
         fx(() -> {
             Screenshot.save(
                     stage.getScene(),
@@ -907,13 +946,14 @@ class WorkbenchUiTest {
         ready();
         click("workspace-print");
         click("print-tab-supports");
-        assertFalse(fx(() -> ((CheckBox) node("#print-supports-enabled")).isSelected()));
+        assertThat(fx(() -> ((CheckBox) node("#print-supports-enabled")).isSelected()))
+                .isFalse();
         click("print-supports-enabled");
         ready();
-        assertFalse(document().printSetup().supportsDisabled());
-        assertEquals(enabled.supports(), document().printSetup().supports());
-        assertEquals(enabled.process(), document().printSetup().process());
-        assertFalse(fx(() -> node("#print-support-apply").isDisabled()));
+        assertThat(document().printSetup().supportsDisabled()).isFalse();
+        assertThat(document().printSetup().supports()).isEqualTo(enabled.supports());
+        assertThat(document().printSetup().process()).isEqualTo(enabled.process());
+        assertThat(fx(() -> node("#print-support-apply").isDisabled())).isFalse();
     }
 
     @Test
@@ -940,14 +980,13 @@ class WorkbenchUiTest {
         });
         ready();
         var after = fx(() -> node("#print-canvas").snapshot(null, null));
-        assertEquals(before.getWidth(), after.getWidth());
-        assertEquals(before.getHeight(), after.getHeight());
+        assertThat(after.getWidth()).isEqualTo(before.getWidth());
+        assertThat(after.getHeight()).isEqualTo(before.getHeight());
         for (int y = 0; y < (int) before.getHeight(); y++)
             for (int x = 0; x < (int) before.getWidth(); x++)
-                assertEquals(
-                        before.getPixelReader().getArgb(x, y),
-                        after.getPixelReader().getArgb(x, y),
-                        "Object list order must not change visibility at " + x + "," + y);
+                assertThat(after.getPixelReader().getArgb(x, y))
+                        .as("Object list order must not change visibility at " + x + "," + y)
+                        .isEqualTo(before.getPixelReader().getArgb(x, y));
         fx(() -> {
             Screenshot.save(
                     stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "slicer-depth-3d.png"));
@@ -970,7 +1009,7 @@ class WorkbenchUiTest {
             robot.mouseRelease(MouseButton.PRIMARY);
             return null;
         });
-        assertEquals("front", fx(() -> ((ComboBox<?>) node("#print-instance")).getValue()));
+        assertThat(fx(() -> ((ComboBox<?>) node("#print-instance")).getValue())).isEqualTo("front");
     }
 
     @Test
@@ -979,7 +1018,7 @@ class WorkbenchUiTest {
         fx(() -> workbench.controller().open(input)).get(20, TimeUnit.SECONDS);
         ready();
         click("workspace-print");
-        assertTrue(fx(() -> node("#print-orient-all").isDisabled()));
+        assertThat(fx(() -> node("#print-orient-all").isDisabled())).isTrue();
         click("print-add");
         ready();
         click("print-add");
@@ -1002,7 +1041,7 @@ class WorkbenchUiTest {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
         while (document().printSetup().instances().equals(before) && System.nanoTime() < deadline) Thread.sleep(40);
         ready();
-        assertEquals(2, document().printSetup().instances().size());
+        assertThat(document().printSetup().instances().size()).isEqualTo(2);
         for (var instance : document().printSetup().instances()) {
             var mesh = fx(() -> workbench.controller().build().bodies().stream()
                     .filter(b -> b.id().equals(instance.bodyId()))
@@ -1010,8 +1049,8 @@ class WorkbenchUiTest {
                     .orElseThrow()
                     .mesh());
             var bounds = MeshGeometry.bounds(MeshGeometry.transform(mesh, instance.transform()));
-            assertEquals(0, bounds.minZ(), 0.001);
-            assertEquals(5, bounds.maxZ(), 0.001);
+            assertThat(bounds.minZ()).isCloseTo(0, org.assertj.core.data.Offset.offset(0.001));
+            assertThat(bounds.maxZ()).isCloseTo(5, org.assertj.core.data.Offset.offset(0.001));
         }
         fx(() -> {
             Screenshot.save(
@@ -1020,7 +1059,7 @@ class WorkbenchUiTest {
             return null;
         });
         ready();
-        assertEquals(before, document().printSetup().instances());
+        assertThat(document().printSetup().instances()).isEqualTo(before);
     }
 
     @Test
@@ -1029,23 +1068,23 @@ class WorkbenchUiTest {
         fx(() -> workbench.controller().open(input)).get(20, TimeUnit.SECONDS);
         ready();
         click("workspace-print");
-        assertTrue(fx(() -> node("#print-remove-plate-plate-1").isDisabled()));
+        assertThat(fx(() -> node("#print-remove-plate-plate-1").isDisabled())).isTrue();
         click("print-add");
         ready();
         click("print-auto-orient");
         Thread.sleep(700);
         ready();
         fx(() -> {
-            assertNull(stage.getScene().lookup("#print-duplicate"));
-            assertNull(stage.getScene().lookup("#print-face"));
-            assertNull(stage.getScene().lookup("#print-apply-process"));
+            assertThat(stage.getScene().lookup("#print-duplicate")).isNull();
+            assertThat(stage.getScene().lookup("#print-face")).isNull();
+            assertThat(stage.getScene().lookup("#print-apply-process")).isNull();
             Screenshot.save(
                     stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "slicer-ux-placement.png"));
             return null;
         });
         click("print-remove");
         ready();
-        assertTrue(document().printSetup().instances().isEmpty());
+        assertThat(document().printSetup().instances().isEmpty()).isTrue();
         click("print-add");
         ready();
         fx(() -> {
@@ -1054,7 +1093,7 @@ class WorkbenchUiTest {
         });
         key(KeyCode.DELETE);
         ready();
-        assertTrue(document().printSetup().instances().isEmpty());
+        assertThat(document().printSetup().instances().isEmpty()).isTrue();
         click("print-add-plate");
         ready();
         String second = document().printSetup().activePlateId();
@@ -1077,16 +1116,16 @@ class WorkbenchUiTest {
         }
         Thread.sleep(300);
         ready();
-        assertEquals(second, document().printSetup().plates().getFirst().id());
-        assertEquals(second, document().printSetup().activePlateId());
+        assertThat(document().printSetup().plates().getFirst().id()).isEqualTo(second);
+        assertThat(document().printSetup().activePlateId()).isEqualTo(second);
         click("print-remove-plate-plate-1");
         ready();
-        assertEquals(second, document().printSetup().activePlateId());
-        assertEquals(1, document().printSetup().plates().size());
-        assertTrue(fx(() -> node("#print-remove-plate-" + second).isDisabled()));
+        assertThat(document().printSetup().activePlateId()).isEqualTo(second);
+        assertThat(document().printSetup().plates().size()).isEqualTo(1);
+        assertThat(fx(() -> node("#print-remove-plate-" + second).isDisabled())).isTrue();
         click("print-tab-job");
-        assertNull(fx(() -> workbench.lookup("#print-overwrite")));
-        assertNull(fx(() -> stage.getScene().lookup("#print-export")));
+        assertThat(fx(() -> workbench.lookup("#print-overwrite"))).isNull();
+        assertThat(fx(() -> stage.getScene().lookup("#print-export"))).isNull();
     }
 
     @Test
@@ -1112,22 +1151,23 @@ class WorkbenchUiTest {
         Path file = directory.resolve("slicer-settings.vxb");
         fx(() -> workbench.controller().save(file, false)).get(20, TimeUnit.SECONDS);
         ready();
-        assertFalse(fx(() -> workbench.controller().dirty()));
+        assertThat(fx(() -> workbench.controller().dirty())).isFalse();
         fx(() -> workbench.controller().open(file)).get(20, TimeUnit.SECONDS);
         ready();
         click("workspace-print");
         ready();
         click("print-tab-job");
-        assertNull(fx(() -> workbench.lookup("#print-overwrite")));
+        assertThat(fx(() -> workbench.lookup("#print-overwrite"))).isNull();
         click("print-tab-process");
-        assertEquals("5", fx(() -> ((TextField) node("#print-walls")).getText()));
-        assertEquals(5, document().printSetup().process().walls());
+        assertThat(fx(() -> ((TextField) node("#print-walls")).getText())).isEqualTo("5");
+        assertThat(document().printSetup().process().walls()).isEqualTo(5);
         click("print-tab-supports");
-        assertEquals("7", fx(() -> ((TextField) node("#print-support-width")).getText()));
+        assertThat(fx(() -> ((TextField) node("#print-support-width")).getText()))
+                .isEqualTo("7");
         click("print-tab-placement");
-        assertEquals("23", fx(() -> ((TextField) node("#print-x")).getText()));
-        assertEquals(
-                23, document().printSetup().instances().getFirst().transform().matrix()[3]);
+        assertThat(fx(() -> ((TextField) node("#print-x")).getText())).isEqualTo("23");
+        assertThat(document().printSetup().instances().getFirst().transform().matrix()[3])
+                .isEqualTo(23);
     }
 
     @Test
@@ -1154,13 +1194,17 @@ class WorkbenchUiTest {
                     .findFirst()
                     .orElseThrow();
             var confirm = stage.getScene().lookup("#printer-export-confirm");
-            assertTrue(confirm.isDisabled(), "Export requires an explicit selection");
+            assertThat(confirm.isDisabled())
+                    .as("Export requires an explicit selection")
+                    .isTrue();
             var choice = (CheckBox) pane.lookup("#printer-export-bambu-lab-a1-mini");
             choice.setSelected(true);
-            assertFalse(confirm.isDisabled());
+            assertThat(confirm.isDisabled()).isFalse();
             ((TextField) pane.lookup("#printer-export-search")).setText("Prusa");
-            assertFalse(choice.isVisible());
-            assertTrue(choice.isSelected(), "Filtering retains explicit selections");
+            assertThat(choice.isVisible()).isFalse();
+            assertThat(choice.isSelected())
+                    .as("Filtering retains explicit selections")
+                    .isTrue();
             ((Button) stage.getScene().lookup("#printer-dialog-cancel")).fire();
             return null;
         });
@@ -1171,19 +1215,18 @@ class WorkbenchUiTest {
                             .filter(item -> "menu-printers".equals(item.getId()))
                             .findFirst()
                             .orElseThrow();
-            assertEquals(
-                    List.of(
+            assertThat(menu.getItems().stream().map(MenuItem::getId).toList())
+                    .isEqualTo(List.of(
                             "printers-configure-devices",
                             "printers-export-defaults",
                             "printers-open-folder",
                             "printers-reload",
-                            "printers-visibility"),
-                    menu.getItems().stream().map(MenuItem::getId).toList());
+                            "printers-visibility"));
             var reload = menu.getItems().stream()
                     .filter(item -> "printers-reload".equals(item.getId()))
                     .findFirst()
                     .orElseThrow();
-            assertEquals("Reload printers profiles", reload.getText());
+            assertThat(reload.getText()).isEqualTo("Reload printers profiles");
             reload.fire();
             return null;
         });
@@ -1209,18 +1252,21 @@ class WorkbenchUiTest {
                     .orElseThrow();
             var choices = ((javafx.scene.layout.VBox) pane.lookup("#printer-options"))
                     .getChildren().stream().map(CheckBox.class::cast).toList();
-            assertEquals(62, choices.size());
+            assertThat(choices.size()).isEqualTo(62);
             ((TextField) pane.lookup("#printer-export-search")).setText("Prusa");
             ((Button) pane.lookup("#printer-deselect-all")).fire();
-            assertTrue(choices.stream().noneMatch(CheckBox::isSelected));
-            assertFalse(
-                    stage.getScene().lookup("#printer-export-confirm").isDisabled(), "Hiding all defaults is allowed");
+            assertThat(choices.stream().noneMatch(CheckBox::isSelected)).isTrue();
+            assertThat(stage.getScene().lookup("#printer-export-confirm").isDisabled())
+                    .as("Hiding all defaults is allowed")
+                    .isFalse();
             choices.getFirst().setSelected(true);
             ((Button) pane.lookup("#printer-invert-selection")).fire();
-            assertFalse(choices.getFirst().isSelected());
-            assertEquals(61, choices.stream().filter(CheckBox::isSelected).count());
+            assertThat(choices.getFirst().isSelected()).isFalse();
+            assertThat(choices.stream().filter(CheckBox::isSelected).count()).isEqualTo(61);
             ((Button) pane.lookup("#printer-select-all")).fire();
-            assertTrue(choices.stream().allMatch(CheckBox::isSelected), "Bulk actions include filtered-out printers");
+            assertThat(choices.stream().allMatch(CheckBox::isSelected))
+                    .as("Bulk actions include filtered-out printers")
+                    .isTrue();
             ((TextField) pane.lookup("#printer-export-search")).clear();
             stage.getScene().getRoot().applyCss();
             stage.getScene().getRoot().layout();
@@ -1237,35 +1283,36 @@ class WorkbenchUiTest {
         var original = document().printSetup();
         click("print-printer");
         ready();
-        assertTrue(fx(() -> node("#print-printer-search").isFocused()));
+        assertThat(fx(() -> node("#print-printer-search").isFocused())).isTrue();
         text("print-printer-search", "no matching printer xyz");
-        assertTrue(fx(
-                () -> ((ListView<?>) node("#print-printer-results")).getItems().isEmpty()));
-        assertTrue(fx(() -> node("#print-printer-confirm").isDisabled()));
+        assertThat(fx(() -> ((ListView<?>) node("#print-printer-results"))
+                        .getItems()
+                        .isEmpty()))
+                .isTrue();
+        assertThat(fx(() -> node("#print-printer-confirm").isDisabled())).isTrue();
         key(KeyCode.ESCAPE);
         ready();
-        assertEquals(original, document().printSetup(), "Cancel leaves project printer unchanged");
+        assertThat(document().printSetup())
+                .as("Cancel leaves project printer unchanged")
+                .isEqualTo(original);
         click("print-printer");
         ready();
         text("print-printer-search", "Bambu");
         key(KeyCode.DOWN);
-        assertEquals(
-                1,
-                fx(() -> ((ListView<?>) node("#print-printer-results"))
+        assertThat(fx(() -> ((ListView<?>) node("#print-printer-results"))
                         .getSelectionModel()
-                        .getSelectedIndex()));
+                        .getSelectedIndex()))
+                .isEqualTo(1);
         key(KeyCode.UP);
-        assertEquals(
-                0,
-                fx(() -> ((ListView<?>) node("#print-printer-results"))
+        assertThat(fx(() -> ((ListView<?>) node("#print-printer-results"))
                         .getSelectionModel()
-                        .getSelectedIndex()));
+                        .getSelectedIndex()))
+                .isEqualTo(0);
         text("print-printer-search", "  a1 MINI  ");
-        assertEquals(
-                1,
-                fx(() -> ((ListView<?>) node("#print-printer-results"))
+        assertThat(fx(() -> ((ListView<?>) node("#print-printer-results"))
                         .getItems()
-                        .size()));
+                        .size()))
+                .isEqualTo(1);
         fx(() -> {
             Screenshot.save(
                     stage.getScene(),
@@ -1274,13 +1321,16 @@ class WorkbenchUiTest {
         });
         key(KeyCode.ENTER);
         ready();
-        assertEquals("bambu-lab-a1-mini", document().printSetup().printerId());
-        assertEquals(
-                180, PrintProfile.resolve(document().printSetup()).printer().usableHeight());
-        assertTrue(fx(() -> ((Label) node("#print-printer-details")).getText()).contains("180.0"));
+        assertThat(document().printSetup().printerId()).isEqualTo("bambu-lab-a1-mini");
+        assertThat(PrintProfile.resolve(document().printSetup()).printer().usableHeight())
+                .isEqualTo(180);
+        assertThat(fx(() -> ((Label) node("#print-printer-details")).getText()).contains("180.0"))
+                .isTrue();
         click("print-add");
         ready();
-        assertFalse(fx(() -> node("#print-slice").isDisabled()), "Selected printer permits slicing");
+        assertThat(fx(() -> node("#print-slice").isDisabled()))
+                .as("Selected printer permits slicing")
+                .isFalse();
         shortcut(KeyCode.Z, false);
         ready();
         fx(() -> {
@@ -1299,18 +1349,18 @@ class WorkbenchUiTest {
         });
         ready();
         var selected = document().printSetup();
-        assertEquals("bambu-lab-a1-mini", selected.printerId());
+        assertThat(selected.printerId()).isEqualTo("bambu-lab-a1-mini");
         shortcut(KeyCode.Z, false);
         ready();
-        assertEquals(original, document().printSetup());
+        assertThat(document().printSetup()).isEqualTo(original);
         shortcut(KeyCode.Z, true);
         ready();
-        assertEquals(selected, document().printSetup());
+        assertThat(document().printSetup()).isEqualTo(selected);
         Path saved = directory.resolve("printer-snapshot.vxb");
         save(saved);
         open(saved);
         ready();
-        assertEquals(selected, document().printSetup());
+        assertThat(document().printSetup()).isEqualTo(selected);
         click("workspace-print");
         ready();
         fx(() -> {
@@ -1351,12 +1401,17 @@ class WorkbenchUiTest {
             Thread.sleep(1200);
             fx(() -> {
                 var label = (Label) node("#print-selected-object-name");
-                assertTrue(label.isVisible(), "Selection name stays visible without hovering");
-                assertEquals("Foo (1)", label.getText());
+                assertThat(label.isVisible())
+                        .as("Selection name stays visible without hovering")
+                        .isTrue();
+                assertThat(label.getText()).isEqualTo("Foo (1)");
                 var bounds = label.localToScreen(label.getBoundsInLocal());
                 var object = centerOf("print-canvas");
-                assertTrue(bounds.getMaxY() < object.getY(), "Name appears above the selected object");
-                assertTrue(bounds.getMinX() < object.getX() && bounds.getMaxX() > object.getX());
+                assertThat(bounds.getMaxY() < object.getY())
+                        .as("Name appears above the selected object")
+                        .isTrue();
+                assertThat(bounds.getMinX() < object.getX() && bounds.getMaxX() > object.getX())
+                        .isTrue();
                 Screenshot.save(
                         stage.getScene(),
                         Path.of(System.getProperty("voxelbrew.ui.artifacts"))
@@ -1366,8 +1421,9 @@ class WorkbenchUiTest {
         }
         click("print-add-plate");
         ready();
-        assertFalse(
-                fx(() -> workbench.lookup("#print-selected-object-name").isVisible()), "Empty plate clears the name");
+        assertThat(fx(() -> workbench.lookup("#print-selected-object-name").isVisible()))
+                .as("Empty plate clears the name")
+                .isFalse();
     }
 
     @Test
@@ -1392,12 +1448,12 @@ class WorkbenchUiTest {
                                     && tip.isShowing()
                                     && tip.getText().equals("Body 1 (1)")))
                     && System.nanoTime() < deadline) Thread.sleep(40);
-            assertTrue(
-                    fx(() -> Window.getWindows().stream()
+            assertThat(fx(() -> Window.getWindows().stream()
                             .anyMatch(window -> window instanceof Tooltip tip
                                     && tip.isShowing()
-                                    && tip.getText().equals("Body 1 (1)"))),
-                    id + " shows the selected object name");
+                                    && tip.getText().equals("Body 1 (1)"))))
+                    .as(id + " shows the selected object name")
+                    .isTrue();
             fx(() -> {
                 for (var window : List.copyOf(Window.getWindows()))
                     if (window instanceof Tooltip && window.isShowing())
@@ -1415,12 +1471,12 @@ class WorkbenchUiTest {
                 return null;
             });
             Thread.sleep(1200);
-            assertFalse(
-                    fx(() -> Window.getWindows().stream()
+            assertThat(fx(() -> Window.getWindows().stream()
                             .anyMatch(window -> window instanceof Tooltip tip
                                     && tip.isShowing()
-                                    && tip.getText().equals("Body 1 (1)"))),
-                    "Empty plate space has no object tooltip");
+                                    && tip.getText().equals("Body 1 (1)"))))
+                    .as("Empty plate space has no object tooltip")
+                    .isFalse();
         }
     }
 
@@ -1438,7 +1494,7 @@ class WorkbenchUiTest {
         text("export-path", target.toString());
         click("export-confirm");
         ready();
-        assertTrue(Files.exists(target));
+        assertThat(Files.exists(target)).isTrue();
     }
 
     @Test
@@ -1461,21 +1517,23 @@ class WorkbenchUiTest {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
         while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().running()) && System.nanoTime() < deadline)
             Thread.sleep(25);
-        assertEquals(
-                PrintController.State.SUCCEEDED,
-                fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()));
+        assertThat(fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()))
+                .isEqualTo(PrintController.State.SUCCEEDED);
         fx(() -> {
             var slider = (Slider) node("#print-layer");
-            assertTrue(slider.getMax() > 0);
-            assertEquals(slider.getMax(), slider.getValue(), "New slice opens at the final layer");
+            assertThat(slider.getMax() > 0).isTrue();
+            assertThat(slider.getValue())
+                    .as("New slice opens at the final layer")
+                    .isEqualTo(slider.getMax());
             return null;
         });
-        assertEquals(original.activePlateId(), document().printSetup().activePlateId());
-        assertEquals(
-                original.plates().stream().map(PrintPlate::id).collect(java.util.stream.Collectors.toSet()),
-                document().gcode().keySet());
-        assertFalse(Files.exists(directory.resolve("all-plates-1-Plate 1.gcode")));
-        assertFalse(Files.exists(directory.resolve("all-plates-2-Plate 2.gcode")));
+        assertThat(document().printSetup().activePlateId()).isEqualTo(original.activePlateId());
+        assertThat(document().gcode().keySet())
+                .isEqualTo(original.plates().stream().map(PrintPlate::id).collect(java.util.stream.Collectors.toSet()));
+        assertThat(Files.exists(directory.resolve("all-plates-1-Plate 1.gcode")))
+                .isFalse();
+        assertThat(Files.exists(directory.resolve("all-plates-2-Plate 2.gcode")))
+                .isFalse();
     }
 
     @Test
@@ -1492,14 +1550,15 @@ class WorkbenchUiTest {
         click("print-auto-arrange");
         ready();
         var arranged = document().printSetup();
-        assertNotEquals(original, arranged);
-        assertEquals(original.instances().size(), arranged.instances().size());
+        assertThat(arranged).isNotEqualTo(original);
+        assertThat(arranged.instances().size()).isEqualTo(original.instances().size());
         var a = arranged.instances().get(0).transform().matrix();
         var b = arranged.instances().get(1).transform().matrix();
-        assertTrue(Math.abs(a[3] - b[3]) >= 65 - 1e-7 || Math.abs(a[7] - b[7]) >= 45 - 1e-7);
+        assertThat(Math.abs(a[3] - b[3]) >= 65 - 1e-7 || Math.abs(a[7] - b[7]) >= 45 - 1e-7)
+                .isTrue();
         shortcut(KeyCode.Z, false);
         ready();
-        assertEquals(original, document().printSetup());
+        assertThat(document().printSetup()).isEqualTo(original);
     }
 
     @Test
@@ -1517,15 +1576,17 @@ class WorkbenchUiTest {
             return null;
         });
         ready();
-        assertEquals(setup, document().printSetup(), "Renaming preserves instance identities");
-        assertEquals(
-                "Foo (1)",
-                fx(() -> ((ComboBox<?>) node("#print-instance")).getButtonCell().getText()));
+        assertThat(document().printSetup())
+                .as("Renaming preserves instance identities")
+                .isEqualTo(setup);
+        assertThat(fx(() ->
+                        ((ComboBox<?>) node("#print-instance")).getButtonCell().getText()))
+                .isEqualTo("Foo (1)");
         shortcut(KeyCode.Z, false);
         ready();
-        assertEquals(
-                "Body 1 (1)",
-                fx(() -> ((ComboBox<?>) node("#print-instance")).getButtonCell().getText()));
+        assertThat(fx(() ->
+                        ((ComboBox<?>) node("#print-instance")).getButtonCell().getText()))
+                .isEqualTo("Body 1 (1)");
     }
 
     @Test
@@ -1537,14 +1598,15 @@ class WorkbenchUiTest {
         click("print-add");
         ready();
         var original = document().printSetup();
-        assertFalse(fx(() -> ((CheckBox) node("#print-show-rotation-gizmos")).isSelected()));
-        assertFalse(slicerHasRing("#728ef5"));
+        assertThat(fx(() -> ((CheckBox) node("#print-show-rotation-gizmos")).isSelected()))
+                .isFalse();
+        assertThat(slicerHasRing("#728ef5")).isFalse();
         click("print-show-rotation-gizmos");
         for (String view : List.of("print-view-2d", "print-view-3d")) {
             click(view);
-            assertTrue(slicerHasRing("#728ef5"));
-            assertEquals(view.equals("print-view-3d"), slicerHasRing("#e46969"));
-            assertEquals(view.equals("print-view-3d"), slicerHasRing("#57ad74"));
+            assertThat(slicerHasRing("#728ef5")).isTrue();
+            assertThat(slicerHasRing("#e46969")).isEqualTo(view.equals("print-view-3d"));
+            assertThat(slicerHasRing("#57ad74")).isEqualTo(view.equals("print-view-3d"));
             var start = fx(() -> {
                 var canvas = (javafx.scene.canvas.Canvas) node("#print-canvas");
                 var image = canvas.snapshot(null, null);
@@ -1557,7 +1619,7 @@ class WorkbenchUiTest {
                                 && color.getBlue() > .94
                                 && (best == null || x - y > best.getX() - best.getY())) best = new Point2D(x, y);
                     }
-                assertNotNull(best, "Z ring is rendered");
+                assertThat(best).as("Z ring is rendered").isNotNull();
                 return canvas.localToScreen(best);
             });
             for (boolean cancel : List.of(false, true)) {
@@ -1577,7 +1639,9 @@ class WorkbenchUiTest {
                     return null;
                 });
                 Thread.sleep(150);
-                assertEquals(original, document().printSetup(), "Rotation preview is transient");
+                assertThat(document().printSetup())
+                        .as("Rotation preview is transient")
+                        .isEqualTo(original);
                 if (cancel) key(KeyCode.ESCAPE);
                 fx(() -> {
                     robot.mouseRelease(MouseButton.PRIMARY);
@@ -1585,9 +1649,11 @@ class WorkbenchUiTest {
                     return null;
                 });
                 ready();
-                if (cancel) assertEquals(original, document().printSetup());
+                if (cancel) assertThat(document().printSetup()).isEqualTo(original);
                 else {
-                    assertNotEquals(original, document().printSetup(), "Ring drag commits rotation");
+                    assertThat(document().printSetup())
+                            .as("Ring drag commits rotation")
+                            .isNotEqualTo(original);
                     var matrix = document()
                             .printSetup()
                             .instances()
@@ -1595,11 +1661,11 @@ class WorkbenchUiTest {
                             .transform()
                             .matrix();
                     double angle = Math.toDegrees(Math.atan2(matrix[4], matrix[0]));
-                    assertEquals(Math.rint(angle / 15) * 15, angle, 1e-7);
+                    assertThat(angle).isCloseTo(Math.rint(angle / 15) * 15, org.assertj.core.data.Offset.offset(1e-7));
                     Path saved = directory.resolve("rotated-" + view + ".vxb");
                     save(saved);
-                    assertEquals(
-                            document().printSetup(), DocumentReader.load(saved).printSetup());
+                    assertThat(DocumentReader.load(saved).printSetup())
+                            .isEqualTo(document().printSetup());
                     fx(() -> {
                         Screenshot.save(
                                 stage.getScene(),
@@ -1609,7 +1675,9 @@ class WorkbenchUiTest {
                     });
                     shortcut(KeyCode.Z, false);
                     ready();
-                    assertEquals(original, document().printSetup(), "One undo restores rotation");
+                    assertThat(document().printSetup())
+                            .as("One undo restores rotation")
+                            .isEqualTo(original);
                 }
             }
         }
@@ -1619,25 +1687,30 @@ class WorkbenchUiTest {
         var tilted = document().printSetup();
         long worldFrame = slicerCameraFrame();
         choice("print-rotation-space", 1);
-        assertNotEquals(worldFrame, slicerCameraFrame(), "Local rings follow object orientation");
-        assertEquals(tilted, document().printSetup(), "Coordinate mode is transient");
-        assertTrue(fx(() -> ((CheckBox) node("#print-gizmo-local")).isSelected()));
+        assertThat(slicerCameraFrame())
+                .as("Local rings follow object orientation")
+                .isNotEqualTo(worldFrame);
+        assertThat(document().printSetup()).as("Coordinate mode is transient").isEqualTo(tilted);
+        assertThat(fx(() -> ((CheckBox) node("#print-gizmo-local")).isSelected()))
+                .isTrue();
         click("print-gizmo-local");
-        assertEquals(
-                PrintRotationGizmo.Space.WORLD, fx(() -> ((ComboBox<?>) node("#print-rotation-space")).getValue()));
-        assertEquals(worldFrame, slicerCameraFrame(), "World rings keep their plate alignment");
+        assertThat(fx(() -> ((ComboBox<?>) node("#print-rotation-space")).getValue()))
+                .isEqualTo(PrintRotationGizmo.Space.WORLD);
+        assertThat(slicerCameraFrame())
+                .as("World rings keep their plate alignment")
+                .isEqualTo(worldFrame);
         click("print-gizmo-local");
-        assertEquals(
-                PrintRotationGizmo.Space.LOCAL, fx(() -> ((ComboBox<?>) node("#print-rotation-space")).getValue()));
-        assertEquals(tilted, document().printSetup());
+        assertThat(fx(() -> ((ComboBox<?>) node("#print-rotation-space")).getValue()))
+                .isEqualTo(PrintRotationGizmo.Space.LOCAL);
+        assertThat(document().printSetup()).isEqualTo(tilted);
         choice("print-rotation-space", 0);
         shortcut(KeyCode.Z, false);
         ready();
         click("print-show-rotation-gizmos");
-        assertFalse(slicerHasRing("#728ef5"));
-        assertFalse(slicerHasRing("#e46969"));
-        assertFalse(slicerHasRing("#57ad74"));
-        assertEquals(original, document().printSetup());
+        assertThat(slicerHasRing("#728ef5")).isFalse();
+        assertThat(slicerHasRing("#e46969")).isFalse();
+        assertThat(slicerHasRing("#57ad74")).isFalse();
+        assertThat(document().printSetup()).isEqualTo(original);
     }
 
     @Test
@@ -1652,49 +1725,52 @@ class WorkbenchUiTest {
         click("print-tab-job");
         doubleClickPlate("plate-1");
         key(KeyCode.ENTER);
-        assertEquals(original, document().printSetup(), "Unchanged names do not modify the design");
+        assertThat(document().printSetup())
+                .as("Unchanged names do not modify the design")
+                .isEqualTo(original);
         doubleClickPlate("plate-1");
         text("print-plate-name", "Assembly");
         key(KeyCode.ENTER);
         ready();
-        assertEquals("Assembly", document().printSetup().activePlate().name());
-        assertEquals(original.instances(), document().printSetup().instances());
-        assertTrue(
-                fx(() -> ((ToggleButton) node("#print-plate-plate-1")).getText().startsWith("Assembly")));
+        assertThat(document().printSetup().activePlate().name()).isEqualTo("Assembly");
+        assertThat(document().printSetup().instances()).isEqualTo(original.instances());
+        assertThat(fx(() ->
+                        ((ToggleButton) node("#print-plate-plate-1")).getText().startsWith("Assembly")))
+                .isTrue();
         shortcut(KeyCode.Z, false);
         ready();
-        assertEquals(original, document().printSetup());
+        assertThat(document().printSetup()).isEqualTo(original);
         doubleClickPlate("plate-1");
         text("print-plate-name", "Discarded");
         key(KeyCode.ESCAPE);
-        assertEquals(original, document().printSetup());
-        assertNull(fx(() -> workbench.lookup("#print-plate-name")));
+        assertThat(document().printSetup()).isEqualTo(original);
+        assertThat(fx(() -> workbench.lookup("#print-plate-name"))).isNull();
         doubleClickPlate("plate-1");
         text("print-plate-name", "");
         key(KeyCode.ENTER);
-        assertNotNull(fx(() -> node("#print-plate-name")));
-        assertEquals(original, document().printSetup());
+        assertThat(fx(() -> node("#print-plate-name"))).isNotNull();
+        assertThat(document().printSetup()).isEqualTo(original);
         click("print-view-2d");
-        assertNull(fx(() -> workbench.lookup("#print-plate-name")));
+        assertThat(fx(() -> workbench.lookup("#print-plate-name"))).isNull();
         click("print-add-plate");
         ready();
         doubleClickPlate("plate-1");
         text("print-plate-name", "Assembly");
         key(KeyCode.ENTER);
         ready();
-        assertEquals(
-                "Assembly",
-                document().printSetup().selectPlate("plate-1").activePlate().name());
+        assertThat(document().printSetup().selectPlate("plate-1").activePlate().name())
+                .isEqualTo("Assembly");
         Path saved = directory.resolve("named-plates.vxb");
         save(saved);
         var expected = document().printSetup();
-        assertEquals(expected, DocumentReader.load(saved).printSetup());
+        assertThat(DocumentReader.load(saved).printSetup()).isEqualTo(expected);
         open(saved);
         ready();
-        assertEquals(expected, document().printSetup());
+        assertThat(document().printSetup()).isEqualTo(expected);
         click("workspace-print");
-        assertTrue(
-                fx(() -> ((ToggleButton) node("#print-plate-plate-1")).getText().startsWith("Assembly")));
+        assertThat(fx(() ->
+                        ((ToggleButton) node("#print-plate-plate-1")).getText().startsWith("Assembly")))
+                .isTrue();
     }
 
     private boolean slicerHasRing(String hex) throws Exception {
@@ -1725,7 +1801,7 @@ class WorkbenchUiTest {
             return null;
         });
         Thread.sleep(180);
-        assertNotNull(fx(() -> node("#print-plate-name")));
+        assertThat(fx(() -> node("#print-plate-name"))).isNotNull();
     }
 
     @Test
@@ -1737,7 +1813,7 @@ class WorkbenchUiTest {
         click("print-add");
         ready();
         var initial = document();
-        assertTrue(fx(() -> node("#print-view-cube").isVisible()));
+        assertThat(fx(() -> node("#print-view-cube").isVisible())).isTrue();
         click("print-view-3d");
         var top = fx(() -> {
             var face = node("#print-view-cube").lookup("#view-cube-top");
@@ -1750,7 +1826,8 @@ class WorkbenchUiTest {
             return null;
         });
         Thread.sleep(150);
-        assertTrue(fx(() -> ((RadioButton) node("#print-view-2d")).isSelected()));
+        assertThat(fx(() -> ((RadioButton) node("#print-view-2d")).isSelected()))
+                .isTrue();
         click("print-view-3d");
         var home =
                 fx(() -> (javafx.scene.control.Button) node("#print-view-cube").lookup("#view-cube-home"));
@@ -1758,8 +1835,9 @@ class WorkbenchUiTest {
             home.fire();
             return null;
         });
-        assertTrue(fx(() -> ((RadioButton) node("#print-view-3d")).isSelected()));
-        assertEquals(initial, document(), "View navigation must not edit placement");
+        assertThat(fx(() -> ((RadioButton) node("#print-view-3d")).isSelected()))
+                .isTrue();
+        assertThat(document()).as("View navigation must not edit placement").isEqualTo(initial);
         fx(() -> {
             Screenshot.save(
                     stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "slicer-view-cube.png"));
@@ -1781,12 +1859,12 @@ class WorkbenchUiTest {
             for (var button : List.of(MouseButton.SECONDARY, MouseButton.MIDDLE, MouseButton.PRIMARY)) {
                 long before = slicerCameraFrame();
                 slicerCameraGesture(button, false);
-                assertNotEquals(before, slicerCameraFrame(), view + " / " + button);
-                assertEquals(initial, document(), "Camera changes are transient");
+                assertThat(slicerCameraFrame()).as(view + " / " + button).isNotEqualTo(before);
+                assertThat(document()).as("Camera changes are transient").isEqualTo(initial);
             }
             long before = slicerCameraFrame();
             slicerCameraGesture(MouseButton.MIDDLE, true);
-            assertNotEquals(before, slicerCameraFrame(), "Shift+middle pans");
+            assertThat(slicerCameraFrame()).as("Shift+middle pans").isNotEqualTo(before);
             before = slicerCameraFrame();
             var center = centerOf("print-canvas");
             fx(() -> {
@@ -1795,8 +1873,8 @@ class WorkbenchUiTest {
                 return null;
             });
             Thread.sleep(150);
-            assertNotEquals(before, slicerCameraFrame(), "Wheel zooms");
-            assertEquals(initial, document());
+            assertThat(slicerCameraFrame()).as("Wheel zooms").isNotEqualTo(before);
+            assertThat(document()).isEqualTo(initial);
             click("print-fit-view");
             var part = fx(() -> {
                 var canvas = (javafx.scene.canvas.Canvas) node("#print-canvas");
@@ -1812,7 +1890,9 @@ class WorkbenchUiTest {
                             count++;
                         }
                     }
-                assertTrue(count > 10, "Object is visible after camera navigation");
+                assertThat(count > 10)
+                        .as("Object is visible after camera navigation")
+                        .isTrue();
                 return canvas.localToScreen(x / count, y / count);
             });
             fx(() -> {
@@ -1831,11 +1911,12 @@ class WorkbenchUiTest {
                 return null;
             });
             ready();
-            assertNotEquals(
-                    initial.printSetup(), document().printSetup(), "Object dragging works after camera navigation");
+            assertThat(document().printSetup())
+                    .as("Object dragging works after camera navigation")
+                    .isNotEqualTo(initial.printSetup());
             shortcut(KeyCode.Z, false);
             ready();
-            assertEquals(initial, document(), "Camera gestures do not add undo steps");
+            assertThat(document()).as("Camera gestures do not add undo steps").isEqualTo(initial);
             fx(() -> {
                 Screenshot.save(
                         stage.getScene(),
@@ -1900,18 +1981,24 @@ class WorkbenchUiTest {
             return null;
         });
         Thread.sleep(120);
-        assertEquals(before, document().printSetup().instances().getFirst(), "Drag stays transient");
+        assertThat(document().printSetup().instances().getFirst())
+                .as("Drag stays transient")
+                .isEqualTo(before);
         fx(() -> {
             robot.mouseRelease(MouseButton.PRIMARY);
             return null;
         });
         ready();
         var moved = document().printSetup().instances().getFirst();
-        assertTrue(moved.transform().matrix()[3] > before.transform().matrix()[3]);
-        assertTrue(moved.transform().matrix()[7] > before.transform().matrix()[7]);
+        assertThat(moved.transform().matrix()[3] > before.transform().matrix()[3])
+                .isTrue();
+        assertThat(moved.transform().matrix()[7] > before.transform().matrix()[7])
+                .isTrue();
         shortcut(KeyCode.Z, false);
         ready();
-        assertEquals(before, document().printSetup().instances().getFirst(), "One undo restores placement");
+        assertThat(document().printSetup().instances().getFirst())
+                .as("One undo restores placement")
+                .isEqualTo(before);
         final var dragCenter = centerOf("print-canvas");
         fx(() -> {
             robot.mouseMove(dragCenter);
@@ -1927,20 +2014,22 @@ class WorkbenchUiTest {
             robot.mouseRelease(MouseButton.PRIMARY);
             return null;
         });
-        assertEquals(before, document().printSetup().instances().getFirst(), "Escape discards placement");
+        assertThat(document().printSetup().instances().getFirst())
+                .as("Escape discards placement")
+                .isEqualTo(before);
         click("print-add-plate");
         ready();
-        assertEquals(2, document().printSetup().plates().size());
-        assertTrue(document().printSetup().instances().isEmpty());
+        assertThat(document().printSetup().plates().size()).isEqualTo(2);
+        assertThat(document().printSetup().instances().isEmpty()).isTrue();
         click("print-add");
         ready();
-        assertEquals(1, document().printSetup().instances().size());
+        assertThat(document().printSetup().instances().size()).isEqualTo(1);
         click("print-plate-plate-1");
         ready();
-        assertEquals(before, document().printSetup().instances().getFirst());
+        assertThat(document().printSetup().instances().getFirst()).isEqualTo(before);
         Path saved = directory.resolve("multiple-plates.vxb");
         save(saved);
-        assertEquals(document().printSetup(), DocumentReader.load(saved).printSetup());
+        assertThat(DocumentReader.load(saved).printSetup()).isEqualTo(document().printSetup());
         for (int palette : List.of(1, 2)) {
             choice("appearance", palette);
             fx(() -> {
@@ -1964,11 +2053,11 @@ class WorkbenchUiTest {
         deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(45);
         while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().running()) && System.nanoTime() < deadline)
             Thread.sleep(25);
-        assertEquals(
-                PrintController.State.SUCCEEDED,
-                fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()));
-        assertFalse(document().activeGcode().isEmpty());
-        assertFalse(Files.exists(saved.resolveSibling("multiple-plates-1-Plate 1.gcode")));
+        assertThat(fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()))
+                .isEqualTo(PrintController.State.SUCCEEDED);
+        assertThat(document().activeGcode().isEmpty()).isFalse();
+        assertThat(Files.exists(saved.resolveSibling("multiple-plates-1-Plate 1.gcode")))
+                .isFalse();
         click("print-legend");
         for (int palette : List.of(1, 2)) {
             choice("appearance", palette);
@@ -1981,7 +2070,8 @@ class WorkbenchUiTest {
             });
         }
         click("print-preview");
-        assertFalse(fx(() -> workbench.lookup("#print-layer").getParent().isVisible()));
+        assertThat(fx(() -> workbench.lookup("#print-layer").getParent().isVisible()))
+                .isFalse();
     }
 
     @Test
@@ -1998,39 +2088,41 @@ class WorkbenchUiTest {
         click("slicer-settings-save");
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (fx(() -> node("#slicer-settings-save").isDisabled()) && System.nanoTime() < deadline) Thread.sleep(25);
-        assertTrue(fx(() -> ((Label) node("#slicer-settings-status")).getText().contains("saved")));
+        assertThat(fx(() -> ((Label) node("#slicer-settings-status")).getText().contains("saved")))
+                .isTrue();
         long probeDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
         while (fx(() -> ((Label) node("#slicer-status-cura")).getText().contains("Checking"))
                 && System.nanoTime() < probeDeadline) Thread.sleep(25);
-        assertTrue(fx(() -> ((Label) node("#slicer-status-cura")).getText().contains("Not working")));
+        assertThat(fx(() -> ((Label) node("#slicer-status-cura")).getText().contains("Not working")))
+                .isTrue();
         fx(() -> {
             var statusPanel = node("#slicer-status-cura").getParent();
-            assertTrue(statusPanel.getStyleClass().contains("unavailable"));
+            assertThat(statusPanel.getStyleClass().contains("unavailable")).isTrue();
             var saveButton = (Button) node("#slicer-settings-save");
             var cancelButton = (Button) node("#slicer-settings-close");
-            assertSame(saveButton.getParent(), cancelButton.getParent());
-            assertTrue(saveButton.isDefaultButton());
-            assertEquals("Cancel", cancelButton.getText());
-            assertEquals(
-                    saveButton.localToScene(saveButton.getBoundsInLocal()).getCenterY(),
-                    cancelButton.localToScene(cancelButton.getBoundsInLocal()).getCenterY(),
-                    1.0);
+            assertThat(cancelButton.getParent()).isSameAs(saveButton.getParent());
+            assertThat(saveButton.isDefaultButton()).isTrue();
+            assertThat(cancelButton.getText()).isEqualTo("Cancel");
+            assertThat(cancelButton
+                            .localToScene(cancelButton.getBoundsInLocal())
+                            .getCenterY())
+                    .isCloseTo(
+                            saveButton
+                                    .localToScene(saveButton.getBoundsInLocal())
+                                    .getCenterY(),
+                            org.assertj.core.data.Offset.offset(1.0));
             return null;
         });
-        assertTrue(fx(() -> workbench.lookup("#print-slice").isDisabled()));
-        assertTrue(fx(() -> workbench.lookup("#print-slice-all").isDisabled()));
-        assertEquals(
-                "C:/Slicers/prusa.exe",
-                configuration.section("slicer", "prusa-slicer").get("executable", ""));
-        assertEquals(
-                "C:/Slicers/CuraEngine.exe",
-                configuration.section("slicer", "cura").get("executable", ""));
-        assertEquals(
-                "C:/Slicers/machine.json",
-                configuration.section("slicer", "cura").get("definition", ""));
-        assertEquals(
-                "C:/Slicers/process.properties",
-                configuration.section("slicer", "cura").get("settings", ""));
+        assertThat(fx(() -> workbench.lookup("#print-slice").isDisabled())).isTrue();
+        assertThat(fx(() -> workbench.lookup("#print-slice-all").isDisabled())).isTrue();
+        assertThat(configuration.section("slicer", "prusa-slicer").get("executable", ""))
+                .isEqualTo("C:/Slicers/prusa.exe");
+        assertThat(configuration.section("slicer", "cura").get("executable", ""))
+                .isEqualTo("C:/Slicers/CuraEngine.exe");
+        assertThat(configuration.section("slicer", "cura").get("definition", ""))
+                .isEqualTo("C:/Slicers/machine.json");
+        assertThat(configuration.section("slicer", "cura").get("settings", ""))
+                .isEqualTo("C:/Slicers/process.properties");
         fx(() -> {
             Screenshot.save(
                     stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "slicer-settings.png"));
@@ -2040,15 +2132,13 @@ class WorkbenchUiTest {
         click("menu-slicer");
         click("slicer-settings");
         click("slicer-settings-prusa-slicer");
-        assertEquals(
-                "C:/Slicers/prusa.exe",
-                fx(() -> ((TextField) node("#slicer-option-prusa-slicer-executable")).getText()));
+        assertThat(fx(() -> ((TextField) node("#slicer-option-prusa-slicer-executable")).getText()))
+                .isEqualTo("C:/Slicers/prusa.exe");
         text("slicer-option-prusa-slicer-executable", "discarded");
         key(KeyCode.ESCAPE);
-        assertEquals(
-                "C:/Slicers/prusa.exe",
-                configuration.section("slicer", "prusa-slicer").get("executable", ""));
-        assertFalse(fx(() -> workbench.controller().dirty()));
+        assertThat(configuration.section("slicer", "prusa-slicer").get("executable", ""))
+                .isEqualTo("C:/Slicers/prusa.exe");
+        assertThat(fx(() -> workbench.controller().dirty())).isFalse();
     }
 
     @Test
@@ -2069,72 +2159,72 @@ class WorkbenchUiTest {
         click("history-0");
         click("extrude");
         ready();
-        assertEquals(1500, volume(), .001);
+        assertThat(volume()).isCloseTo(1500, org.assertj.core.data.Offset.offset(.001));
         choice("extrude-region", 1);
         ready();
-        assertEquals(1000, volume(), .001);
+        assertThat(volume()).isCloseTo(1000, org.assertj.core.data.Offset.offset(.001));
         choice("extrude-region", 2);
         ready();
-        assertEquals(500, volume(), .001);
+        assertThat(volume()).isCloseTo(500, org.assertj.core.data.Offset.offset(.001));
         choice("extrude-region", 1);
         text("extrude-distance", "8");
         key(KeyCode.ENTER);
         ready();
-        assertEquals(1600, volume(), .001);
-        assertEquals(sketch, document().features().getFirst());
+        assertThat(volume()).isCloseTo(1600, org.assertj.core.data.Offset.offset(.001));
+        assertThat(document().features().getFirst()).isEqualTo(sketch);
         click("undo");
         ready();
-        assertEquals(List.of(sketch), document().features());
+        assertThat(document().features()).isEqualTo(List.of(sketch));
     }
 
     @Test
     void constructionMenuCreatesEditablePlaneAndCancelsDraftWithoutHistory() throws Exception {
         ready();
         click("construction-menu");
-        assertTrue(
-                fx(() -> ((MenuButton) node("#construction-menu")).isShowing()),
-                "Construct menu stays open after mouse click");
-        assertEquals(
-                20,
-                fx(() -> ((MenuButton) node("#construction-menu"))
+        assertThat(fx(() -> ((MenuButton) node("#construction-menu")).isShowing()))
+                .as("Construct menu stays open after mouse click")
+                .isTrue();
+        assertThat(fx(() -> ((MenuButton) node("#construction-menu"))
                                 .getItems().stream()
                                         .filter(item -> !(item instanceof SeparatorMenuItem))
                                         .count())
-                        .intValue());
+                        .intValue())
+                .isEqualTo(20);
         click("construct-offset-plane");
         choice("construction-input-0", 4);
         text("construction-value", "12");
         click("construction-preview");
         Thread.sleep(500);
-        assertTrue(document().features().isEmpty(), "Preview does not create a history entry");
+        assertThat(document().features().isEmpty())
+                .as("Preview does not create a history entry")
+                .isTrue();
         click("construction-apply");
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
         while (document().features().isEmpty() && System.nanoTime() < deadline) Thread.sleep(40);
         ready();
-        assertEquals(1, document().features().size());
+        assertThat(document().features().size()).isEqualTo(1);
         var feature = (ConstructionFeature) document().features().getFirst();
-        assertEquals(12, feature.value());
-        assertEquals(
-                12,
-                fx(() -> ((dev.voxelbrew.engine.construction.ConstructionGeometry.Plane)
+        assertThat(feature.value()).isEqualTo(12);
+        assertThat(fx(() -> ((dev.voxelbrew.engine.construction.ConstructionGeometry.Plane)
                                 workbench.controller().build().construction().get(feature.id()))
                         .origin()
-                        .z()));
+                        .z()))
+                .isEqualTo(12);
         click("history-0");
         click("construction-edit");
         text("construction-value", "20");
         click("construction-cancel");
-        assertEquals(feature, document().features().getFirst());
+        assertThat(document().features().getFirst()).isEqualTo(feature);
         click("construction-menu");
         click("construct-point-vertex");
         key(KeyCode.ESCAPE);
-        assertEquals(1, document().features().size());
+        assertThat(document().features().size()).isEqualTo(1);
         shortcut(KeyCode.Z, false);
         ready();
-        assertTrue(document().features().isEmpty());
+        assertThat(document().features().isEmpty()).isTrue();
         shortcut(KeyCode.Z, true);
         ready();
-        assertEquals(feature, document().features().getFirst());
+        assertThat(document().features().getFirst()).isEqualTo(feature);
         fx(() -> {
             workbench
                     .controller()
@@ -2152,7 +2242,7 @@ class WorkbenchUiTest {
             return null;
         });
         ready();
-        assertFalse(fx(() -> workbench.controller().build().valid()));
+        assertThat(fx(() -> workbench.controller().build().valid())).isFalse();
         click("history-0");
         click("construction-edit");
         choice("construction-input-0", 4);
@@ -2160,9 +2250,10 @@ class WorkbenchUiTest {
         deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
         while (!fx(() -> workbench.controller().build().valid()) && System.nanoTime() < deadline) Thread.sleep(40);
         ready();
-        assertTrue(
-                fx(() -> workbench.controller().build().valid()), "Broken construction can be repaired in its editor");
-        assertEquals(feature, document().features().getFirst());
+        assertThat(fx(() -> workbench.controller().build().valid()))
+                .as("Broken construction can be repaired in its editor")
+                .isTrue();
+        assertThat(document().features().getFirst()).isEqualTo(feature);
     }
 
     @Test
@@ -2200,15 +2291,20 @@ class WorkbenchUiTest {
         click("history-0");
         click("edit-sketch-constraints");
         sketchReady();
-        assertTrue(fx(() ->
-                ((SketchEditor) node("#sketch-editor")).controller().result().degreesOfFreedom() > 0));
+        assertThat(fx(() -> ((SketchEditor) node("#sketch-editor"))
+                                .controller()
+                                .result()
+                                .degreesOfFreedom()
+                        > 0))
+                .isTrue();
         assertSketchGeometryColor(20, 10, true);
         assertSketchGeometryColor(10, 10, true);
         assertSketchGeometryColor(20, 30, false);
         assertSketchGeometryColor(40, 10, true);
         assertSketchGeometryColor(50, 10, false);
         sketchReference("fixed");
-        assertFalse(fx(() -> ((Label) node("#sketch-selection")).getText().isBlank()));
+        assertThat(fx(() -> ((Label) node("#sketch-selection")).getText().isBlank()))
+                .isFalse();
         click("sketch-clear-selection");
         assertSketchGeometryColor(20, 10, true);
         fx(() -> {
@@ -2235,7 +2331,9 @@ class WorkbenchUiTest {
                 }
             return false;
         });
-        assertTrue(matches, (black ? "Constrained black" : "Unconstrained blue") + " geometry at " + x + ", " + y);
+        assertThat(matches)
+                .as((black ? "Constrained black" : "Unconstrained blue") + " geometry at " + x + ", " + y)
+                .isTrue();
     }
 
     @Test
@@ -2261,17 +2359,18 @@ class WorkbenchUiTest {
         sketchDrag(x, 20, x + 10, 25, false);
         assertDimensionLineInk(x + 10, 8, true);
         assertDimensionLineInk(x, 8, false);
-        assertEquals(before, sketchGeometry());
+        assertThat(sketchGeometry()).isEqualTo(before);
         sketchDrag(x + 10, 8, x + 20, 8, false);
         assertDimensionLineInk(x + 20, 8, true);
         assertDimensionLineInk(x + 10, 8, false);
         sketchDrag(x + 20, 8, x + 30, 8, true);
         assertDimensionLineInk(x + 20, 8, true);
         assertDimensionLineInk(x + 30, 8, false);
-        assertEquals(before, sketchGeometry());
+        assertThat(sketchGeometry()).isEqualTo(before);
         click("sketch-undo");
         sketchReady();
-        assertFalse(sketchGeometry().constraints().stream().anyMatch(c -> c.type() == SketchGeometry.Type.DISTANCE_Y));
+        assertThat(sketchGeometry().constraints().stream().anyMatch(c -> c.type() == SketchGeometry.Type.DISTANCE_Y))
+                .isFalse();
         click("constraint-cancel");
     }
 
@@ -2289,7 +2388,7 @@ class WorkbenchUiTest {
                             < .65) return true;
             return false;
         });
-        assertEquals(expected, ink, "Dimension line at " + x + ", " + y);
+        assertThat(ink).as("Dimension line at " + x + ", " + y).isEqualTo(expected);
     }
 
     @Test
@@ -2304,14 +2403,15 @@ class WorkbenchUiTest {
         click("sketch-tool-point");
         sketchClick(40, 50, false);
         sketchReady();
-        assertEquals(2, sketchGeometry().entities().size());
+        assertThat(sketchGeometry().entities().size()).isEqualTo(2);
         var placed = sketchGeometry().entities();
         double initialDistance = placed.get(0).at(0).distance(placed.get(1).at(0));
         click("sketch-tool-select");
         key(KeyCode.D);
         sketchClick(10, 10, false);
         sketchClick(40, 50, false);
-        assertEquals(initialDistance, fx(() -> ((FormulaField) node("#sketch-inline-dimension")).value()), 1e-4);
+        assertThat(fx(() -> ((FormulaField) node("#sketch-inline-dimension")).value()))
+                .isCloseTo(initialDistance, org.assertj.core.data.Offset.offset(1e-4));
         text("sketch-inline-dimension", "60");
         key(KeyCode.ENTER);
         sketchReady();
@@ -2320,11 +2420,9 @@ class WorkbenchUiTest {
                 .filter(c -> c.type() == SketchGeometry.Type.DISTANCE)
                 .findFirst()
                 .orElseThrow();
-        assertEquals(
-                60,
-                g.point(dimension.refs().get(0))
-                        .distance(g.point(dimension.refs().get(1))),
-                1e-6);
+        assertThat(g.point(dimension.refs().get(0))
+                        .distance(g.point(dimension.refs().get(1))))
+                .isCloseTo(60, org.assertj.core.data.Offset.offset(1e-6));
         key(KeyCode.ESCAPE);
         click("constraint-cancel");
     }
@@ -2338,30 +2436,39 @@ class WorkbenchUiTest {
         key(KeyCode.D);
         dimensionSnapClick(60, 40, 7, 0);
         String pointSelection = fx(() -> ((Label) node("#sketch-selection")).getText());
-        assertTrue(pointSelection.contains(".start") || pointSelection.contains(".end"), pointSelection);
-        assertNull(
-                fx(() -> stage.getScene().lookup("#sketch-inline-dimension")),
-                "Snapping selects the point instead of placing a label");
+        assertThat(pointSelection.contains(".start") || pointSelection.contains(".end"))
+                .as(pointSelection)
+                .isTrue();
+        assertThat(fx(() -> stage.getScene().lookup("#sketch-inline-dimension")))
+                .as("Snapping selects the point instead of placing a label")
+                .isNull();
         click("sketch-clear-selection");
         dimensionSnapClick(0, 20, -7, 0);
-        assertTrue(fx(() -> ((Label) node("#sketch-selection")).getText().contains("left")));
+        assertThat(fx(() -> ((Label) node("#sketch-selection")).getText().contains("left")))
+                .isTrue();
         dimensionSnapClick(60, 20, 7, 0);
-        assertTrue(fx(() -> ((Label) node("#sketch-selection")).getText().contains("right")));
-        assertNotNull(fx(() -> node("#sketch-inline-dimension")), "Second line opens the field immediately");
+        assertThat(fx(() -> ((Label) node("#sketch-selection")).getText().contains("right")))
+                .isTrue();
+        assertThat(fx(() -> node("#sketch-inline-dimension")))
+                .as("Second line opens the field immediately")
+                .isNotNull();
         String pair = fx(() -> ((Label) node("#sketch-selection")).getText());
         sketchClick(30, 0, false);
-        assertEquals(
-                pair,
-                fx(() -> ((Label) node("#sketch-selection")).getText()),
-                "Third line cannot change the active dimension");
+        assertThat(fx(() -> ((Label) node("#sketch-selection")).getText()))
+                .as("Third line cannot change the active dimension")
+                .isEqualTo(pair);
         text("sketch-inline-dimension", "80");
         key(KeyCode.ENTER);
         sketchReady();
-        assertTrue(fx(() ->
-                ((SketchEditor) node("#sketch-editor")).controller().result().solved()));
-        assertTrue(sketchGeometry().constraints().stream()
-                .anyMatch(c ->
-                        c.type() == SketchGeometry.Type.DISTANCE && c.values().getFirst() == 80));
+        assertThat(fx(() -> ((SketchEditor) node("#sketch-editor"))
+                        .controller()
+                        .result()
+                        .solved()))
+                .isTrue();
+        assertThat(sketchGeometry().constraints().stream()
+                        .anyMatch(c -> c.type() == SketchGeometry.Type.DISTANCE
+                                && c.values().getFirst() == 80))
+                .isTrue();
         key(KeyCode.ESCAPE);
         click("constraint-cancel");
     }
@@ -2391,34 +2498,33 @@ class WorkbenchUiTest {
             return null;
         });
         Thread.sleep(150);
-        assertEquals(
-                dimension,
-                fx(() -> ((ListView<?>) node("#sketch-constraints"))
+        assertThat(fx(() -> ((ListView<?>) node("#sketch-constraints"))
                         .getSelectionModel()
-                        .getSelectedItem()));
+                        .getSelectedItem()))
+                .isEqualTo(dimension);
         key(KeyCode.DELETE);
         sketchReady();
         var after = sketchGeometry();
-        assertEquals(before.entities(), after.entities(), "Deleting a dimension must preserve its geometry");
-        assertEquals(before.boundary(), after.boundary());
-        assertEquals(
-                before.constraints().stream()
+        assertThat(after.entities())
+                .as("Deleting a dimension must preserve its geometry")
+                .isEqualTo(before.entities());
+        assertThat(after.boundary()).isEqualTo(before.boundary());
+        assertThat(after.constraints())
+                .isEqualTo(before.constraints().stream()
                         .filter(c -> !c.id().equals(dimension.id()))
-                        .toList(),
-                after.constraints());
+                        .toList());
         click("sketch-undo");
         sketchReady();
-        assertEquals(before, sketchGeometry());
+        assertThat(sketchGeometry()).isEqualTo(before);
         click("sketch-redo");
         sketchReady();
-        assertEquals(after, sketchGeometry());
+        assertThat(sketchGeometry()).isEqualTo(after);
         sketchClick(30, 0, false);
         key(KeyCode.DELETE);
         sketchReady();
-        assertEquals(
-                before.entities().size() - 1,
-                sketchGeometry().entities().size(),
-                "Selecting geometry afterwards must still allow geometry deletion");
+        assertThat(sketchGeometry().entities().size())
+                .as("Selecting geometry afterwards must still allow geometry deletion")
+                .isEqualTo(before.entities().size() - 1);
         click("constraint-cancel");
     }
 
@@ -2445,7 +2551,9 @@ class WorkbenchUiTest {
                 return false;
             });
         } while (!highlighted && System.nanoTime() < deadline);
-        assertTrue(highlighted, "Nearby dimension reference must visibly highlight before clicking");
+        assertThat(highlighted)
+                .as("Nearby dimension reference must visibly highlight before clicking")
+                .isTrue();
         fx(() -> {
             robot.mousePress(MouseButton.PRIMARY);
             return null;
@@ -2471,22 +2579,25 @@ class WorkbenchUiTest {
         sketchClick(60, 20, true);
         key(KeyCode.D);
         var field = fx(() -> node("#sketch-inline-dimension"));
-        assertInstanceOf(FormulaField.class, field);
-        assertEquals(FormulaField.ExpressionType.NUMBER, ((FormulaField) field).expressionType());
-        assertTrue(fx(() -> field.lookup(".formula-mark") != null));
-        assertTrue(
-                fx(() -> field.getBoundsInLocal().getWidth() >= 200),
-                "Inline input must display the expression, not just the fx mark");
+        assertThat(field).isInstanceOf(FormulaField.class);
+        assertThat(((FormulaField) field).expressionType()).isEqualTo(FormulaField.ExpressionType.NUMBER);
+        assertThat(fx(() -> field.lookup(".formula-mark") != null)).isTrue();
+        assertThat(fx(() -> field.getBoundsInLocal().getWidth() >= 200))
+                .as("Inline input must display the expression, not just the fx mark")
+                .isTrue();
         text("sketch-inline-dimension", "=missingParameter");
         key(KeyCode.ENTER);
-        assertNotNull(fx(() -> node("#sketch-inline-dimension")), "Invalid input stays open for repair");
-        assertFalse(fx(() -> ((Label) node("#sketch-error")).getText().isBlank()));
+        assertThat(fx(() -> node("#sketch-inline-dimension")))
+                .as("Invalid input stays open for repair")
+                .isNotNull();
+        assertThat(fx(() -> ((Label) node("#sketch-error")).getText().isBlank()))
+                .isFalse();
         focus(stage);
         text("sketch-inline-dimension", "=$plateW");
         key(KeyCode.TAB);
-        assertEquals("=$plateWidth", fx(() -> ((TextField) field).getText()));
+        assertThat(fx(() -> ((TextField) field).getText())).isEqualTo("=$plateWidth");
         fx(() -> {
-            assertEquals(80, ((FormulaField) field).value());
+            assertThat(((FormulaField) field).value()).isEqualTo(80);
             Screenshot.save(
                     stage.getScene(),
                     Path.of(System.getProperty("voxelbrew.ui.artifacts"), "inline-dimension-formula.png"));
@@ -2494,35 +2605,42 @@ class WorkbenchUiTest {
         });
         key(KeyCode.ENTER);
         sketchReady();
-        assertNull(fx(() -> stage.getScene().lookup("#sketch-inline-dimension")));
+        assertThat(fx(() -> stage.getScene().lookup("#sketch-inline-dimension")))
+                .isNull();
         var geometry = sketchGeometry();
         var distance = geometry.constraints().stream()
                 .filter(c -> c.type() == SketchGeometry.Type.DISTANCE)
                 .findFirst()
                 .orElseThrow();
-        assertEquals(80, distance.values().getFirst(), 1e-6);
-        assertTrue(fx(() ->
-                ((SketchEditor) node("#sketch-editor")).controller().result().solved()));
+        assertThat(distance.values().getFirst()).isCloseTo(80, org.assertj.core.data.Offset.offset(1e-6));
+        assertThat(fx(() -> ((SketchEditor) node("#sketch-editor"))
+                        .controller()
+                        .result()
+                        .solved()))
+                .isTrue();
         dev.voxelbrew.engine.sketch.SketchConstraints.requireSatisfied(geometry);
-        assertEquals("", fx(() -> ((Label) node("#sketch-error")).getText()));
+        assertThat(fx(() -> ((Label) node("#sketch-error")).getText())).isEqualTo("");
         click("sketch-undo");
         sketchReady();
-        assertFalse(sketchGeometry().constraints().stream().anyMatch(c -> c.id().equals(distance.id())));
+        assertThat(sketchGeometry().constraints().stream().anyMatch(c -> c.id().equals(distance.id())))
+                .isFalse();
         click("sketch-redo");
         sketchReady();
         key(KeyCode.ESCAPE);
         click("constraint-finish");
         ready();
         var feature = (Feature.Sketch) document().features().getFirst();
-        assertEquals(
-                "=$plateWidth",
-                document().parameters().binding(new ParameterSet.Target(feature.id(), "constraint:" + distance.id())));
+        assertThat(document()
+                        .parameters()
+                        .binding(new ParameterSet.Target(feature.id(), "constraint:" + distance.id())))
+                .isEqualTo("=$plateWidth");
         Path saved = directory.resolve("line-distance-formula.vxb");
         save(saved);
         open(saved);
-        assertEquals(
-                "=$plateWidth",
-                document().parameters().binding(new ParameterSet.Target(feature.id(), "constraint:" + distance.id())));
+        assertThat(document()
+                        .parameters()
+                        .binding(new ParameterSet.Target(feature.id(), "constraint:" + distance.id())))
+                .isEqualTo("=$plateWidth");
     }
 
     @Test
@@ -2532,12 +2650,14 @@ class WorkbenchUiTest {
         click("sketch-tool-select");
         key(KeyCode.D);
         sketchClick(0, 0, false);
-        assertNull(fx(() -> stage.getScene().lookup("#sketch-inline-dimension")));
+        assertThat(fx(() -> stage.getScene().lookup("#sketch-inline-dimension")))
+                .isNull();
         sketchClick(0, 40, false);
-        assertEquals(40, fx(() -> ((FormulaField) node("#sketch-inline-dimension")).value()), 1e-6);
+        assertThat(fx(() -> ((FormulaField) node("#sketch-inline-dimension")).value()))
+                .isCloseTo(40, org.assertj.core.data.Offset.offset(1e-6));
         String pair = fx(() -> ((Label) node("#sketch-selection")).getText());
         sketchClick(60, 0, false);
-        assertEquals(pair, fx(() -> ((Label) node("#sketch-selection")).getText()));
+        assertThat(fx(() -> ((Label) node("#sketch-selection")).getText())).isEqualTo(pair);
         text("sketch-inline-dimension", "50");
         key(KeyCode.ENTER);
         sketchReady();
@@ -2545,10 +2665,13 @@ class WorkbenchUiTest {
                 .filter(c -> c.type() == SketchGeometry.Type.DISTANCE_Y)
                 .findFirst()
                 .orElseThrow();
-        assertEquals(2, dimension.refs().size());
-        assertEquals(50, dimension.values().getFirst(), 1e-6);
-        assertTrue(fx(() ->
-                ((SketchEditor) node("#sketch-editor")).controller().result().solved()));
+        assertThat(dimension.refs().size()).isEqualTo(2);
+        assertThat(dimension.values().getFirst()).isCloseTo(50, org.assertj.core.data.Offset.offset(1e-6));
+        assertThat(fx(() -> ((SketchEditor) node("#sketch-editor"))
+                        .controller()
+                        .result()
+                        .solved()))
+                .isTrue();
         key(KeyCode.ESCAPE);
         click("constraint-cancel");
     }
@@ -2580,17 +2703,17 @@ class WorkbenchUiTest {
         Thread.sleep(250);
         fx(() -> {
             var view = workbench.viewport();
-            assertEquals(Rendering.Style.TECHNICAL, view.rendering());
+            assertThat(view.rendering()).isEqualTo(Rendering.Style.TECHNICAL);
             var scene = (SubScene) node("#viewport-scene");
-            assertEquals(javafx.scene.paint.Color.WHITE, scene.getFill());
+            assertThat(scene.getFill()).isEqualTo(javafx.scene.paint.Color.WHITE);
             var image = scene.snapshot(null, null);
             for (var point : List.of(new Point3D(30, 20, 8), new Point3D(20, 15, -3), new Point3D(25, 10, -3))) {
                 var screen = view.modelToScreen(point);
                 var pixel = scene.screenToLocal(screen);
                 var color = image.getPixelReader().getColor((int) pixel.getX(), (int) pixel.getY());
-                assertTrue(
-                        color.getBrightness() > .97,
-                        "White face conceals internal triangles, grid and rear-body edges: " + color);
+                assertThat(color.getBrightness() > .97)
+                        .as("White face conceals internal triangles, grid and rear-body edges: " + color)
+                        .isTrue();
             }
             var start = scene.screenToLocal(view.modelToScreen(new Point3D(0, 0, 8)));
             var end = scene.screenToLocal(view.modelToScreen(new Point3D(60, 0, 8)));
@@ -2603,20 +2726,25 @@ class WorkbenchUiTest {
                                         .getColor((int) pixel.getX() + dx, (int) pixel.getY() + dy)
                                         .getBrightness()
                                 < .6;
-                assertTrue(ink, "Visible outline is continuous at sample " + step);
+                assertThat(ink)
+                        .as("Visible outline is continuous at sample " + step)
+                        .isTrue();
             }
             var outline = findBodyView(view, "outline-thickness.body");
-            assertNotNull(outline);
-            assertTrue(((javafx.scene.shape.TriangleMesh) outline.getMesh())
-                            .getFaces()
-                            .size()
-                    > 0);
+            assertThat(outline).isNotNull();
+            assertThat(((javafx.scene.shape.TriangleMesh) outline.getMesh())
+                                    .getFaces()
+                                    .size()
+                            > 0)
+                    .isTrue();
             return null;
         });
-        assertEquals(snapshot, fx(() -> workbench.controller().snapshot()));
-        assertFalse(fx(() -> workbench.controller().dirty()));
+        assertThat(fx(() -> workbench.controller().snapshot())).isEqualTo(snapshot);
+        assertThat(fx(() -> workbench.controller().dirty())).isFalse();
         modelClick(35, 25, 8);
-        assertNotNull(fx(() -> node("#body-material-name")), "Visible solid remains pickable through its outlines");
+        assertThat(fx(() -> node("#body-material-name")))
+                .as("Visible solid remains pickable through its outlines")
+                .isNotNull();
         click("history-3");
         standardView(0);
         fx(() -> {
@@ -2643,17 +2771,17 @@ class WorkbenchUiTest {
         click("choose-plane-xy");
         sketchReady();
         click("constraint-cancel");
-        assertEquals(snapshot, fx(() -> workbench.controller().snapshot()));
+        assertThat(fx(() -> workbench.controller().snapshot())).isEqualTo(snapshot);
         renderStyle("shaded");
-        assertEquals(Rendering.Style.SHADED, fx(() -> workbench.viewport().rendering()));
-        assertEquals(
-                javafx.scene.paint.Color.RED,
-                fx(() -> ((javafx.scene.paint.PhongMaterial) findBodyView(workbench.viewport(), "body-thickness.body")
-                                .getMaterial())
-                        .getDiffuseColor()));
+        assertThat(fx(() -> workbench.viewport().rendering())).isEqualTo(Rendering.Style.SHADED);
+        assertThat(fx(() -> ((javafx.scene.paint.PhongMaterial)
+                                findBodyView(workbench.viewport(), "body-thickness.body")
+                                        .getMaterial())
+                        .getDiffuseColor()))
+                .isEqualTo(javafx.scene.paint.Color.RED);
         renderStyle("technical");
-        assertEquals("TECHNICAL", configuration.get("rendering.style", ""));
-        assertEquals("preserve me", configuration.get("external.setting", ""));
+        assertThat(configuration.get("rendering.style", "")).isEqualTo("TECHNICAL");
+        assertThat(configuration.get("external.setting", "")).isEqualTo("preserve me");
         fx(() -> {
             workbench.close();
             return null;
@@ -2672,8 +2800,8 @@ class WorkbenchUiTest {
         });
         Thread.sleep(400);
         open(file);
-        assertEquals(Rendering.Style.TECHNICAL, fx(() -> workbench.viewport().rendering()));
-        assertArrayEquals(bytes, Files.readAllBytes(file));
+        assertThat(fx(() -> workbench.viewport().rendering())).isEqualTo(Rendering.Style.TECHNICAL);
+        assertThat(Files.readAllBytes(file)).containsExactly(bytes);
     }
 
     private void renderStyle(String style) throws Exception {
@@ -2681,7 +2809,8 @@ class WorkbenchUiTest {
         click("menu-rendering");
         click("rendering-" + style);
         Thread.sleep(200);
-        assertTrue(fx(() -> ((RadioMenuItem) command(workbench, "rendering-" + style)).isSelected()));
+        assertThat(fx(() -> ((RadioMenuItem) command(workbench, "rendering-" + style)).isSelected()))
+                .isTrue();
     }
 
     @Test
@@ -2696,13 +2825,18 @@ class WorkbenchUiTest {
         click("cut-confirm");
         ready();
         var complete = document();
-        assertEquals(4, complete.cursor());
+        assertThat(complete.cursor()).isEqualTo(4);
         click("history-1");
-        assertEquals(complete, document(), "Selecting an icon must not roll back the model");
-        assertTrue(fx(() -> node("#history-1").getStyleClass().contains("history-selected")));
-        assertEquals(ContentDisplay.GRAPHIC_ONLY, fx(() -> ((Button) node("#history-1")).getContentDisplay()));
-        assertTrue(fx(() -> ((Button) node("#history-1")).getTooltip().getText().contains("2 ·")));
-        assertTrue(fx(() -> node("#feature-timeline").getBoundsInParent().getHeight()) < 80);
+        assertThat(document())
+                .as("Selecting an icon must not roll back the model")
+                .isEqualTo(complete);
+        assertThat(fx(() -> node("#history-1").getStyleClass().contains("history-selected")))
+                .isTrue();
+        assertThat(fx(() -> ((Button) node("#history-1")).getContentDisplay())).isEqualTo(ContentDisplay.GRAPHIC_ONLY);
+        assertThat(fx(() -> ((Button) node("#history-1")).getTooltip().getText().contains("2 ·")))
+                .isTrue();
+        assertThat(fx(() -> node("#feature-timeline").getBoundsInParent().getHeight()) < 80)
+                .isTrue();
         for (int palette : List.of(1, 2)) {
             choice("appearance", palette);
             fx(() -> {
@@ -2716,18 +2850,19 @@ class WorkbenchUiTest {
         }
         click("timeline-first");
         ready();
-        assertEquals(0, document().cursor());
-        assertTrue(fx(() -> node("#constrained-sketch").isDisabled()));
-        assertTrue(fx(() -> node("#history-0").getStyleClass().contains("history-future")));
+        assertThat(document().cursor()).isEqualTo(0);
+        assertThat(fx(() -> node("#constrained-sketch").isDisabled())).isTrue();
+        assertThat(fx(() -> node("#history-0").getStyleClass().contains("history-future")))
+                .isTrue();
         click("timeline-next");
         ready();
-        assertEquals(1, document().cursor());
+        assertThat(document().cursor()).isEqualTo(1);
         click("timeline-last");
         ready();
         click("timeline-previous");
         ready();
-        assertEquals(3, document().cursor());
-        assertEquals(19200, volume(), .01);
+        assertThat(document().cursor()).isEqualTo(3);
+        assertThat(volume()).isCloseTo(19200, org.assertj.core.data.Offset.offset(.01));
         var start = fx(() -> {
             var bounds = node("#history-cursor")
                     .localToScreen(node("#history-cursor").getBoundsInLocal());
@@ -2754,21 +2889,27 @@ class WorkbenchUiTest {
             });
         }
         ready();
-        assertEquals(1, document().cursor(), "Dragging the marker snaps between feature icons");
+        assertThat(document().cursor())
+                .as("Dragging the marker snaps between feature icons")
+                .isEqualTo(1);
         key(KeyCode.END);
         ready();
-        assertEquals(complete, document());
+        assertThat(document()).isEqualTo(complete);
         click("undo");
         ready();
-        assertEquals(3, document().features().size(), "Rollback must not create undo entries");
+        assertThat(document().features().size())
+                .as("Rollback must not create undo entries")
+                .isEqualTo(3);
         click("redo");
         ready();
-        assertEquals(complete, document());
+        assertThat(document()).isEqualTo(complete);
         click("timeline-play");
         click("timeline-play");
         int paused = document().cursor();
         Thread.sleep(1400);
-        assertEquals(paused, document().cursor(), "Pause cancels the pending playback tick");
+        assertThat(document().cursor())
+                .as("Pause cancels the pending playback tick")
+                .isEqualTo(paused);
         click("history-cursor");
         key(KeyCode.HOME);
         ready();
@@ -2776,10 +2917,12 @@ class WorkbenchUiTest {
         key(KeyCode.RIGHT);
         key(KeyCode.RIGHT);
         ready();
-        assertEquals(3, document().cursor(), "Arrow navigation keeps focus on the marker");
+        assertThat(document().cursor())
+                .as("Arrow navigation keeps focus on the marker")
+                .isEqualTo(3);
         key(KeyCode.LEFT);
         ready();
-        assertEquals(2, document().cursor());
+        assertThat(document().cursor()).isEqualTo(2);
         key(KeyCode.HOME);
         ready();
         click("timeline-play");
@@ -2794,9 +2937,9 @@ class WorkbenchUiTest {
             Thread.sleep(40);
         }
         ready();
-        assertEquals(Set.of(0, 1, 2, 3, 4), visited);
-        assertEquals(complete, document());
-        assertEquals(19099.469035085127, volume(), .01);
+        assertThat(visited).isEqualTo(Set.of(0, 1, 2, 3, 4));
+        assertThat(document()).isEqualTo(complete);
+        assertThat(volume()).isCloseTo(19099.469035085127, org.assertj.core.data.Offset.offset(.01));
     }
 
     @Test
@@ -2811,36 +2954,43 @@ class WorkbenchUiTest {
         Path file = directory.resolve("long history.vxb");
         DocumentWriter.save(session.document(), file, false);
         open(file);
-        assertTrue(fx(() -> node("#timeline-play").isDisabled()));
-        assertTrue(fx(() -> node("#history-26").getStyleClass().contains("history-error")));
+        assertThat(fx(() -> node("#timeline-play").isDisabled())).isTrue();
+        assertThat(fx(() -> node("#history-26").getStyleClass().contains("history-error")))
+                .isTrue();
         click("timeline-previous");
         ready();
-        assertEquals(26, document().cursor());
-        assertFalse(fx(() -> node("#timeline-play").isDisabled()));
-        assertTrue(fx(() -> ((ScrollPane) node("#timeline-scroll")).getHvalue()) > .9);
+        assertThat(document().cursor()).isEqualTo(26);
+        assertThat(fx(() -> node("#timeline-play").isDisabled())).isFalse();
+        assertThat(fx(() -> ((ScrollPane) node("#timeline-scroll")).getHvalue()) > .9)
+                .isTrue();
         click("history-25");
-        assertTrue(fx(() -> node("#history-25").getStyleClass().contains("history-selected")));
+        assertThat(fx(() -> node("#history-25").getStyleClass().contains("history-selected")))
+                .isTrue();
         click("timeline-play");
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (document().cursor() < 27 && System.nanoTime() < deadline) Thread.sleep(40);
         ready();
-        assertEquals(27, document().cursor());
-        assertFalse(fx(() -> node("#timeline-play")
-                .getPseudoClassStates()
-                .contains(javafx.css.PseudoClass.getPseudoClass("playing"))));
-        assertTrue(fx(() -> node("#timeline-play").isDisabled()));
+        assertThat(document().cursor()).isEqualTo(27);
+        assertThat(fx(() -> node("#timeline-play")
+                        .getPseudoClassStates()
+                        .contains(javafx.css.PseudoClass.getPseudoClass("playing"))))
+                .isFalse();
+        assertThat(fx(() -> node("#timeline-play").isDisabled())).isTrue();
         click("timeline-first");
         ready();
-        assertEquals(0, fx(() -> ((ScrollPane) node("#timeline-scroll")).getHvalue()), .01);
+        assertThat(fx(() -> ((ScrollPane) node("#timeline-scroll")).getHvalue()))
+                .isCloseTo(0, org.assertj.core.data.Offset.offset(.01));
         click("history-0");
-        assertEquals(0, document().cursor());
+        assertThat(document().cursor()).isEqualTo(0);
         click("timeline-play");
         click("new");
         click("unsaved-discard");
         ready();
-        assertTrue(document().features().isEmpty());
+        assertThat(document().features().isEmpty()).isTrue();
         Thread.sleep(900);
-        assertEquals(0, document().cursor(), "Changing documents cancels history playback");
+        assertThat(document().cursor())
+                .as("Changing documents cancels history playback")
+                .isEqualTo(0);
     }
 
     @Test
@@ -2857,19 +3007,21 @@ class WorkbenchUiTest {
         click("constrained-sketch");
         standardView(2);
         modelClick(40, 20, 8);
-        assertNull(fx(() -> stage.getScene().lookup("#sketch-editor")));
-        assertNotNull(fx(() -> node("#sketch-plane-hint")));
-        assertEquals(before, fx(() -> workbench.controller().snapshot()));
+        assertThat(fx(() -> stage.getScene().lookup("#sketch-editor"))).isNull();
+        assertThat(fx(() -> node("#sketch-plane-hint"))).isNotNull();
+        assertThat(fx(() -> workbench.controller().snapshot())).isEqualTo(before);
         // An asynchronous external change must invalidate all picks, including origin targets.
         fx(() -> {
             workbench.controller().edit("cylinder", "distance", 20);
             return null;
         });
         ready();
-        assertNull(fx(() -> workbench.lookup("#sketch-plane-hint")));
-        assertNull(fx(() -> ((SubScene) node("#viewport-scene")).getRoot().lookup("#sketch-plane-xy")));
-        assertEquals(2, document().features().size());
-        assertEquals(20, ((Feature.Extrude) document().features().getLast()).distance());
+        assertThat(fx(() -> workbench.lookup("#sketch-plane-hint"))).isNull();
+        assertThat(fx(() -> ((SubScene) node("#viewport-scene")).getRoot().lookup("#sketch-plane-xy")))
+                .isNull();
+        assertThat(document().features().size()).isEqualTo(2);
+        assertThat(((Feature.Extrude) document().features().getLast()).distance())
+                .isEqualTo(20);
     }
 
     @Test
@@ -2877,8 +3029,8 @@ class WorkbenchUiTest {
         ready();
         var empty = fx(() -> workbench.controller().snapshot());
         click("constrained-sketch");
-        assertNotNull(fx(() -> node("#sketch-plane-hint")));
-        assertNull(fx(() -> stage.getScene().lookup("#sketch-editor")));
+        assertThat(fx(() -> node("#sketch-plane-hint"))).isNotNull();
+        assertThat(fx(() -> stage.getScene().lookup("#sketch-editor"))).isNull();
         fx(() -> {
             Screenshot.save(
                     stage.getScene(),
@@ -2886,7 +3038,7 @@ class WorkbenchUiTest {
             return null;
         });
         key(KeyCode.ESCAPE);
-        assertEquals(empty, fx(() -> workbench.controller().snapshot()));
+        assertThat(fx(() -> workbench.controller().snapshot())).isEqualTo(empty);
         int index = 0;
         for (String name : List.of("XY", "XZ", "YZ")) {
             click("constrained-sketch");
@@ -2900,24 +3052,24 @@ class WorkbenchUiTest {
             sketchNumericPoint(20, 10);
             click("constraint-finish");
             ready();
-            assertEquals(
-                    Feature.Plane.origin(name),
-                    ((Feature.Sketch) document().features().getFirst()).plane());
+            assertThat(((Feature.Sketch) document().features().getFirst()).plane())
+                    .isEqualTo(Feature.Plane.origin(name));
             click("extrude");
             text("extrude-distance", "-5");
             click("commit-extrusion");
             ready();
-            assertEquals(1000, volume(), .01);
-            assertEquals(2, document().features().size());
+            assertThat(volume()).isCloseTo(1000, org.assertj.core.data.Offset.offset(.01));
+            assertThat(document().features().size()).isEqualTo(2);
             var p = Feature.Plane.origin(name).frame().apply(10, 5, -2);
             try (var result = new ModelSession(document()).evaluate()) {
-                assertTrue(result.bodies().getFirst().solid().contains(p[0], p[1], p[2]));
+                assertThat(result.bodies().getFirst().solid().contains(p[0], p[1], p[2]))
+                        .isTrue();
             }
             click("undo");
             ready();
             click("undo");
             ready();
-            assertTrue(document().features().isEmpty());
+            assertThat(document().features().isEmpty()).isTrue();
         }
     }
 
@@ -2951,7 +3103,7 @@ class WorkbenchUiTest {
         click("constraint-finish");
         ready();
         var attached = (Feature.Sketch) document().features().get(2);
-        assertNotNull(attached.plane().support());
+        assertThat(attached.plane().support()).isNotNull();
         click("extrude");
         text("extrude-distance", "3");
         click("commit-extrusion");
@@ -2963,26 +3115,26 @@ class WorkbenchUiTest {
         text("dimension-distance", "8");
         click("apply-distance");
         ready();
-        assertEquals(19500, volume(), .01);
+        assertThat(volume()).isCloseTo(19500, org.assertj.core.data.Offset.offset(.01));
         try (var result = new ModelSession(document()).evaluate()) {
             var boss = result.bodies().getLast().solid();
-            assertEquals(8, boss.bounds().minZ(), .001);
-            assertEquals(11, boss.bounds().maxZ(), .001);
+            assertThat(boss.bounds().minZ()).isCloseTo(8, org.assertj.core.data.Offset.offset(.001));
+            assertThat(boss.bounds().maxZ()).isCloseTo(11, org.assertj.core.data.Offset.offset(.001));
         }
         click("history-2");
         click("change-sketch-plane");
         click("choose-plane-yz");
         ready();
         var repaired = (Feature.Sketch) document().features().get(2);
-        assertEquals(attached.id(), repaired.id());
-        assertEquals(attached.profile(), repaired.profile());
-        assertEquals(Feature.Plane.origin("YZ"), repaired.plane());
+        assertThat(repaired.id()).isEqualTo(attached.id());
+        assertThat(repaired.profile()).isEqualTo(attached.profile());
+        assertThat(repaired.plane()).isEqualTo(Feature.Plane.origin("YZ"));
         click("undo");
         ready();
-        assertEquals(attached.plane(), ((Feature.Sketch) document().features().get(2)).plane());
+        assertThat(((Feature.Sketch) document().features().get(2)).plane()).isEqualTo(attached.plane());
         click("redo");
         ready();
-        assertEquals(repaired, document().features().get(2));
+        assertThat(document().features().get(2)).isEqualTo(repaired);
     }
 
     @TempDir
@@ -3004,11 +3156,11 @@ class WorkbenchUiTest {
             Platform.setImplicitExit(false);
             started.countDown();
         });
-        assertTrue(started.await(20, TimeUnit.SECONDS));
+        assertThat(started.await(20, TimeUnit.SECONDS)).isTrue();
         fx(() -> {
-            assertTrue(
-                    Platform.isSupported(ConditionalFeature.SCENE3D),
-                    "Real JavaFX 3D is required; use WSLg or Xvfb/Mesa");
+            assertThat(Platform.isSupported(ConditionalFeature.SCENE3D))
+                    .as("Real JavaFX 3D is required; use WSLg or Xvfb/Mesa")
+                    .isTrue();
             robot = new Robot();
             return null;
         });
@@ -3105,48 +3257,50 @@ class WorkbenchUiTest {
     @Test
     void integratedHeaderMovesResizesMaximizesAndMinimizesWithoutEditing() throws Exception {
         ready();
-        assertEquals(StageStyle.UNDECORATED, fx(stage::getStyle));
-        assertEquals(0, fx(() -> stage.getScene().getY()), 0.1, "No duplicate native title row");
+        assertThat(fx(stage::getStyle)).isEqualTo(StageStyle.UNDECORATED);
+        assertThat(fx(() -> stage.getScene().getY())).isCloseTo(0, org.assertj.core.data.Offset.offset(0.1));
         var snapshot = fx(() -> workbench.controller().snapshot());
         var start = windowBounds();
         // Leave room for the bottom-right resize on the runner's 1024 x 768 display.
         // Moving right would put that corner off screen, beyond the native mouse's reach.
         primaryDrag(centerOf("document-title"), -20, -10);
         var moved = windowBounds();
-        assertEquals(start.getMinX() - 20, moved.getMinX(), 2);
-        assertEquals(start.getMinY() - 10, moved.getMinY(), 2);
+        assertThat(moved.getMinX()).isCloseTo(start.getMinX() - 20, org.assertj.core.data.Offset.offset(2.0));
+        assertThat(moved.getMinY()).isCloseTo(start.getMinY() - 10, org.assertj.core.data.Offset.offset(2.0));
         var screen = fx(() -> Screen.getPrimary().getVisualBounds());
-        assertTrue(
-                screen.contains(moved.getMaxX() + 33, moved.getMaxY() + 23),
-                "The complete resize gesture must stay inside the primary display");
+        assertThat(screen.contains(moved.getMaxX() + 33, moved.getMaxY() + 23))
+                .as("The complete resize gesture must stay inside the primary display")
+                .isTrue();
         primaryDrag(new Point2D(moved.getMaxX() - 2, moved.getMaxY() - 2), 35, 25);
         var resized = windowBounds();
-        assertEquals(moved.getWidth() + 35, resized.getWidth(), 2);
-        assertEquals(moved.getHeight() + 25, resized.getHeight(), 2);
-        assertEquals(moved.getMinX(), resized.getMinX(), 2);
+        assertThat(resized.getWidth()).isCloseTo(moved.getWidth() + 35, org.assertj.core.data.Offset.offset(2.0));
+        assertThat(resized.getHeight()).isCloseTo(moved.getHeight() + 25, org.assertj.core.data.Offset.offset(2.0));
+        assertThat(resized.getMinX()).isCloseTo(moved.getMinX(), org.assertj.core.data.Offset.offset(2.0));
         primaryDrag(new Point2D(resized.getMinX() + 2, resized.getMinY() + 2), 15, 10);
         var restored = windowBounds();
-        assertEquals(resized.getMaxX(), restored.getMaxX(), 2);
-        assertEquals(resized.getMaxY(), restored.getMaxY(), 2);
-        assertEquals(resized.getWidth() - 15, restored.getWidth(), 2);
+        assertThat(restored.getMaxX()).isCloseTo(resized.getMaxX(), org.assertj.core.data.Offset.offset(2.0));
+        assertThat(restored.getMaxY()).isCloseTo(resized.getMaxY(), org.assertj.core.data.Offset.offset(2.0));
+        assertThat(restored.getWidth()).isCloseTo(resized.getWidth() - 15, org.assertj.core.data.Offset.offset(2.0));
         click("window-maximize");
         var maximized = windowBounds();
-        assertTrue(
-                fx(() -> Screen.getScreens().stream()
+        assertThat(fx(() -> Screen.getScreens().stream()
                         .map(Screen::getVisualBounds)
                         .anyMatch(bounds -> Math.abs(bounds.getMinX() - maximized.getMinX()) <= 2
                                 && Math.abs(bounds.getMinY() - maximized.getMinY()) <= 2
                                 && Math.abs(bounds.getWidth() - maximized.getWidth()) <= 2
-                                && Math.abs(bounds.getHeight() - maximized.getHeight()) <= 2)),
-                "Maximized window should fill the visual bounds of a display");
-        assertTrue(fx(() -> node("#window-maximize").getAccessibleHelp().startsWith("Restore")));
+                                && Math.abs(bounds.getHeight() - maximized.getHeight()) <= 2)))
+                .as("Maximized window should fill the visual bounds of a display")
+                .isTrue();
+        assertThat(fx(() -> node("#window-maximize").getAccessibleHelp().startsWith("Restore")))
+                .isTrue();
         doubleClickHeader();
         assertWindowBounds(restored);
         doubleClickHeader();
         assertWindowBounds(maximized);
         primaryDrag(centerOf("document-title"), 35, 40);
-        assertEquals(restored.getWidth(), windowBounds().getWidth(), 2);
-        assertEquals(restored.getHeight(), windowBounds().getHeight(), 2);
+        assertThat(windowBounds().getWidth()).isCloseTo(restored.getWidth(), org.assertj.core.data.Offset.offset(2.0));
+        assertThat(windowBounds().getHeight())
+                .isCloseTo(restored.getHeight(), org.assertj.core.data.Offset.offset(2.0));
         // Recenter before native input on the mixed-DPI Windows desktop.
         fx(() -> {
             stage.centerOnScreen();
@@ -3154,7 +3308,7 @@ class WorkbenchUiTest {
         });
         Thread.sleep(250);
         click("window-minimize");
-        assertTrue(fx(stage::isIconified));
+        assertThat(fx(stage::isIconified)).isTrue();
         fx(() -> {
             stage.setIconified(false);
             stage.toFront();
@@ -3162,9 +3316,9 @@ class WorkbenchUiTest {
             return null;
         });
         Thread.sleep(400);
-        assertFalse(fx(stage::isIconified));
-        assertEquals(snapshot, fx(() -> workbench.controller().snapshot()));
-        assertFalse(fx(() -> workbench.controller().dirty()));
+        assertThat(fx(stage::isIconified)).isFalse();
+        assertThat(fx(() -> workbench.controller().snapshot())).isEqualTo(snapshot);
+        assertThat(fx(() -> workbench.controller().dirty())).isFalse();
         assertButtonDescriptions();
         for (int palette : List.of(1, 2)) {
             choice("appearance", palette);
@@ -3184,42 +3338,42 @@ class WorkbenchUiTest {
         rectangle(0);
         var original = document();
         click("window-close");
-        assertNotNull(fx(() -> node("#unsaved-cancel")));
-        assertFalse(fx(() -> node("#window-close").isDisabled()));
-        assertTrue(fx(() -> node("#main-menu").isDisabled()));
+        assertThat(fx(() -> node("#unsaved-cancel"))).isNotNull();
+        assertThat(fx(() -> node("#window-close").isDisabled())).isFalse();
+        assertThat(fx(() -> node("#main-menu").isDisabled())).isTrue();
         click("window-close"); // The topmost dialog handles Close as Cancel.
-        assertTrue(fx(stage::isShowing));
-        assertFalse(fx(workbench::isDisabled));
-        assertEquals(original, document());
+        assertThat(fx(stage::isShowing)).isTrue();
+        assertThat(fx(workbench::isDisabled)).isFalse();
+        assertThat(document()).isEqualTo(original);
         click("constrained-sketch");
         click("choose-plane-xy");
         sketchReady();
-        assertFalse(fx(() -> node("#window-minimize").isDisabled()));
+        assertThat(fx(() -> node("#window-minimize").isDisabled())).isFalse();
         click("window-close"); // Dismiss the uncommitted sketch, keeping the document open.
-        assertTrue(fx(stage::isShowing));
-        assertEquals(original, document());
+        assertThat(fx(stage::isShowing)).isTrue();
+        assertThat(document()).isEqualTo(original);
         click("save-as");
-        assertNotNull(fx(() -> node("#file-path")));
+        assertThat(fx(() -> node("#file-path"))).isNotNull();
         click("window-close");
-        assertTrue(fx(stage::isShowing));
-        assertTrue(fx(() -> workbench.controller().dirty()));
+        assertThat(fx(stage::isShowing)).isTrue();
+        assertThat(fx(() -> workbench.controller().dirty())).isTrue();
         click("window-close");
         click("unsaved-cancel");
-        assertEquals(original, document());
+        assertThat(document()).isEqualTo(original);
         click("window-close");
         click("unsaved-save");
         Path file = directory.resolve("Saved by integrated Close.vxb");
         text("file-path", file.toString());
         click("file-confirm");
         awaitWindowClosed();
-        assertEquals(original, DocumentReader.load(file));
+        assertThat(DocumentReader.load(file)).isEqualTo(original);
     }
 
     @Test
     void integratedCloseDiscardsOnlyAfterTheExplicitChoice() throws Exception {
         rectangle(0);
         click("window-close");
-        assertTrue(fx(stage::isShowing));
+        assertThat(fx(stage::isShowing)).isTrue();
         click("unsaved-discard");
         awaitWindowClosed();
     }
@@ -3227,7 +3381,7 @@ class WorkbenchUiTest {
     private void awaitWindowClosed() throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (fx(stage::isShowing) && System.nanoTime() < deadline) Thread.sleep(30);
-        assertFalse(fx(stage::isShowing));
+        assertThat(fx(stage::isShowing)).isFalse();
         workbench.whenClosed().toCompletableFuture().get(20, TimeUnit.SECONDS);
     }
 
@@ -3249,10 +3403,10 @@ class WorkbenchUiTest {
             Thread.sleep(30);
             actual = windowBounds();
         }
-        assertEquals(expected.getMinX(), actual.getMinX(), 2);
-        assertEquals(expected.getMinY(), actual.getMinY(), 2);
-        assertEquals(expected.getWidth(), actual.getWidth(), 2);
-        assertEquals(expected.getHeight(), actual.getHeight(), 2);
+        assertThat(actual.getMinX()).isCloseTo(expected.getMinX(), org.assertj.core.data.Offset.offset(2.0));
+        assertThat(actual.getMinY()).isCloseTo(expected.getMinY(), org.assertj.core.data.Offset.offset(2.0));
+        assertThat(actual.getWidth()).isCloseTo(expected.getWidth(), org.assertj.core.data.Offset.offset(2.0));
+        assertThat(actual.getHeight()).isCloseTo(expected.getHeight(), org.assertj.core.data.Offset.offset(2.0));
     }
 
     private Point2D centerOf(String id) throws Exception {
@@ -3289,9 +3443,9 @@ class WorkbenchUiTest {
         double volume =
                 fx(() -> workbench.controller().build().bodies().getFirst().volume());
         bodyTreeClick("Body 1", MouseButton.SECONDARY, 1);
-        assertFalse(fx(() -> node("#body-rename").getAccessibleHelp().isBlank()));
+        assertThat(fx(() -> node("#body-rename").getAccessibleHelp().isBlank())).isFalse();
         click("body-rename");
-        assertEquals("Body 1", fx(() -> ((TextField) node("#body-rename-field")).getText()));
+        assertThat(fx(() -> ((TextField) node("#body-rename-field")).getText())).isEqualTo("Body 1");
         text("body-rename-field", "Mounting plate");
         fx(() -> {
             Screenshot.save(
@@ -3300,49 +3454,47 @@ class WorkbenchUiTest {
         });
         key(KeyCode.ENTER);
         ready();
-        assertEquals(Map.of("named0.body", "Mounting plate"), document().bodyNames());
-        assertEquals(before + 1, fx(() -> workbench.controller().snapshot().revision()));
-        assertEquals(original.features(), document().features());
-        assertEquals(
-                ids,
-                fx(() -> workbench.controller().build().bodies().stream()
+        assertThat(document().bodyNames()).isEqualTo(Map.of("named0.body", "Mounting plate"));
+        assertThat(fx(() -> workbench.controller().snapshot().revision())).isEqualTo(before + 1);
+        assertThat(document().features()).isEqualTo(original.features());
+        assertThat(fx(() -> workbench.controller().build().bodies().stream()
                         .map(DocumentController.Body::id)
-                        .toList()));
-        assertEquals(
-                volume,
-                fx(() -> workbench.controller().build().bodies().getFirst().volume()),
-                0.000001);
+                        .toList()))
+                .isEqualTo(ids);
+        assertThat(fx(() -> workbench.controller().build().bodies().getFirst().volume()))
+                .isCloseTo(volume, org.assertj.core.data.Offset.offset(0.000001));
         click("undo");
         ready();
-        assertTrue(document().bodyNames().isEmpty());
+        assertThat(document().bodyNames().isEmpty()).isTrue();
         click("redo");
         ready();
         long renamed = fx(() -> workbench.controller().snapshot().revision());
         bodyTreeClick("Mounting plate", MouseButton.PRIMARY, 1);
-        assertNull(
-                fx(() -> ((TreeView<?>) node("#model-tree")).getEditingItem()),
-                "A single click must not resize or scroll the selected row before a double-click");
+        assertThat(fx(() -> ((TreeView<?>) node("#model-tree")).getEditingItem()))
+                .as("A single click must not resize or scroll the selected row before a double-click")
+                .isNull();
         bodyTreeClick("Mounting plate", MouseButton.PRIMARY, 2);
         key(KeyCode.ENTER);
         ready();
-        assertEquals(
-                renamed,
-                fx(() -> workbench.controller().snapshot().revision()),
-                "Accepting an unchanged name creates no undo entry");
+        assertThat(fx(() -> workbench.controller().snapshot().revision()))
+                .as("Accepting an unchanged name creates no undo entry")
+                .isEqualTo(renamed);
         bodyTreeClick("Mounting plate", MouseButton.PRIMARY, 2);
         text("body-rename-field", "");
         key(KeyCode.ENTER);
-        assertFalse(fx(() -> ((Label) node("#body-rename-error")).getText().isBlank()));
-        assertEquals(renamed, fx(() -> workbench.controller().snapshot().revision()));
+        assertThat(fx(() -> ((Label) node("#body-rename-error")).getText().isBlank()))
+                .isFalse();
+        assertThat(fx(() -> workbench.controller().snapshot().revision())).isEqualTo(renamed);
         text("body-rename-field", "Discard this");
         key(KeyCode.ESCAPE);
-        assertEquals(renamed, fx(() -> workbench.controller().snapshot().revision()));
-        assertEquals("Mounting plate", document().bodyNames().get("named0.body"));
+        assertThat(fx(() -> workbench.controller().snapshot().revision())).isEqualTo(renamed);
+        assertThat(document().bodyNames().get("named0.body")).isEqualTo("Mounting plate");
         bodyTreeClick("Mounting plate", MouseButton.PRIMARY, 2);
         text("body-rename-field", "Uncommitted");
         click("body-material-name");
-        assertNull(fx(() -> ((TreeView<?>) node("#model-tree")).getEditingItem()));
-        assertEquals(renamed, fx(() -> workbench.controller().snapshot().revision()));
+        assertThat(fx(() -> ((TreeView<?>) node("#model-tree")).getEditingItem()))
+                .isNull();
+        assertThat(fx(() -> workbench.controller().snapshot().revision())).isEqualTo(renamed);
         Path file = directory.resolve("named bodies.vxb");
         click("save-as");
         text("file-path", file.toString());
@@ -3352,12 +3504,11 @@ class WorkbenchUiTest {
         text("file-path", file.toString());
         click("file-confirm");
         ready();
-        assertEquals("Mounting plate", document().bodyNames().get("named0.body"));
-        assertEquals(
-                ids,
-                fx(() -> workbench.controller().build().bodies().stream()
+        assertThat(document().bodyNames().get("named0.body")).isEqualTo("Mounting plate");
+        assertThat(fx(() -> workbench.controller().build().bodies().stream()
                         .map(DocumentController.Body::id)
-                        .toList()));
+                        .toList()))
+                .isEqualTo(ids);
         bodyTreeClick("Mounting plate", MouseButton.PRIMARY, 2);
         text("body-rename-field", "Stale draft");
         fx(() -> {
@@ -3365,10 +3516,10 @@ class WorkbenchUiTest {
             return null;
         });
         ready();
-        assertNull(fx(() -> ((TreeView<?>) node("#model-tree")).getEditingItem()));
+        assertThat(fx(() -> ((TreeView<?>) node("#model-tree")).getEditingItem()))
+                .isNull();
         bodyTreeClick("Mounting plate", MouseButton.SECONDARY, 1);
-        assertTrue(
-                fx(() -> Window.getWindows().stream()
+        assertThat(fx(() -> Window.getWindows().stream()
                         .filter(ContextMenu.class::isInstance)
                         .map(ContextMenu.class::cast)
                         .filter(Window::isShowing)
@@ -3376,17 +3527,19 @@ class WorkbenchUiTest {
                         .filter(item -> "body-rename".equals(item.getId()))
                         .findFirst()
                         .orElseThrow()
-                        .isDisable()),
-                "Cannot rename while rolled back");
+                        .isDisable()))
+                .as("Cannot rename while rolled back")
+                .isTrue();
         key(KeyCode.ESCAPE);
         bodyTreeClick("Mounting plate", MouseButton.PRIMARY, 2);
-        assertNull(fx(() -> ((TreeView<?>) node("#model-tree")).getEditingItem()));
+        assertThat(fx(() -> ((TreeView<?>) node("#model-tree")).getEditingItem()))
+                .isNull();
         fx(() -> {
             workbench.controller().cursor(4);
             return null;
         });
         ready();
-        assertEquals("Mounting plate", document().bodyNames().get("named0.body"));
+        assertThat(document().bodyNames().get("named0.body")).isEqualTo("Mounting plate");
         String featureLabel = fx(() -> ((TreeView<?>) node("#model-tree"))
                 .getRoot()
                 .getChildren()
@@ -3396,16 +3549,17 @@ class WorkbenchUiTest {
                 .getValue()
                 .toString());
         bodyTreeClick(featureLabel, MouseButton.PRIMARY, 2);
-        assertNotNull(
-                fx(() -> ((TreeView<?>) node("#model-tree")).getEditingItem()),
-                "Feature rows support their own name editing");
+        assertThat(fx(() -> ((TreeView<?>) node("#model-tree")).getEditingItem()))
+                .as("Feature rows support their own name editing")
+                .isNotNull();
         text("feature-rename-field", "Base profile");
         key(KeyCode.ENTER);
         ready();
-        assertEquals(
-                "Base profile",
-                document().featureNames().get(document().features().getFirst().id()));
-        assertEquals("Mounting plate", document().bodyNames().get("named0.body"));
+        assertThat(document()
+                        .featureNames()
+                        .get(document().features().getFirst().id()))
+                .isEqualTo("Base profile");
+        assertThat(document().bodyNames().get("named0.body")).isEqualTo("Mounting plate");
     }
 
     @Test
@@ -3414,7 +3568,8 @@ class WorkbenchUiTest {
         choice("appearance", 2);
         var translations = new dev.voxelbrew.util.i18n.Translations(Locale.forLanguageTag("pl"));
         bodyTreeClick(translations.text("feature.body", 2), MouseButton.SECONDARY, 1);
-        assertEquals("Zmień nazwę", fx(() -> ((Label) node("#body-rename").lookup(".label")).getText()));
+        assertThat(fx(() -> ((Label) node("#body-rename").lookup(".label")).getText()))
+                .isEqualTo("Zmień nazwę");
         fx(() -> {
             Screenshot.save(
                     node("#body-rename").getScene(),
@@ -3426,13 +3581,13 @@ class WorkbenchUiTest {
         fx(() -> {
             var editor = node("#body-rename-field");
             var clip = node("#model-tree").lookup(".clipped-container");
-            assertNotNull(clip);
+            assertThat(clip).isNotNull();
             var fieldBounds = editor.localToScene(editor.getLayoutBounds());
             var visibleBounds = clip.localToScene(clip.getLayoutBounds());
-            assertTrue(fieldBounds.getMinY() >= visibleBounds.getMinY() - 1);
-            assertTrue(
-                    fieldBounds.getMaxY() <= visibleBounds.getMaxY() + 1,
-                    "The entire inline editor must remain visible on the last row");
+            assertThat(fieldBounds.getMinY() >= visibleBounds.getMinY() - 1).isTrue();
+            assertThat(fieldBounds.getMaxY() <= visibleBounds.getMaxY() + 1)
+                    .as("The entire inline editor must remain visible on the last row")
+                    .isTrue();
             return null;
         });
         fx(() -> {
@@ -3442,19 +3597,20 @@ class WorkbenchUiTest {
         });
         key(KeyCode.ENTER);
         ready();
-        assertEquals(Map.of("named1.body", "Obudowa"), document().bodyNames());
+        assertThat(document().bodyNames()).isEqualTo(Map.of("named1.body", "Obudowa"));
         long revision = fx(() -> workbench.controller().snapshot().revision());
         bodyTreeClick("Obudowa", MouseButton.SECONDARY, 1);
         click("body-fit");
-        assertEquals(revision, fx(() -> workbench.controller().snapshot().revision()));
+        assertThat(fx(() -> workbench.controller().snapshot().revision())).isEqualTo(revision);
         bodyTreeClick("Obudowa", MouseButton.PRIMARY, 2);
         fx(() -> {
             workbench.controller().newDocument();
             return null;
         });
         ready();
-        assertTrue(document().bodyNames().isEmpty());
-        assertNull(fx(() -> ((TreeView<?>) node("#model-tree")).getEditingItem()));
+        assertThat(document().bodyNames().isEmpty()).isTrue();
+        assertThat(fx(() -> ((TreeView<?>) node("#model-tree")).getEditingItem()))
+                .isNull();
     }
 
     private void createRenameBodies() throws Exception {
@@ -3510,14 +3666,13 @@ class WorkbenchUiTest {
             Thread.sleep(80);
         }
         Thread.sleep(250);
-        assertEquals(
-                label,
-                fx(() -> ((TreeView<?>) node("#model-tree"))
+        assertThat(fx(() -> ((TreeView<?>) node("#model-tree"))
                         .getSelectionModel()
                         .getSelectedItem()
                         .getValue()
-                        .toString()),
-                "Native click selects the intended row");
+                        .toString()))
+                .as("Native click selects the intended row")
+                .isEqualTo(label);
     }
 
     @Test
@@ -3540,27 +3695,29 @@ class WorkbenchUiTest {
         modelClick(15, 15, 5);
         text("body-material-name", "PETG");
         pickBodyColor(javafx.scene.paint.Color.RED);
-        assertTrue(document().bodyStyles().isEmpty(), "Editing controls is only a draft");
+        assertThat(document().bodyStyles().isEmpty())
+                .as("Editing controls is only a draft")
+                .isTrue();
         click("body-style-apply");
         ready();
         var red = new BodyStyle("PETG", "#FF0000");
-        assertEquals(red, document().bodyStyle("solid0.body"));
-        assertTrue(fx(() -> workbench.controller().dirty()));
+        assertThat(document().bodyStyle("solid0.body")).isEqualTo(red);
+        assertThat(fx(() -> workbench.controller().dirty())).isTrue();
         click("undo");
         ready();
-        assertTrue(document().bodyStyles().isEmpty());
+        assertThat(document().bodyStyles().isEmpty()).isTrue();
         click("redo");
         ready();
-        assertEquals(red, document().bodyStyle("solid0.body"));
+        assertThat(document().bodyStyle("solid0.body")).isEqualTo(red);
         modelClick(55, 15, 5);
         text("body-material-name", "PLA");
         pickBodyColor(javafx.scene.paint.Color.BLUE);
         click("body-style-apply");
         ready();
-        assertEquals(new BodyStyle("PLA", "#0000FF"), document().bodyStyle("solid1.body"));
+        assertThat(document().bodyStyle("solid1.body")).isEqualTo(new BodyStyle("PLA", "#0000FF"));
         click("save");
         ready();
-        assertEquals(document(), DocumentReader.load(file));
+        assertThat(DocumentReader.load(file)).isEqualTo(document());
         click("new");
         ready();
         click("open");
@@ -3574,10 +3731,9 @@ class WorkbenchUiTest {
             fx(() -> {
                 for (int i = 0; i < 2; i++) {
                     var view = findBodyView(workbench.viewport(), "body-solid" + i + ".body");
-                    assertNotNull(view);
-                    assertEquals(
-                            i == 0 ? javafx.scene.paint.Color.RED : javafx.scene.paint.Color.BLUE,
-                            ((javafx.scene.paint.PhongMaterial) view.getMaterial()).getDiffuseColor());
+                    assertThat(view).isNotNull();
+                    assertThat(((javafx.scene.paint.PhongMaterial) view.getMaterial()).getDiffuseColor())
+                            .isEqualTo(i == 0 ? javafx.scene.paint.Color.RED : javafx.scene.paint.Color.BLUE);
                 }
                 Screenshot.save(
                         stage.getScene(),
@@ -3586,12 +3742,13 @@ class WorkbenchUiTest {
             });
         }
         modelClick(55, 15, 5);
-        assertEquals("PLA", fx(() -> ((TextField) node("#body-material-name")).getText()));
+        assertThat(fx(() -> ((TextField) node("#body-material-name")).getText()))
+                .isEqualTo("PLA");
         assertButtonDescriptions();
         click("body-style-reset");
         ready();
-        assertEquals(BodyStyle.DEFAULT, document().bodyStyle("solid1.body"));
-        assertEquals(red, document().bodyStyle("solid0.body"));
+        assertThat(document().bodyStyle("solid1.body")).isEqualTo(BodyStyle.DEFAULT);
+        assertThat(document().bodyStyle("solid0.body")).isEqualTo(red);
     }
 
     private static javafx.scene.shape.MeshView findBodyView(Node node, String id) {
@@ -3634,22 +3791,23 @@ class WorkbenchUiTest {
             return null;
         });
         Thread.sleep(150);
-        assertEquals(color, fx(() -> ((ColorPicker) node("#body-color")).getValue()));
+        assertThat(fx(() -> ((ColorPicker) node("#body-color")).getValue())).isEqualTo(color);
     }
 
     @Test
     void firstLaunchUsesSystemDisplayLanguageAndShowsSystemPreference() throws Exception {
         ready();
-        assertEquals("Zapisz", fx(() -> command(workbench, "save").getText()));
-        assertEquals("Widok: Góra", fx(() -> node("#view-cube-top").getAccessibleText()));
-        assertFalse(configuration.read().containsKey("language"));
+        assertThat(fx(() -> command(workbench, "save").getText())).isEqualTo("Zapisz");
+        assertThat(fx(() -> node("#view-cube-top").getAccessibleText())).isEqualTo("Widok: Góra");
+        assertThat(configuration.read().containsKey("language")).isFalse();
         click("language");
-        assertEquals("system", fx(() -> ((ComboBox<?>) node("#language-choice")).getValue()));
-        assertEquals("Zapisz", fx(() -> ((Button) node("#language-save")).getText()));
+        assertThat(fx(() -> ((ComboBox<?>) node("#language-choice")).getValue()))
+                .isEqualTo("system");
+        assertThat(fx(() -> ((Button) node("#language-save")).getText())).isEqualTo("Zapisz");
         click("language-close");
-        assertFalse(configuration.read().containsKey("language"));
-        assertEquals("preserve me", configuration.get("external.setting", ""));
-        assertFalse(fx(() -> workbench.controller().dirty()));
+        assertThat(configuration.read().containsKey("language")).isFalse();
+        assertThat(configuration.get("external.setting", "")).isEqualTo("preserve me");
+        assertThat(fx(() -> workbench.controller().dirty())).isFalse();
     }
 
     @Test
@@ -3658,69 +3816,83 @@ class WorkbenchUiTest {
         // One translated dialog wiring check; message/resource matrices live in UiTextTest.
         click("about");
         waitForAbout("Dostępna nowa wersja: 1.1.0");
-        assertEquals("Wersja " + Version.version(), fx(() -> ((Label) node("#about-version")).getText()));
-        assertEquals("Otwórz aktualizator…", fx(() -> ((Hyperlink) node("#about-updates")).getText()));
-        assertTrue(fx(() ->
-                ((Hyperlink) node("#about-license")).getTooltip().getText().contains("licencję")));
+        assertThat(fx(() -> ((Label) node("#about-version")).getText())).isEqualTo("Wersja " + Version.version());
+        assertThat(fx(() -> ((Hyperlink) node("#about-updates")).getText())).isEqualTo("Otwórz aktualizator…");
+        assertThat(fx(() -> ((Hyperlink) node("#about-license"))
+                        .getTooltip()
+                        .getText()
+                        .contains("licencję")))
+                .isTrue();
         click("about-close");
         ready();
         click("keyboard-shortcuts");
-        assertNotNull(fx(() -> node("#keyboard-shortcuts-list")));
-        assertTrue(fx(() -> node("#keyboard-shortcuts-list").lookupAll(".label").stream()
-                .filter(Label.class::isInstance)
-                .map(Label.class::cast)
-                .anyMatch(label -> label.getText().equals("PROJEKTOWANIE 3D"))));
+        assertThat(fx(() -> node("#keyboard-shortcuts-list"))).isNotNull();
+        assertThat(fx(() -> node("#keyboard-shortcuts-list").lookupAll(".label").stream()
+                        .filter(Label.class::isInstance)
+                        .map(Label.class::cast)
+                        .anyMatch(label -> label.getText().equals("PROJEKTOWANIE 3D"))))
+                .isTrue();
         closeShortcutHelp();
         click("constrained-sketch");
         click("choose-plane-xy");
         sketchReady();
         sketchType(SketchTools.Tool.RECTANGLE_TWO_POINT);
         text("sketch-point-x", "=$missing");
-        assertEquals(List.of(), completionNames());
-        assertEquals(
-                "Brak pasujących parametrów",
-                fx(() -> ((Label) ((ListView<?>) node("#formula-suggestions")).getPlaceholder()).getText()));
+        assertThat(completionNames()).isEqualTo(List.of());
+        assertThat(fx(() -> ((Label) ((ListView<?>) node("#formula-suggestions")).getPlaceholder()).getText()))
+                .isEqualTo("Brak pasujących parametrów");
         key(KeyCode.ESCAPE);
         assertNoCompletion();
-        assertNotNull(fx(() -> node("#sketch-point-x")), "Escape closes suggestions before the tool");
+        assertThat(fx(() -> node("#sketch-point-x")))
+                .as("Escape closes suggestions before the tool")
+                .isNotNull();
         click("constraint-cancel");
-        assertEquals("Zapisz", fx(() -> command(workbench, "save").getText()));
+        assertThat(fx(() -> command(workbench, "save").getText())).isEqualTo("Zapisz");
         assertButtonDescriptions();
-        assertEquals("Widok: Góra", fx(() -> node("#view-cube-top").getAccessibleText()));
+        assertThat(fx(() -> node("#view-cube-top").getAccessibleText())).isEqualTo("Widok: Góra");
         choice("appearance", 1);
         click("constrained-sketch");
         click("choose-plane-xy");
         sketchReady();
         assertButtonDescriptions();
-        assertEquals("Prostokąt", fx(() -> ((Button) node("#sketch-tool-rectangle")).getText()));
+        assertThat(fx(() -> ((Button) node("#sketch-tool-rectangle")).getText()))
+                .isEqualTo("Prostokąt");
         assertShortcutCaption("sketch-tool-rectangle", "Prostokąt", "r");
         assertShortcutCaption("sketch-tool-circle", "Okrąg (C)", "C");
         assertShortcutCaption("sketch-tool-arc", "Łuk (A)", "A");
         saveShortcutLabels("pl-light");
-        assertEquals("Zakończ szkic", fx(() -> ((Button) node("#constraint-finish")).getText()));
-        assertTrue(fx(() ->
-                ((Button) node("#constraint-horizontal")).getTooltip().getText().contains("Wybierz linię")));
+        assertThat(fx(() -> ((Button) node("#constraint-finish")).getText())).isEqualTo("Zakończ szkic");
+        assertThat(fx(() -> ((Button) node("#constraint-horizontal"))
+                        .getTooltip()
+                        .getText()
+                        .contains("Wybierz linię")))
+                .isTrue();
         click("sketch-create-type");
         text("sketch-type-search", "Elipsa");
-        assertEquals(
-                List.of(SketchTools.Tool.ELLIPSE), fx(() -> ((ListView<?>) node("#sketch-type-results")).getItems()));
-        assertTrue(fx(() -> node("#sketch-type-results").lookupAll(".list-cell").stream()
-                .filter(ListCell.class::isInstance)
-                .map(ListCell.class::cast)
-                .anyMatch(cell -> "Elipsa".equals(cell.getText()))));
+        assertThat(fx(() -> ((ListView<?>) node("#sketch-type-results")).getItems()))
+                .isEqualTo(List.of(SketchTools.Tool.ELLIPSE));
+        assertThat(fx(() -> node("#sketch-type-results").lookupAll(".list-cell").stream()
+                        .filter(ListCell.class::isInstance)
+                        .map(ListCell.class::cast)
+                        .anyMatch(cell -> "Elipsa".equals(cell.getText()))))
+                .isTrue();
         key(KeyCode.ENTER);
         click("constraint-cancel");
         click("parameters");
-        assertEquals("Zastosuj", fx(() -> ((Button) node("#parameters-apply")).getText()));
+        assertThat(fx(() -> ((Button) node("#parameters-apply")).getText())).isEqualTo("Zastosuj");
         assertButtonDescriptions();
         click("parameters-cancel");
         rectangle(0);
         click("extrude");
         text("extrude-distance", "=1+2/3");
-        assertTrue(
-                fx(() -> ((TextField) node("#extrude-distance")).getPromptText().startsWith("Liczba")));
-        assertTrue(fx(() ->
-                ((TextField) node("#extrude-distance")).getTooltip().getText().startsWith("ƒx  Wynik:")));
+        assertThat(fx(() ->
+                        ((TextField) node("#extrude-distance")).getPromptText().startsWith("Liczba")))
+                .isTrue();
+        assertThat(fx(() -> ((TextField) node("#extrude-distance"))
+                        .getTooltip()
+                        .getText()
+                        .startsWith("ƒx  Wynik:")))
+                .isTrue();
         click("commit-extrusion");
         ready();
         var part = document();
@@ -3730,16 +3902,17 @@ class WorkbenchUiTest {
         text("file-path", file.toString());
         click("file-confirm");
         ready();
-        assertEquals(part, document());
+        assertThat(document()).isEqualTo(part);
         click("export");
-        assertEquals("Eksportuj", fx(() -> ((Button) node("#export-confirm")).getText()));
+        assertThat(fx(() -> ((Button) node("#export-confirm")).getText())).isEqualTo("Eksportuj");
         chooseExporter("3mf");
         assertPathRowLabels("export-path");
-        assertEquals("DESIGN", fx(() -> ((ComboBox<?>) node("#export-space")).getValue()));
+        assertThat(fx(() -> ((ComboBox<?>) node("#export-space")).getValue())).isEqualTo("DESIGN");
         key(KeyCode.ESCAPE);
         click("workspace-print");
         click("print-tab-supports");
-        assertEquals("Podpory automatyczne", fx(() -> ((CheckBox) node("#print-auto-supports")).getText()));
+        assertThat(fx(() -> ((CheckBox) node("#print-auto-supports")).getText()))
+                .isEqualTo("Podpory automatyczne");
         click("workspace-design");
         for (int palette : new int[] {1, 2}) {
             choice("appearance", palette);
@@ -3757,15 +3930,17 @@ class WorkbenchUiTest {
         click("language-save");
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         while (!fx(() -> ((Label) node("#language-status")).getText().startsWith("Zapisano"))) {
-            assertTrue(System.nanoTime() < deadline, "Language preference saved");
+            assertThat(System.nanoTime() < deadline)
+                    .as("Language preference saved")
+                    .isTrue();
             Thread.sleep(30);
         }
-        assertEquals("en-EN", configuration.get("language", ""));
-        assertEquals("preserve me", configuration.get("external.setting", ""));
+        assertThat(configuration.get("language", "")).isEqualTo("en-EN");
+        assertThat(configuration.get("external.setting", "")).isEqualTo("preserve me");
         click("language-close");
-        assertEquals(part, document());
-        assertFalse(fx(() -> workbench.controller().dirty()));
-        assertEquals("Zapisz", fx(() -> command(workbench, "save").getText()));
+        assertThat(document()).isEqualTo(part);
+        assertThat(fx(() -> workbench.controller().dirty())).isFalse();
+        assertThat(fx(() -> command(workbench, "save").getText())).isEqualTo("Zapisz");
         assertButtonDescriptions();
         // A new window reads the saved preference; the existing one retains its own catalog.
         fx(() -> {
@@ -3778,7 +3953,7 @@ class WorkbenchUiTest {
             try {
                 reopenedStage.setScene(reopened.createScene(964, 648));
                 reopenedStage.show();
-                assertEquals("Save", command(reopened, "save").getText());
+                assertThat(command(reopened, "save").getText()).isEqualTo("Save");
             } finally {
                 reopened.close();
                 reopenedStage.hide();
@@ -3806,31 +3981,31 @@ class WorkbenchUiTest {
             try {
                 secondStage.setScene(second.createScene(964, 648));
                 secondStage.show();
-                assertSame(second, graph.workbench());
-                assertNotSame(workbench.controller(), second.controller());
-                assertNotSame(
-                        workbench.controller().snapshot().document(),
-                        second.controller().snapshot().document());
-                assertNotSame(
-                        workbench.controller().snapshot().document().uuidGenerator(),
-                        second.controller().snapshot().document().uuidGenerator());
-                assertEquals(
-                        new dev.voxelbrew.util.i18n.Translations(Locale.forLanguageTag("pl")).text("action.save"),
-                        command(second, "save").getText());
-                assertTrue(second.getStyleClass().contains("dark"));
+                assertThat(graph.workbench()).isSameAs(second);
+                assertThat(second.controller()).isNotSameAs(workbench.controller());
+                assertThat(second.controller().snapshot().document())
+                        .isNotSameAs(workbench.controller().snapshot().document());
+                assertThat(second.controller().snapshot().document().uuidGenerator())
+                        .isNotSameAs(
+                                workbench.controller().snapshot().document().uuidGenerator());
+                assertThat(command(second, "save").getText())
+                        .isEqualTo(new dev.voxelbrew.util.i18n.Translations(Locale.forLanguageTag("pl"))
+                                .text("action.save"));
+                assertThat(second.getStyleClass().contains("dark")).isTrue();
                 second.close();
                 second.close();
                 var resources = graph.resources();
-                assertTrue(List.of(
-                                resources.rebuild,
-                                resources.files,
-                                resources.slicing,
-                                resources.validation,
-                                resources.appearance)
-                        .stream()
-                        .allMatch(ExecutorService::isShutdown));
+                assertThat(List.of(
+                                        resources.rebuild,
+                                        resources.files,
+                                        resources.slicing,
+                                        resources.validation,
+                                        resources.appearance)
+                                .stream()
+                                .allMatch(ExecutorService::isShutdown))
+                        .isTrue();
                 workbench.controller().newDocument();
-                assertFalse(workbench.controller().ioBusy());
+                assertThat(workbench.controller().ioBusy()).isFalse();
             } finally {
                 second.close();
                 secondStage.hide();
@@ -3858,19 +4033,19 @@ class WorkbenchUiTest {
         var savedDocument = document();
         shortcut(KeyCode.N, false);
         ready();
-        assertTrue(document().features().isEmpty());
+        assertThat(document().features().isEmpty()).isTrue();
         click("menu-file");
         fx(() -> {
             var recent = (Menu) command(workbench, "menu-open-recent");
             recent.show();
-            assertEquals(saved.toString(), recent.getItems().getFirst().getText());
+            assertThat(recent.getItems().getFirst().getText()).isEqualTo(saved.toString());
             recent.getItems().getFirst().fire();
             recent.hide();
             return null;
         });
         ready();
-        assertEquals(savedDocument, document());
-        assertEquals(saved, fx(() -> workbench.controller().path()));
+        assertThat(document()).isEqualTo(savedDocument);
+        assertThat(fx(() -> workbench.controller().path())).isEqualTo(saved);
         Path second = directory.resolve("second recent.vxb");
         Path third = directory.resolve("third recent.vxb");
         save(second);
@@ -3878,18 +4053,17 @@ class WorkbenchUiTest {
         shortcut(KeyCode.N, false);
         ready();
         click("open");
-        assertEquals(third.toString(), fx(() -> ((Hyperlink) node("#file-recent-0")).getText()));
-        assertEquals(second.toString(), fx(() -> ((Hyperlink) node("#file-recent-1")).getText()));
-        assertEquals(saved.toString(), fx(() -> ((Hyperlink) node("#file-recent-2")).getText()));
-        assertEquals(
-                4,
-                fx(() -> ((javafx.scene.layout.VBox) node("#file-recent-projects"))
+        assertThat(fx(() -> ((Hyperlink) node("#file-recent-0")).getText())).isEqualTo(third.toString());
+        assertThat(fx(() -> ((Hyperlink) node("#file-recent-1")).getText())).isEqualTo(second.toString());
+        assertThat(fx(() -> ((Hyperlink) node("#file-recent-2")).getText())).isEqualTo(saved.toString());
+        assertThat(fx(() -> ((javafx.scene.layout.VBox) node("#file-recent-projects"))
                         .getChildren()
-                        .size()));
+                        .size()))
+                .isEqualTo(4);
         click("file-recent-2");
         ready();
-        assertEquals(savedDocument, document());
-        assertEquals(saved, fx(() -> workbench.controller().path()));
+        assertThat(document()).isEqualTo(savedDocument);
+        assertThat(fx(() -> workbench.controller().path())).isEqualTo(saved);
     }
 
     @Test
@@ -3897,11 +4071,14 @@ class WorkbenchUiTest {
         var artifacts = Path.of(System.getProperty("voxelbrew.ui.artifacts"));
         ready();
         assertButtonDescriptions();
-        assertNull(fx(() -> workbench.lookup("#modeling-toolbar").lookup("#save")));
+        assertThat(fx(() -> workbench.lookup("#modeling-toolbar").lookup("#save")))
+                .isNull();
         click("menu-file");
-        assertEquals("Save", fx(() -> command(workbench, "save").getText()));
-        assertNotNull(fx(() -> command(workbench, "save-as").getAccelerator()));
-        assertNotNull(fx(() -> node("#save").getAccessibleHelp()), "Menu description is attached to the popup node");
+        assertThat(fx(() -> command(workbench, "save").getText())).isEqualTo("Save");
+        assertThat(fx(() -> command(workbench, "save-as").getAccelerator())).isNotNull();
+        assertThat(fx(() -> node("#save").getAccessibleHelp()))
+                .as("Menu description is attached to the popup node")
+                .isNotNull();
         fx(() -> {
             var bounds = node("#save").localToScreen(node("#save").getBoundsInLocal());
             robot.mouseMove(bounds.getCenterX(), bounds.getCenterY());
@@ -3913,12 +4090,12 @@ class WorkbenchUiTest {
                                 && tip.isShowing()
                                 && tip.getText().contains("features and parameters")))
                 && System.nanoTime() < deadline) Thread.sleep(40);
-        assertTrue(
-                fx(() -> Window.getWindows().stream()
+        assertThat(fx(() -> Window.getWindows().stream()
                         .anyMatch(window -> window instanceof Tooltip tip
                                 && tip.isShowing()
-                                && tip.getText().contains("features and parameters"))),
-                "Save description is a real hover popup");
+                                && tip.getText().contains("features and parameters"))))
+                .as("Save description is a real hover popup")
+                .isTrue();
         fx(() -> {
             Screenshot.save(stage.getScene(), artifacts.resolve("workbench-menu-light.png"));
             for (var window : Window.getWindows())
@@ -3927,31 +4104,36 @@ class WorkbenchUiTest {
             return null;
         });
         key(KeyCode.ESCAPE);
-        assertFalse(fx(() -> ((MenuBar) workbench.getScene().lookup("#main-menu"))
-                .getMenus()
-                .getFirst()
-                .isShowing()));
+        assertThat(fx(() -> ((MenuBar) workbench.getScene().lookup("#main-menu"))
+                        .getMenus()
+                        .getFirst()
+                        .isShowing()))
+                .isFalse();
         String documentId = document().id();
         click("save-as");
         assertButtonDescriptions();
-        assertTrue(
-                fx(() -> command(workbench, "new").isDisable()),
-                "Document commands are disabled behind a modal dialog");
+        assertThat(fx(() -> command(workbench, "new").isDisable()))
+                .as("Document commands are disabled behind a modal dialog")
+                .isTrue();
         shortcut(KeyCode.N, false);
-        assertEquals(documentId, document().id());
-        assertNotNull(fx(() -> node("#file-path")));
+        assertThat(document().id()).isEqualTo(documentId);
+        assertThat(fx(() -> node("#file-path"))).isNotNull();
         key(KeyCode.ESCAPE);
         hoverHelp("constrained-sketch");
         click("constrained-sketch");
         click("choose-plane-xy");
         sketchReady();
-        assertNotNull(fx(() -> node("#sketch-editor")), "Help must not consume the modeling click");
+        assertThat(fx(() -> node("#sketch-editor")))
+                .as("Help must not consume the modeling click")
+                .isNotNull();
         click("constraint-cancel");
         hoverHelp("menu-file");
         click("constrained-sketch");
         click("choose-plane-xy");
         sketchReady();
-        assertNotNull(fx(() -> node("#sketch-editor")), "Menu help must not cover a neighboring action");
+        assertThat(fx(() -> node("#sketch-editor")))
+                .as("Menu help must not cover a neighboring action")
+                .isNotNull();
         click("constraint-cancel");
         click("constrained-sketch");
         click("choose-plane-xy");
@@ -3975,7 +4157,7 @@ class WorkbenchUiTest {
         click("menu-file");
         fx(() -> {
             var popup = node("#save").getScene();
-            assertTrue(popup.getRoot().getStyleClass().contains("dark"));
+            assertThat(popup.getRoot().getStyleClass().contains("dark")).isTrue();
             Screenshot.save(popup, artifacts.resolve("file-menu-dark.png"));
             return null;
         });
@@ -3993,14 +4175,14 @@ class WorkbenchUiTest {
         fx(() -> {
             for (var node : stage.getScene().getRoot().lookupAll("*")) {
                 if (node instanceof ButtonBase button && button.isVisible()) {
-                    assertNotNull(
-                            button.getAccessibleHelp(),
-                            "Missing description: " + button.getId() + " " + button.getText());
-                    assertFalse(button.getAccessibleHelp().isBlank());
-                    assertTrue(
-                            button.getTooltip() != null
-                                    || button.getProperties().containsKey(UiHelp.class),
-                            "Missing popup: " + button.getId());
+                    assertThat(button.getAccessibleHelp())
+                            .as("Missing description: " + button.getId() + " " + button.getText())
+                            .isNotNull();
+                    assertThat(button.getAccessibleHelp().isBlank()).isFalse();
+                    assertThat(button.getTooltip() != null
+                                    || button.getProperties().containsKey(UiHelp.class))
+                            .as("Missing popup: " + button.getId())
+                            .isTrue();
                 }
             }
             return null;
@@ -4070,9 +4252,11 @@ class WorkbenchUiTest {
             // Native popup coordinates can belong to a different DPI monitor in Windows Robot.
             // Navigate the visible popup with real keys and observe focus before accepting it.
             var item = fx(() -> node("#" + id));
-            assertFalse(fx(item::isDisabled), id + " is disabled");
+            assertThat(fx(item::isDisabled)).as(id + " is disabled").isFalse();
             for (int step = 0; step < 100 && !fx(item::isFocused); step++) key(KeyCode.DOWN);
-            assertTrue(fx(item::isFocused), "Native menu selection reached " + id);
+            assertThat(fx(item::isFocused))
+                    .as("Native menu selection reached " + id)
+                    .isTrue();
             key(KeyCode.ENTER);
             Thread.sleep(180);
             if (id.equals("new")) chooseCurrentProjectWindow();
@@ -4084,11 +4268,13 @@ class WorkbenchUiTest {
             window.getScene().getRoot().applyCss();
             window.getScene().getRoot().layout();
             var node = node("#" + id);
-            assertFalse(node.isDisabled(), id + " is disabled");
+            assertThat(node.isDisabled()).as(id + " is disabled").isFalse();
             var hitTarget = node instanceof CheckBox ? node.lookup(".box") : node;
             var bounds = hitTarget.localToScreen(hitTarget.getBoundsInLocal());
-            assertNotNull(bounds);
-            assertTrue(bounds.getCenterY() < window.getY() + window.getHeight(), "Control outside window: " + id);
+            assertThat(bounds).isNotNull();
+            assertThat(bounds.getCenterY() < window.getY() + window.getHeight())
+                    .as("Control outside window: " + id)
+                    .isTrue();
             robot.mouseMove(bounds.getCenterX(), bounds.getCenterY());
             return null;
         });
@@ -4126,7 +4312,9 @@ class WorkbenchUiTest {
                     releaseSent[0] = true;
                     return null;
                 });
-                assertTrue(released.await(3, TimeUnit.SECONDS), "Mouse release reached " + id);
+                assertThat(released.await(3, TimeUnit.SECONDS))
+                        .as("Mouse release reached " + id)
+                        .isTrue();
             }
         } finally {
             fx(() -> {
@@ -4157,7 +4345,9 @@ class WorkbenchUiTest {
         });
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(4);
         while (!fx(() -> control.getTooltip().isShowing()) && System.nanoTime() < deadline) Thread.sleep(40);
-        assertTrue(fx(() -> control.getTooltip().isShowing()), "Hover help for " + id);
+        assertThat(fx(() -> control.getTooltip().isShowing()))
+                .as("Hover help for " + id)
+                .isTrue();
     }
 
     private void reveal(String id) throws Exception {
@@ -4228,9 +4418,9 @@ class WorkbenchUiTest {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
         while (!fx(() -> node("#keyboard-shortcuts-close").isFocused()) && System.nanoTime() < deadline)
             Thread.sleep(20);
-        assertTrue(
-                fx(() -> node("#keyboard-shortcuts-close").isFocused()),
-                "The shortcut reference gives its Close button keyboard focus");
+        assertThat(fx(() -> node("#keyboard-shortcuts-close").isFocused()))
+                .as("The shortcut reference gives its Close button keyboard focus")
+                .isTrue();
     }
 
     private void closeShortcutHelp() throws Exception {
@@ -4238,15 +4428,15 @@ class WorkbenchUiTest {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
         while (fx(() -> stage.getScene().lookup("#keyboard-shortcuts-list") != null) && System.nanoTime() < deadline)
             Thread.sleep(20);
-        assertNull(
-                fx(() -> stage.getScene().lookup("#keyboard-shortcuts-list")),
-                "One Escape closes the shortcut reference");
+        assertThat(fx(() -> stage.getScene().lookup("#keyboard-shortcuts-list")))
+                .as("One Escape closes the shortcut reference")
+                .isNull();
     }
 
     private void shortcut(KeyCode code, boolean shift) throws Exception {
         KeyCode modifier = System.getProperty("os.name").startsWith("Mac") ? KeyCode.META : KeyCode.CONTROL;
         focus(stage);
-        assertTrue(fx(stage::isFocused), "Window focus before shortcut");
+        assertThat(fx(stage::isFocused)).as("Window focus before shortcut").isTrue();
         fx(() -> {
             robot.keyPress(modifier);
             return null;
@@ -4282,11 +4472,11 @@ class WorkbenchUiTest {
             Thread.sleep(250);
             click(id);
         }
-        assertTrue(fx(target::isFocused), "Focused field: " + id);
+        assertThat(fx(target::isFocused)).as("Focused field: " + id).isTrue();
         int length = fx(target::getLength);
         key(KeyCode.HOME);
-        assertSame(target, fx(() -> node("#" + id)), "Stable inspector field: " + id);
-        assertEquals(0, fx(target::getCaretPosition), "Home key: " + id);
+        assertThat(fx(() -> node("#" + id))).as("Stable inspector field: " + id).isSameAs(target);
+        assertThat(fx(target::getCaretPosition)).as("Home key: " + id).isEqualTo(0);
         for (int i = 0; i < length; i++) {
             fx(() -> {
                 robot.keyType(KeyCode.DELETE);
@@ -4295,7 +4485,9 @@ class WorkbenchUiTest {
             Thread.sleep(20);
         }
         Thread.sleep(150);
-        assertEquals("", fx(() -> ((TextField) node("#" + id)).getText()), "Robot field clearing: " + id);
+        assertThat(fx(() -> ((TextField) node("#" + id)).getText()))
+                .as("Robot field clearing: " + id)
+                .isEqualTo("");
         var entered = new StringBuilder();
         for (char c : value.toCharArray()) {
             fx(() -> {
@@ -4337,10 +4529,13 @@ class WorkbenchUiTest {
             String expected = entered.toString();
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
             while (!expected.equals(fx(target::getText)) && System.nanoTime() < deadline) Thread.sleep(10);
-            assertEquals(expected, fx(target::getText), "Delivered keyboard input: " + id);
+            String actualText = fx(target::getText);
+            assertThat(actualText).as("Delivered keyboard input: " + id).isEqualTo(expected);
         }
         Thread.sleep(120);
-        assertEquals(value, fx(() -> ((TextField) node("#" + id)).getText()), "Robot text entry: " + id);
+        assertThat(fx(() -> ((TextField) node("#" + id)).getText()))
+                .as("Robot text entry: " + id)
+                .isEqualTo(value);
         if (Set.of("file-path", "import-path", "export-path").contains(id)) assertPathRowLabels(id);
     }
 
@@ -4354,8 +4549,10 @@ class WorkbenchUiTest {
             // Use control layout bounds rather than shadows for the overlap check.
             var fieldBounds = field.localToParent(field.getLayoutBounds());
             var buttonBounds = browse.localToParent(browse.getLayoutBounds());
-            assertTrue(browse.getWidth() > 0);
-            assertTrue(fieldBounds.getMaxX() <= buttonBounds.getMinX(), "Path field must not overlap Browse");
+            assertThat(browse.getWidth() > 0).isTrue();
+            assertThat(fieldBounds.getMaxX() <= buttonBounds.getMinX())
+                    .as("Path field must not overlap Browse")
+                    .isTrue();
             Node panel = row;
             while (!panel.getStyleClass().contains("dialog-overlay")) panel = panel.getParent();
             for (var control : panel.lookupAll(".button")) {
@@ -4363,11 +4560,11 @@ class WorkbenchUiTest {
                 if (control instanceof Button button
                         && !button.getText().isEmpty()
                         && !button.getStyleClass().contains("formula-help")) {
-                    var rendered = assertInstanceOf(javafx.scene.text.Text.class, button.lookup(".text"));
-                    assertEquals(
-                            button.getText(),
-                            rendered.getText(),
-                            "The full translated button label must be displayed: " + button.getId());
+                    assertThat(button.lookup(".text")).isInstanceOf(javafx.scene.text.Text.class);
+                    var rendered = (javafx.scene.text.Text) button.lookup(".text");
+                    assertThat(rendered.getText())
+                            .as("The full translated button label must be displayed: " + button.getId())
+                            .isEqualTo(button.getText());
                     var textBounds = rendered.localToScene(rendered.getLayoutBounds());
                     boolean scrollable = false;
                     for (var parent = button.getParent(); parent != panel; parent = parent.getParent()) {
@@ -4376,16 +4573,16 @@ class WorkbenchUiTest {
                             var viewport = scroll.lookup(".viewport");
                             var viewportBounds = viewport.localToScene(viewport.getLayoutBounds());
                             // Forms may scroll vertically; labels must still fit horizontally.
-                            assertTrue(
-                                    textBounds.getMinX() >= viewportBounds.getMinX()
-                                            && textBounds.getMaxX() <= viewportBounds.getMaxX(),
-                                    "Button label must not be clipped horizontally: " + button.getId());
+                            assertThat(textBounds.getMinX() >= viewportBounds.getMinX()
+                                            && textBounds.getMaxX() <= viewportBounds.getMaxX())
+                                    .as("Button label must not be clipped horizontally: " + button.getId())
+                                    .isTrue();
                         }
                     }
                     if (!scrollable)
-                        assertTrue(
-                                panel.localToScene(panel.getLayoutBounds()).contains(textBounds),
-                                "Button label must stay visible inside the dialog: " + button.getId());
+                        assertThat(panel.localToScene(panel.getLayoutBounds()).contains(textBounds))
+                                .as("Button label must stay visible inside the dialog: " + button.getId())
+                                .isTrue();
                 }
             }
             Screenshot.save(
@@ -4430,28 +4627,33 @@ class WorkbenchUiTest {
         text("export-path", "");
         click("export-confirm");
 
-        assertTrue(fx(() -> node("#export-path").getStyleClass().contains("export-dialog-invalid")));
-        assertTrue(fx(() -> node(".export-dialog-inline-error").isVisible()));
-        assertEquals("Choose a destination", fx(() -> ((Label) node(".export-dialog-inline-error")).getText()));
+        assertThat(fx(() -> node("#export-path").getStyleClass().contains("export-dialog-invalid")))
+                .isTrue();
+        assertThat(fx(() -> node(".export-dialog-inline-error").isVisible())).isTrue();
+        assertThat(fx(() -> ((Label) node(".export-dialog-inline-error")).getText()))
+                .isEqualTo("Choose a destination");
 
         text("export-path", directory.resolve("valid.json").toString());
-        assertFalse(fx(() -> node("#export-path").getStyleClass().contains("export-dialog-invalid")));
+        assertThat(fx(() -> node("#export-path").getStyleClass().contains("export-dialog-invalid")))
+                .isFalse();
         key(KeyCode.ESCAPE);
     }
 
     private void assertDesignRejectsMeshExport(String diagnostic) throws Exception {
         var before = document();
-        assertFalse(fx(() -> workbench.controller().canExport()));
+        assertThat(fx(() -> workbench.controller().canExport())).isFalse();
         Path target = directory.resolve("invalid-design.stl");
         click("export");
         chooseExporter("stl");
         text("export-path", target.toString());
         click("export-confirm");
         ready();
-        assertFalse(Files.exists(target), "Broken geometry must not produce an export");
+        assertThat(Files.exists(target))
+                .as("Broken geometry must not produce an export")
+                .isFalse();
         String error = fx(() -> ((Label) node("#status")).getText());
-        assertTrue(error.contains(diagnostic), error);
-        assertEquals(before, document());
+        assertThat(error.contains(diagnostic)).as(error).isTrue();
+        assertThat(document()).isEqualTo(before);
     }
 
     private void choice(String id, int index) throws Exception {
@@ -4467,22 +4669,24 @@ class WorkbenchUiTest {
             long submenuDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
             while (!fx(() -> ((Menu) command(workbench, "menu-appearance")).isShowing())
                     && System.nanoTime() < submenuDeadline) Thread.sleep(25);
-            assertTrue(
-                    fx(() -> ((Menu) command(workbench, "menu-appearance")).isShowing()),
-                    "Appearance submenu opens on native hover");
+            assertThat(fx(() -> ((Menu) command(workbench, "menu-appearance")).isShowing()))
+                    .as("Appearance submenu opens on native hover")
+                    .isTrue();
             click("appearance-" + List.of("system", "light", "dark").get(index));
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
             while (fx(() -> ((MenuBar) workbench.getScene().lookup("#main-menu"))
                             .getMenus().stream().anyMatch(Menu::isShowing))
                     && System.nanoTime() < deadline) Thread.sleep(25);
-            assertFalse(
-                    fx(() -> ((MenuBar) workbench.getScene().lookup("#main-menu"))
-                            .getMenus().stream().anyMatch(Menu::isShowing)),
-                    "Appearance menus closed after selection");
-            assertTrue(fx(() -> ((RadioMenuItem) command(
-                            workbench,
-                            "appearance-" + List.of("system", "light", "dark").get(index)))
-                    .isSelected()));
+            assertThat(fx(() -> ((MenuBar) workbench.getScene().lookup("#main-menu"))
+                            .getMenus().stream().anyMatch(Menu::isShowing)))
+                    .as("Appearance menus closed after selection")
+                    .isFalse();
+            assertThat(fx(() -> ((RadioMenuItem) command(
+                                    workbench,
+                                    "appearance-"
+                                            + List.of("system", "light", "dark").get(index)))
+                            .isSelected()))
+                    .isTrue();
             return;
         }
         click(id);
@@ -4490,16 +4694,17 @@ class WorkbenchUiTest {
         // Wait for the observed popup; do not replay the click or set its selection in code.
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
         while (!fx(() -> ((ComboBox<?>) node("#" + id)).isShowing()) && System.nanoTime() < deadline) Thread.sleep(25);
-        assertTrue(fx(() -> ((ComboBox<?>) node("#" + id)).isShowing()), "Popup opened: " + id);
+        assertThat(fx(() -> ((ComboBox<?>) node("#" + id)).isShowing()))
+                .as("Popup opened: " + id)
+                .isTrue();
         // Popup windows can select a different DPI monitor than their owner in Windows Robot.
         // Exercise the actual opened popup through native keys, without setting selection in code.
         key(KeyCode.HOME);
         for (int row = 0; row < index; row++) key(KeyCode.DOWN);
         key(KeyCode.ENTER);
-        assertEquals(
-                index,
-                fx(() -> ((ComboBox<?>) node("#" + id)).getSelectionModel().getSelectedIndex()),
-                "Combo selection: " + id);
+        assertThat(fx(() -> ((ComboBox<?>) node("#" + id)).getSelectionModel().getSelectedIndex()))
+                .as("Combo selection: " + id)
+                .isEqualTo(index);
     }
 
     private void ready() throws Exception {
@@ -4521,20 +4726,21 @@ class WorkbenchUiTest {
 
     @Test
     void aboutDetailsAndUpdateLinkInBothPalettes() throws Exception {
-        assertEquals(0, updates.requests.get(), "Startup must not contact the release service");
+        assertThat(updates.requests.get())
+                .as("Startup must not contact the release service")
+                .isEqualTo(0);
         for (int palette : List.of(1, 2)) {
             choice("appearance", palette);
             click("about");
             waitForAbout("New version available: 1.1.0");
-            assertEquals(
-                    "Version " + dev.voxelbrew.util.Version.version(),
-                    fx(() -> ((Label) node("#about-version")).getText()));
+            assertThat(fx(() -> ((Label) node("#about-version")).getText()))
+                    .isEqualTo("Version " + dev.voxelbrew.util.Version.version());
             fx(() -> {
                 for (String id :
                         List.of("about-check", "about-updates", "about-license", "about-notices", "about-close")) {
                     var control = (Control) node("#" + id);
-                    assertNotNull(control.getTooltip(), id);
-                    assertFalse(control.getAccessibleHelp().isBlank(), id);
+                    assertThat(control.getTooltip()).as(id).isNotNull();
+                    assertThat(control.getAccessibleHelp().isBlank()).as(id).isFalse();
                 }
                 Screenshot.save(
                         stage.getScene(),
@@ -4542,15 +4748,19 @@ class WorkbenchUiTest {
                 return null;
             });
             click("about-license");
-            assertTrue(fx(() ->
-                    ((TextArea) node("#about-legal-text")).getText().contains("GNU AFFERO GENERAL PUBLIC LICENSE")));
-            assertFalse(fx(() -> ((TextArea) node("#about-legal-text")).isEditable()));
+            assertThat(fx(() -> ((TextArea) node("#about-legal-text"))
+                            .getText()
+                            .contains("GNU AFFERO GENERAL PUBLIC LICENSE")))
+                    .isTrue();
+            assertThat(fx(() -> ((TextArea) node("#about-legal-text")).isEditable()))
+                    .isFalse();
             click("about-legal-close");
             click("about-notices");
-            assertTrue(fx(() -> ((TextArea) node("#about-legal-text")).getText().contains("Open CASCADE")));
+            assertThat(fx(() -> ((TextArea) node("#about-legal-text")).getText().contains("Open CASCADE")))
+                    .isTrue();
             click("about-legal-close");
             click("about-updates");
-            assertNotNull(fx(() -> node("#update-check")));
+            assertThat(fx(() -> node("#update-check"))).isNotNull();
             click("update-cancel");
             ready();
         }
@@ -4562,16 +4772,17 @@ class WorkbenchUiTest {
         click("about");
         waitForAbout("Checking for updates");
         // Synchronize with the server: initial HTTP-client startup can exceed five seconds on CI.
-        assertTrue(
-                updates.requestReceived.await(30, TimeUnit.SECONDS), "Cancel a lookup already waiting for a response");
-        assertTrue(fx(() -> node("#about-check").isDisabled()));
+        assertThat(updates.requestReceived.await(30, TimeUnit.SECONDS))
+                .as("Cancel a lookup already waiting for a response")
+                .isTrue();
+        assertThat(fx(() -> node("#about-check").isDisabled())).isTrue();
         click("about-close");
         ready();
         updates.failureStatus = 503;
         updates.slow = false;
         click("about");
         waitForAbout("Could not check for updates");
-        assertFalse(fx(() -> node("#about-check").isDisabled()));
+        assertThat(fx(() -> node("#about-check").isDisabled())).isFalse();
         updates.failureStatus = 0;
         updates.current = true;
         click("about-check");
@@ -4580,7 +4791,8 @@ class WorkbenchUiTest {
         updates.development = true;
         click("about-check");
         waitForAbout("Development runs are not replaced");
-        assertTrue(fx(() -> ((Label) node("#about-status")).getText().startsWith("New version available: 1.1.0")));
+        assertThat(fx(() -> ((Label) node("#about-status")).getText().startsWith("New version available: 1.1.0")))
+                .isTrue();
         click("about-close");
         ready();
     }
@@ -4589,7 +4801,9 @@ class WorkbenchUiTest {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
         while (!fx(() -> ((Label) node("#about-status")).getText().contains(message)) && System.nanoTime() < deadline)
             Thread.sleep(50);
-        assertTrue(fx(() -> ((Label) node("#about-status")).getText().contains(message)), message);
+        assertThat(fx(() -> ((Label) node("#about-status")).getText().contains(message)))
+                .as(message)
+                .isTrue();
     }
 
     @Test
@@ -4607,8 +4821,8 @@ class WorkbenchUiTest {
             click("update-force");
             click("update-check");
             waitForUpdate("Update available");
-            assertTrue(updates.requests.get() > request);
-            assertEquals(dev.voxelbrew.util.update.ReleaseVersion.release("1.1.0"), updates.requested);
+            assertThat(updates.requests.get() > request).isTrue();
+            assertThat(updates.requested).isEqualTo(dev.voxelbrew.util.update.ReleaseVersion.release("1.1.0"));
             fx(() -> {
                 Screenshot.save(
                         stage.getScene(),
@@ -4636,12 +4850,12 @@ class WorkbenchUiTest {
         waitForUpdate("Verified and ready");
         click("update-install");
         click("unsaved-cancel");
-        assertEquals(before, document());
-        assertTrue(fx(() -> stage.isShowing()));
-        assertFalse(fx(() -> node("#update-install").isDisabled()));
+        assertThat(document()).isEqualTo(before);
+        assertThat(fx(() -> stage.isShowing())).isTrue();
+        assertThat(fx(() -> node("#update-install").isDisabled())).isFalse();
         click("update-cancel");
         ready();
-        assertEquals(before, document());
+        assertThat(document()).isEqualTo(before);
         // Cancel removes staging after background work has stopped.
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         boolean exists;
@@ -4651,7 +4865,7 @@ class WorkbenchUiTest {
             }
             if (exists) Thread.sleep(50);
         } while (exists && System.nanoTime() < deadline);
-        assertFalse(exists);
+        assertThat(exists).isFalse();
     }
 
     @Test
@@ -4668,22 +4882,23 @@ class WorkbenchUiTest {
             click("import-confirm");
             key(KeyCode.ESCAPE);
             ready();
-            assertEquals(before, document());
-            assertFalse(fx(() -> workbench.controller().dirty()));
+            assertThat(document()).isEqualTo(before);
+            assertThat(fx(() -> workbench.controller().dirty())).isFalse();
             click("import");
             chooseImporter(source.equals(json) ? "json" : "vxb");
             click("import-confirm");
             text("import-path", source.toString());
             click("import-confirm");
             ready();
-            assertEquals(expected.features(), document().features());
-            assertTrue(fx(() -> workbench.controller().dirty()));
-            assertNull(fx(() -> workbench.controller().path()));
-            assertEquals(12000, volume(), .01);
+            assertThat(document().features()).isEqualTo(expected.features());
+            assertThat(fx(() -> workbench.controller().dirty())).isTrue();
+            assertThat(fx(() -> workbench.controller().path())).isNull();
+            assertThat(volume()).isCloseTo(12000, org.assertj.core.data.Offset.offset(.01));
             save(directory.resolve(source.equals(json) ? "json-copy.vxb" : "native-copy.vxb"));
         }
-        assertEquals(expected.features(), DocumentReader.load(original).features());
-        assertEquals(dev.voxelbrew.engine.persistence.DocumentCodec.encodeJson(expected), Files.readString(json));
+        assertThat(DocumentReader.load(original).features()).isEqualTo(expected.features());
+        assertThat(Files.readString(json))
+                .isEqualTo(dev.voxelbrew.engine.persistence.DocumentCodec.encodeJson(expected));
     }
 
     @Test
@@ -4700,16 +4915,14 @@ class WorkbenchUiTest {
         assertButtonDescriptions();
         click("import-confirm");
         ready();
-        assertEquals("imported-plate", document().id());
-        assertTrue(fx(() -> workbench.controller().dirty()));
-        assertNull(fx(() -> workbench.controller().path()));
-        assertEquals(
-                76800,
-                fx(() -> workbench.controller().build().bodies().getFirst().volume()),
-                .01);
+        assertThat(document().id()).isEqualTo("imported-plate");
+        assertThat(fx(() -> workbench.controller().dirty())).isTrue();
+        assertThat(fx(() -> workbench.controller().path())).isNull();
+        assertThat(fx(() -> workbench.controller().build().bodies().getFirst().volume()))
+                .isCloseTo(76800, org.assertj.core.data.Offset.offset(.01));
         Path saved = directory.resolve("imported design.vxb");
         save(saved);
-        assertFalse(fx(() -> workbench.controller().dirty()));
+        assertThat(fx(() -> workbench.controller().dirty())).isFalse();
         var before = document();
         choice("appearance", 2);
         click("import");
@@ -4718,10 +4931,11 @@ class WorkbenchUiTest {
         text("import-path", source.toString());
         click("import-confirm"); // First provider deliberately fails.
         ready();
-        assertEquals(before, document());
-        assertTrue(fx(() -> workbench.controller().error().contains("Deliberate importer failure")));
-        assertEquals("60,40,4", Files.readString(source));
-        assertEquals(before, DocumentReader.load(saved));
+        assertThat(document()).isEqualTo(before);
+        assertThat(fx(() -> workbench.controller().error().contains("Deliberate importer failure")))
+                .isTrue();
+        assertThat(Files.readString(source)).isEqualTo("60,40,4");
+        assertThat(DocumentReader.load(saved)).isEqualTo(before);
     }
 
     @SuppressWarnings("unchecked")
@@ -4754,7 +4968,7 @@ class WorkbenchUiTest {
     private void modelClick(double x, double y, double z) throws Exception {
         fx(() -> {
             var point = workbench.viewport().modelToScreen(new Point3D(x, y, z));
-            assertNotNull(point);
+            assertThat(point).isNotNull();
             robot.mouseMove(point);
             return null;
         });
@@ -4796,12 +5010,12 @@ class WorkbenchUiTest {
         click("constrained-sketch");
         click("choose-plane-xy");
         sketchReady();
-        assertEquals(0, offset);
-        assertNull(fx(() -> stage.getScene().lookup("#constraint-plane")));
+        assertThat(offset).isEqualTo(0);
+        assertThat(fx(() -> stage.getScene().lookup("#constraint-plane"))).isNull();
         sketchType(SketchTools.Tool.RECTANGLE_TWO_POINT);
         sketchNumericPoint(0, 0);
         sketchNumericPoint(width, height);
-        assertEquals(4, sketchGeometry().entities().size());
+        assertThat(sketchGeometry().entities().size()).isEqualTo(4);
     }
 
     private void circle() throws Exception {
@@ -4832,22 +5046,22 @@ class WorkbenchUiTest {
         text("file-path", path.toString());
         click("file-confirm");
         ready();
-        assertTrue(Files.exists(path));
+        assertThat(Files.exists(path)).isTrue();
     }
 
     private void sketchReady() throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
         while (fx(() -> ((SketchEditor) node("#sketch-editor")).controller().busy()) && System.nanoTime() < deadline)
             Thread.sleep(25);
-        assertFalse(
-                fx(() -> ((SketchEditor) node("#sketch-editor")).controller().busy()));
+        assertThat(fx(() -> ((SketchEditor) node("#sketch-editor")).controller().busy()))
+                .isFalse();
         Thread.sleep(100);
     }
 
     private void sketchClick(double x, double y, boolean shift) throws Exception {
         fx(() -> {
             var point = ((SketchEditor) node("#sketch-editor")).modelToScreen(new SketchGeometry.Vec(x, y));
-            assertNotNull(point);
+            assertThat(point).isNotNull();
             robot.mouseMove(point);
             if (shift) robot.keyPress(KeyCode.SHIFT);
             return null;
@@ -4905,7 +5119,7 @@ class WorkbenchUiTest {
         text("parameter-name", name);
         text("parameter-expression", expression);
         click("parameter-save");
-        assertEquals("", fx(() -> ((Label) node("#parameters-error")).getText()));
+        assertThat(fx(() -> ((Label) node("#parameters-error")).getText())).isEqualTo("");
     }
 
     private void parameterTab(int index) throws Exception {
@@ -4924,19 +5138,17 @@ class WorkbenchUiTest {
             return null;
         });
         Thread.sleep(200);
-        assertEquals(
-                index,
-                fx(() ->
-                        ((TabPane) node("#parameters-tabs")).getSelectionModel().getSelectedIndex()));
+        assertThat(fx(() ->
+                        ((TabPane) node("#parameters-tabs")).getSelectionModel().getSelectedIndex()))
+                .isEqualTo(index);
     }
 
     private void tableRow(String id, int index) throws Exception {
         click(id);
         key(KeyCode.HOME);
         for (int i = 0; i < index; i++) key(KeyCode.DOWN);
-        assertEquals(
-                index,
-                fx(() -> ((TableView<?>) node("#" + id)).getSelectionModel().getSelectedIndex()));
+        assertThat(fx(() -> ((TableView<?>) node("#" + id)).getSelectionModel().getSelectedIndex()))
+                .isEqualTo(index);
     }
 
     @Test
@@ -4955,114 +5167,127 @@ class WorkbenchUiTest {
         sketchType(SketchTools.Tool.RECTANGLE_TWO_POINT);
         text("sketch-point-x", "=$");
         var allNames = completionNames();
-        assertEquals(
-                List.of("bar", "fooHeight", "fooWidth"),
-                allNames.stream().filter(name -> !name.startsWith("vb.")).toList());
-        assertTrue(allNames.contains("vb.project.version"));
+        assertThat(allNames.stream().filter(name -> !name.startsWith("vb.")).toList())
+                .isEqualTo(List.of("bar", "fooHeight", "fooWidth"));
+        assertThat(allNames.contains("vb.project.version")).isTrue();
         key(KeyCode.F);
         key(KeyCode.O);
         key(KeyCode.O);
-        assertEquals("=$foo", fx(() -> ((TextField) node("#sketch-point-x")).getText()));
-        assertEquals(List.of("fooHeight", "fooWidth"), completionNames());
+        assertThat(fx(() -> ((TextField) node("#sketch-point-x")).getText())).isEqualTo("=$foo");
+        assertThat(completionNames()).isEqualTo(List.of("fooHeight", "fooWidth"));
         completionScreenshot("parameter-completion-light.png");
         key(KeyCode.DOWN);
         key(KeyCode.ENTER);
         assertNoCompletion();
-        assertEquals("=$fooWidth", fx(() -> ((TextField) node("#sketch-point-x")).getText()));
-        assertEquals(original, document(), "Accepting a suggestion creates no feature or history entry");
+        assertThat(fx(() -> ((TextField) node("#sketch-point-x")).getText())).isEqualTo("=$fooWidth");
+        assertThat(document())
+                .as("Accepting a suggestion creates no feature or history entry")
+                .isEqualTo(original);
         shortcut(KeyCode.Z, false);
-        assertEquals("=$foo", fx(() -> ((TextField) node("#sketch-point-x")).getText()));
+        assertThat(fx(() -> ((TextField) node("#sketch-point-x")).getText())).isEqualTo("=$foo");
         assertNoCompletion(); // Text undo selects the replaced reference; resume at its end.
         key(KeyCode.RIGHT);
-        assertEquals(List.of("fooHeight", "fooWidth"), completionNames());
+        assertThat(completionNames()).isEqualTo(List.of("fooHeight", "fooWidth"));
         shortcut(KeyCode.Y, false);
-        assertEquals("=$fooWidth", fx(() -> ((TextField) node("#sketch-point-x")).getText()));
+        assertThat(fx(() -> ((TextField) node("#sketch-point-x")).getText())).isEqualTo("=$fooWidth");
         completionNames();
         key(KeyCode.ESCAPE);
         assertNoCompletion();
-        assertNotNull(fx(() -> node("#sketch-point-x")));
+        assertThat(fx(() -> node("#sketch-point-x"))).isNotNull();
         text("sketch-point-x", "=$fooH");
-        assertEquals(List.of("fooHeight"), completionNames());
+        assertThat(completionNames()).isEqualTo(List.of("fooHeight"));
         key(KeyCode.TAB);
-        assertEquals("=$fooHeight", fx(() -> ((TextField) node("#sketch-point-x")).getText()));
-        assertTrue(fx(() -> node("#sketch-point-x").isFocused()));
-        assertEquals(original, document());
+        assertThat(fx(() -> ((TextField) node("#sketch-point-x")).getText())).isEqualTo("=$fooHeight");
+        assertThat(fx(() -> node("#sketch-point-x").isFocused())).isTrue();
+        assertThat(document()).isEqualTo(original);
         text("sketch-point-x", "=$vb.project.ver");
-        assertEquals(List.of("vb.project.version"), completionNames());
+        assertThat(completionNames()).isEqualTo(List.of("vb.project.version"));
         key(KeyCode.ENTER);
         assertNoCompletion();
-        assertEquals("=$vb.project.version", fx(() -> ((FormulaField) node("#sketch-point-x")).getText()));
-        assertEquals(0, fx(() -> ((FormulaField) node("#sketch-point-x")).value()));
+        assertThat(fx(() -> ((FormulaField) node("#sketch-point-x")).getText())).isEqualTo("=$vb.project.version");
+        assertThat(fx(() -> ((FormulaField) node("#sketch-point-x")).value())).isEqualTo(0);
         sketchNumericPoint(0, 0);
         sketchNumericPoint(60, 40);
         click("constraint-finish");
         ready();
-        assertEquals(1, document().features().size());
+        assertThat(document().features().size()).isEqualTo(1);
         var part = document();
 
         text("dimension-offsetZ", "=$fooWidth/2+1");
         key(KeyCode.HOME);
         for (int i = 0; i < 5; i++) key(KeyCode.RIGHT);
-        assertEquals(List.of("fooHeight", "fooWidth"), completionNames());
+        assertThat(completionNames()).isEqualTo(List.of("fooHeight", "fooWidth"));
         click("formula-suggestion-fooHeight");
         assertNoCompletion();
-        assertEquals("=$fooHeight/2+1", fx(() -> ((TextField) node("#dimension-offsetZ")).getText()));
-        assertEquals(part, document(), "Mouse completion also preserves uncommitted editing");
+        assertThat(fx(() -> ((TextField) node("#dimension-offsetZ")).getText())).isEqualTo("=$fooHeight/2+1");
+        assertThat(document())
+                .as("Mouse completion also preserves uncommitted editing")
+                .isEqualTo(part);
         text("dimension-offsetZ", "=$missing");
-        assertEquals(List.of(), completionNames());
+        assertThat(completionNames()).isEqualTo(List.of());
         key(KeyCode.ESCAPE);
         assertNoCompletion();
-        assertEquals("=$missing", fx(() -> ((TextField) node("#dimension-offsetZ")).getText()));
+        assertThat(fx(() -> ((TextField) node("#dimension-offsetZ")).getText())).isEqualTo("=$missing");
         click("history-0");
 
         choice("appearance", 2);
         click("parameters");
         click("parameter-new");
         text("parameter-comment", "=\"Width: \" + $fooW");
-        assertEquals(List.of("fooWidth"), completionNames());
+        assertThat(completionNames()).isEqualTo(List.of("fooWidth"));
         completionScreenshot("parameter-completion-dark.png");
         key(KeyCode.ENTER);
         assertNoCompletion();
-        assertEquals("=\"Width: \" + $fooWidth", fx(() -> ((TextField) node("#parameter-comment")).getText()));
-        assertEquals("Width: 60", fx(() -> ((FormulaField) node("#parameter-comment")).evaluatedText()));
-        assertNotNull(fx(() -> node("#parameters-apply")), "Completing text does not apply or close a dialog");
+        assertThat(fx(() -> ((TextField) node("#parameter-comment")).getText())).isEqualTo("=\"Width: \" + $fooWidth");
+        assertThat(fx(() -> ((FormulaField) node("#parameter-comment")).evaluatedText()))
+                .isEqualTo("Width: 60");
+        assertThat(fx(() -> node("#parameters-apply")))
+                .as("Completing text does not apply or close a dialog")
+                .isNotNull();
         text("parameter-comment", "=\"Version: \" + $vb.project.ver");
-        assertEquals(List.of("vb.project.version"), completionNames());
+        assertThat(completionNames()).isEqualTo(List.of("vb.project.version"));
         key(KeyCode.ENTER);
         assertNoCompletion();
-        assertEquals("Version: 0", fx(() -> ((FormulaField) node("#parameter-comment")).evaluatedText()));
+        assertThat(fx(() -> ((FormulaField) node("#parameter-comment")).evaluatedText()))
+                .isEqualTo("Version: 0");
         text("parameter-comment", "=\"literal $foo\"");
         assertNoCompletion();
         parameter("fooLength", "5");
         text("parameter-comment", "=$foo");
-        assertEquals(List.of("fooHeight", "fooLength", "fooWidth"), completionNames());
+        assertThat(completionNames()).isEqualTo(List.of("fooHeight", "fooLength", "fooWidth"));
         key(KeyCode.ESCAPE);
         assertNoCompletion();
-        assertNotNull(fx(() -> node("#parameters-cancel")), "Escape does not cancel the parameter draft");
+        assertThat(fx(() -> node("#parameters-cancel")))
+                .as("Escape does not cancel the parameter draft")
+                .isNotNull();
         click("parameters-cancel");
-        assertEquals(part, document());
+        assertThat(document()).isEqualTo(part);
 
         click("constrained-sketch");
         click("choose-plane-xy");
         sketchReady();
         sketchType(SketchTools.Tool.RECTANGLE_TWO_POINT);
         text("sketch-point-x", "=$foo");
-        assertEquals(List.of("fooHeight", "fooWidth"), completionNames());
+        assertThat(completionNames()).isEqualTo(List.of("fooHeight", "fooWidth"));
         key(KeyCode.ESCAPE);
         assertNoCompletion();
-        assertEquals("=$foo", fx(() -> ((TextField) node("#sketch-point-x")).getText()));
+        assertThat(fx(() -> ((TextField) node("#sketch-point-x")).getText())).isEqualTo("=$foo");
         sketchType(SketchTools.Tool.RECTANGLE_TWO_POINT);
         text("sketch-point-x", "=$fooW");
         completionNames();
         click("constraint-cancel");
         assertNoCompletion();
-        assertEquals(part, document(), "Closing a sketch hides completion and discards the draft");
+        assertThat(document())
+                .as("Closing a sketch hides completion and discards the draft")
+                .isEqualTo(part);
     }
 
     private List<String> completionNames() throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
         while (!fx(this::completionShowing) && System.nanoTime() < deadline) Thread.sleep(20);
-        assertTrue(fx(this::completionShowing), "Parameter suggestions are visible");
+        assertThat(fx(this::completionShowing))
+                .as("Parameter suggestions are visible")
+                .isTrue();
         return fx(() -> ((ListView<?>) node("#formula-suggestions"))
                 .getItems().stream().map(Object::toString).toList());
     }
@@ -5077,7 +5302,9 @@ class WorkbenchUiTest {
     private void assertNoCompletion() throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
         while (fx(this::completionShowing) && System.nanoTime() < deadline) Thread.sleep(20);
-        assertFalse(fx(this::completionShowing), "Suggestions must close without another key or click");
+        assertThat(fx(this::completionShowing))
+                .as("Suggestions must close without another key or click")
+                .isFalse();
     }
 
     private void completionScreenshot(String name) throws Exception {
@@ -5115,46 +5342,48 @@ class WorkbenchUiTest {
                             null));
             middle.accept(MouseEvent.MOUSE_PRESSED, 100.0);
             middle.accept(MouseEvent.MOUSE_DRAGGED, 120.0);
-            assertEquals("3.25", field.getText());
-            assertEquals(32.5, field.value(), 1e-9);
+            assertThat(field.getText()).isEqualTo("3.25");
+            assertThat(field.value()).isCloseTo(32.5, org.assertj.core.data.Offset.offset(1e-9));
             middle.accept(MouseEvent.MOUSE_DRAGGED, 80.0);
-            assertEquals("-0.75", field.getText());
+            assertThat(field.getText()).isEqualTo("-0.75");
             field.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ESCAPE, false, false, false, false));
-            assertEquals("1.25", field.getText());
+            assertThat(field.getText()).isEqualTo("1.25");
             middle.accept(MouseEvent.MOUSE_DRAGGED, 140.0);
-            assertEquals("1.25", field.getText());
+            assertThat(field.getText()).isEqualTo("1.25");
             middle.accept(MouseEvent.MOUSE_PRESSED, 100.0);
             middle.accept(MouseEvent.MOUSE_DRAGGED, 110.0);
             middle.accept(MouseEvent.MOUSE_RELEASED, 110.0);
             middle.accept(MouseEvent.MOUSE_DRAGGED, 150.0);
-            assertEquals("2.25", field.getText());
+            assertThat(field.getText()).isEqualTo("2.25");
             for (double invalidStep : new double[] {0, -1, Double.NaN, Double.POSITIVE_INFINITY}) {
-                assertThrows(IllegalArgumentException.class, () -> field.dragStep(invalidStep));
+                assertThatThrownBy(() -> field.dragStep(invalidStep)).isInstanceOf(IllegalArgumentException.class);
             }
             field.dragStep(0.01).bounds(0.05, true, 0.3, true);
             field.setText("0.2");
             middle.accept(MouseEvent.MOUSE_PRESSED, 100.0);
             middle.accept(MouseEvent.MOUSE_DRAGGED, 101.0);
-            assertEquals("0.21", field.getText());
+            assertThat(field.getText()).isEqualTo("0.21");
             field.dragStep(1);
             middle.accept(MouseEvent.MOUSE_DRAGGED, 102.0);
-            assertEquals("0.22", field.getText(), "Step is fixed for the active gesture");
+            assertThat(field.getText())
+                    .as("Step is fixed for the active gesture")
+                    .isEqualTo("0.22");
             middle.accept(MouseEvent.MOUSE_RELEASED, 102.0);
             field.bounds(1, true, 20, true);
             field.setText("2");
             middle.accept(MouseEvent.MOUSE_PRESSED, 100.0);
             middle.accept(MouseEvent.MOUSE_DRAGGED, 101.0);
-            assertEquals("3", field.getText());
+            assertThat(field.getText()).isEqualTo("3");
             middle.accept(MouseEvent.MOUSE_DRAGGED, 99.0);
-            assertEquals("1", field.getText());
+            assertThat(field.getText()).isEqualTo("1");
             middle.accept(MouseEvent.MOUSE_RELEASED, 99.0);
             field.bounds(0, false, 5, false);
             field.setText("2");
             middle.accept(MouseEvent.MOUSE_PRESSED, 100.0);
             middle.accept(MouseEvent.MOUSE_DRAGGED, 1000.0);
-            assertEquals("4", field.getText());
+            assertThat(field.getText()).isEqualTo("4");
             middle.accept(MouseEvent.MOUSE_DRAGGED, -1000.0);
-            assertEquals("1", field.getText());
+            assertThat(field.getText()).isEqualTo("1");
             middle.accept(MouseEvent.MOUSE_RELEASED, -1000.0);
             field.dragStep(0.1);
             for (boolean inclusive : new boolean[] {true, false}) {
@@ -5162,35 +5391,35 @@ class WorkbenchUiTest {
                 field.setText("1.25");
                 middle.accept(MouseEvent.MOUSE_PRESSED, 100.0);
                 middle.accept(MouseEvent.MOUSE_DRAGGED, 1000.0);
-                assertEquals(inclusive ? "2" : "1.95", field.getText());
-                assertEquals(inclusive ? 20 : 19.5, field.value(), 1e-9);
+                assertThat(field.getText()).isEqualTo(inclusive ? "2" : "1.95");
+                assertThat(field.value()).isCloseTo(inclusive ? 20 : 19.5, org.assertj.core.data.Offset.offset(1e-9));
                 middle.accept(MouseEvent.MOUSE_DRAGGED, -1000.0);
-                assertEquals(inclusive ? "1" : "1.05", field.getText());
-                assertEquals(inclusive ? 10 : 10.5, field.value(), 1e-9);
+                assertThat(field.getText()).isEqualTo(inclusive ? "1" : "1.05");
+                assertThat(field.value()).isCloseTo(inclusive ? 10 : 10.5, org.assertj.core.data.Offset.offset(1e-9));
                 middle.accept(MouseEvent.MOUSE_DRAGGED, 101.0);
-                assertEquals("1.35", field.getText());
+                assertThat(field.getText()).isEqualTo("1.35");
                 field.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ESCAPE, false, false, false, false));
-                assertEquals("1.25", field.getText());
+                assertThat(field.getText()).isEqualTo("1.25");
             }
             field.bounds(0.05, true, 0.3, true);
             field.setText("0.2");
             middle.accept(MouseEvent.MOUSE_PRESSED, 100.0);
             middle.accept(MouseEvent.MOUSE_DRAGGED, 200.0);
-            assertEquals("0.3", field.getText());
+            assertThat(field.getText()).isEqualTo("0.3");
             middle.accept(MouseEvent.MOUSE_DRAGGED, 0.0);
-            assertEquals("0.05", field.getText());
+            assertThat(field.getText()).isEqualTo("0.05");
             middle.accept(MouseEvent.MOUSE_RELEASED, 0.0);
             field.bounds(0, false, Double.POSITIVE_INFINITY, false);
             field.setText("0.5");
             middle.accept(MouseEvent.MOUSE_PRESSED, 100.0);
             middle.accept(MouseEvent.MOUSE_DRAGGED, -1000.0);
-            assertEquals("0.1", field.getText());
+            assertThat(field.getText()).isEqualTo("0.1");
             middle.accept(MouseEvent.MOUSE_RELEASED, -1000.0);
             field.bounds(Double.NEGATIVE_INFINITY, false, 1, false);
             field.setText("0.5");
             middle.accept(MouseEvent.MOUSE_PRESSED, 100.0);
             middle.accept(MouseEvent.MOUSE_DRAGGED, 1000.0);
-            assertEquals("0.9", field.getText());
+            assertThat(field.getText()).isEqualTo("0.9");
             middle.accept(MouseEvent.MOUSE_RELEASED, 1000.0);
             field.bounds(Double.NEGATIVE_INFINITY, false, Double.POSITIVE_INFINITY, false);
             for (String unchanged : List.of("=5", "  =5", "$width", "", "NaN", "1e999", "2 mm")) {
@@ -5198,13 +5427,13 @@ class WorkbenchUiTest {
                 middle.accept(MouseEvent.MOUSE_PRESSED, 100.0);
                 middle.accept(MouseEvent.MOUSE_DRAGGED, 120.0);
                 middle.accept(MouseEvent.MOUSE_RELEASED, 120.0);
-                assertEquals(unchanged, field.getText());
+                assertThat(field.getText()).isEqualTo(unchanged);
             }
             field.setText("5");
             field.setEditable(false);
             middle.accept(MouseEvent.MOUSE_PRESSED, 100.0);
             middle.accept(MouseEvent.MOUSE_DRAGGED, 120.0);
-            assertEquals("5", field.getText());
+            assertThat(field.getText()).isEqualTo("5");
             return null;
         });
     }
@@ -5223,17 +5452,18 @@ class WorkbenchUiTest {
         text("sketch-dimension-value", "=$width/2");
         fx(() -> {
             var field = (FormulaField) node("#sketch-dimension-value");
-            assertEquals(30, field.value());
-            assertTrue(field.getPseudoClassStates().contains(javafx.css.PseudoClass.getPseudoClass("formula")));
-            assertEquals(FormulaField.ExpressionType.NUMBER, field.expressionType());
-            assertEquals("ƒx", ((Label) field.lookup(".formula-mark")).getText());
-            assertTrue(field.getTooltip().getText().contains("30"));
+            assertThat(field.value()).isEqualTo(30);
+            assertThat(field.getPseudoClassStates().contains(javafx.css.PseudoClass.getPseudoClass("formula")))
+                    .isTrue();
+            assertThat(field.expressionType()).isEqualTo(FormulaField.ExpressionType.NUMBER);
+            assertThat(((Label) field.lookup(".formula-mark")).getText()).isEqualTo("ƒx");
+            assertThat(field.getTooltip().getText().contains("30")).isTrue();
             var centimeters = FormulaField.number(
                     "=$width/2",
                     () -> workbench.controller().snapshot().document().parameters(),
                     ParameterUnit.CM);
-            assertEquals(30, centimeters.value());
-            assertEquals(3, centimeters.declaredValue());
+            assertThat(centimeters.value()).isEqualTo(30);
+            assertThat(centimeters.declaredValue()).isEqualTo(3);
             Screenshot.save(stage.getScene(), artifacts.resolve("formulas-light.png"));
             return null;
         });
@@ -5242,22 +5472,23 @@ class WorkbenchUiTest {
         sketchReference(sketchGeometry().entities().get(1).id());
         text("sketch-dimension-value", "=1/0");
         click("sketch-apply-dimension");
-        assertEquals(before, document());
-        assertTrue(fx(() -> node("#sketch-dimension-value")
-                .getPseudoClassStates()
-                .contains(javafx.css.PseudoClass.getPseudoClass("formula-invalid"))));
+        assertThat(document()).isEqualTo(before);
+        assertThat(fx(() -> node("#sketch-dimension-value")
+                        .getPseudoClassStates()
+                        .contains(javafx.css.PseudoClass.getPseudoClass("formula-invalid"))))
+                .isTrue();
         sketchDimension(0, "=20+20");
         click("constraint-finish");
         ready();
-        assertEquals(2, document().parameters().bindings().size());
+        assertThat(document().parameters().bindings().size()).isEqualTo(2);
         click("extrude");
         text("extrude-distance", "=1+2/3");
         click("commit-extrusion");
         ready();
-        assertEquals(2000, volume(), .01);
+        assertThat(volume()).isCloseTo(2000, org.assertj.core.data.Offset.offset(.01));
         click("undo");
         ready();
-        assertEquals(1, document().features().size());
+        assertThat(document().features().size()).isEqualTo(1);
         click("redo");
         ready();
         choice("appearance", 2);
@@ -5268,11 +5499,13 @@ class WorkbenchUiTest {
         text("sketch-text-content", "=\"Width: \" + 5");
         text("sketch-text-height", "=$width/12");
         fx(() -> {
-            assertEquals("Width: 5", ((FormulaField) node("#sketch-text-content")).evaluatedText());
+            assertThat(((FormulaField) node("#sketch-text-content")).evaluatedText())
+                    .isEqualTo("Width: 5");
             var stringField = (FormulaField) node("#sketch-text-content");
-            assertEquals(FormulaField.ExpressionType.STRING, stringField.expressionType());
-            assertTrue(stringField.getStyleClass().contains("string-expression"));
-            assertEquals("ƒs", ((Label) stringField.lookup(".formula-mark")).getText());
+            assertThat(stringField.expressionType()).isEqualTo(FormulaField.ExpressionType.STRING);
+            assertThat(stringField.getStyleClass().contains("string-expression"))
+                    .isTrue();
+            assertThat(((Label) stringField.lookup(".formula-mark")).getText()).isEqualTo("ƒs");
             Screenshot.save(stage.getScene(), artifacts.resolve("formulas-dark.png"));
             return null;
         });
@@ -5281,30 +5514,29 @@ class WorkbenchUiTest {
                 .filter(e -> e.kind() == SketchGeometry.Kind.TEXT)
                 .findFirst()
                 .orElseThrow();
-        assertEquals("Width: 5", textEntity.text().content());
-        assertEquals(5, textEntity.value(2), .00001);
+        assertThat(textEntity.text().content()).isEqualTo("Width: 5");
+        assertThat(textEntity.value(2)).isCloseTo(5, org.assertj.core.data.Offset.offset(.00001));
         sketchReference(textEntity.id());
         click("sketch-edit-text");
-        assertEquals("=\"Width: \" + 5", fx(() -> ((TextField) node("#sketch-edit-text-content")).getText()));
+        assertThat(fx(() -> ((TextField) node("#sketch-edit-text-content")).getText()))
+                .isEqualTo("=\"Width: \" + 5");
         text("sketch-edit-text-content", "=\"Width: \" + $missing");
-        assertEquals(
-                javafx.scene.paint.Color.web("#d65c46"),
-                fx(() -> ((TextField) node("#sketch-edit-text-content"))
+        assertThat(fx(() -> ((TextField) node("#sketch-edit-text-content"))
                         .getBorder()
                         .getStrokes()
                         .getFirst()
-                        .getTopStroke()));
+                        .getTopStroke()))
+                .isEqualTo(javafx.scene.paint.Color.web("#d65c46"));
         key(KeyCode.ENTER);
-        assertEquals("Width: 5", sketchGeometry().entity(textEntity.id()).text().content());
+        assertThat(sketchGeometry().entity(textEntity.id()).text().content()).isEqualTo("Width: 5");
         text("sketch-edit-text-content", "=\"Width: \" + $width");
         key(KeyCode.ENTER); // Accept the parameter suggestion first; the next Enter applies.
         key(KeyCode.ENTER);
         sketchReady();
-        assertEquals(
-                "Width: 60", sketchGeometry().entity(textEntity.id()).text().content());
+        assertThat(sketchGeometry().entity(textEntity.id()).text().content()).isEqualTo("Width: 60");
         click("sketch-undo");
         sketchReady();
-        assertEquals("Width: 5", sketchGeometry().entity(textEntity.id()).text().content());
+        assertThat(sketchGeometry().entity(textEntity.id()).text().content()).isEqualTo("Width: 5");
         click("sketch-redo");
         sketchReady();
         click("constraint-finish");
@@ -5313,33 +5545,34 @@ class WorkbenchUiTest {
         parameter("width", "=80");
         click("parameters-apply");
         ready();
-        assertEquals(8000.0 / 3, volume(), .01);
-        assertEquals(
-                5, // Four rectangle edges and one text entity are rendered as sketch curves.
-                fx(() -> ((SubScene) workbench.viewport().getChildren().getFirst())
-                        .getRoot()
-                        .lookupAll(".sketch-curves")
-                        .size()));
+        assertThat(volume()).isCloseTo(8000.0 / 3, org.assertj.core.data.Offset.offset(.01));
+        assertThat( // Four rectangle edges and one text entity are rendered as sketch curves.
+                        fx(() -> ((SubScene) workbench.viewport().getChildren().getFirst())
+                                .getRoot()
+                                .lookupAll(".sketch-curves")
+                                .size()))
+                .isEqualTo(5);
         var file = directory.resolve("formula fields.vxb");
         save(file);
         var saved = document();
         open(file);
-        assertEquals(saved, document());
-        assertTrue(DocumentReader.load(file).parameters().bindings().stream()
-                .anyMatch(b -> b.expression().equals("=\"Width: \" + $width")));
+        assertThat(document()).isEqualTo(saved);
+        assertThat(DocumentReader.load(file).parameters().bindings().stream()
+                        .anyMatch(b -> b.expression().equals("=\"Width: \" + $width")))
+                .isTrue();
         click("history-2");
         click("edit-sketch-constraints");
         sketchReady();
-        assertEquals(
-                "Width: 80", sketchGeometry().entity(textEntity.id()).text().content());
-        assertEquals(80.0 / 12, sketchGeometry().entity(textEntity.id()).value(2), .00001);
+        assertThat(sketchGeometry().entity(textEntity.id()).text().content()).isEqualTo("Width: 80");
+        assertThat(sketchGeometry().entity(textEntity.id()).value(2))
+                .isCloseTo(80.0 / 12, org.assertj.core.data.Offset.offset(.00001));
         sketchReference(textEntity.id());
         click("sketch-edit-text");
         text("sketch-edit-text-content", "=\"Cancelled\"");
         key(KeyCode.ESCAPE);
         click("constraint-cancel");
         ready();
-        assertEquals(saved, document());
+        assertThat(document()).isEqualTo(saved);
         Files.copy(file, artifacts.resolve("formula-fields.vxb"), StandardCopyOption.REPLACE_EXISTING);
         Files.writeString(artifacts.resolve("formula-cli-inspection.txt"), cli("designer", "inspect", file.toString()));
     }
@@ -5367,14 +5600,13 @@ class WorkbenchUiTest {
         text("sketch-dimension-value", "width");
         click("sketch-apply-dimension");
         sketchReady();
-        assertEquals(
-                "width",
-                fx(() -> ((SketchEditor) node("#sketch-editor"))
+        assertThat(fx(() -> ((SketchEditor) node("#sketch-editor"))
                         .controller()
                         .parameters()
                         .bindings()
                         .getFirst()
-                        .expression()));
+                        .expression()))
+                .isEqualTo("width");
         click("sketch-clear-selection");
         sketchReference(sketchGeometry().entities().get(1).id());
         text("sketch-dimension-value", "40");
@@ -5386,7 +5618,7 @@ class WorkbenchUiTest {
         text("extrude-distance", "thickness");
         click("commit-extrusion");
         ready();
-        assertEquals(12000, volume(), .01);
+        assertThat(volume()).isCloseTo(12000, org.assertj.core.data.Offset.offset(.01));
         String body =
                 fx(() -> workbench.controller().build().bodies().getFirst().id());
         var featureIds = fx(() -> workbench.controller().snapshot().document().features().stream()
@@ -5411,45 +5643,42 @@ class WorkbenchUiTest {
         });
         click("parameters-apply");
         ready();
-        assertEquals(25600, volume(), .02);
-        assertEquals(
-                body,
-                fx(() -> workbench.controller().build().bodies().getFirst().id()));
+        assertThat(volume()).isCloseTo(25600, org.assertj.core.data.Offset.offset(.02));
+        assertThat(fx(() -> workbench.controller().build().bodies().getFirst().id()))
+                .isEqualTo(body);
         click("undo");
         ready();
-        assertEquals(12000, volume(), .02);
+        assertThat(volume()).isCloseTo(12000, org.assertj.core.data.Offset.offset(.02));
         click("redo");
         ready();
-        assertEquals(25600, volume(), .02);
-        assertEquals(
-                featureIds,
-                fx(() -> workbench.controller().snapshot().document().features().stream()
+        assertThat(volume()).isCloseTo(25600, org.assertj.core.data.Offset.offset(.02));
+        assertThat(fx(() -> workbench.controller().snapshot().document().features().stream()
                         .map(Feature::id)
-                        .toList()));
+                        .toList()))
+                .isEqualTo(featureIds);
         Path file = directory.resolve("parameter versions.vxb");
         save(file);
         open(file);
         ready();
-        assertEquals(
-                "Large",
-                fx(() -> workbench
+        assertThat(fx(() -> workbench
                         .controller()
                         .snapshot()
                         .document()
                         .parameters()
-                        .activeName()));
+                        .activeName()))
+                .isEqualTo("Large");
         choice("active-configuration", 0);
         ready();
-        assertEquals(12000, volume(), .02);
+        assertThat(volume()).isCloseTo(12000, org.assertj.core.data.Offset.offset(.02));
         choice("active-configuration", 1);
         ready();
-        assertEquals(25600, volume(), .02);
+        assertThat(volume()).isCloseTo(25600, org.assertj.core.data.Offset.offset(.02));
         click("save");
         ready();
         String inspection = cli("designer", "inspect", file.toString());
         var measured = java.util.regex.Pattern.compile("volume=([0-9.eE+\\-]+)").matcher(inspection);
-        assertTrue(measured.find(), inspection);
-        assertEquals(25600, Double.parseDouble(measured.group(1)), .02, inspection);
+        assertThat(measured.find()).as(inspection).isTrue();
+        assertThat(Double.parseDouble(measured.group(1))).isCloseTo(25600, org.assertj.core.data.Offset.offset(.02));
         Files.copy(file, artifacts.resolve("gui-parameter-variants.vxb"), StandardCopyOption.REPLACE_EXISTING);
         Files.writeString(artifacts.resolve("parameter-cli-inspection.txt"), inspection);
     }
@@ -5470,16 +5699,18 @@ class WorkbenchUiTest {
         tableRow("parameter-table", 0);
         text("parameter-expression", "missing");
         click("parameter-save");
-        assertTrue(fx(() -> ((Label) node("#parameters-error")).getText().contains("Unknown parameter")));
+        assertThat(fx(() -> ((Label) node("#parameters-error")).getText().contains("Unknown parameter")))
+                .isTrue();
         text("parameter-expression", "60");
         choice("parameter-unit", 5); // reject an angle parameter bound to a length
         click("parameter-save");
-        assertTrue(fx(() -> ((Label) node("#parameters-error"))
-                .getText()
-                .toLowerCase(java.util.Locale.ROOT)
-                .contains("incompatible")));
+        assertThat(fx(() -> ((Label) node("#parameters-error"))
+                        .getText()
+                        .toLowerCase(java.util.Locale.ROOT)
+                        .contains("incompatible")))
+                .isTrue();
         click("parameters-cancel");
-        assertEquals(before, fx(() -> workbench.controller().snapshot()));
+        assertThat(fx(() -> workbench.controller().snapshot())).isEqualTo(before);
         click("parameters");
         tableRow("parameter-table", 0);
         text("parameter-name", "plateWidth");
@@ -5491,7 +5722,7 @@ class WorkbenchUiTest {
         });
         click("parameters-apply");
         ready();
-        assertEquals("plateWidth", fx(() -> ((TextField) node("#dimension-width")).getText()));
+        assertThat(fx(() -> ((TextField) node("#dimension-width")).getText())).isEqualTo("plateWidth");
         before = fx(() -> workbench.controller().snapshot());
         click("edit-sketch-constraints");
         sketchReady();
@@ -5500,14 +5731,12 @@ class WorkbenchUiTest {
         click("parameters-apply");
         sketchReady();
         click("constraint-cancel");
-        assertEquals(before, fx(() -> workbench.controller().snapshot()));
+        assertThat(fx(() -> workbench.controller().snapshot())).isEqualTo(before);
         click("edit-sketch-constraints");
         sketchReady();
         click("constraint-finish");
         ready();
-        assertEquals(
-                "constraint:width",
-                fx(() -> workbench
+        assertThat(fx(() -> workbench
                         .controller()
                         .snapshot()
                         .document()
@@ -5515,11 +5744,12 @@ class WorkbenchUiTest {
                         .bindings()
                         .getFirst()
                         .target()
-                        .field()));
+                        .field()))
+                .isEqualTo("constraint:width");
         click("extrude");
         click("commit-extrusion");
         ready();
-        assertEquals(12000, volume(), .01);
+        assertThat(volume()).isCloseTo(12000, org.assertj.core.data.Offset.offset(.01));
         click("parameters");
         parameterTab(1);
         text("configuration-name", "Invalid");
@@ -5530,13 +5760,13 @@ class WorkbenchUiTest {
         click("configuration-activate");
         click("parameters-apply");
         ready();
-        assertFalse(fx(() -> workbench.controller().build().valid()));
-        assertTrue(fx(() -> workbench.controller().build().bodies().isEmpty()));
+        assertThat(fx(() -> workbench.controller().build().valid())).isFalse();
+        assertThat(fx(() -> workbench.controller().build().bodies().isEmpty())).isTrue();
         assertDesignRejectsMeshExport("Rebuild failed");
         choice("active-configuration", 0);
         ready();
-        assertEquals(12000, volume(), .01);
-        assertTrue(fx(() -> workbench.controller().canExport()));
+        assertThat(volume()).isCloseTo(12000, org.assertj.core.data.Offset.offset(.01));
+        assertThat(fx(() -> workbench.controller().canExport())).isTrue();
     }
 
     @Test
@@ -5567,9 +5797,9 @@ class WorkbenchUiTest {
         sketchClick(35, 20, false);
         sketchClick(45, 10, false);
         sketchReady();
-        assertTrue(
-                fx(() -> ((SketchEditor) node("#sketch-editor")).controller().canFinish()),
-                fx(() -> ((Label) node("#sketch-error")).getText()));
+        assertThat(fx(() -> ((SketchEditor) node("#sketch-editor")).controller().canFinish()))
+                .as(fx(() -> ((Label) node("#sketch-error")).getText()))
+                .isTrue();
         Path artifacts = Path.of(System.getProperty("voxelbrew.ui.artifacts"));
         fx(() -> {
             Screenshot.save(stage.getScene(), artifacts.resolve("sketch-types-ellipse-slot-conic.png"));
@@ -5581,13 +5811,16 @@ class WorkbenchUiTest {
         ready();
         key(KeyCode.ENTER);
         ready();
-        assertEquals(3, fx(() -> workbench.controller().build().bodies().size()));
-        assertEquals((50 * Math.PI + 80 + 4 * Math.PI + 25 * Math.PI - 50) * 5, volume(), .02);
+        assertThat(fx(() -> workbench.controller().build().bodies().size())).isEqualTo(3);
+        assertThat(volume())
+                .isCloseTo(
+                        (50 * Math.PI + 80 + 4 * Math.PI + 25 * Math.PI - 50) * 5,
+                        org.assertj.core.data.Offset.offset(.02));
         var file = directory.resolve("ellipse slot conic.vxb");
         save(file);
         open(file);
         ready();
-        assertEquals(3, fx(() -> workbench.controller().build().bodies().size()));
+        assertThat(fx(() -> workbench.controller().build().bodies().size())).isEqualTo(3);
     }
 
     @Test
@@ -5620,11 +5853,11 @@ class WorkbenchUiTest {
                 .filter(e -> e.kind() == SketchGeometry.Kind.CONTROL_SPLINE)
                 .findFirst()
                 .orElseThrow();
-        assertEquals(2, control.value(0), .3);
-        assertEquals(37, control.value(1), .3);
+        assertThat(control.value(0)).isCloseTo(2, org.assertj.core.data.Offset.offset(.3));
+        assertThat(control.value(1)).isCloseTo(37, org.assertj.core.data.Offset.offset(.3));
         click("sketch-undo");
         sketchReady();
-        assertEquals(before, sketchGeometry());
+        assertThat(sketchGeometry()).isEqualTo(before);
         sketchType(SketchTools.Tool.TEXT);
         text("sketch-text-content", "OB");
         text("sketch-text-height", "8");
@@ -5639,7 +5872,7 @@ class WorkbenchUiTest {
         text("sketch-edit-text-content", "OC");
         key(KeyCode.ENTER);
         sketchReady();
-        assertEquals("OC", sketchGeometry().entity(textId).text().content());
+        assertThat(sketchGeometry().entity(textId).text().content()).isEqualTo("OC");
         click("sketch-fit");
         Path artifacts = Path.of(System.getProperty("voxelbrew.ui.artifacts"));
         fx(() -> {
@@ -5652,19 +5885,19 @@ class WorkbenchUiTest {
         ready();
         key(KeyCode.ENTER);
         ready();
-        assertEquals(4, fx(() -> workbench.controller().build().bodies().size()));
+        assertThat(fx(() -> workbench.controller().build().bodies().size())).isEqualTo(4);
         var file = directory.resolve("splines and editable text.vxb");
         save(file);
         var saved = document();
         click("undo");
         ready();
-        assertTrue(fx(() -> workbench.controller().build().bodies().isEmpty()));
+        assertThat(fx(() -> workbench.controller().build().bodies().isEmpty())).isTrue();
         click("redo");
         ready();
-        assertEquals(saved, document());
+        assertThat(document()).isEqualTo(saved);
         open(file);
         ready();
-        assertEquals(saved, document());
+        assertThat(document()).isEqualTo(saved);
         Files.writeString(
                 artifacts.resolve("sketch-types-cli-inspection.txt"),
                 cli("designer", "inspect", file.toString(), "--point", "5,5,2"));
@@ -5695,7 +5928,8 @@ class WorkbenchUiTest {
                 .filter(e -> e.kind() == SketchGeometry.Kind.CIRCLE)
                 .findFirst()
                 .orElseThrow();
-        assertEquals(0, circle.point(SketchGeometry.Part.CENTER).distance(new SketchGeometry.Vec(5, 5)), .05);
+        assertThat(circle.point(SketchGeometry.Part.CENTER).distance(new SketchGeometry.Vec(5, 5)))
+                .isCloseTo(0, org.assertj.core.data.Offset.offset(.05));
         click("sketch-construction");
         click("sketch-tool-arc");
         sketchClick(30, 20, false);
@@ -5717,10 +5951,11 @@ class WorkbenchUiTest {
                 .filter(e -> e.kind() == SketchGeometry.Kind.TEXT)
                 .findFirst()
                 .orElseThrow();
-        assertEquals(arc, text.text().pathId());
+        assertThat(text.text().pathId()).isEqualTo(arc);
         var before = sketchGeometry().curves(text).getFirst().at(0);
         sketchDrag(30, 20, 35, 20, false);
-        assertTrue(before.distance(sketchGeometry().curves(text).getFirst().at(0)) > 4);
+        assertThat(before.distance(sketchGeometry().curves(text).getFirst().at(0)) > 4)
+                .isTrue();
         Path artifacts = Path.of(System.getProperty("voxelbrew.ui.artifacts"));
         fx(() -> {
             Screenshot.save(stage.getScene(), artifacts.resolve("sketch-types-tangent-and-path-text.png"));
@@ -5731,17 +5966,17 @@ class WorkbenchUiTest {
         choice("sketch-edit-text-path", 0);
         key(KeyCode.ENTER);
         sketchReady();
-        assertEquals("", sketchGeometry().entity(text.id()).text().pathId());
+        assertThat(sketchGeometry().entity(text.id()).text().pathId()).isEqualTo("");
         click("sketch-undo");
         sketchReady();
-        assertEquals(arc, sketchGeometry().entity(text.id()).text().pathId());
+        assertThat(sketchGeometry().entity(text.id()).text().pathId()).isEqualTo(arc);
         click("constraint-finish");
         ready();
         click("extrude");
         ready();
         key(KeyCode.ENTER);
         ready();
-        assertEquals(4, fx(() -> workbench.controller().build().bodies().size()));
+        assertThat(fx(() -> workbench.controller().build().bodies().size())).isEqualTo(4);
         var saved = document();
         click("constrained-sketch");
         click("choose-plane-xy");
@@ -5750,7 +5985,7 @@ class WorkbenchUiTest {
         sketchClick(0, 0, false);
         key(KeyCode.ESCAPE);
         click("constraint-cancel");
-        assertEquals(saved, document());
+        assertThat(document()).isEqualTo(saved);
     }
 
     @Test
@@ -5770,17 +6005,18 @@ class WorkbenchUiTest {
         sketchDimension(0, "60");
         sketchClick(0, 20, false);
         sketchDimension(0, "40");
-        assertEquals("Fully constrained", fx(() -> ((Label) node("#sketch-solve-status")).getText()));
+        assertThat(fx(() -> ((Label) node("#sketch-solve-status")).getText())).isEqualTo("Fully constrained");
         sketchClick(30, 0, false);
         sketchDimension(0, "80");
-        assertTrue(fx(() -> node("#constraint-finish").isDisabled()));
-        assertTrue(fx(() -> ((Label) node("#sketch-error")).getText().contains("cannot satisfy")));
+        assertThat(fx(() -> node("#constraint-finish").isDisabled())).isTrue();
+        assertThat(fx(() -> ((Label) node("#sketch-error")).getText().contains("cannot satisfy")))
+                .isTrue();
         click("sketch-undo");
         sketchReady();
-        assertFalse(fx(() -> node("#constraint-finish").isDisabled()));
+        assertThat(fx(() -> node("#constraint-finish").isDisabled())).isFalse();
         click("sketch-redo");
         sketchReady();
-        assertTrue(fx(() -> node("#constraint-finish").isDisabled()));
+        assertThat(fx(() -> node("#constraint-finish").isDisabled())).isTrue();
         click("sketch-undo");
         sketchReady();
         click("sketch-tool-circle");
@@ -5800,8 +6036,10 @@ class WorkbenchUiTest {
         sketchReference("origin.point");
         sketchDimension(2, "-10");
         sketchDimension(3, "-10");
-        assertEquals("Fully constrained", fx(() -> ((Label) node("#sketch-solve-status")).getText()));
-        assertEquals(0, document().features().size(), "Sketch editing stays transient until Finish");
+        assertThat(fx(() -> ((Label) node("#sketch-solve-status")).getText())).isEqualTo("Fully constrained");
+        assertThat(document().features().size())
+                .as("Sketch editing stays transient until Finish")
+                .isEqualTo(0);
         Path artifacts = Path.of(System.getProperty("voxelbrew.ui.artifacts"));
         fx(() -> {
             Screenshot.save(stage.getScene(), artifacts.resolve("sketch-constraints-light.png"));
@@ -5809,16 +6047,15 @@ class WorkbenchUiTest {
         });
         click("constraint-finish");
         ready();
-        assertEquals(1, document().features().size());
-        assertInstanceOf(
-                Feature.Constrained.class,
-                ((Feature.Sketch) document().features().getFirst()).profile());
+        assertThat(document().features().size()).isEqualTo(1);
+        assertThat(((Feature.Sketch) document().features().getFirst()).profile())
+                .isInstanceOf(Feature.Constrained.class);
         click("extrude");
         ready();
         text("extrude-distance", "8");
         key(KeyCode.ENTER);
         ready();
-        assertEquals(19099.469035085127, volume(), 0.01);
+        assertThat(volume()).isCloseTo(19099.469035085127, org.assertj.core.data.Offset.offset(0.01));
         Path file = directory.resolve("GUI constrained plate.vxb");
         save(file);
         var saved = DocumentReader.load(file);
@@ -5826,11 +6063,12 @@ class WorkbenchUiTest {
         text("file-path", file.toString());
         click("file-confirm");
         ready();
-        assertEquals(saved, document());
+        assertThat(document()).isEqualTo(saved);
         String inspection = cli("designer", "inspect", file.toString(), "--point", "10,10,4");
-        assertTrue(inspection.contains("contains=false"));
-        assertTrue(cli("designer", "inspect", file.toString(), "--point", "30,20,4")
-                .contains("contains=true"));
+        assertThat(inspection.contains("contains=false")).isTrue();
+        assertThat(cli("designer", "inspect", file.toString(), "--point", "30,20,4")
+                        .contains("contains=true"))
+                .isTrue();
         choice("appearance", 2);
         click("history-0");
         click("edit-sketch-constraints");
@@ -5851,23 +6089,22 @@ class WorkbenchUiTest {
         text("sketch-dimension-value", "80");
         click("sketch-apply-dimension");
         sketchReady();
-        assertEquals("Fully constrained", fx(() -> ((Label) node("#sketch-solve-status")).getText()));
+        assertThat(fx(() -> ((Label) node("#sketch-solve-status")).getText())).isEqualTo("Fully constrained");
         fx(() -> {
             Screenshot.save(stage.getScene(), artifacts.resolve("sketch-constraints-dark.png"));
             return null;
         });
         click("constraint-finish");
         ready();
-        assertEquals((80 * 40 - 4 * Math.PI) * 8, volume(), 0.01);
-        assertEquals(
-                saved.features().getFirst().id(),
-                document().features().getFirst().id());
+        assertThat(volume()).isCloseTo((80 * 40 - 4 * Math.PI) * 8, org.assertj.core.data.Offset.offset(0.01));
+        assertThat(document().features().getFirst().id())
+                .isEqualTo(saved.features().getFirst().id());
         click("undo");
         ready();
-        assertEquals(saved, document());
+        assertThat(document()).isEqualTo(saved);
         click("redo");
         ready();
-        assertEquals((80 * 40 - 4 * Math.PI) * 8, volume(), 0.01);
+        assertThat(volume()).isCloseTo((80 * 40 - 4 * Math.PI) * 8, org.assertj.core.data.Offset.offset(0.01));
         var beforeCancel = fx(() -> workbench.controller().snapshot());
         click("constrained-sketch");
         click("choose-plane-xy");
@@ -5875,13 +6112,14 @@ class WorkbenchUiTest {
         click("sketch-tool-line");
         sketchClick(10, 10, false);
         key(KeyCode.ESCAPE);
-        assertTrue(fx(() -> ((SketchEditor) node("#sketch-editor"))
-                .controller()
-                .definition()
-                .entities()
-                .isEmpty()));
+        assertThat(fx(() -> ((SketchEditor) node("#sketch-editor"))
+                        .controller()
+                        .definition()
+                        .entities()
+                        .isEmpty()))
+                .isTrue();
         click("constraint-cancel");
-        assertEquals(beforeCancel, fx(() -> workbench.controller().snapshot()));
+        assertThat(fx(() -> workbench.controller().snapshot())).isEqualTo(beforeCancel);
         Files.copy(file, artifacts.resolve("gui-constrained-plate.vxb"), StandardCopyOption.REPLACE_EXISTING);
         Files.writeString(artifacts.resolve("constrained-cli-inspection.txt"), inspection);
     }
@@ -5916,13 +6154,13 @@ class WorkbenchUiTest {
         click("sketch-tool-select");
         var emptySelection = fx(() -> ((Label) node("#sketch-selection")).getText());
         sketchDrag(15, 30, 25, 10, false);
-        assertEquals(emptySelection, fx(() -> ((Label) node("#sketch-selection")).getText()));
+        assertThat(fx(() -> ((Label) node("#sketch-selection")).getText())).isEqualTo(emptySelection);
         sketchDrag(25, 10, 15, 30, false);
-        assertEquals("inside\ncrossing", fx(() -> ((Label) node("#sketch-selection")).getText()));
+        assertThat(fx(() -> ((Label) node("#sketch-selection")).getText())).isEqualTo("inside\ncrossing");
         sketchDrag(15, 30, 40, 10, false);
-        assertEquals("inside", fx(() -> ((Label) node("#sketch-selection")).getText()));
+        assertThat(fx(() -> ((Label) node("#sketch-selection")).getText())).isEqualTo("inside");
         sketchDrag(40, 10, 15, 30, false);
-        assertEquals("inside\ncrossing", fx(() -> ((Label) node("#sketch-selection")).getText()));
+        assertThat(fx(() -> ((Label) node("#sketch-selection")).getText())).isEqualTo("inside\ncrossing");
         fx(() -> {
             robot.keyPress(KeyCode.CONTROL);
             return null;
@@ -5935,18 +6173,17 @@ class WorkbenchUiTest {
                 return null;
             });
         }
-        assertEquals("crossing", fx(() -> ((Label) node("#sketch-selection")).getText()));
+        assertThat(fx(() -> ((Label) node("#sketch-selection")).getText())).isEqualTo("crossing");
         click("sketch-tool-line");
         sketchClick(55, 35, false);
         sketchDrag(15, 30, 40, 10, false);
-        assertEquals("inside", fx(() -> ((Label) node("#sketch-selection")).getText()));
-        assertEquals(
-                2,
-                fx(() -> ((SketchEditor) node("#sketch-editor"))
+        assertThat(fx(() -> ((Label) node("#sketch-selection")).getText())).isEqualTo("inside");
+        assertThat(fx(() -> ((SketchEditor) node("#sketch-editor"))
                         .controller()
                         .definition()
                         .entities()
-                        .size()));
+                        .size()))
+                .isEqualTo(2);
         click("constraint-cancel");
     }
 
@@ -5985,7 +6222,9 @@ class WorkbenchUiTest {
                 robot.mouseRelease(MouseButton.PRIMARY);
                 return null;
             });
-            assertTrue(released.await(10, TimeUnit.SECONDS), "Native sketch mouse release was not delivered");
+            assertThat(released.await(10, TimeUnit.SECONDS))
+                    .as("Native sketch mouse release was not delivered")
+                    .isTrue();
         } finally {
             // This FX dispatch also waits until the release handler has submitted its solve.
             fx(() -> {
@@ -6009,27 +6248,23 @@ class WorkbenchUiTest {
         var before =
                 fx(() -> ((SketchEditor) node("#sketch-editor")).controller().definition());
         sketchDrag(30, 10, 35, 15, true);
-        assertEquals(
-                before,
-                fx(() -> ((SketchEditor) node("#sketch-editor")).controller().definition()));
+        assertThat(fx(() -> ((SketchEditor) node("#sketch-editor")).controller().definition()))
+                .isEqualTo(before);
         sketchDrag(30, 10, 35, 15, false);
         var moved =
                 fx(() -> ((SketchEditor) node("#sketch-editor")).controller().definition());
-        assertEquals(35, moved.entities().getFirst().at(1).x(), 0.3);
-        assertEquals(15, moved.entities().getFirst().at(1).y(), 0.3);
-        assertEquals(
-                moved.entities().getFirst().at(0).y(),
-                moved.entities().getFirst().at(1).y(),
-                1e-6);
+        assertThat(moved.entities().getFirst().at(1).x()).isCloseTo(35, org.assertj.core.data.Offset.offset(0.3));
+        assertThat(moved.entities().getFirst().at(1).y()).isCloseTo(15, org.assertj.core.data.Offset.offset(0.3));
+        assertThat(moved.entities().getFirst().at(1).y())
+                .isCloseTo(moved.entities().getFirst().at(0).y(), org.assertj.core.data.Offset.offset(1e-6));
         click("sketch-undo");
         sketchReady();
-        assertEquals(
-                before,
-                fx(() -> ((SketchEditor) node("#sketch-editor")).controller().definition()));
+        assertThat(fx(() -> ((SketchEditor) node("#sketch-editor")).controller().definition()))
+                .isEqualTo(before);
         click("sketch-redo");
         sketchReady();
         click("constraint-cancel");
-        assertTrue(document().features().isEmpty());
+        assertThat(document().features().isEmpty()).isTrue();
         click("constrained-sketch");
         click("choose-plane-xy");
         sketchReady();
@@ -6066,16 +6301,17 @@ class WorkbenchUiTest {
         sketchReady();
         var geometry =
                 fx(() -> ((SketchEditor) node("#sketch-editor")).controller().definition());
-        assertTrue(
-                fx(() -> ((SketchEditor) node("#sketch-editor")).controller().canFinish()),
-                fx(() -> ((Label) node("#sketch-error")).getText()));
-        assertTrue(geometry.constraints().stream().anyMatch(c -> c.type() == SketchGeometry.Type.CURVATURE));
-        assertEquals(
-                0,
-                geometry.entity(arcId).at(1).distance(geometry.entity(splineId).at(0)),
-                1e-6);
-        assertEquals(
-                geometry.entity(arcId).curvature(1), geometry.entity(splineId).curvature(0), 1e-8);
+        assertThat(fx(() -> ((SketchEditor) node("#sketch-editor")).controller().canFinish()))
+                .as(fx(() -> ((Label) node("#sketch-error")).getText()))
+                .isTrue();
+        assertThat(geometry.constraints().stream().anyMatch(c -> c.type() == SketchGeometry.Type.CURVATURE))
+                .isTrue();
+        assertThat(geometry.entity(arcId)
+                        .at(1)
+                        .distance(geometry.entity(splineId).at(0)))
+                .isCloseTo(0, org.assertj.core.data.Offset.offset(1e-6));
+        assertThat(geometry.entity(splineId).curvature(0))
+                .isCloseTo(geometry.entity(arcId).curvature(1), org.assertj.core.data.Offset.offset(1e-8));
         click("sketch-tool-line");
         sketchClick(-10, 0, false);
         sketchClick(10, 0, false);
@@ -6091,7 +6327,7 @@ class WorkbenchUiTest {
         ready();
         key(KeyCode.ENTER);
         ready();
-        assertTrue(volume() > 100);
+        assertThat(volume() > 100).isTrue();
         choice("appearance", 2);
         click("constrained-sketch");
         click("choose-plane-xy");
@@ -6101,28 +6337,26 @@ class WorkbenchUiTest {
         sketchClick(45, 20, false);
         sketchReady();
         geometry = fx(() -> ((SketchEditor) node("#sketch-editor")).controller().definition());
-        assertEquals(6, geometry.entities().size());
-        assertEquals(
-                SketchGeometry.Type.POLYGON, geometry.constraints().getFirst().type());
-        assertEquals(
-                4,
-                fx(() -> ((SketchEditor) node("#sketch-editor"))
+        assertThat(geometry.entities().size()).isEqualTo(6);
+        assertThat(geometry.constraints().getFirst().type()).isEqualTo(SketchGeometry.Type.POLYGON);
+        assertThat(fx(() -> ((SketchEditor) node("#sketch-editor"))
                         .controller()
                         .result()
-                        .degreesOfFreedom()));
+                        .degreesOfFreedom()))
+                .isEqualTo(4);
         fx(() -> {
             Screenshot.save(stage.getScene(), artifacts.resolve("sketch-regular-polygon.png"));
             return null;
         });
         click("constraint-finish");
         ready();
-        assertEquals(3, document().features().size());
+        assertThat(document().features().size()).isEqualTo(3);
         click("undo");
         ready();
-        assertEquals(2, document().features().size());
+        assertThat(document().features().size()).isEqualTo(2);
         click("redo");
         ready();
-        assertEquals(3, document().features().size());
+        assertThat(document().features().size()).isEqualTo(3);
     }
 
     private void cubeClick(String region, ViewOrientation expected) throws Exception {
@@ -6148,8 +6382,9 @@ class WorkbenchUiTest {
             return null;
         });
         Thread.sleep(180);
-        assertEquals(
-                expected, fx(() -> workbench.viewport().orientationProperty().get()), region);
+        assertThat(fx(() -> workbench.viewport().orientationProperty().get()))
+                .as(region)
+                .isEqualTo(expected);
     }
 
     @Test
@@ -6162,14 +6397,13 @@ class WorkbenchUiTest {
         });
         primaryDrag(background, 40, 24);
         assertOrbit(new ViewOrientation(40, -55), "An empty document's grid can be grabbed and rotated right/down");
-        assertEquals(
-                Cursor.DEFAULT,
-                fx(() -> node("#viewport-scene").getCursor()),
-                "Releasing a grid drag restores the cursor");
+        assertThat(fx(() -> node("#viewport-scene").getCursor()))
+                .as("Releasing a grid drag restores the cursor")
+                .isEqualTo(Cursor.DEFAULT);
         primaryDrag(background, -40, -24);
         assertOrbit(ViewOrientation.HOME, "Reverse drag returns to the original view");
-        assertEquals(empty, fx(() -> workbench.controller().snapshot()));
-        assertFalse(fx(() -> workbench.controller().dirty()));
+        assertThat(fx(() -> workbench.controller().snapshot())).isEqualTo(empty);
+        assertThat(fx(() -> workbench.controller().dirty())).isFalse();
 
         openPrepared("rectangle-0.vxb");
         var top = fx(() -> workbench.viewport().orientationProperty().get());
@@ -6185,18 +6419,17 @@ class WorkbenchUiTest {
             return null;
         });
         Thread.sleep(200);
-        assertTrue(
-                fx(() -> workbench
+        assertThat(fx(() -> workbench
                                 .viewport()
                                 .modelToScreen(new Point3D(0, 0, 0))
                                 .distance(workbench.viewport().modelToScreen(new Point3D(60, 0, 0))))
-                        > fittedWidth,
-                "Zoom enlarges the curve before native picking");
+                        > fittedWidth)
+                .as("Zoom enlarges the curve before native picking")
+                .isTrue();
         primaryDrag(fx(() -> workbench.viewport().modelToScreen(new Point3D(30, 0, .04))), 80, 24);
-        assertEquals(
-                top,
-                fx(() -> workbench.viewport().orientationProperty().get()),
-                "A drag that starts on a sketch does not become a grid orbit");
+        assertThat(fx(() -> workbench.viewport().orientationProperty().get()))
+                .as("A drag that starts on a sketch does not become a grid orbit")
+                .isEqualTo(top);
         primaryDrag(
                 fx(() -> workbench
                         .viewport()
@@ -6204,10 +6437,9 @@ class WorkbenchUiTest {
                         .add(0, 2)),
                 40,
                 12);
-        assertEquals(
-                top,
-                fx(() -> workbench.viewport().orientationProperty().get()),
-                "A small screen-space picking tolerance protects thin curves after viewport resizing");
+        assertThat(fx(() -> workbench.viewport().orientationProperty().get()))
+                .as("A small screen-space picking tolerance protects thin curves after viewport resizing")
+                .isEqualTo(top);
         click("menu-fit");
         click("extrude");
         ready();
@@ -6217,21 +6449,21 @@ class WorkbenchUiTest {
         click("view-cube-home");
         modelClick(30, 20, 5);
         var selection = fx(() -> ((Label) workbench.lookup(".selection-title")).getText());
-        assertTrue(selection.startsWith("Face"), "Single-click still picks a face");
+        assertThat(selection.startsWith("Face"))
+                .as("Single-click still picks a face")
+                .isTrue();
         var saved = fx(() -> workbench.controller().snapshot());
         primaryDrag(fx(() -> workbench.viewport().modelToScreen(new Point3D(30, 20, 5))), 40, 24);
-        assertEquals(
-                ViewOrientation.HOME,
-                fx(() -> workbench.viewport().orientationProperty().get()),
-                "Dragging from a body does not orbit, even when leaving its surface");
+        assertThat(fx(() -> workbench.viewport().orientationProperty().get()))
+                .as("Dragging from a body does not orbit, even when leaving its surface")
+                .isEqualTo(ViewOrientation.HOME);
         primaryDrag(fx(() -> workbench.viewport().modelToScreen(new Point3D(-15, 10, 0))), 40, 24);
         assertOrbit(new ViewOrientation(40, -55), "Grid rotation also works with a model present");
-        assertEquals(
-                selection,
-                fx(() -> ((Label) workbench.lookup(".selection-title")).getText()),
-                "Releasing a grid drag does not change selection");
-        assertEquals(saved, fx(() -> workbench.controller().snapshot()));
-        assertFalse(fx(() -> workbench.controller().dirty()));
+        assertThat(fx(() -> ((Label) workbench.lookup(".selection-title")).getText()))
+                .as("Releasing a grid drag does not change selection")
+                .isEqualTo(selection);
+        assertThat(fx(() -> workbench.controller().snapshot())).isEqualTo(saved);
+        assertThat(fx(() -> workbench.controller().dirty())).isFalse();
         fx(() -> {
             Screenshot.save(stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "grid-orbit.png"));
             return null;
@@ -6245,14 +6477,13 @@ class WorkbenchUiTest {
         var drawingPoint =
                 fx(() -> ((SketchEditor) node("#sketch-editor")).modelToScreen(new SketchGeometry.Vec(0, 0)));
         primaryDrag(drawingPoint, 40, 24);
-        assertEquals(
-                drawingView,
-                fx(() -> workbench.viewport().orientationProperty().get()),
-                "Drawing in the sketch editor cannot orbit the underlying model");
+        assertThat(fx(() -> workbench.viewport().orientationProperty().get()))
+                .as("Drawing in the sketch editor cannot orbit the underlying model")
+                .isEqualTo(drawingView);
         key(KeyCode.ESCAPE);
         click("constraint-cancel");
-        assertEquals(saved, fx(() -> workbench.controller().snapshot()));
-        assertFalse(fx(() -> workbench.controller().dirty()));
+        assertThat(fx(() -> workbench.controller().snapshot())).isEqualTo(saved);
+        assertThat(fx(() -> workbench.controller().dirty())).isFalse();
     }
 
     @Test
@@ -6282,11 +6513,11 @@ class WorkbenchUiTest {
         var beforeOrbit = fx(() -> List.copyOf(((Polygon) node("#view-cube-top")).getPoints()));
         var beforePan = fx(() -> workbench.viewport().modelToScreen(point));
         navigate(false);
-        assertEquals(
-                beforeOrbit,
-                fx(() -> List.copyOf(((Polygon) node("#view-cube-top")).getPoints())),
-                "Middle drag does not rotate the cube");
-        assertTrue(beforePan.distance(fx(() -> workbench.viewport().modelToScreen(point))) > 2);
+        assertThat(fx(() -> List.copyOf(((Polygon) node("#view-cube-top")).getPoints())))
+                .as("Middle drag does not rotate the cube")
+                .isEqualTo(beforeOrbit);
+        assertThat(beforePan.distance(fx(() -> workbench.viewport().modelToScreen(point))) > 2)
+                .isTrue();
         var orientation = fx(() -> workbench.viewport().orientationProperty().get());
         navigate(true);
         fx(() -> {
@@ -6294,17 +6525,14 @@ class WorkbenchUiTest {
             return null;
         });
         Thread.sleep(200);
-        assertEquals(
-                orientation,
-                fx(() -> workbench.viewport().orientationProperty().get()),
-                "Pan and zoom do not rotate the cube");
-        assertTrue(homeProjection.distance(fx(() -> workbench.viewport().modelToScreen(point))) > 2);
+        assertThat(fx(() -> workbench.viewport().orientationProperty().get()))
+                .as("Pan and zoom do not rotate the cube")
+                .isEqualTo(orientation);
+        assertThat(homeProjection.distance(fx(() -> workbench.viewport().modelToScreen(point))) > 2)
+                .isTrue();
         click("view-cube-home");
-        assertEquals(
-                0,
-                homeProjection.distance(fx(() -> workbench.viewport().modelToScreen(point))),
-                0.01,
-                "Home resets rotation, pan and zoom");
+        assertThat(homeProjection.distance(fx(() -> workbench.viewport().modelToScreen(point))))
+                .isCloseTo(0, org.assertj.core.data.Offset.offset(0.01));
         var beforeDrag = fx(() -> workbench.viewport().modelToScreen(point));
         fx(() -> {
             var face = node("#view-cube-front");
@@ -6328,34 +6556,32 @@ class WorkbenchUiTest {
             return null;
         });
         Thread.sleep(180);
-        assertTrue(
-                beforeDrag.distance(fx(() -> workbench.viewport().modelToScreen(point))) > 2,
-                "Dragging cube orbits the main view");
+        assertThat(beforeDrag.distance(fx(() -> workbench.viewport().modelToScreen(point))) > 2)
+                .as("Dragging cube orbits the main view")
+                .isTrue();
         assertOrbit(
                 new ViewOrientation(38, -50), "Right/down drag follows the pointer and must not also snap on release");
         click("view-cube-menu");
-        assertTrue(fx(() -> ((MenuButton) node("#view-cube-menu")).isShowing()));
+        assertThat(fx(() -> ((MenuButton) node("#view-cube-menu")).isShowing())).isTrue();
         key(KeyCode.DOWN);
         key(KeyCode.DOWN);
         key(KeyCode.ENTER);
-        assertEquals(
-                ViewOrientation.named("Top"),
-                fx(() -> workbench.viewport().orientationProperty().get()));
+        assertThat(fx(() -> workbench.viewport().orientationProperty().get())).isEqualTo(ViewOrientation.named("Top"));
         // The sketch editor owns input while the design viewport is disabled.
         click("constrained-sketch");
         click("choose-plane-xy");
         sketchReady();
-        assertTrue(fx(workbench::isDisabled));
-        assertEquals(snapshot, fx(() -> workbench.controller().snapshot()));
+        assertThat(fx(workbench::isDisabled)).isTrue();
+        assertThat(fx(() -> workbench.controller().snapshot())).isEqualTo(snapshot);
         click("constraint-cancel");
         click("view-cube-home");
         modelClick(30, 20, 5);
-        assertTrue(
-                fx(() ->
-                        ((Label) workbench.lookup(".selection-title")).getText().startsWith("Face")),
-                "Model picking still works around the overlay");
-        assertEquals(snapshot, fx(() -> workbench.controller().snapshot()));
-        assertFalse(fx(() -> workbench.controller().dirty()));
+        assertThat(fx(() ->
+                        ((Label) workbench.lookup(".selection-title")).getText().startsWith("Face")))
+                .as("Model picking still works around the overlay")
+                .isTrue();
+        assertThat(fx(() -> workbench.controller().snapshot())).isEqualTo(snapshot);
+        assertThat(fx(() -> workbench.controller().dirty())).isFalse();
         for (int palette = 1; palette <= 2; palette++) {
             choice("appearance", palette);
             String name = palette == 1 ? "view-cube-light.png" : "view-cube-dark.png";
@@ -6374,12 +6600,12 @@ class WorkbenchUiTest {
         text("extrude-distance", "5");
         key(KeyCode.ENTER);
         ready();
-        assertEquals(2, document().features().size());
+        assertThat(document().features().size()).isEqualTo(2);
         circle();
         click("cut");
         click("cut-confirm");
         ready();
-        assertEquals(11937.168146928205, volume(), 0.01);
+        assertThat(volume()).isCloseTo(11937.168146928205, org.assertj.core.data.Offset.offset(0.01));
         Path file = directory.resolve("GUI reference.vxb");
         save(file);
         var before = DocumentReader.load(file);
@@ -6389,49 +6615,48 @@ class WorkbenchUiTest {
         text("file-path", file.toString());
         click("file-confirm");
         ready();
-        assertEquals(before, document());
+        assertThat(document()).isEqualTo(before);
         click("history-1");
         text("dimension-distance", "8");
         key(KeyCode.ENTER);
         ready();
-        assertEquals(19099.469035085127, volume(), 0.01);
+        assertThat(volume()).isCloseTo(19099.469035085127, org.assertj.core.data.Offset.offset(0.01));
         click("history-cursor");
         key(KeyCode.HOME);
         key(KeyCode.RIGHT);
         key(KeyCode.RIGHT);
         key(KeyCode.RIGHT);
         ready();
-        assertEquals(3, document().cursor());
-        assertEquals(19200, volume(), 0.01);
+        assertThat(document().cursor()).isEqualTo(3);
+        assertThat(volume()).isCloseTo(19200, org.assertj.core.data.Offset.offset(0.01));
         key(KeyCode.RIGHT);
         ready();
-        assertEquals(4, document().cursor());
-        assertEquals(19099.469035085127, volume(), 0.01);
+        assertThat(document().cursor()).isEqualTo(4);
+        assertThat(volume()).isCloseTo(19099.469035085127, org.assertj.core.data.Offset.offset(0.01));
         click("undo");
         ready();
-        assertEquals(11937.168146928205, volume(), 0.01);
+        assertThat(volume()).isCloseTo(11937.168146928205, org.assertj.core.data.Offset.offset(0.01));
         click("redo");
         ready();
-        assertEquals(19099.469035085127, volume(), 0.01);
+        assertThat(volume()).isCloseTo(19099.469035085127, org.assertj.core.data.Offset.offset(0.01));
         click("save");
         ready();
-        assertEquals(
-                before.features().stream().map(Feature::id).toList(),
-                document().features().stream().map(Feature::id).toList());
+        assertThat(document().features().stream().map(Feature::id).toList())
+                .isEqualTo(before.features().stream().map(Feature::id).toList());
         Path exported = directory.resolve("GUI reference.3mf");
         click("export");
         chooseExporter("3mf");
         text("export-path", exported.toString());
         click("export-confirm");
         ready();
-        assertTrue(Files.size(exported) > 500);
+        assertThat(Files.size(exported) > 500).isTrue();
         Path external = directory.resolve("external report.txt");
         click("export");
         chooseExporter("document-probe");
         text("file-path", external.toString());
         click("file-confirm");
         ready();
-        assertTrue(Files.readString(external).startsWith("document="));
+        assertThat(Files.readString(external).startsWith("document=")).isTrue();
         cli(
                 "designer",
                 "feature",
@@ -6443,24 +6668,27 @@ class WorkbenchUiTest {
                 "distance",
                 "--value",
                 "8");
-        assertEquals(DocumentReader.load(cliFile), DocumentReader.load(file));
+        assertThat(DocumentReader.load(file)).isEqualTo(DocumentReader.load(cliFile));
         String inspection = cli("designer", "inspect", file.toString(), "--point", "10,10,4");
-        assertTrue(inspection.contains("volume=19099.469035085127"));
-        assertTrue(inspection.contains("contains=false"));
-        assertTrue(inspection.contains(
-                "bounds=0.000000000,0.000000000,0.000000000,60.000000000,40.000000000,8.000000000"));
-        assertTrue(cli("designer", "inspect", file.toString(), "--point", "30,20,4")
-                .contains("contains=true"));
+        assertThat(inspection.contains("volume=19099.469035085127")).isTrue();
+        assertThat(inspection.contains("contains=false")).isTrue();
+        assertThat(inspection.contains(
+                        "bounds=0.000000000,0.000000000,0.000000000,60.000000000,40.000000000,8.000000000"))
+                .isTrue();
+        assertThat(cli("designer", "inspect", file.toString(), "--point", "30,20,4")
+                        .contains("contains=true"))
+                .isTrue();
         standardView(0);
         modelClick(30, 20, 8);
-        assertTrue(fx(
-                () -> ((Label) workbench.lookup(".selection-title")).getText().startsWith("Face")));
+        assertThat(fx(() ->
+                        ((Label) workbench.lookup(".selection-title")).getText().startsWith("Face")))
+                .isTrue();
         var selectedTree = fx(() -> ((TreeView<?>) node("#model-tree"))
                 .getSelectionModel()
                 .getSelectedItem()
                 .getValue()
                 .toString());
-        assertEquals("Body 1", selectedTree);
+        assertThat(selectedTree).isEqualTo("Body 1");
         var navigationDocument = document();
         var point = new Point3D(60, 40, 8);
         var beforeOrientation =
@@ -6468,21 +6696,24 @@ class WorkbenchUiTest {
         var beforePan = fx(() -> workbench.viewport().modelToScreen(point));
         navigate(false);
         var afterMiddlePan = fx(() -> workbench.viewport().modelToScreen(point));
-        assertEquals(
-                beforeOrientation,
-                fx(() -> workbench.viewport().orientationProperty().get()));
-        assertTrue(beforePan.distance(afterMiddlePan) > 2, "Middle drag pans the view");
+        assertThat(fx(() -> workbench.viewport().orientationProperty().get())).isEqualTo(beforeOrientation);
+        assertThat(beforePan.distance(afterMiddlePan) > 2)
+                .as("Middle drag pans the view")
+                .isTrue();
         navigate(true);
         var afterPan = fx(() -> workbench.viewport().modelToScreen(point));
-        assertTrue(afterMiddlePan.distance(afterPan) > 2, "Right drag pans the view");
+        assertThat(afterMiddlePan.distance(afterPan) > 2)
+                .as("Right drag pans the view")
+                .isTrue();
         fx(() -> {
             robot.mouseWheel(4);
             return null;
         });
         Thread.sleep(250);
-        assertTrue(
-                afterPan.distance(fx(() -> workbench.viewport().modelToScreen(point))) > 2, "Zoom changes projection");
-        assertEquals(navigationDocument, document());
+        assertThat(afterPan.distance(fx(() -> workbench.viewport().modelToScreen(point))) > 2)
+                .as("Zoom changes projection")
+                .isTrue();
+        assertThat(document()).isEqualTo(navigationDocument);
         standardView(1);
         standardView(0);
         click("menu-fit");
@@ -6498,9 +6729,10 @@ class WorkbenchUiTest {
             Screenshot.save(stage.getScene(), artifacts.resolve("workbench-dark.png"));
             return null;
         });
-        assertFalse(Arrays.equals(
-                Files.readAllBytes(artifacts.resolve("workbench-light.png")),
-                Files.readAllBytes(artifacts.resolve("workbench-dark.png"))));
+        assertThat(Arrays.equals(
+                        Files.readAllBytes(artifacts.resolve("workbench-light.png")),
+                        Files.readAllBytes(artifacts.resolve("workbench-dark.png"))))
+                .isFalse();
         Files.copy(file, artifacts.resolve("gui-reference-8mm.vxb"), StandardCopyOption.REPLACE_EXISTING);
         Files.copy(exported, artifacts.resolve("gui-reference.3mf"), StandardCopyOption.REPLACE_EXISTING);
         Files.copy(external, artifacts.resolve("external-provider.txt"), StandardCopyOption.REPLACE_EXISTING);
@@ -6513,26 +6745,29 @@ class WorkbenchUiTest {
         choice("custom-type", 1); // Sorted descriptors: failed fixture, then the spacer.
         text("custom-innerDiameter", "30");
         click("custom-add");
-        assertTrue(document().features().isEmpty());
-        assertTrue(fx(() -> ((Label) node("#custom-error")).getText().contains("innerDiameter")));
-        assertTrue(fx(() -> node("#custom-innerDiameter").getStyleClass().contains("invalid")));
+        assertThat(document().features().isEmpty()).isTrue();
+        assertThat(fx(() -> ((Label) node("#custom-error")).getText().contains("innerDiameter")))
+                .isTrue();
+        assertThat(fx(() -> node("#custom-innerDiameter").getStyleClass().contains("invalid")))
+                .isTrue();
         click("custom-cancel");
-        assertFalse(fx(() -> workbench.controller().snapshot().canUndo()));
+        assertThat(fx(() -> workbench.controller().snapshot().canUndo())).isFalse();
         click("custom-feature");
         choice("custom-type", 1);
         text("custom-height", "5");
         click("custom-add");
         ready();
-        assertEquals(1, document().features().size());
-        assertEquals(Math.PI * 96 * 5, volume(), 0.01);
-        assertTrue(fx(() -> ((Button) node("#history-0")).getText().contains("spacer")));
+        assertThat(document().features().size()).isEqualTo(1);
+        assertThat(volume()).isCloseTo(Math.PI * 96 * 5, org.assertj.core.data.Offset.offset(0.01));
+        assertThat(fx(() -> ((Button) node("#history-0")).getText().contains("spacer")))
+                .isTrue();
         text("dimension-height", "8");
         key(KeyCode.ENTER);
         ready();
-        assertEquals(Math.PI * 96 * 8, volume(), 0.01);
+        assertThat(volume()).isCloseTo(Math.PI * 96 * 8, org.assertj.core.data.Offset.offset(0.01));
         click("undo");
         ready();
-        assertEquals(Math.PI * 96 * 5, volume(), 0.01);
+        assertThat(volume()).isCloseTo(Math.PI * 96 * 5, org.assertj.core.data.Offset.offset(0.01));
         click("redo");
         ready();
         Path file = directory.resolve("GUI spacer.vxb");
@@ -6557,28 +6792,29 @@ class WorkbenchUiTest {
         text("file-path", file.toString());
         click("file-confirm");
         ready();
-        assertFalse(fx(() -> workbench.controller().build().valid()));
-        assertEquals(0, volume(), 0);
+        assertThat(fx(() -> workbench.controller().build().valid())).isFalse();
+        assertThat(volume()).isCloseTo(0, org.assertj.core.data.Offset.offset(0.0));
         assertDesignRejectsMeshExport("Rebuild failed");
         click("save");
         ready();
-        assertEquals(before, DocumentReader.load(file));
+        assertThat(DocumentReader.load(file)).isEqualTo(before);
         Files.copy(Path.of(System.getProperty("voxelbrew.test.plugin")), jar);
         click("history-0");
         click("custom-rebuild");
         ready();
-        assertTrue(fx(() -> workbench.controller().canExport()));
-        assertEquals(Math.PI * 96 * 8, volume(), 0.01);
-        assertEquals(before, document());
+        assertThat(fx(() -> workbench.controller().canExport())).isTrue();
+        assertThat(volume()).isCloseTo(Math.PI * 96 * 8, org.assertj.core.data.Offset.offset(0.01));
+        assertThat(document()).isEqualTo(before);
         Path exported = directory.resolve("GUI spacer.3mf");
         click("export");
         chooseExporter("3mf");
         text("export-path", exported.toString());
         click("export-confirm");
         ready();
-        assertTrue(Files.size(exported) > 500);
-        assertTrue(cli("designer", "inspect", file.toString(), "--point", "0,0,4", "--plugin-dir", plugins.toString())
-                .contains("contains=false"));
+        assertThat(Files.size(exported) > 500).isTrue();
+        assertThat(cli("designer", "inspect", file.toString(), "--point", "0,0,4", "--plugin-dir", plugins.toString())
+                        .contains("contains=false"))
+                .isTrue();
         fx(() -> {
             Screenshot.save(
                     stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "custom-spacer.png"));
@@ -6589,8 +6825,8 @@ class WorkbenchUiTest {
     private void assertOrbit(ViewOrientation expected, String message) throws Exception {
         var actual = fx(() -> workbench.viewport().orientationProperty().get());
         // Native mouse coordinates can accumulate sub-pixel floating-point rounding.
-        assertEquals(expected.tilt(), actual.tilt(), 1e-9, message + " (tilt)");
-        assertEquals(expected.orbit(), actual.orbit(), 1e-9, message + " (orbit)");
+        assertThat(actual.tilt()).isCloseTo(expected.tilt(), org.assertj.core.data.Offset.offset(1e-9));
+        assertThat(actual.orbit()).isCloseTo(expected.orbit(), org.assertj.core.data.Offset.offset(1e-9));
     }
 
     private void primaryDrag(Point2D start, double dx, double dy) throws Exception {
@@ -6647,11 +6883,11 @@ class WorkbenchUiTest {
         text("extrude-distance", "-3");
         key(KeyCode.ENTER);
         ready();
-        assertEquals(2, document().features().size());
+        assertThat(document().features().size()).isEqualTo(2);
         try (var evaluation = Evaluator.evaluate(document())) {
             var bounds = evaluation.bodies().getFirst().solid().bounds();
-            assertEquals(9, bounds.minZ(), 0.001);
-            assertEquals(12, bounds.maxZ(), 0.001);
+            assertThat(bounds.minZ()).isCloseTo(9, org.assertj.core.data.Offset.offset(0.001));
+            assertThat(bounds.maxZ()).isCloseTo(12, org.assertj.core.data.Offset.offset(0.001));
         }
         click("undo");
         ready();
@@ -6661,7 +6897,7 @@ class WorkbenchUiTest {
         var before = document();
         fx(() -> {
             var point = workbench.viewport().handleScreenPosition();
-            assertNotNull(point);
+            assertThat(point).isNotNull();
             robot.mouseMove(point);
             robot.mousePress(MouseButton.PRIMARY);
             robot.mouseMove(point.getX(), point.getY() - 60);
@@ -6674,8 +6910,8 @@ class WorkbenchUiTest {
             return null;
         });
         ready();
-        assertEquals(before, document());
-        assertFalse(fx(() -> workbench.controller().hasPreview()));
+        assertThat(document()).isEqualTo(before);
+        assertThat(fx(() -> workbench.controller().hasPreview())).isFalse();
         click("history-0");
         click("extrude");
         ready();
@@ -6697,14 +6933,15 @@ class WorkbenchUiTest {
             return null;
         });
         ready();
-        assertEquals(2, document().features().size());
-        assertTrue(((Feature.Extrude) document().features().getLast()).distance() > 5);
+        assertThat(document().features().size()).isEqualTo(2);
+        assertThat(((Feature.Extrude) document().features().getLast()).distance() > 5)
+                .isTrue();
         click("undo");
         ready();
-        assertEquals(1, document().features().size());
+        assertThat(document().features().size()).isEqualTo(1);
         click("redo");
         ready();
-        assertEquals(2, document().features().size());
+        assertThat(document().features().size()).isEqualTo(2);
     }
 
     @Test
@@ -6713,8 +6950,9 @@ class WorkbenchUiTest {
         var original = document();
         text("dimension-offsetZ", "NaN");
         key(KeyCode.ENTER);
-        assertEquals(original, document());
-        assertTrue(fx(() -> ((Label) node("#tool-error")).getText().contains("finite")));
+        assertThat(document()).isEqualTo(original);
+        assertThat(fx(() -> ((Label) node("#tool-error")).getText().contains("finite")))
+                .isTrue();
         var sketch = (Feature.Sketch) original.features().getFirst();
         var broken = new CadDocument(
                 "broken", List.of(sketch, new Feature.Extrude("bad", new Feature.ProfileRef("missing", "none"), 8)), 2);
@@ -6727,20 +6965,22 @@ class WorkbenchUiTest {
         text("file-path", file.toString());
         click("file-confirm");
         ready();
-        assertFalse(fx(() -> workbench.controller().build().valid()));
-        assertTrue(fx(() -> workbench.controller().build().bodies().isEmpty()));
+        assertThat(fx(() -> workbench.controller().build().valid())).isFalse();
+        assertThat(fx(() -> workbench.controller().build().bodies().isEmpty())).isTrue();
         click("history-1");
-        assertFalse(fx(() -> ((javafx.scene.layout.VBox) node("#feature-diagnostics"))
-                .getChildren()
-                .isEmpty()));
+        assertThat(fx(() -> ((javafx.scene.layout.VBox) node("#feature-diagnostics"))
+                        .getChildren()
+                        .isEmpty()))
+                .isFalse();
         choice("repair-sketch", 0);
         click("repair");
         ready();
-        assertEquals(19200, volume(), 0.01);
-        assertEquals("bad", document().features().getLast().id());
-        assertTrue(fx(() -> ((javafx.scene.layout.VBox) node("#feature-diagnostics"))
-                .getChildren()
-                .isEmpty()));
+        assertThat(volume()).isCloseTo(19200, org.assertj.core.data.Offset.offset(0.01));
+        assertThat(document().features().getLast().id()).isEqualTo("bad");
+        assertThat(fx(() -> ((javafx.scene.layout.VBox) node("#feature-diagnostics"))
+                        .getChildren()
+                        .isEmpty()))
+                .isTrue();
     }
 
     @Test
@@ -6750,21 +6990,22 @@ class WorkbenchUiTest {
         click("choose-plane-xy");
         sketchReady();
         key(KeyCode.M);
-        assertEquals("", fx(() -> ((TextField) node("#sketch-type-search")).getText()));
+        assertThat(fx(() -> ((TextField) node("#sketch-type-search")).getText()))
+                .isEqualTo("");
         text("sketch-type-search", "CiRcLe");
-        assertEquals(
-                5,
-                fx(() -> ((ListView<?>) node("#sketch-type-results")).getItems().size()));
+        assertThat(fx(() ->
+                        ((ListView<?>) node("#sketch-type-results")).getItems().size()))
+                .isEqualTo(5);
         text("sketch-type-search", "no such tool");
-        assertTrue(fx(() -> node("#sketch-type-confirm").isDisabled()));
+        assertThat(fx(() -> node("#sketch-type-confirm").isDisabled())).isTrue();
         key(KeyCode.ESCAPE);
-        assertTrue(sketchGeometry().entities().isEmpty());
+        assertThat(sketchGeometry().entities().isEmpty()).isTrue();
         click("sketch-create-type");
         text("sketch-type-search", "2-point rectangle");
         key(KeyCode.ENTER);
         sketchNumericPoint(0, 0);
         sketchNumericPoint(60, 40);
-        assertEquals(4, sketchGeometry().entities().size());
+        assertThat(sketchGeometry().entities().size()).isEqualTo(4);
         click("constraint-cancel");
         ready();
     }
@@ -6780,27 +7021,37 @@ class WorkbenchUiTest {
                         .filter(value -> id.equals(value.getId()))
                         .findFirst()
                         .orElseThrow();
-                assertEquals(KeyboardShortcuts.primary(id), item.getAccelerator(), "Visible operation shortcut: " + id);
-                assertNotNull(node("#" + id));
+                assertThat(item.getAccelerator())
+                        .as("Visible operation shortcut: " + id)
+                        .isEqualTo(KeyboardShortcuts.primary(id));
+                assertThat(node("#" + id)).isNotNull();
             }
             return null;
         });
         key(KeyCode.ESCAPE);
         click("menu-fit");
         key(KeyCode.E);
-        assertNull(fx(() -> workbench.lookup("#extrude-distance")), "Disabled extrusion stays unavailable");
+        assertThat(fx(() -> workbench.lookup("#extrude-distance")))
+                .as("Disabled extrusion stays unavailable")
+                .isNull();
         shortcut(KeyCode.E, false);
-        assertTrue(fx(workbench::isDisabled), "An empty design can still use document exporters");
-        assertNotNull(fx(() -> node("#export-format")));
+        assertThat(fx(workbench::isDisabled))
+                .as("An empty design can still use document exporters")
+                .isTrue();
+        assertThat(fx(() -> node("#export-format"))).isNotNull();
         key(KeyCode.ESCAPE);
-        assertFalse(fx(workbench::isDisabled), "Cancelling export restores the workbench");
-        assertNull(fx(() -> workbench.lookup("#rectangle")));
-        assertNull(fx(() -> workbench.lookup("#circle")));
+        assertThat(fx(workbench::isDisabled))
+                .as("Cancelling export restores the workbench")
+                .isFalse();
+        assertThat(fx(() -> workbench.lookup("#rectangle"))).isNull();
+        assertThat(fx(() -> workbench.lookup("#circle"))).isNull();
         var empty = fx(() -> workbench.controller().snapshot());
         key(KeyCode.R);
         key(KeyCode.C);
-        assertEquals(empty, fx(() -> workbench.controller().snapshot()));
-        assertFalse(fx(workbench::isDisabled), "R/C cannot open a standalone design tool");
+        assertThat(fx(() -> workbench.controller().snapshot())).isEqualTo(empty);
+        assertThat(fx(workbench::isDisabled))
+                .as("R/C cannot open a standalone design tool")
+                .isFalse();
         key(KeyCode.K);
         click("choose-plane-xy");
         sketchReady();
@@ -6814,36 +7065,40 @@ class WorkbenchUiTest {
         sketchNumericPoint(60, 40);
         click("constraint-finish");
         ready();
-        assertEquals(1, document().features().size());
+        assertThat(document().features().size()).isEqualTo(1);
         var rectangle = document();
         text("dimension-offsetZ", "=30+30");
         shortcut(KeyCode.Z, false);
-        assertEquals(rectangle, document(), "Typing undo must not remove a CAD feature");
-        assertNotEquals("=30+30", fx(() -> ((TextField) node("#dimension-offsetZ")).getText()));
+        assertThat(document()).as("Typing undo must not remove a CAD feature").isEqualTo(rectangle);
+        assertThat(fx(() -> ((TextField) node("#dimension-offsetZ")).getText())).isNotEqualTo("=30+30");
         shortcut(KeyCode.Y, false);
-        assertEquals("=30+30", fx(() -> ((TextField) node("#dimension-offsetZ")).getText()));
+        assertThat(fx(() -> ((TextField) node("#dimension-offsetZ")).getText())).isEqualTo("=30+30");
         text("dimension-offsetZ", "circle");
-        assertNull(fx(() -> workbench.lookup("#sketch-diameter")), "Letters stay in the field");
+        assertThat(fx(() -> workbench.lookup("#sketch-diameter")))
+                .as("Letters stay in the field")
+                .isNull();
         text("dimension-offsetZ", "0");
         click("menu-fit");
         key(KeyCode.E);
-        assertNotNull(fx(() -> node("#extrude-distance")));
+        assertThat(fx(() -> node("#extrude-distance"))).isNotNull();
         key(KeyCode.ESCAPE);
-        assertEquals(rectangle, document(), "Cancelled extrusion creates no history entry");
+        assertThat(document())
+                .as("Cancelled extrusion creates no history entry")
+                .isEqualTo(rectangle);
         click("menu-fit");
         key(KeyCode.E);
         text("extrude-distance", "-5");
         key(KeyCode.ENTER);
         ready();
-        assertEquals(2, document().features().size());
-        assertEquals(12000, volume(), .01);
+        assertThat(document().features().size()).isEqualTo(2);
+        assertThat(volume()).isCloseTo(12000, org.assertj.core.data.Offset.offset(.01));
         click("menu-fit");
         shortcut(KeyCode.Z, false);
         ready();
-        assertEquals(1, document().features().size());
+        assertThat(document().features().size()).isEqualTo(1);
         shortcut(KeyCode.Z, true);
         ready();
-        assertEquals(2, document().features().size());
+        assertThat(document().features().size()).isEqualTo(2);
         var part = document();
         for (var entry : Map.of(
                         KeyCode.DIGIT0,
@@ -6862,61 +7117,62 @@ class WorkbenchUiTest {
                         "Bottom")
                 .entrySet()) {
             key(entry.getKey());
-            assertEquals(
-                    entry.getValue(),
-                    fx(() -> workbench.viewport().orientationProperty().get().name()));
+            assertThat(fx(() -> workbench.viewport().orientationProperty().get().name()))
+                    .isEqualTo(entry.getValue());
         }
         key(KeyCode.F);
-        assertEquals(part, document(), "Navigation must not edit the document");
+        assertThat(document()).as("Navigation must not edit the document").isEqualTo(part);
         save(directory.resolve("keyboard-workspace.vxb"));
         shortcut(KeyCode.DIGIT2, false);
-        assertEquals(
-                "workspace-print",
-                fx(() -> ((TabPane) node("#workspaces"))
+        assertThat(fx(() -> ((TabPane) node("#workspaces"))
                         .getSelectionModel()
                         .getSelectedItem()
-                        .getId()));
+                        .getId()))
+                .isEqualTo("workspace-print");
         key(KeyCode.K);
-        assertNull(fx(() -> stage.getScene().lookup("#sketch-editor")), "Design tools are inactive in Print");
+        assertThat(fx(() -> stage.getScene().lookup("#sketch-editor")))
+                .as("Design tools are inactive in Print")
+                .isNull();
         shortcut(KeyCode.DIGIT1, false);
         shortcut(KeyCode.P, true);
-        assertNotNull(fx(() -> node("#parameters-cancel")));
+        assertThat(fx(() -> node("#parameters-cancel"))).isNotNull();
         shortcut(KeyCode.N, false);
-        assertEquals(part, document());
+        assertThat(document()).isEqualTo(part);
         click("parameters-cancel");
         shortcut(KeyCode.E, false);
-        assertNotNull(fx(() -> node("#export-format")));
+        assertThat(fx(() -> node("#export-format"))).isNotNull();
         key(KeyCode.ESCAPE);
         click("menu-fit");
         key(KeyCode.K);
         click("choose-plane-xy");
         sketchReady();
-        assertNull(fx(() -> stage.getScene().lookup("#constraint-plane")));
+        assertThat(fx(() -> stage.getScene().lookup("#constraint-plane"))).isNull();
         key(KeyCode.R);
         sketchClick(0, 0, false);
         sketchClick(20, 10, false);
         sketchReady();
-        assertEquals(4, sketchGeometry().entities().size());
+        assertThat(sketchGeometry().entities().size()).isEqualTo(4);
         shortcut(KeyCode.Z, false);
         sketchReady();
-        assertTrue(sketchGeometry().entities().isEmpty());
+        assertThat(sketchGeometry().entities().isEmpty()).isTrue();
         shortcut(KeyCode.Y, false);
         sketchReady();
-        assertEquals(4, sketchGeometry().entities().size());
-        assertEquals(part, document(), "Sketch undo/redo stays in the draft");
+        assertThat(sketchGeometry().entities().size()).isEqualTo(4);
+        assertThat(document()).as("Sketch undo/redo stays in the draft").isEqualTo(part);
         int constraints = sketchGeometry().constraints().size();
-        assertTrue(constraints > 0);
+        assertThat(constraints > 0).isTrue();
         click("sketch-constraints");
         key(KeyCode.HOME);
         key(KeyCode.DELETE);
         sketchReady();
-        assertEquals(
-                constraints - 1, sketchGeometry().constraints().size(), "Delete works on the focused constraint list");
+        assertThat(sketchGeometry().constraints().size())
+                .as("Delete works on the focused constraint list")
+                .isEqualTo(constraints - 1);
         shortcut(KeyCode.Z, false);
         sketchReady();
-        assertEquals(constraints, sketchGeometry().constraints().size());
+        assertThat(sketchGeometry().constraints().size()).isEqualTo(constraints);
         openShortcutHelp();
-        assertNotNull(fx(() -> node("#keyboard-shortcuts-list")));
+        assertThat(fx(() -> node("#keyboard-shortcuts-list"))).isNotNull();
         fx(() -> {
             Screenshot.save(
                     stage.getScene(),
@@ -6924,23 +7180,29 @@ class WorkbenchUiTest {
             return null;
         });
         shortcut(KeyCode.ENTER, false);
-        assertEquals(part, document(), "Help overlay blocks finish-sketch");
+        assertThat(document()).as("Help overlay blocks finish-sketch").isEqualTo(part);
         closeShortcutHelp();
         shortcut(KeyCode.ENTER, false);
         ready();
-        assertEquals(3, document().features().size(), "Finish sketch commits exactly one operation");
+        assertThat(document().features().size())
+                .as("Finish sketch commits exactly one operation")
+                .isEqualTo(3);
         click("menu-fit");
         shortcut(KeyCode.Z, false);
         ready();
-        assertEquals(part, document());
+        assertThat(document()).isEqualTo(part);
         click("history-cursor");
         key(KeyCode.HOME);
         ready();
-        assertEquals(0, document().cursor());
+        assertThat(document().cursor()).isEqualTo(0);
         key(KeyCode.K);
-        assertNull(fx(() -> stage.getScene().lookup("#sketch-editor")), "Rollback blocks new features");
+        assertThat(fx(() -> stage.getScene().lookup("#sketch-editor")))
+                .as("Rollback blocks new features")
+                .isNull();
         shortcut(KeyCode.E, false);
-        assertNotNull(fx(() -> node("#export-format")), "Rollback still allows document exporters");
+        assertThat(fx(() -> node("#export-format")))
+                .as("Rollback still allows document exporters")
+                .isNotNull();
         key(KeyCode.ESCAPE);
         assertDesignRejectsMeshExport("Return timeline cursor to the end");
         fx(() -> {
@@ -6949,7 +7211,7 @@ class WorkbenchUiTest {
         });
         key(KeyCode.END);
         ready();
-        assertEquals(part, document());
+        assertThat(document()).isEqualTo(part);
         choice("appearance", 2);
         openShortcutHelp();
         fx(() -> {
@@ -6974,32 +7236,33 @@ class WorkbenchUiTest {
             button.getScene().getRoot().applyCss();
             button.getScene().getRoot().layout();
             var caption = (javafx.scene.layout.HBox) button.lookup(".shortcut-caption");
-            assertNotNull(caption, id);
+            assertThat(caption).as(id).isNotNull();
             var fragments = caption.getChildren().stream()
                     .map(javafx.scene.text.Text.class::cast)
                     .toList();
-            assertEquals(
-                    expected,
-                    fragments.stream()
+            assertThat(fragments.stream()
                             .map(javafx.scene.text.Text::getText)
-                            .collect(java.util.stream.Collectors.joining()),
-                    id);
+                            .collect(java.util.stream.Collectors.joining()))
+                    .as(id)
+                    .isEqualTo(expected);
             var marked = fragments.stream()
                     .filter(javafx.scene.text.Text::isUnderline)
                     .toList();
-            assertEquals(1, marked.size(), id);
-            assertEquals(letter, marked.getFirst().getText(), id);
-            assertEquals(button.getTextFill(), marked.getFirst().getFill(), id);
-            assertEquals(button.getFont(), marked.getFirst().getFont(), id);
-            assertFalse(button.isMnemonicParsing(), "Do not register unrelated Alt mnemonics");
+            assertThat(marked.size()).as(id).isEqualTo(1);
+            assertThat(marked.getFirst().getText()).as(id).isEqualTo(letter);
+            assertThat(marked.getFirst().getFill()).as(id).isEqualTo(button.getTextFill());
+            assertThat(marked.getFirst().getFont()).as(id).isEqualTo(button.getFont());
+            assertThat(button.isMnemonicParsing())
+                    .as("Do not register unrelated Alt mnemonics")
+                    .isFalse();
             var bounds = button.localToScene(button.getLayoutBounds());
             var textBounds = caption.localToScene(caption.getLayoutBounds());
-            assertTrue(
-                    textBounds.getMinX() >= bounds.getMinX() - 1 && textBounds.getMaxX() <= bounds.getMaxX() + 1,
-                    "Full caption fits: " + id);
-            assertTrue(
-                    textBounds.getMinY() >= bounds.getMinY() - 1 && textBounds.getMaxY() <= bounds.getMaxY() + 1,
-                    "Caption height fits: " + id);
+            assertThat(textBounds.getMinX() >= bounds.getMinX() - 1 && textBounds.getMaxX() <= bounds.getMaxX() + 1)
+                    .as("Full caption fits: " + id)
+                    .isTrue();
+            assertThat(textBounds.getMinY() >= bounds.getMinY() - 1 && textBounds.getMaxY() <= bounds.getMaxY() + 1)
+                    .as("Caption height fits: " + id)
+                    .isTrue();
             return null;
         });
     }
@@ -7022,29 +7285,28 @@ class WorkbenchUiTest {
         key(KeyCode.ENTER);
         ready();
         var original = document();
-        assertTrue(fx(() -> stage.getTitle().startsWith("●")));
+        assertThat(fx(() -> stage.getTitle().startsWith("●"))).isTrue();
         click("new");
         click("unsaved-cancel");
-        assertEquals(original, document());
+        assertThat(document()).isEqualTo(original);
         Path file = directory.resolve("Save As ~ design.vxb");
         shortcut(KeyCode.S, true);
         text("file-path", file.toString());
         click("file-confirm");
         ready();
-        assertFalse(fx(() -> workbench.controller().dirty()));
+        assertThat(fx(() -> workbench.controller().dirty())).isFalse();
         text("dimension-offsetZ", "1");
         key(KeyCode.ENTER);
         ready();
-        assertTrue(fx(() -> workbench.controller().dirty()));
+        assertThat(fx(() -> workbench.controller().dirty())).isTrue();
         shortcut(KeyCode.N, false);
         click("unsaved-save");
         ready();
-        assertTrue(document().features().isEmpty());
-        assertEquals(
-                1,
-                ((Feature.Sketch) DocumentReader.load(file).features().getFirst())
+        assertThat(document().features().isEmpty()).isTrue();
+        assertThat(((Feature.Sketch) DocumentReader.load(file).features().getFirst())
                         .plane()
-                        .offsetZ());
+                        .offsetZ())
+                .isEqualTo(1);
         shortcut(KeyCode.O, false);
         text("file-path", file.toString());
         click("file-confirm");
@@ -7056,12 +7318,11 @@ class WorkbenchUiTest {
         click("new");
         click("unsaved-discard");
         ready();
-        assertTrue(document().features().isEmpty());
-        assertEquals(
-                1,
-                ((Feature.Sketch) DocumentReader.load(file).features().getFirst())
+        assertThat(document().features().isEmpty()).isTrue();
+        assertThat(((Feature.Sketch) DocumentReader.load(file).features().getFirst())
                         .plane()
-                        .offsetZ());
+                        .offsetZ())
+                .isEqualTo(1);
     }
 
     @Test
@@ -7071,19 +7332,22 @@ class WorkbenchUiTest {
         click("workspace-design");
         key(KeyCode.F1);
         Thread.sleep(500);
-        assertTrue(fx(() -> ((Label) node("#context-help-content")).getText().contains("Create a sketch")));
+        assertThat(fx(() -> ((Label) node("#context-help-content")).getText().contains("Create a sketch")))
+                .isTrue();
         key(KeyCode.ESCAPE);
-        assertTrue(fx(() -> ((TabPane) node("#workspaces"))
-                .getTabs().stream()
-                        .filter(tab -> tab.getId().equals("workspace-print"))
-                        .findFirst()
-                        .orElseThrow()
-                        .isDisable()));
-        assertTrue(fx(() -> ((TabPane) node("#workspaces"))
-                .getSelectionModel()
-                .getSelectedItem()
-                .getId()
-                .equals("workspace-design")));
+        assertThat(fx(() -> ((TabPane) node("#workspaces"))
+                        .getTabs().stream()
+                                .filter(tab -> tab.getId().equals("workspace-print"))
+                                .findFirst()
+                                .orElseThrow()
+                                .isDisable()))
+                .isTrue();
+        assertThat(fx(() -> ((TabPane) node("#workspaces"))
+                        .getSelectionModel()
+                        .getSelectedItem()
+                        .getId()
+                        .equals("workspace-design")))
+                .isTrue();
         openPrepared("rectangle-0.vxb");
         click("extrude");
         ready();
@@ -7098,27 +7362,31 @@ class WorkbenchUiTest {
         text("split-offset", "30");
         click("split-confirm");
         ready();
-        assertEquals(2, fx(() -> workbench.controller().build().bodies().size()));
-        assertEquals(19099.469035085127, volume(), .01);
+        assertThat(fx(() -> workbench.controller().build().bodies().size())).isEqualTo(2);
+        assertThat(volume()).isCloseTo(19099.469035085127, org.assertj.core.data.Offset.offset(.01));
         click("undo");
         ready();
-        assertEquals(1, fx(() -> workbench.controller().build().bodies().size()));
+        assertThat(fx(() -> workbench.controller().build().bodies().size())).isEqualTo(1);
         choice("appearance", 2);
         click("workspace-print");
         ready();
-        assertFalse(fx(() -> workbench.controller().dirty()));
-        assertTrue(fx(() -> node("#print-instance").isDisabled()));
-        assertTrue(fx(() -> workbench.lookup("#print-support-instance").isDisabled()));
-        assertTrue(fx(() -> workbench.lookup("#print-support-id").isDisabled()));
-        assertEquals("Body 1", fx(() -> {
-            var choice = (ComboBox<String>) node("#print-body");
-            return choice.getConverter().toString(choice.getValue());
-        }));
+        assertThat(fx(() -> workbench.controller().dirty())).isFalse();
+        assertThat(fx(() -> node("#print-instance").isDisabled())).isTrue();
+        assertThat(fx(() -> workbench.lookup("#print-support-instance").isDisabled()))
+                .isTrue();
+        assertThat(fx(() -> workbench.lookup("#print-support-id").isDisabled())).isTrue();
+        assertThat(fx(() -> {
+                    var choice = (ComboBox<String>) node("#print-body");
+                    return choice.getConverter().toString(choice.getValue());
+                }))
+                .isEqualTo("Body 1");
         key(KeyCode.F1);
-        assertTrue(fx(() -> ((Label) node("#context-help-content")).getText().contains("Add a CAD body")));
+        assertThat(fx(() -> ((Label) node("#context-help-content")).getText().contains("Add a CAD body")))
+                .isTrue();
         key(KeyCode.ESCAPE);
         click("print-view-3d");
-        assertTrue(fx(() -> ((RadioButton) node("#print-view-3d")).isSelected()));
+        assertThat(fx(() -> ((RadioButton) node("#print-view-3d")).isSelected()))
+                .isTrue();
         var plateCaption = centerOf("print-plate-size");
         fx(() -> {
             robot.mouseMove(plateCaption);
@@ -7135,28 +7403,25 @@ class WorkbenchUiTest {
         text("print-bed-depth", "220");
         key(KeyCode.ENTER);
         ready();
-        assertEquals(
-                250,
-                PrintProfile.resolve(document().printSetup())
+        assertThat(PrintProfile.resolve(document().printSetup())
                         .printer()
                         .bed()
                         .get(2)
-                        .x());
-        assertEquals(
-                220,
-                PrintProfile.resolve(document().printSetup())
+                        .x())
+                .isEqualTo(250);
+        assertThat(PrintProfile.resolve(document().printSetup())
                         .printer()
                         .bed()
                         .get(2)
-                        .y());
+                        .y())
+                .isEqualTo(220);
         click("print-view-2d");
         click("print-add");
         ready();
         click("print-view-3d");
         fx(() -> {
-            assertEquals(
-                    "Body 1",
-                    ((ComboBox<?>) node("#print-body")).getButtonCell().getText());
+            assertThat(((ComboBox<?>) node("#print-body")).getButtonCell().getText())
+                    .isEqualTo("Body 1");
             Screenshot.save(
                     stage.getScene(),
                     Path.of(System.getProperty("voxelbrew.ui.artifacts"), "printing-3d-placement.png"));
@@ -7170,31 +7435,30 @@ class WorkbenchUiTest {
         ready();
         click("print-add");
         ready();
-        assertEquals(2, document().printSetup().instances().size());
+        assertThat(document().printSetup().instances().size()).isEqualTo(2);
         click("print-remove");
         ready();
-        assertEquals(1, document().printSetup().instances().size());
+        assertThat(document().printSetup().instances().size()).isEqualTo(1);
         click("print-tab-process");
         choice("print-material", 1);
         click("print-tab-job");
         ready();
-        assertEquals("PETG", document().printSetup().materialId());
+        assertThat(document().printSetup().materialId()).isEqualTo("PETG");
         Path file = directory.resolve("GUI print setup.vxb");
         save(file);
         click("open");
         text("file-path", file.toString());
         click("file-confirm");
         ready();
-        assertEquals(DocumentReader.load(file), document());
+        assertThat(document()).isEqualTo(DocumentReader.load(file));
         click("workspace-print");
         click("print-tab-job");
-        assertEquals(
-                250,
-                PrintProfile.resolve(document().printSetup())
+        assertThat(PrintProfile.resolve(document().printSetup())
                         .printer()
                         .bed()
                         .get(2)
-                        .x());
+                        .x())
+                .isEqualTo(250);
         Path job = directory.resolve("GUI printer job.gcode");
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
         while (fx(() -> node("#print-slice").isDisabled()) && System.nanoTime() < deadline) Thread.sleep(25);
@@ -7202,10 +7466,9 @@ class WorkbenchUiTest {
         deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(45);
         while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().running()) && System.nanoTime() < deadline)
             Thread.sleep(25);
-        assertEquals(
-                PrintController.State.SUCCEEDED,
-                fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()),
-                fx(() -> ((Label) node("#print-status")).getText()));
+        assertThat(fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()))
+                .as(fx(() -> ((Label) node("#print-status")).getText()))
+                .isEqualTo(PrintController.State.SUCCEEDED);
         try (var registry = java.util.ServiceLoader.load(dev.voxelbrew.api.exporter.ExporterProviderRegistry.class)
                 .findFirst()
                 .orElseThrow()
@@ -7218,8 +7481,8 @@ class WorkbenchUiTest {
                     .get(20, TimeUnit.SECONDS);
         }
         var actual = GcodeReader.read(job);
-        assertEquals(40, actual.modelLayers().size());
-        assertEquals("PETG", actual.report().get("material"));
+        assertThat(actual.modelLayers().size()).isEqualTo(40);
+        assertThat(actual.report().get("material")).isEqualTo("PETG");
         click("print-layer");
         key(KeyCode.END);
         click("print-legend");
@@ -7239,7 +7502,7 @@ class WorkbenchUiTest {
             return null;
         });
         Path cliJob = directory.resolve("CLI printer job.gcode");
-        assertTrue(cli("slicer", "validate", file.toString()).contains("VALID"));
+        assertThat(cli("slicer", "validate", file.toString()).contains("VALID")).isTrue();
         cli(
                 "slicer",
                 "job",
@@ -7249,7 +7512,7 @@ class WorkbenchUiTest {
                 cliJob.toString(),
                 "--slicer",
                 PrusaSlicerBackend.defaultExecutable().toString());
-        assertEquals(actual.segments(), GcodeReader.read(cliJob).segments());
+        assertThat(GcodeReader.read(cliJob).segments()).isEqualTo(actual.segments());
         Files.copy(file, evidence.resolve("GUI print setup.vxb"), StandardCopyOption.REPLACE_EXISTING);
         Files.copy(job, evidence.resolve("GUI printer job.gcode"), StandardCopyOption.REPLACE_EXISTING);
         click("print-tab-job");
@@ -7258,10 +7521,10 @@ class WorkbenchUiTest {
         text("print-layer-height", "0.3");
         click("print-tab-job");
         ready();
-        assertEquals(
-                PrintController.State.IDLE,
-                fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()));
-        assertNull(fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().result()));
+        assertThat(fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()))
+                .isEqualTo(PrintController.State.IDLE);
+        assertThat(fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().result()))
+                .isNull();
     }
 
     @Test
@@ -7288,12 +7551,14 @@ class WorkbenchUiTest {
         click("file-confirm");
         ready();
         String error = fx(() -> ((Label) node("#status")).getText());
-        assertTrue(error.contains("VoxelBrew 65534.65534.65534"), error);
-        assertTrue(error.contains("supported version " + Version.version()), error);
-        assertTrue(error.contains("Update VoxelBrew"), error);
-        assertEquals(before, document());
-        assertEquals(file.toAbsolutePath(), fx(() -> workbench.controller().path()));
-        assertFalse(fx(() -> workbench.controller().dirty()));
+        assertThat(error.contains("VoxelBrew 65534.65534.65534")).as(error).isTrue();
+        assertThat(error.contains("supported version " + Version.version()))
+                .as(error)
+                .isTrue();
+        assertThat(error.contains("Update VoxelBrew")).as(error).isTrue();
+        assertThat(document()).isEqualTo(before);
+        assertThat(fx(() -> workbench.controller().path())).isEqualTo(file.toAbsolutePath());
+        assertThat(fx(() -> workbench.controller().dirty())).isFalse();
     }
 
     private static byte[] versionedDocument(DocumentProto.Document document, String version) throws Exception {
@@ -7321,9 +7586,9 @@ class WorkbenchUiTest {
                 .redirectErrorStream(true)
                 .redirectOutput(log.toFile())
                 .start();
-        assertTrue(process.waitFor(30, TimeUnit.SECONDS));
+        assertThat(process.waitFor(30, TimeUnit.SECONDS)).isTrue();
         String output = Files.readString(log);
-        assertEquals(0, process.exitValue(), output);
+        assertThat(process.exitValue()).as(output).isEqualTo(0);
         return output;
     }
 }

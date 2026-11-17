@@ -1,6 +1,6 @@
 package dev.voxelbrew.exporter;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.CadDocument;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
@@ -27,28 +27,30 @@ class DocumentWriterTest {
         var fingerprint = DocumentCodec.fingerprint(document);
         Path first = directory.resolve("first.vxb");
         DocumentWriter.save(document, first, false);
-        assertEquals("first", document.parameters().text("=$vb.project.name"));
-        assertEquals("first.vxb", document.parameters().text("=$vb.project.filename"));
-        assertEquals(first.toAbsolutePath().toString(), document.parameters().text("=$vb.project.path"));
-        assertEquals(
-                directory.toAbsolutePath().toString(), document.parameters().text("=$vb.project.folder"));
-        assertEquals(1, document.parameters().builtins().fileVersion());
-        assertThrows(IOException.class, () -> DocumentWriter.save(document, first, false));
-        assertEquals(1, document.parameters().builtins().fileVersion());
+        assertThat(document.parameters().text("=$vb.project.name")).isEqualTo("first");
+        assertThat(document.parameters().text("=$vb.project.filename")).isEqualTo("first.vxb");
+        assertThat(document.parameters().text("=$vb.project.path"))
+                .isEqualTo(first.toAbsolutePath().toString());
+        assertThat(document.parameters().text("=$vb.project.folder"))
+                .isEqualTo(directory.toAbsolutePath().toString());
+        assertThat(document.parameters().builtins().fileVersion()).isEqualTo(1);
+        assertThatThrownBy(() -> DocumentWriter.save(document, first, false)).isInstanceOf(IOException.class);
+        assertThat(document.parameters().builtins().fileVersion()).isEqualTo(1);
         var reopened = DocumentReader.load(first);
-        assertEquals(1, reopened.parameters().builtins().fileVersion());
-        assertEquals("first", reopened.parameters().text("=$vb.project.name"));
+        assertThat(reopened.parameters().builtins().fileVersion()).isEqualTo(1);
+        assertThat(reopened.parameters().text("=$vb.project.name")).isEqualTo("first");
         Path existing = directory.resolve("existing.vxb");
         DocumentWriter.save(CadDocument.empty(), existing, false);
-        assertThrows(IOException.class, () -> DocumentWriter.save(reopened, existing, false));
-        assertEquals("first", reopened.parameters().text("=$vb.project.name"));
+        assertThatThrownBy(() -> DocumentWriter.save(reopened, existing, false)).isInstanceOf(IOException.class);
+        assertThat(reopened.parameters().text("=$vb.project.name")).isEqualTo("first");
         DocumentWriter.save(reopened, directory.resolve("copy.vxb"), false);
-        assertEquals("copy", reopened.parameters().text("=$vb.project.name"));
-        assertEquals(
-                "copy",
-                DocumentReader.load(directory.resolve("copy.vxb")).parameters().text("=$vb.project.name"));
-        assertEquals(2, reopened.parameters().builtins().fileVersion());
-        assertEquals(fingerprint, DocumentCodec.fingerprint(reopened));
+        assertThat(reopened.parameters().text("=$vb.project.name")).isEqualTo("copy");
+        assertThat(DocumentReader.load(directory.resolve("copy.vxb"))
+                        .parameters()
+                        .text("=$vb.project.name"))
+                .isEqualTo("copy");
+        assertThat(reopened.parameters().builtins().fileVersion()).isEqualTo(2);
+        assertThat(DocumentCodec.fingerprint(reopened)).isEqualTo(fingerprint);
     }
 
     @Test
@@ -57,9 +59,8 @@ class DocumentWriterTest {
         try (var input = getClass().getResourceAsStream("/fixtures/reference-schema10.vxb")) {
             baseline = Objects.requireNonNull(input).readAllBytes();
         }
-        assertEquals(
-                "c4e5b9b089b98334a8feaad44189ae30102bd48fea47acd410e6c38b31339053",
-                HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(baseline)));
+        assertThat(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(baseline)))
+                .isEqualTo("c4e5b9b089b98334a8feaad44189ae30102bd48fea47acd410e6c38b31339053");
         var document = DocumentCodec.decode(baseline);
         var upgradedDefinitions = message(baseline).toBuilder()
                 .setSchemaVersion(DocumentCodec.SCHEMA_VERSION)
@@ -71,23 +72,22 @@ class DocumentWriterTest {
                         .addAllFrame(Arrays.stream(dev.voxelbrew.engine.model.Transform.IDENTITY.matrix())
                                 .boxed()
                                 .toList());
-        assertEquals(
-                HexFormat.of()
+        assertThat(DocumentCodec.fingerprint(document))
+                .isEqualTo(HexFormat.of()
                         .formatHex(MessageDigest.getInstance("SHA-256")
-                                .digest(upgradedDefinitions.build().toByteArray())),
-                DocumentCodec.fingerprint(document));
+                                .digest(upgradedDefinitions.build().toByteArray())));
         Path file = directory.resolve("saved with spaces.vxb");
         DocumentWriter.save(document, file, false);
         byte[] saved = Files.readAllBytes(file);
-        assertEquals(
-                upgradedDefinitions
+        assertThat(message(saved))
+                .isEqualTo(upgradedDefinitions
                         .setApplicationVersion(Version.version())
                         .setFileVersion(1)
-                        .build(),
-                message(saved));
-        assertEquals(document, DocumentReader.load(file));
+                        .build());
+        assertThat(DocumentReader.load(file)).isEqualTo(document);
         DocumentWriter.save(document, file, true);
-        assertEquals(2, DocumentReader.load(file).parameters().builtins().fileVersion());
+        assertThat(DocumentReader.load(file).parameters().builtins().fileVersion())
+                .isEqualTo(2);
     }
 
     @Test
@@ -101,11 +101,13 @@ class DocumentWriterTest {
         Path file = directory.resolve("older application.vxb");
         Files.write(file, older);
         var document = DocumentReader.load(file);
-        assertArrayEquals(older, Files.readAllBytes(file), "Opening must not rewrite the original");
-        assertEquals(DocumentCodec.decode(baseline), document);
+        assertThat(Files.readAllBytes(file))
+                .as("Opening must not rewrite the original")
+                .containsExactly(older);
+        assertThat(document).isEqualTo(DocumentCodec.decode(baseline));
         DocumentWriter.save(document, file, true);
-        assertEquals(Version.version(), message(Files.readAllBytes(file)).getApplicationVersion());
-        assertEquals(document, DocumentReader.load(file));
+        assertThat(message(Files.readAllBytes(file)).getApplicationVersion()).isEqualTo(Version.version());
+        assertThat(DocumentReader.load(file)).isEqualTo(document);
     }
 
     @Test
@@ -117,12 +119,13 @@ class DocumentWriterTest {
                     envelope(current.toBuilder().setApplicationVersion(version).build());
             Path file = directory.resolve(version + ".vxb");
             Files.write(file, future);
-            assertThrows(DocumentFormatException.class, () -> DocumentReader.load(file));
-            assertThrows(DocumentFormatException.class, () -> DocumentWriter.save(document, file, true));
-            assertArrayEquals(future, Files.readAllBytes(file));
+            assertThatThrownBy(() -> DocumentReader.load(file)).isInstanceOf(DocumentFormatException.class);
+            assertThatThrownBy(() -> DocumentWriter.save(document, file, true))
+                    .isInstanceOf(DocumentFormatException.class);
+            assertThat(Files.readAllBytes(file)).containsExactly(future);
         }
         try (var paths = Files.list(directory)) {
-            assertEquals(2, paths.count(), "No temporary files should remain");
+            assertThat(paths.count()).as("No temporary files should remain").isEqualTo(2);
         }
     }
 
@@ -132,13 +135,14 @@ class DocumentWriterTest {
         var document = CadDocument.empty();
         DocumentWriter.save(document, file, false);
         byte[] original = Files.readAllBytes(file);
-        assertThrows(IOException.class, () -> DocumentWriter.save(CadDocument.empty(), file, false));
-        assertArrayEquals(original, Files.readAllBytes(file));
+        assertThatThrownBy(() -> DocumentWriter.save(CadDocument.empty(), file, false))
+                .isInstanceOf(IOException.class);
+        assertThat(Files.readAllBytes(file)).containsExactly(original);
         Files.writeString(file, "Unsupported or damaged original");
-        assertThrows(IOException.class, () -> DocumentWriter.save(document, file, true));
-        assertEquals("Unsupported or damaged original", Files.readString(file));
+        assertThatThrownBy(() -> DocumentWriter.save(document, file, true)).isInstanceOf(IOException.class);
+        assertThat(Files.readString(file)).isEqualTo("Unsupported or damaged original");
         try (var paths = Files.list(directory)) {
-            assertEquals(List.of(file), paths.toList());
+            assertThat(paths.toList()).isEqualTo(List.of(file));
         }
     }
 
@@ -161,17 +165,17 @@ class DocumentWriterTest {
                         return false;
                     }
                 }));
-            assertTrue(ready.await(10, TimeUnit.SECONDS));
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
             start.countDown();
             int winner = -1;
             for (int index = 0; index < results.size(); index++) {
                 if (results.get(index).get(10, TimeUnit.SECONDS)) {
-                    assertEquals(-1, winner, "Both writers published");
+                    assertThat(winner).as("Both writers published").isEqualTo(-1);
                     winner = index;
                 }
             }
-            assertTrue(winner >= 0);
-            assertEquals(documents.get(winner), DocumentReader.load(destination));
+            assertThat(winner >= 0).isTrue();
+            assertThat(DocumentReader.load(destination)).isEqualTo(documents.get(winner));
         } finally {
             start.countDown();
         }

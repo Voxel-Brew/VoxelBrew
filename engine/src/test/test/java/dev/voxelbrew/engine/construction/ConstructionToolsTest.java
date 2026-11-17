@@ -2,7 +2,7 @@ package dev.voxelbrew.engine.construction;
 
 import static dev.voxelbrew.engine.construction.ConstructionGeometry.*;
 import static dev.voxelbrew.engine.construction.ConstructionTools.*;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import org.junit.jupiter.api.Test;
 
@@ -28,44 +28,46 @@ class ConstructionToolsTest {
                 return X;
             }
         };
-        assertEquals(20, Tool.values().length);
-        assertArrayEquals(
-                new double[] {1, 2, 3},
-                coordinateSystem(new Vector(1, 2, 3), X, Y).frame().apply(0, 0, 0),
-                1e-9);
-        assertEquals(new Vector(0, 0, 8), offsetPlane(xy, 8).origin());
-        assertEquals(1, Math.abs(angledPlane(xy, x, 90).normal().dot(Y)), 1e-9);
-        assertEquals(Z, tangentPlane(O, Z).normal());
-        assertEquals(
-                new Vector(0, 0, 4), midplane(xy, offsetPlane(xy, 8), false).origin());
-        assertEquals(X, perpendicularPlane(x, O).normal());
-        assertEquals(Z, planeTwoEdges(x, y).normal());
-        assertEquals(Z, planeThreePoints(O, X, Y).normal());
-        assertEquals(new Vector(5, 0, 0), planeAlongPath(path, .5).origin());
-        assertEquals(new Axis(O, Z), axisSurface(O, Z));
-        assertEquals(new Axis(O, Z), axisNormal(O, Z));
-        assertEquals(1, Math.abs(axisTwoPlanes(xy, yz).direction().dot(Y)), 1e-9);
-        assertEquals(x, axisTwoPoints(O, X));
-        assertEquals(x, axisEdge(x));
-        assertEquals(new Point(X), pointVertex(X));
-        assertEquals(new Point(O), pointTwoEdges(x, y));
-        assertEquals(new Point(O), pointThreePlanes(xy, yz, zx));
-        assertEquals(new Point(Y), pointCenter(Y));
-        assertEquals(new Point(new Vector(3, 0, 0)), pointEdgePlane(x, offsetPlane(yz, 3)));
-        assertEquals(new Point(new Vector(2.5, 0, 0)), pointAlongPath(path, .25));
+        assertThat(Tool.values().length).isEqualTo(20);
+        assertThat(coordinateSystem(new Vector(1, 2, 3), X, Y).frame().apply(0, 0, 0))
+                .usingComparatorWithPrecision(1e-9)
+                .containsExactly(new double[] {1, 2, 3});
+        assertThat(offsetPlane(xy, 8).origin()).isEqualTo(new Vector(0, 0, 8));
+        assertThat(Math.abs(angledPlane(xy, x, 90).normal().dot(Y)))
+                .isCloseTo(1, org.assertj.core.data.Offset.offset(1e-9));
+        assertThat(tangentPlane(O, Z).normal()).isEqualTo(Z);
+        assertThat(midplane(xy, offsetPlane(xy, 8), false).origin()).isEqualTo(new Vector(0, 0, 4));
+        assertThat(perpendicularPlane(x, O).normal()).isEqualTo(X);
+        assertThat(planeTwoEdges(x, y).normal()).isEqualTo(Z);
+        assertThat(planeThreePoints(O, X, Y).normal()).isEqualTo(Z);
+        assertThat(planeAlongPath(path, .5).origin()).isEqualTo(new Vector(5, 0, 0));
+        assertThat(axisSurface(O, Z)).isEqualTo(new Axis(O, Z));
+        assertThat(axisNormal(O, Z)).isEqualTo(new Axis(O, Z));
+        assertThat(Math.abs(axisTwoPlanes(xy, yz).direction().dot(Y)))
+                .isCloseTo(1, org.assertj.core.data.Offset.offset(1e-9));
+        assertThat(axisTwoPoints(O, X)).isEqualTo(x);
+        assertThat(axisEdge(x)).isEqualTo(x);
+        assertThat(pointVertex(X)).isEqualTo(new Point(X));
+        assertThat(pointTwoEdges(x, y)).isEqualTo(new Point(O));
+        assertThat(pointThreePlanes(xy, yz, zx)).isEqualTo(new Point(O));
+        assertThat(pointCenter(Y)).isEqualTo(new Point(Y));
+        assertThat(pointEdgePlane(x, offsetPlane(yz, 3))).isEqualTo(new Point(new Vector(3, 0, 0)));
+        assertThat(pointAlongPath(path, .25)).isEqualTo(new Point(new Vector(2.5, 0, 0)));
     }
 
     @Test
     void ambiguousAndNonfiniteInputsAreRejected() {
         var xy = new Plane(O, Z);
-        assertThrows(IllegalArgumentException.class, () -> axisTwoPoints(O, O));
-        assertThrows(IllegalArgumentException.class, () -> planeThreePoints(O, X, X.times(2)));
-        assertThrows(IllegalArgumentException.class, () -> axisTwoPlanes(xy, offsetPlane(xy, 1)));
-        assertThrows(IllegalArgumentException.class, () -> pointTwoEdges(new Axis(O, X), new Axis(Z, Y)));
-        assertThrows(IllegalArgumentException.class, () -> planeTwoEdges(new Axis(O, X), new Axis(Z, Y)));
-        assertThrows(IllegalArgumentException.class, () -> pointEdgePlane(new Axis(O, X), xy));
-        assertThrows(IllegalArgumentException.class, () -> coordinateSystem(O, X, X));
-        assertThrows(IllegalArgumentException.class, () -> offsetPlane(xy, Double.NaN));
-        assertThrows(IllegalArgumentException.class, () -> angledPlane(xy, new Axis(Z, X), 45));
+        assertThatThrownBy(() -> axisTwoPoints(O, O)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> planeThreePoints(O, X, X.times(2))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> axisTwoPlanes(xy, offsetPlane(xy, 1))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> pointTwoEdges(new Axis(O, X), new Axis(Z, Y)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> planeTwoEdges(new Axis(O, X), new Axis(Z, Y)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> pointEdgePlane(new Axis(O, X), xy)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> coordinateSystem(O, X, X)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> offsetPlane(xy, Double.NaN)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> angledPlane(xy, new Axis(Z, X), 45)).isInstanceOf(IllegalArgumentException.class);
     }
 }

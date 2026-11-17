@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine.model;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import java.util.*;
@@ -15,31 +15,32 @@ class BodyNameTest {
         var initial = new CadDocument("named", List.of(sketch, extrusion), 2);
         var session = new ModelSession(initial);
         session.renameBody("solid.body", "  Mounting plate  ");
-        assertEquals("Mounting plate", session.document().bodyName("solid.body", "Body 1"));
-        assertEquals(initial.features(), session.document().features());
-        assertEquals(initial.id(), session.document().id());
+        assertThat(session.document().bodyName("solid.body", "Body 1")).isEqualTo("Mounting plate");
+        assertThat(session.document().features()).isEqualTo(initial.features());
+        assertThat(session.document().id()).isEqualTo(initial.id());
         long revision = session.revision();
         session.renameBody("solid.body", "Mounting plate");
-        assertEquals(revision, session.revision());
-        assertTrue(session.undo());
-        assertEquals(initial, session.document());
-        assertFalse(session.canUndo(), "Rename adds exactly one transaction");
+        assertThat(session.revision()).isEqualTo(revision);
+        assertThat(session.undo()).isTrue();
+        assertThat(session.document()).isEqualTo(initial);
+        assertThat(session.canUndo()).as("Rename adds exactly one transaction").isFalse();
         session.redo();
         var style = new BodyStyle("PETG", "#FF0000");
         session.setBodyStyle("solid.body", style);
         session.editDimension("solid", "distance", 8);
-        assertEquals("Mounting plate", session.document().bodyNames().get("solid.body"));
+        assertThat(session.document().bodyNames().get("solid.body")).isEqualTo("Mounting plate");
         session.setCursor(1);
         session.undo();
-        assertEquals(1, session.document().cursor());
-        assertEquals(5, ((Feature.Extrude) session.document().features().get(1)).distance());
-        assertEquals(style, session.document().bodyStyle("solid.body"));
+        assertThat(session.document().cursor()).isEqualTo(1);
+        assertThat(((Feature.Extrude) session.document().features().get(1)).distance())
+                .isEqualTo(5);
+        assertThat(session.document().bodyStyle("solid.body")).isEqualTo(style);
         session.redo();
-        assertEquals(1, session.document().cursor());
+        assertThat(session.document().cursor()).isEqualTo(1);
         session.renameBody("solid.body", null);
-        assertEquals("Body 1", session.document().bodyName("solid.body", "Body 1"));
+        assertThat(session.document().bodyName("solid.body", "Body 1")).isEqualTo("Body 1");
         session.undo();
-        assertEquals("Mounting plate", session.document().bodyNames().get("solid.body"));
+        assertThat(session.document().bodyNames().get("solid.body")).isEqualTo("Mounting plate");
     }
 
     @Test
@@ -56,10 +57,9 @@ class BodyNameTest {
                 Map.of(),
                 names);
         names.clear();
-        assertEquals(2, document.bodyNames().size());
-        assertEquals(document, DocumentCodec.decode(DocumentCodec.encode(document)));
-        assertThrows(
-                UnsupportedOperationException.class, () -> document.bodyNames().clear());
+        assertThat(document.bodyNames().size()).isEqualTo(2);
+        assertThat(DocumentCodec.decode(DocumentCodec.encode(document))).isEqualTo(document);
+        assertThatThrownBy(() -> document.bodyNames().clear()).isInstanceOf(UnsupportedOperationException.class);
         var reverse = new TreeMap<>(document.bodyNames());
         var reordered = new CadDocument(
                 document.id(),
@@ -69,14 +69,16 @@ class BodyNameTest {
                 document.parameters(),
                 document.bodyStyles(),
                 reverse);
-        assertArrayEquals(DocumentCodec.encode(document), DocumentCodec.encode(reordered));
-        assertEquals(DocumentCodec.fingerprint(document), DocumentCodec.fingerprint(reordered));
+        assertThat(DocumentCodec.encode(reordered)).containsExactly(DocumentCodec.encode(document));
+        assertThat(DocumentCodec.fingerprint(reordered)).isEqualTo(DocumentCodec.fingerprint(document));
         var session = new ModelSession(document);
         session.renameBody("a.body", "Right support");
-        assertNotEquals(DocumentCodec.fingerprint(document), DocumentCodec.fingerprint(session.document()));
+        assertThat(DocumentCodec.fingerprint(session.document())).isNotEqualTo(DocumentCodec.fingerprint(document));
         var unnamed = new CadDocument("names", List.of(), 0);
-        assertTrue(
-                DocumentCodec.decode(DocumentCodec.encode(unnamed)).bodyNames().isEmpty());
+        assertThat(DocumentCodec.decode(DocumentCodec.encode(unnamed))
+                        .bodyNames()
+                        .isEmpty())
+                .isTrue();
     }
 
     @Test
@@ -84,8 +86,9 @@ class BodyNameTest {
         var session = new ModelSession(CadDocument.empty());
         var before = session.snapshot();
         for (String name : List.of("", "   ", "line\nbreak", "x\u0000y", "x".repeat(129)))
-            assertThrows(IllegalArgumentException.class, () -> session.renameBody("body.one", name));
-        assertThrows(IllegalArgumentException.class, () -> session.renameBody("invalid body ID", "Plate"));
-        assertEquals(before, session.snapshot());
+            assertThatThrownBy(() -> session.renameBody("body.one", name)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> session.renameBody("invalid body ID", "Plate"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(session.snapshot()).isEqualTo(before);
     }
 }

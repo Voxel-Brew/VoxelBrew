@@ -1,6 +1,6 @@
 package dev.voxelbrew.util;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import org.junit.jupiter.api.Test;
 
@@ -8,26 +8,25 @@ class UuidGeneratorTest {
     @Test
     void startsAtOneAndResumesWithoutReusingIds() {
         var ids = new UuidGenerator();
-        assertEquals(1, ids.next());
-        assertEquals(2, ids.next());
-        assertEquals(3, new UuidGenerator(ids.nextValue()).next());
+        assertThat(ids.next()).isEqualTo(1);
+        assertThat(ids.next()).isEqualTo(2);
+        assertThat(new UuidGenerator(ids.nextValue()).next()).isEqualTo(3);
     }
 
     @Test
     void concurrentCallsAreUnique() {
         var ids = new UuidGenerator();
-        assertEquals(
-                10000,
-                java.util.stream.IntStream.range(0, 10000)
+        assertThat(java.util.stream.IntStream.range(0, 10000)
                         .parallel()
                         .mapToLong(i -> ids.next())
                         .distinct()
-                        .count());
+                        .count())
+                .isEqualTo(10000);
     }
 
     @Test
     void invalidAndExhaustedSequencesFail() {
-        assertThrows(IllegalArgumentException.class, () -> new UuidGenerator(0));
-        assertThrows(IllegalStateException.class, () -> new UuidGenerator(Long.MAX_VALUE).next());
+        assertThatThrownBy(() -> new UuidGenerator(0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new UuidGenerator(Long.MAX_VALUE).next()).isInstanceOf(IllegalStateException.class);
     }
 }

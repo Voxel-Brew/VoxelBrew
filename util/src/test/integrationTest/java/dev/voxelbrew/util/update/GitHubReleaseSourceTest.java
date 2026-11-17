@@ -1,6 +1,7 @@
 package dev.voxelbrew.util.update;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import com.sun.net.httpserver.*;
 import java.io.IOException;
@@ -14,6 +15,7 @@ import java.util.concurrent.atomic.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 
+@SuppressWarnings("deprecation")
 class GitHubReleaseSourceTest {
     @TempDir
     Path directory;
@@ -48,7 +50,9 @@ class GitHubReleaseSourceTest {
     void stop() {
         server.stop(0);
         workers.shutdownNow();
-        assertEquals(List.of(), authentication, "Public updates must never send credentials");
+        assertThat(authentication)
+                .as("Public updates must never send credentials")
+                .isEqualTo(List.of());
     }
 
     @Test
@@ -58,9 +62,7 @@ class GitHubReleaseSourceTest {
             userAgents.add(exchange.getRequestHeaders().getFirst("User-Agent"));
             String path = exchange.getRequestURI().getPath();
             if (path.startsWith("/repos/")) {
-                assertEquals(
-                        "application/vnd.github+json",
-                        exchange.getRequestHeaders().getFirst("Accept"));
+                assertThat(exchange.getRequestHeaders().getFirst("Accept")).isEqualTo("application/vnd.github+json");
                 respond(exchange, 200, metadata().getBytes(StandardCharsets.UTF_8));
             } else if (path.startsWith("/Voxel-Brew/")) {
                 exchange.getResponseHeaders().set("Location", "/cdn/asset");
@@ -70,20 +72,20 @@ class GitHubReleaseSourceTest {
         var source = new GitHubReleaseSource(root);
         var token = new UpdateCancellation();
         var release = source.fetch(null, token);
-        assertEquals(version, release.version());
-        assertEquals(Set.of(asset, "SHA256SUMS"), release.assets());
-        assertEquals(release, source.fetch(version, token));
+        assertThat(release.version()).isEqualTo(version);
+        assertThat(release.assets()).isEqualTo(Set.of(asset, "SHA256SUMS"));
+        assertThat(source.fetch(version, token)).isEqualTo(release);
         Path file = directory.resolve("download with spaces.zip");
         source.download(release, asset, file, token);
-        assertArrayEquals(new byte[] {0, 1, 2, (byte) 255}, Files.readAllBytes(file));
-        assertEquals(
-                List.of(
+        assertThat(Files.readAllBytes(file)).containsExactly(new byte[] {0, 1, 2, (byte) 255});
+        assertThat(paths)
+                .isEqualTo(List.of(
                         "/repos/Voxel-Brew/VoxelBrew/releases/latest",
                         "/repos/Voxel-Brew/VoxelBrew/releases/tags/v1.2.3",
                         "/Voxel-Brew/VoxelBrew/releases/download/v1.2.3/" + asset,
-                        "/cdn/asset"),
-                paths);
-        assertTrue(userAgents.stream().allMatch(agent -> agent.startsWith("VoxelBrew/")));
+                        "/cdn/asset"));
+        assertThat(userAgents.stream().allMatch(agent -> agent.startsWith("VoxelBrew/")))
+                .isTrue();
     }
 
     @Test
@@ -97,10 +99,12 @@ class GitHubReleaseSourceTest {
                 }
                 respond(exchange, status, "error".getBytes(StandardCharsets.UTF_8));
             });
-            var failure = assertThrows(IOException.class, () -> source.fetch(null, new UpdateCancellation()));
-            assertTrue(failure.getMessage().contains("HTTP " + status));
-            assertFalse(failure.getMessage().contains("gh auth"));
-            if (status == 403 || status == 429) assertTrue(failure.getMessage().contains("rate limit"));
+            var failure = org.assertj.core.api.Assertions.catchThrowableOfType(
+                    () -> source.fetch(null, new UpdateCancellation()), IOException.class);
+            assertThat(failure.getMessage().contains("HTTP " + status)).isTrue();
+            assertThat(failure.getMessage().contains("gh auth")).isFalse();
+            if (status == 403 || status == 429)
+                assertThat(failure.getMessage().contains("rate limit")).isTrue();
         }
     }
 
@@ -109,17 +113,19 @@ class GitHubReleaseSourceTest {
         var source = new GitHubReleaseSource(root);
         var release = new ReleaseSource.Release(version, Set.of(asset));
         Path file = Files.writeString(directory.resolve("existing.zip"), "keep");
-        assertThrows(IOException.class, () -> source.download(release, asset, file, new UpdateCancellation()));
-        assertEquals("keep", Files.readString(file));
-        assertTrue(paths.isEmpty());
+        assertThatThrownBy(() -> source.download(release, asset, file, new UpdateCancellation()))
+                .isInstanceOf(IOException.class);
+        assertThat(Files.readString(file)).isEqualTo("keep");
+        assertThat(paths.isEmpty()).isTrue();
         for (int status : List.of(404, 200)) {
             handler.set(exchange -> {
                 exchange.sendResponseHeaders(status, 100);
                 exchange.getResponseBody().write(new byte[] {1, 2});
             });
             Path partial = directory.resolve("partial-" + status);
-            assertThrows(IOException.class, () -> source.download(release, asset, partial, new UpdateCancellation()));
-            assertFalse(Files.exists(partial));
+            assertThatThrownBy(() -> source.download(release, asset, partial, new UpdateCancellation()))
+                    .isInstanceOf(IOException.class);
+            assertThat(Files.exists(partial)).isFalse();
         }
     }
 
@@ -131,16 +137,16 @@ class GitHubReleaseSourceTest {
                 exchange.sendResponseHeaders(200, declared ? 2 * 1024 * 1024 : 0);
                 if (!declared) exchange.getResponseBody().write(new byte[2 * 1024 * 1024]);
             });
-            assertThrows(IOException.class, () -> source.fetch(null, new UpdateCancellation()));
+            assertThatThrownBy(() -> source.fetch(null, new UpdateCancellation()))
+                    .isInstanceOf(IOException.class);
             Path file = directory.resolve("SHA256SUMS");
-            assertThrows(
-                    IOException.class,
-                    () -> source.download(
+            assertThatThrownBy(() -> source.download(
                             new ReleaseSource.Release(version, Set.of("SHA256SUMS")),
                             "SHA256SUMS",
                             file,
-                            new UpdateCancellation()));
-            assertFalse(Files.exists(file));
+                            new UpdateCancellation()))
+                    .isInstanceOf(IOException.class);
+            assertThat(Files.exists(file)).isFalse();
         }
     }
 
@@ -170,11 +176,12 @@ class GitHubReleaseSourceTest {
                 return null;
             });
             try {
-                assertTrue(entered.await(5, TimeUnit.SECONDS));
+                assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
                 cancellation.cancel();
-                var failure = assertThrows(ExecutionException.class, () -> pending.get(3, TimeUnit.SECONDS));
-                assertInstanceOf(CancellationException.class, failure.getCause());
-                assertFalse(Files.exists(file));
+                var failure = org.assertj.core.api.Assertions.catchThrowableOfType(
+                        () -> pending.get(3, TimeUnit.SECONDS), ExecutionException.class);
+                assertThat(failure.getCause()).isInstanceOf(CancellationException.class);
+                assertThat(Files.exists(file)).isFalse();
             } finally {
                 releaseServer.countDown();
             }
@@ -198,15 +205,15 @@ class GitHubReleaseSourceTest {
         Path file = directory.resolve("timed-out");
         try {
             assertTimeoutPreemptively(Duration.ofSeconds(3), () -> {
-                var failure = assertThrows(
-                        IOException.class,
+                var failure = org.assertj.core.api.Assertions.catchThrowableOfType(
                         () -> source.download(
                                 new ReleaseSource.Release(version, Set.of(asset)),
                                 asset,
                                 file,
-                                new UpdateCancellation()));
-                assertTrue(failure.getMessage().contains("timed out"));
-                assertFalse(Files.exists(file));
+                                new UpdateCancellation()),
+                        IOException.class);
+                assertThat(failure.getMessage().contains("timed out")).isTrue();
+                assertThat(Files.exists(file)).isFalse();
             });
         } finally {
             releaseServer.countDown();
@@ -222,7 +229,8 @@ class GitHubReleaseSourceTest {
                 "http://user:secret@127.0.0.1:8080/",
                 "http://127.0.0.1:8080/?token=abc",
                 "http://127.0.0.1:8080/path/"))
-            assertThrows(IllegalArgumentException.class, () -> new GitHubReleaseSource(URI.create(invalid)));
+            assertThatThrownBy(() -> new GitHubReleaseSource(URI.create(invalid)))
+                    .isInstanceOf(IllegalArgumentException.class);
     }
 
     private String metadata() {

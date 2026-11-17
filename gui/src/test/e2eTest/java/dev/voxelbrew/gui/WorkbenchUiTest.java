@@ -4022,6 +4022,9 @@ class WorkbenchUiTest {
             if (window.isShowing() && window.getScene() != null) {
                 for (var node : window.getScene().getRoot().lookupAll(selector)) if (treeVisible(node)) return node;
             }
+        // Save As uses the exporter dialog; Open still uses the editable-design dialog.
+        if (selector.equals("#file-path")) return node("#export-path");
+        if (selector.equals("#file-confirm")) return node("#export-confirm");
         throw new AssertionError("Missing control " + selector);
     }
 

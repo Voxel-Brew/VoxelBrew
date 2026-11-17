@@ -176,6 +176,7 @@ public final class DesktopExportWindow implements ExportWindow {
                         .toString());
             var browse = new Button(translations.text("gui.browse"));
             browse.setId("file-browse");
+            UiHelp.install(browse, translations);
             browse.setOnAction(event -> {
                 var chooser = new FileChooser();
                 chooser.setTitle(translations.text("gui.destination"));
@@ -229,6 +230,7 @@ public final class DesktopExportWindow implements ExportWindow {
         if (component instanceof dev.voxelbrew.api.exporter.component.CheckBox box) {
             var input = new javafx.scene.control.CheckBox(box.label());
             input.setId("export-" + box.id());
+            UiHelp.describe(input, translations.textOrDefault("help.export-" + box.id(), box.label()));
             input.setSelected(box.selected());
             input.getStyleClass().add("export-dialog-choice");
             return bind(

@@ -154,6 +154,10 @@ tasks.named("assemble") { dependsOn(libraryProjects.map { "${it.path}:assemble" 
 tasks.named("clean") { dependsOn(libraryProjects.map { "${it.path}:clean" }) }
 
 configure(libraryProjects) {
+    configurations.configureEach {
+        // API and BOM snapshots can be republished under the same version.
+        resolutionStrategy.cacheChangingModulesFor(0, "seconds")
+    }
     // Fixture publications share engine/build; its clean must finish before any publisher writes.
     tasks.withType<org.gradle.api.publish.maven.tasks.PublishToMavenRepository>().configureEach {
         if (name.endsWith("ToFixtureRepository")) mustRunAfter(":engine:clean")

@@ -3,7 +3,7 @@ package dev.voxelbrew.cli;
 import dev.voxelbrew.engine.mesh.MeshOptions;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.printing.*;
-import dev.voxelbrew.importer.api.DocumentSource;
+import dev.voxelbrew.importer.DocumentSource;
 import dev.voxelbrew.slicer.api.PrinterProfileCatalog;
 import dev.voxelbrew.slicer.api.SlicerCatalog;
 import dev.voxelbrew.slicer.api.Slicing;
@@ -685,7 +685,7 @@ final class PrintingCommands {
             description = "Independently inspect actual G-code deposition layers, roles, estimates and job provenance.")
     @RequiredArgsConstructor(access = AccessLevel.PACKAGE, onConstructor_ = @javax.inject.Inject)
     static final class InspectJob implements Callable<Integer> {
-        private final dev.voxelbrew.importer.api.GcodeSource gcode;
+        private final dev.voxelbrew.importer.GcodeSource gcode;
         private final DocumentSource documents;
 
         @Parameters(index = "0", arity = "0..1", description = "G-code file; omit when using --document")

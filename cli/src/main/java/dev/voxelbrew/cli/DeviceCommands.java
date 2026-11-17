@@ -2,7 +2,7 @@ package dev.voxelbrew.cli;
 
 import static dev.voxelbrew.cli.WorkspaceEdits.*;
 
-import dev.voxelbrew.importer.api.DocumentSource;
+import dev.voxelbrew.importer.DocumentSource;
 import dev.voxelbrew.printer.api.*;
 import dev.voxelbrew.util.config.ApplicationPaths;
 import java.nio.file.*;

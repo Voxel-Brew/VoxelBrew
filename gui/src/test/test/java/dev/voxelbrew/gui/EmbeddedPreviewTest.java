@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.CadDocument;
 import dev.voxelbrew.engine.printing.GcodeJob;
-import dev.voxelbrew.importer.api.GcodeSource;
+import dev.voxelbrew.importer.GcodeSource;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.*;

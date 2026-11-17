@@ -16,11 +16,10 @@ dependencies {
     implementation("dev.voxelbrew.api:export")
     implementation("dev.voxelbrew.api:slicer")
     implementation("dev.voxelbrew.api:printer")
-    runtimeOnly(project(":importer-impl"))
+    implementation(project(":importer-impl"))
     implementation(project(":exporter-impl"))
     runtimeOnly(project(":slicer-impl"))
     runtimeOnly(project(":printer-impl"))
-    testImplementation(project(":importer-impl"))
     testImplementation(project(":exporter-impl"))
     testImplementation(project(":slicer-impl"))
     implementation(project(":util"))
@@ -48,7 +47,12 @@ tasks
         val runtime = project(":engine").layout.buildDirectory.dir("native/runtime")
         inputs.dir(runtime)
         systemProperty("voxelbrew.native.path", runtime.get().asFile.absolutePath)
-        systemProperty("voxelbrew.test.classpath", sourceSets.main.get().runtimeClasspath.asPath)
+        doFirst {
+            systemProperty(
+                "voxelbrew.test.classpath",
+                sourceSets.main.get().runtimeClasspath.asPath,
+            )
+        }
     }
 
 tasks.named<Sync>("installDist") {

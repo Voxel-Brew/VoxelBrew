@@ -3,7 +3,10 @@ package dev.voxelbrew.cli;
 import dagger.Module;
 import dagger.Provides;
 import dev.voxelbrew.api.exporter.*;
-import dev.voxelbrew.importer.api.*;
+import dev.voxelbrew.api.importer.*;
+import dev.voxelbrew.importer.DocumentSource;
+import dev.voxelbrew.importer.GcodeSource;
+import dev.voxelbrew.importer.ImportRuntime;
 import dev.voxelbrew.slicer.api.SlicerCatalog;
 import dev.voxelbrew.slicer.api.SlicerRuntime;
 import dev.voxelbrew.slicer.api.Slicing;
@@ -65,8 +68,10 @@ public final class FileIoModule {
     }
 
     @Provides
-    ImporterCatalog.Factory importers() {
-        return imports.importers();
+    java.util.function.Supplier<ImporterProviderRegistry> importers() {
+        return () -> java.util.ServiceLoader.load(ImporterProviderRegistry.class)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No ImporterProviderRegistry service found"));
     }
 
     @Provides

@@ -2,7 +2,7 @@ package dev.voxelbrew.cli;
 
 import dev.voxelbrew.engine.geometry.Solid;
 import dev.voxelbrew.engine.model.*;
-import dev.voxelbrew.importer.api.DocumentSource;
+import dev.voxelbrew.importer.DocumentSource;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;

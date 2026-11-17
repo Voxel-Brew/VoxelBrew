@@ -278,7 +278,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private final Path pluginDirectory;
     private final ExporterProviderRegistry registry;
-    private final dev.voxelbrew.importer.api.ImporterCatalog.Factory importers;
+    private final java.util.function.Supplier<dev.voxelbrew.api.importer.ImporterProviderRegistry> importers;
 
     @Getter
     @Accessors(fluent = true)
@@ -401,7 +401,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             DocumentController controller,
             McpServerHost mcpServer,
             ExporterProviderRegistry registry,
-            dev.voxelbrew.importer.api.ImporterCatalog.Factory importers,
+            java.util.function.Supplier<dev.voxelbrew.api.importer.ImporterProviderRegistry> importers,
             PrintingPane printing,
             PrinterPane printer,
             SlicerSettingsDialog slicerSettings,
@@ -1086,7 +1086,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private void importFile() {
         try {
-            var providers = importers.open(pluginDirectory);
+            var providers = importers.get().withDirectory(pluginDirectory);
             boolean started = false;
             try {
                 var choice = ImportDialog.choose(stage, providers, translations);
@@ -1095,10 +1095,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     controller
                             .importDocument(
                                     providers.require(choice.get().id()),
-                                    new DesktopImportWindow(
-                                            stage,
-                                            controller.snapshot().document().parameters(),
-                                            translations))
+                                    new DesktopImportWindow(stage, null, translations)
+                                            .importerVersion(choice.get().version()))
                             .whenComplete((value, failure) -> {
                                 try {
                                     providers.close();

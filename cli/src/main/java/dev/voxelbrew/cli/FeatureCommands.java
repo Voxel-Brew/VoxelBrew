@@ -1,7 +1,7 @@
 package dev.voxelbrew.cli;
 
 import dev.voxelbrew.engine.feature.*;
-import dev.voxelbrew.importer.api.DocumentSource;
+import dev.voxelbrew.importer.DocumentSource;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.Callable;

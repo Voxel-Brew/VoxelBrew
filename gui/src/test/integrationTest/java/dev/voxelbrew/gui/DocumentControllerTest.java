@@ -2,6 +2,9 @@ package dev.voxelbrew.gui;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.importer.ImportDialog;
+import dev.voxelbrew.api.importer.ImportWindow;
+import dev.voxelbrew.api.importer.ServiceLoaderImporterProviderRegistry;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.exporter.DocumentWriter;
 import dev.voxelbrew.importer.DocumentReader;
@@ -175,9 +178,16 @@ class DocumentControllerTest {
         Files.copy(Path.of(System.getProperty("voxelbrew.test.plugin")), plugins.resolve("provider.jar"));
         Path source = directory.resolve("plate.vbplate");
         Files.writeString(source, "60,40,4");
-        try (var controller = new DocumentController(callbacks::add, plugins)) {
-            var imported = controller.importFile(
-                    dev.voxelbrew.importer.ImporterRegistry::new, "plate", source, java.util.Map.of("scale", "2"));
+        ImportWindow window = new ImportWindow() {
+            @Override
+            public <R> java.util.Optional<R> show(ImportDialog<R> dialog) {
+                return java.util.Optional.of(
+                        dialog.buildSettings(java.util.Map.of("source", source.toString(), "scale", "2")));
+            }
+        };
+        try (var registry = new ServiceLoaderImporterProviderRegistry(plugins);
+                var controller = new DocumentController(callbacks::add, plugins)) {
+            var imported = controller.importDocument(registry.require("plate"), window);
             assertThat(controller.ioBusy()).isTrue();
             await(() -> imported.isDone() && !controller.rebuilding());
             imported.join();
@@ -192,8 +202,7 @@ class DocumentControllerTest {
             controller.edit("thickness", "distance", 9);
             await(() -> !controller.rebuilding());
             var before = controller.snapshot();
-            var failed = controller.importFile(
-                    dev.voxelbrew.importer.ImporterRegistry::new, "failing", source, java.util.Map.of());
+            var failed = controller.importDocument(registry.require("failing"), window);
             await(failed::isDone);
             assertThat(failed.isCompletedExceptionally()).isTrue();
             assertThat(controller.snapshot()).isEqualTo(before);

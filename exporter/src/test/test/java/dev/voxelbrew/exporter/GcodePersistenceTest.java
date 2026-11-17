@@ -3,10 +3,10 @@ package dev.voxelbrew.exporter;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.exporter.*;
+import dev.voxelbrew.api.importer.ServiceLoaderImporterProviderRegistry;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import dev.voxelbrew.importer.*;
-import dev.voxelbrew.importer.api.ImportResult;
 import java.nio.file.*;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -22,13 +22,16 @@ class GcodePersistenceTest {
                 dev.voxelbrew.engine.printing.PrintArtifact.of("gcode.3mf", bytes, Map.of("model", "Bambu Lab A1"));
         var document = base.withGcode(Map.of(plate, LINES)).withPrintArtifacts(Map.of(plate, artifact));
         try (var exports = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory);
-                var imports = new ImporterRegistry(directory)) {
+                var imports = new ServiceLoaderImporterProviderRegistry(directory)) {
             for (String format : List.of("vxb", "json")) {
                 Path file = directory.resolve("packaged." + format);
                 exports.require(format)
                         .create()
                         .export(document, dev.voxelbrew.util.testing.FileExportWindows.destination(file, false));
-                var loaded = ((ImportResult.Document) ImportService.read(imports, format, file, Map.of())).document();
+                var loaded = imports.require(format)
+                        .create()
+                        .importFrom(dev.voxelbrew.util.testing.FileImportWindows.source(file))
+                        .orElseThrow();
                 assertThat(loaded.printArtifacts()).isEqualTo(document.printArtifacts());
                 Path output = directory.resolve(format + ".gcode.3mf");
                 exports.require("gcode-package")
@@ -61,13 +64,16 @@ class GcodePersistenceTest {
                 base.withGcode(Map.of(base.printSetup().activePlateId(), LINES, "plate-2", List.of("; other plate")));
         assertThat(DocumentCodec.fingerprint(document)).isEqualTo(DocumentCodec.fingerprint(base));
         try (var exports = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory);
-                var imports = new ImporterRegistry(directory)) {
+                var imports = new ServiceLoaderImporterProviderRegistry(directory)) {
             for (String format : List.of("vxb", "json")) {
                 Path file = directory.resolve("part." + format);
                 exports.require(format)
                         .create()
                         .export(document, dev.voxelbrew.util.testing.FileExportWindows.destination(file, false));
-                var loaded = ((ImportResult.Document) ImportService.read(imports, format, file, Map.of())).document();
+                var loaded = imports.require(format)
+                        .create()
+                        .importFrom(dev.voxelbrew.util.testing.FileImportWindows.source(file))
+                        .orElseThrow();
                 assertThat(loaded.gcode()).isEqualTo(document.gcode());
                 Path output = directory.resolve(format + ".gcode");
                 exports.require("gcode")

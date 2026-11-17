@@ -4,7 +4,7 @@ import static dev.voxelbrew.engine.sketch.SketchGeometry.*;
 
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.sketch.*;
-import dev.voxelbrew.importer.api.DocumentSource;
+import dev.voxelbrew.importer.DocumentSource;
 import java.util.*;
 import picocli.CommandLine;
 import picocli.CommandLine.*;

@@ -4911,7 +4911,19 @@ class WorkbenchUiTest {
         chooseImporter("plate");
         click("import-confirm");
         text("import-path", source.toString());
-        text("import-option-scale", "2");
+        text("import-scale", "invalid");
+        click("import-confirm");
+        assertThat(fx(() -> node("#import-scale")
+                        .getParent()
+                        .lookup(".import-dialog-inline-error")
+                        .isVisible()))
+                .isTrue();
+        text("import-scale", "2");
+        assertThat(fx(() -> node("#import-scale")
+                        .getParent()
+                        .lookup(".import-dialog-inline-error")
+                        .isVisible()))
+                .isFalse();
         assertButtonDescriptions();
         click("import-confirm");
         ready();
@@ -4941,7 +4953,7 @@ class WorkbenchUiTest {
     @SuppressWarnings("unchecked")
     private void chooseImporter(String id) throws Exception {
         int index = fx(() -> {
-            var choices = (ComboBox<dev.voxelbrew.importer.api.ImporterDescriptor>) node("#import-format");
+            var choices = (ComboBox<dev.voxelbrew.api.importer.ImporterDescriptor>) node("#import-format");
             return java.util.stream.IntStream.range(0, choices.getItems().size())
                     .filter(i -> choices.getItems().get(i).id().equals(id))
                     .findFirst()

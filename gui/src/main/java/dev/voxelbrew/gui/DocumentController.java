@@ -1,6 +1,7 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.engine.mesh.*;
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.mesh.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.importer.ImportRuntime;
 import java.nio.file.Path;
@@ -25,7 +26,7 @@ public final class DocumentController implements AutoCloseable {
             Feature.BodyRef output,
             MeshData mesh,
             double volume,
-            List<dev.voxelbrew.engine.geometry.PlanarFace> planarFaces,
+            List<dev.voxelbrew.api.model.geometry.PlanarFace> planarFaces,
             TechnicalEdges edges,
             int[] faceEdges,
             double[] edgeSamples) {
@@ -38,7 +39,7 @@ public final class DocumentController implements AutoCloseable {
                 Feature.BodyRef output,
                 MeshData mesh,
                 double volume,
-                List<dev.voxelbrew.engine.geometry.PlanarFace> planarFaces) {
+                List<dev.voxelbrew.api.model.geometry.PlanarFace> planarFaces) {
             this(id, output, mesh, volume, planarFaces, TechnicalEdges.from(mesh), new int[0], new double[0]);
         }
 
@@ -47,7 +48,7 @@ public final class DocumentController implements AutoCloseable {
                 Feature.BodyRef output,
                 MeshData mesh,
                 double volume,
-                List<dev.voxelbrew.engine.geometry.PlanarFace> planarFaces,
+                List<dev.voxelbrew.api.model.geometry.PlanarFace> planarFaces,
                 int[] faceEdges,
                 double[] edgeSamples) {
             this(id, output, mesh, volume, planarFaces, TechnicalEdges.from(mesh), faceEdges, edgeSamples);
@@ -81,7 +82,7 @@ public final class DocumentController implements AutoCloseable {
             List<Evaluation.Diagnostic> diagnostics,
             boolean valid,
             List<Feature> features,
-            Map<String, dev.voxelbrew.engine.construction.ConstructionGeometry.Datum> construction,
+            Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction,
             List<ConstructionFeature.Input> constructionInputs) {
         public Build(
                 List<Body> bodies, List<Evaluation.Diagnostic> diagnostics, boolean valid, List<Feature> features) {
@@ -227,7 +228,7 @@ public final class DocumentController implements AutoCloseable {
                 : session.document().features();
     }
 
-    public void parameters(dev.voxelbrew.engine.parameters.ParameterSet parameters) {
+    public void parameters(dev.voxelbrew.api.model.parameters.ParameterSet parameters) {
         session.setParameters(parameters);
         preview = null;
         schedule(session.document(), false);
@@ -245,7 +246,8 @@ public final class DocumentController implements AutoCloseable {
         schedule(session.document(), false);
     }
 
-    public void sketch(Feature.Sketch sketch, dev.voxelbrew.engine.parameters.ParameterSet parameters, boolean create) {
+    public void sketch(
+            Feature.Sketch sketch, dev.voxelbrew.api.model.parameters.ParameterSet parameters, boolean create) {
         if (create) session.add(sketch, parameters);
         else session.replace(sketch, parameters);
         preview = null;
@@ -325,7 +327,7 @@ public final class DocumentController implements AutoCloseable {
         schedule(session.document(), false);
     }
 
-    public void add(Feature feature, dev.voxelbrew.engine.parameters.ParameterSet parameters) {
+    public void add(Feature feature, dev.voxelbrew.api.model.parameters.ParameterSet parameters) {
         session.add(feature, parameters);
         preview = null;
         schedule(session.document(), false);
@@ -355,7 +357,7 @@ public final class DocumentController implements AutoCloseable {
         schedule(session.document(), false);
     }
 
-    public void printSetup(dev.voxelbrew.engine.printing.PrintSetup setup) {
+    public void printSetup(dev.voxelbrew.api.model.printing.PrintSetup setup) {
         session.setPrintSetup(setup);
         preview = null;
         schedule(session.document(), false);
@@ -367,7 +369,7 @@ public final class DocumentController implements AutoCloseable {
         onChanged.run();
     }
 
-    void printArtifacts(java.util.Map<String, dev.voxelbrew.engine.printing.PrintArtifact> artifacts) {
+    void printArtifacts(java.util.Map<String, dev.voxelbrew.api.model.printing.PrintArtifact> artifacts) {
         session.setPrintArtifacts(artifacts);
         onChanged.run();
     }
@@ -448,7 +450,7 @@ public final class DocumentController implements AutoCloseable {
 
     public void previewExtrusion(Feature.Sketch sketch, String profileId, String expression) {
         double value =
-                session.document().parameters().value(expression, dev.voxelbrew.engine.parameters.ParameterUnit.MM);
+                session.document().parameters().value(expression, dev.voxelbrew.api.model.parameters.ParameterUnit.MM);
         previewExtrusion(sketch, profileId, value);
         if (!expression.matches("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?"))
             previewExpression = expression;
@@ -462,7 +464,7 @@ public final class DocumentController implements AutoCloseable {
             var parameters = session.document()
                     .parameters()
                     .bind(
-                            new dev.voxelbrew.engine.parameters.ParameterSet.Target(feature.id(), "distance"),
+                            new dev.voxelbrew.api.model.parameters.ParameterSet.Target(feature.id(), "distance"),
                             previewExpression);
             session.add(feature, parameters);
             preview = null;
@@ -875,7 +877,7 @@ public final class DocumentController implements AutoCloseable {
                             b.solid().faceEdges(),
                             b.solid().edgeSamples()));
             var inputs = new ArrayList<ConstructionFeature.Input>();
-            var zero = new dev.voxelbrew.engine.construction.ConstructionGeometry.Vector(0, 0, 0);
+            var zero = new dev.voxelbrew.api.model.construction.ConstructionGeometry.Vector(0, 0, 0);
             for (var body : evaluation.bodies()) {
                 for (int kind = 0; kind < 3; kind++) {
                     int count = (int) body.solid().constructionInput(kind, -1, .5)[0];
@@ -903,7 +905,7 @@ public final class DocumentController implements AutoCloseable {
         }
     }
 
-    public CompletableFuture<dev.voxelbrew.engine.construction.ConstructionGeometry.Datum> previewConstruction(
+    public CompletableFuture<dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> previewConstruction(
             ConstructionFeature feature) {
         var captured = session.document();
         return CompletableFuture.supplyAsync(

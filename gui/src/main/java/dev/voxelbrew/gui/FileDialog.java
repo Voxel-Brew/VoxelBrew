@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.engine.parameters.ParameterSet;
+import dev.voxelbrew.api.model.parameters.ParameterSet;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;

@@ -1,5 +1,10 @@
 package dev.voxelbrew.engine.parameters;
 
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.parameters.Expressions;
+import dev.voxelbrew.api.model.parameters.ParameterSet;
+import dev.voxelbrew.api.model.parameters.ParameterUnit;
+import dev.voxelbrew.api.model.sketch.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.sketch.*;
 import java.util.*;
@@ -18,7 +23,7 @@ public final class FeatureDimensions {
         }
 
         public Quantity<?> quantity() {
-            return dev.voxelbrew.engine.units.Measurements.quantity(value, unit.canonicalUnit());
+            return dev.voxelbrew.api.model.units.Measurements.quantity(value, unit.canonicalUnit());
         }
 
         @Override

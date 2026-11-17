@@ -1,8 +1,8 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.engine.model.CadDocument;
-import dev.voxelbrew.engine.printing.PrintArtifact;
-import dev.voxelbrew.printer.api.*;
+import dev.voxelbrew.api.model.CadDocument;
+import dev.voxelbrew.api.model.printing.PrintArtifact;
+import dev.voxelbrew.api.printer.*;
 import dev.voxelbrew.util.config.UserConfiguration;
 import dev.voxelbrew.util.i18n.Translations;
 import java.nio.file.*;
@@ -30,7 +30,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
     private record ConnectionDraft(String address, String serial, String model, String secret) {}
 
     private final PrinterRuntime runtime;
-    private final dev.voxelbrew.slicer.api.PrinterProfileCatalog profiles;
+    private final dev.voxelbrew.api.slicer.PrinterProfileCatalog profiles;
     private final PrinterVisibility printerVisibility;
     private final Translations text;
     private final Path directory;
@@ -61,7 +61,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
     @javax.inject.Inject
     PrinterPane(
             PrinterRuntime runtime,
-            dev.voxelbrew.slicer.api.PrinterProfileCatalog profiles,
+            dev.voxelbrew.api.slicer.PrinterProfileCatalog profiles,
             PrinterVisibility printerVisibility,
             UserConfiguration configuration,
             Translations text,
@@ -537,7 +537,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
         var address = new TextField();
         var serial = new TextField();
         var model = new TextField();
-        var profile = new ComboBox<dev.voxelbrew.slicer.api.PrinterProfileCatalog.Entry>();
+        var profile = new ComboBox<dev.voxelbrew.api.slicer.PrinterProfileCatalog.Entry>();
         profile.setId("device-config-profile");
         try {
             var hidden = printerVisibility.hidden();

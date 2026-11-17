@@ -2,6 +2,9 @@ package dev.voxelbrew.engine.mesh;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.mesh.MeshData;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
+import dev.voxelbrew.api.model.mesh.MeshValidation;
 import org.junit.jupiter.api.Test;
 
 class MeshValidationTest {

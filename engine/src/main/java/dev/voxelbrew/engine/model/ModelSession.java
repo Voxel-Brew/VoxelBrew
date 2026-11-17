@@ -1,5 +1,10 @@
 package dev.voxelbrew.engine.model;
 
+import dev.voxelbrew.api.model.BodyStyle;
+import dev.voxelbrew.api.model.CadDocument;
+import dev.voxelbrew.api.model.ConstructionFeature;
+import dev.voxelbrew.api.model.Feature;
+import dev.voxelbrew.api.model.ModelException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -9,22 +14,22 @@ import java.util.List;
 @lombok.extern.slf4j.Slf4j
 public final class ModelSession {
     private final String id;
-    private final dev.voxelbrew.engine.model.UuidGenerator uuidGenerator;
+    private final dev.voxelbrew.api.model.UuidGenerator uuidGenerator;
     private List<Feature> features;
-    private dev.voxelbrew.engine.printing.PrintSetup printSetup;
-    private dev.voxelbrew.engine.parameters.ParameterSet parameters;
+    private dev.voxelbrew.api.model.printing.PrintSetup printSetup;
+    private dev.voxelbrew.api.model.parameters.ParameterSet parameters;
     private java.util.Map<String, BodyStyle> bodyStyles;
     private java.util.Map<String, String> bodyNames;
     private java.util.Map<String, String> featureNames;
     private int cursor;
     private long revision;
     private java.util.Map<String, List<String>> gcode;
-    private java.util.Map<String, dev.voxelbrew.engine.printing.PrintArtifact> printArtifacts;
+    private java.util.Map<String, dev.voxelbrew.api.model.printing.PrintArtifact> printArtifacts;
 
     private record State(
             List<Feature> features,
-            dev.voxelbrew.engine.printing.PrintSetup printSetup,
-            dev.voxelbrew.engine.parameters.ParameterSet parameters,
+            dev.voxelbrew.api.model.printing.PrintSetup printSetup,
+            dev.voxelbrew.api.model.parameters.ParameterSet parameters,
             java.util.Map<String, BodyStyle> bodyStyles,
             java.util.Map<String, String> bodyNames,
             java.util.Map<String, String> featureNames) {}
@@ -66,7 +71,7 @@ public final class ModelSession {
     }
 
     public synchronized void setPrintArtifacts(
-            java.util.Map<String, dev.voxelbrew.engine.printing.PrintArtifact> artifacts) {
+            java.util.Map<String, dev.voxelbrew.api.model.printing.PrintArtifact> artifacts) {
         printArtifacts = java.util.Map.copyOf(artifacts);
     }
 
@@ -97,7 +102,7 @@ public final class ModelSession {
         add(feature, parameters);
     }
 
-    public synchronized void add(Feature feature, dev.voxelbrew.engine.parameters.ParameterSet expressions) {
+    public synchronized void add(Feature feature, dev.voxelbrew.api.model.parameters.ParameterSet expressions) {
         if (cursor != features.size()) {
             throw new ModelException(feature.id(), "return the timeline cursor to the end before adding a feature");
         }
@@ -113,7 +118,7 @@ public final class ModelSession {
         replace(feature, parameters);
     }
 
-    public synchronized void replace(Feature feature, dev.voxelbrew.engine.parameters.ParameterSet expressions) {
+    public synchronized void replace(Feature feature, dev.voxelbrew.api.model.parameters.ParameterSet expressions) {
         FeatureValidation.validate(feature);
         var next = new ArrayList<>(features);
         next.set(index(feature.id()), feature);
@@ -129,7 +134,7 @@ public final class ModelSession {
         var removed = features.subList(from, to).stream().map(Feature::id).collect(java.util.stream.Collectors.toSet());
         var next = new ArrayList<>(features);
         next.subList(from, to).clear();
-        var expressions = new dev.voxelbrew.engine.parameters.ParameterSet(
+        var expressions = new dev.voxelbrew.api.model.parameters.ParameterSet(
                 parameters.parameters(),
                 parameters.configurations(),
                 parameters.active(),
@@ -140,14 +145,14 @@ public final class ModelSession {
         cursor = nextCursor;
     }
 
-    public synchronized void setParameters(dev.voxelbrew.engine.parameters.ParameterSet next) {
+    public synchronized void setParameters(dev.voxelbrew.api.model.parameters.ParameterSet next) {
         dev.voxelbrew.engine.parameters.FeatureDimensions.validateBindings(features, next);
         commit(features, printSetup, next);
     }
 
     public synchronized void bindExpression(String featureId, String field, String expression) {
         setParameters(dev.voxelbrew.engine.parameters.FeatureDimensions.bind(
-                document(), new dev.voxelbrew.engine.parameters.ParameterSet.Target(featureId, field), expression));
+                document(), new dev.voxelbrew.api.model.parameters.ParameterSet.Target(featureId, field), expression));
     }
 
     public synchronized void selectConfiguration(String nameOrId) {
@@ -169,7 +174,7 @@ public final class ModelSession {
                 : field;
         var dimension = dev.voxelbrew.engine.parameters.FeatureDimensions.dimension(feature, target);
         editDimension(
-                featureId, field, dev.voxelbrew.engine.units.Measurements.value(value, dimension.measurementUnit()));
+                featureId, field, dev.voxelbrew.api.model.units.Measurements.value(value, dimension.measurementUnit()));
     }
 
     public synchronized void editDimension(
@@ -198,7 +203,8 @@ public final class ModelSession {
             for (var candidate : next)
                 if (candidate instanceof Feature.Sketch s
                         && s.plane().id().equals(selected.plane().id()))
-                    unbound = unbound.bind(new dev.voxelbrew.engine.parameters.ParameterSet.Target(s.id(), field), "");
+                    unbound =
+                            unbound.bind(new dev.voxelbrew.api.model.parameters.ParameterSet.Target(s.id(), field), "");
             commit(next, printSetup, unbound);
             return;
         }
@@ -244,12 +250,12 @@ public final class ModelSession {
         } else {
             throw new ModelException(featureId, "unknown dimension '" + field + "'");
         }
-        var unbound = parameters.bind(new dev.voxelbrew.engine.parameters.ParameterSet.Target(featureId, field), "");
+        var unbound = parameters.bind(new dev.voxelbrew.api.model.parameters.ParameterSet.Target(featureId, field), "");
         if (feature instanceof Feature.Sketch s
                 && s.profile() instanceof Feature.Constrained
                 && !field.startsWith("constraint:"))
             unbound = unbound.bind(
-                    new dev.voxelbrew.engine.parameters.ParameterSet.Target(featureId, "constraint:" + field), "");
+                    new dev.voxelbrew.api.model.parameters.ParameterSet.Target(featureId, "constraint:" + field), "");
         replace(replacement, unbound);
     }
 
@@ -322,7 +328,7 @@ public final class ModelSession {
         commit(next, printSetup);
     }
 
-    public synchronized void setPrintSetup(dev.voxelbrew.engine.printing.PrintSetup setup) {
+    public synchronized void setPrintSetup(dev.voxelbrew.api.model.printing.PrintSetup setup) {
         var retained = gcode;
         var retainedArtifacts = printArtifacts;
         boolean selectionOnly =
@@ -335,14 +341,14 @@ public final class ModelSession {
         }
     }
 
-    private void commit(List<Feature> next, dev.voxelbrew.engine.printing.PrintSetup setup) {
+    private void commit(List<Feature> next, dev.voxelbrew.api.model.printing.PrintSetup setup) {
         commit(next, setup, parameters);
     }
 
     private void commit(
             List<Feature> next,
-            dev.voxelbrew.engine.printing.PrintSetup setup,
-            dev.voxelbrew.engine.parameters.ParameterSet expressions) {
+            dev.voxelbrew.api.model.printing.PrintSetup setup,
+            dev.voxelbrew.api.model.parameters.ParameterSet expressions) {
         commit(next, setup, expressions, bodyStyles);
     }
 
@@ -358,8 +364,8 @@ public final class ModelSession {
 
     private void commit(
             List<Feature> next,
-            dev.voxelbrew.engine.printing.PrintSetup setup,
-            dev.voxelbrew.engine.parameters.ParameterSet expressions,
+            dev.voxelbrew.api.model.printing.PrintSetup setup,
+            dev.voxelbrew.api.model.parameters.ParameterSet expressions,
             java.util.Map<String, BodyStyle> styles) {
         commit(next, setup, expressions, styles, bodyNames);
     }
@@ -397,8 +403,8 @@ public final class ModelSession {
 
     private void commit(
             List<Feature> next,
-            dev.voxelbrew.engine.printing.PrintSetup setup,
-            dev.voxelbrew.engine.parameters.ParameterSet expressions,
+            dev.voxelbrew.api.model.printing.PrintSetup setup,
+            dev.voxelbrew.api.model.parameters.ParameterSet expressions,
             java.util.Map<String, BodyStyle> styles,
             java.util.Map<String, String> names) {
         List<Feature> validated =

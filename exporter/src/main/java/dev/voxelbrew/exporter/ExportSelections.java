@@ -1,6 +1,7 @@
 package dev.voxelbrew.exporter;
 
-import dev.voxelbrew.engine.mesh.MeshOptions;
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
 import dev.voxelbrew.engine.model.*;
 
 @lombok.experimental.UtilityClass

@@ -1,7 +1,8 @@
 package dev.voxelbrew.exporter.printing;
 
-import dev.voxelbrew.engine.mesh.*;
-import dev.voxelbrew.engine.model.BodyInstance;
+import dev.voxelbrew.api.model.BodyInstance;
+import dev.voxelbrew.api.model.mesh.*;
+import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.exporter.ManufacturingView;
 import dev.voxelbrew.exporter.MeshExportOption;

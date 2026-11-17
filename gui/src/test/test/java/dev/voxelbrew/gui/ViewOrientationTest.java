@@ -19,11 +19,11 @@ class ViewOrientationTest {
 
     @Test
     void sketchFrameConversionPreservesModelCoordinatesForAllPlanesAndArbitraryFaces() {
-        var frames = new java.util.ArrayList<dev.voxelbrew.engine.model.Transform>();
+        var frames = new java.util.ArrayList<dev.voxelbrew.api.model.Transform>();
         for (String name : new String[] {"XY", "XZ", "YZ"})
-            frames.add(dev.voxelbrew.engine.model.Feature.Plane.origin(name).frame());
-        frames.add(dev.voxelbrew.engine.model.Transform.translation(3, 7, -9)
-                .compose(dev.voxelbrew.engine.model.Transform.rotation(21, 33, 47)));
+            frames.add(dev.voxelbrew.api.model.Feature.Plane.origin(name).frame());
+        frames.add(dev.voxelbrew.api.model.Transform.translation(3, 7, -9)
+                .compose(dev.voxelbrew.api.model.Transform.rotation(21, 33, 47)));
         for (var frame : frames) {
             var model = frame.apply(4, -8, 12);
             assertThat(Viewport.viewTransform(frame)

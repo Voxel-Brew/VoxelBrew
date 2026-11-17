@@ -2,8 +2,12 @@ package dev.voxelbrew.engine.model;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.CadDocument;
+import dev.voxelbrew.api.model.FaceSupport;
+import dev.voxelbrew.api.model.Feature;
+import dev.voxelbrew.api.model.Transform;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
 import dev.voxelbrew.engine.geometry.Solid;
-import dev.voxelbrew.engine.mesh.MeshOptions;
 import dev.voxelbrew.exporter.DocumentWriter;
 import dev.voxelbrew.importer.DocumentReader;
 import java.nio.file.Path;

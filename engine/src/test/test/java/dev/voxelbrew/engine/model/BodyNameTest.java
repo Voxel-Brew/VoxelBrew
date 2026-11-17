@@ -2,6 +2,9 @@ package dev.voxelbrew.engine.model;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.BodyStyle;
+import dev.voxelbrew.api.model.CadDocument;
+import dev.voxelbrew.api.model.Feature;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -52,8 +55,8 @@ class BodyNameTest {
                 "names",
                 List.of(),
                 0,
-                dev.voxelbrew.engine.printing.PrintSetup.empty(),
-                dev.voxelbrew.engine.parameters.ParameterSet.empty(),
+                dev.voxelbrew.api.model.printing.PrintSetup.empty(),
+                dev.voxelbrew.api.model.parameters.ParameterSet.empty(),
                 Map.of(),
                 names);
         names.clear();

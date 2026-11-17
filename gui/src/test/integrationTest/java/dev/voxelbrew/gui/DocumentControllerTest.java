@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.*;
 import dev.voxelbrew.api.importer.ImportDialog;
 import dev.voxelbrew.api.importer.ImportWindow;
 import dev.voxelbrew.api.importer.ServiceLoaderImporterProviderRegistry;
+import dev.voxelbrew.api.model.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.exporter.DocumentWriter;
 import dev.voxelbrew.importer.DocumentReader;
@@ -27,14 +28,14 @@ class DocumentControllerTest {
         var g = dev.voxelbrew.engine.sketch.Sketches.rectangle("r", 0, 0, 20, 10, false);
         var entities = new java.util.ArrayList<>(g.entities());
         entities.add(dev.voxelbrew.engine.sketch.Sketches.entity(
-                "roof-left", dev.voxelbrew.engine.sketch.SketchGeometry.Kind.LINE, false, 0, 10, 10, 20));
+                "roof-left", dev.voxelbrew.api.model.sketch.SketchGeometry.Kind.LINE, false, 0, 10, 10, 20));
         entities.add(dev.voxelbrew.engine.sketch.Sketches.entity(
-                "roof-right", dev.voxelbrew.engine.sketch.SketchGeometry.Kind.LINE, false, 10, 20, 20, 10));
-        g = new dev.voxelbrew.engine.sketch.SketchGeometry(
+                "roof-right", dev.voxelbrew.api.model.sketch.SketchGeometry.Kind.LINE, false, 10, 20, 20, 10));
+        g = new dev.voxelbrew.api.model.sketch.SketchGeometry(
                 entities,
                 g.constraints(),
                 entities.stream()
-                        .map(dev.voxelbrew.engine.sketch.SketchGeometry.Entity::id)
+                        .map(dev.voxelbrew.api.model.sketch.SketchGeometry.Entity::id)
                         .toList());
         var sketch =
                 new Feature.Sketch("sketch", "profile", new Feature.Plane("origin-xy", 0), new Feature.Constrained(g));
@@ -238,8 +239,8 @@ class DocumentControllerTest {
             var sketch = sketch("plate", 0);
             controller.add(sketch);
             await(() -> !controller.rebuilding());
-            var p = dev.voxelbrew.engine.parameters.ParameterSet.empty()
-                    .put("thickness", dev.voxelbrew.engine.parameters.ParameterUnit.MM, "5", "")
+            var p = dev.voxelbrew.api.model.parameters.ParameterSet.empty()
+                    .put("thickness", dev.voxelbrew.api.model.parameters.ParameterUnit.MM, "5", "")
                     .addConfiguration("Thick", false)
                     .override("thickness", "Thick", "8")
                     .addConfiguration("Invalid", false)

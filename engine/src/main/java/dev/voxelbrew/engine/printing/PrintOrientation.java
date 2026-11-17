@@ -1,27 +1,28 @@
 package dev.voxelbrew.engine.printing;
 
-import dev.voxelbrew.engine.model.Transform;
+import dev.voxelbrew.api.model.Transform;
+import dev.voxelbrew.api.model.printing.MeshGeometry;
 
 /** Shared automatic bed orientation for desktop and headless preparation. */
 public final class PrintOrientation {
     private PrintOrientation() {}
 
     /** Rank feasible planar bed faces by unsupported area, bed contact, then height. */
-    public static Transform autoOrient(dev.voxelbrew.engine.mesh.MeshData mesh, Transform current) {
+    public static Transform autoOrient(dev.voxelbrew.api.model.mesh.MeshData mesh, Transform current) {
         Transform best = null;
         double bestOverhang = Double.POSITIVE_INFINITY, bestContact = -1, bestHeight = Double.POSITIVE_INFINITY;
         for (int face :
                 java.util.Arrays.stream(mesh.faceIndices()).distinct().sorted().toArray()) {
             Transform candidate;
             try {
-                candidate = dev.voxelbrew.engine.printing.MeshGeometry.layOnFace(mesh, face, current);
+                candidate = dev.voxelbrew.api.model.printing.MeshGeometry.layOnFace(mesh, face, current);
             } catch (IllegalArgumentException unsuitable) {
                 continue;
             }
-            var placed = dev.voxelbrew.engine.printing.MeshGeometry.transform(mesh, candidate);
+            var placed = dev.voxelbrew.api.model.printing.MeshGeometry.transform(mesh, candidate);
             double overhang = 0, contact = 0;
             for (int t = 0; t < placed.triangleCount(); t++) {
-                double[] n = dev.voxelbrew.engine.mesh.MeshValidation.normal(placed, t);
+                double[] n = dev.voxelbrew.api.model.mesh.MeshValidation.normal(placed, t);
                 double area = Math.sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]) / 2;
                 boolean onBed = true;
                 for (int c = 0; c < 3; c++) onBed &= Math.abs(placed.coordinate(placed.vertexIndex(t, c), 2)) < 0.001;
@@ -29,7 +30,7 @@ public final class PrintOrientation {
                 else if (n[2] < -2 * area * Math.cos(Math.PI / 4)) overhang += area;
             }
             double height =
-                    dev.voxelbrew.engine.printing.MeshGeometry.bounds(placed).maxZ();
+                    dev.voxelbrew.api.model.printing.MeshGeometry.bounds(placed).maxZ();
             if (overhang < bestOverhang - 1e-6
                     || Math.abs(overhang - bestOverhang) < 1e-6
                             && (contact > bestContact + 1e-6
@@ -44,9 +45,9 @@ public final class PrintOrientation {
         return best;
     }
     /** Rotate about the placed center in world/local axes, preserving bed clearance. */
-    public static dev.voxelbrew.engine.model.BodyInstance rotate(
-            dev.voxelbrew.engine.model.BodyInstance source,
-            dev.voxelbrew.engine.mesh.MeshData mesh,
+    public static dev.voxelbrew.api.model.BodyInstance rotate(
+            dev.voxelbrew.api.model.BodyInstance source,
+            dev.voxelbrew.api.model.mesh.MeshData mesh,
             int axis,
             double degrees,
             boolean local) {
@@ -66,7 +67,7 @@ public final class PrintOrientation {
                 .compose(Transform.translation(-x, -y, -z))
                 .compose(source.transform());
         var after = MeshGeometry.bounds(MeshGeometry.transform(mesh, placed));
-        return new dev.voxelbrew.engine.model.BodyInstance(
+        return new dev.voxelbrew.api.model.BodyInstance(
                 source.id(),
                 source.bodyId(),
                 Transform.translation(0, 0, before.minZ() - after.minZ()).compose(placed));

@@ -1,5 +1,6 @@
 package dev.voxelbrew.cli;
 
+import dev.voxelbrew.api.model.parameters.*;
 import dev.voxelbrew.engine.parameters.*;
 import dev.voxelbrew.importer.DocumentSource;
 import picocli.CommandLine;

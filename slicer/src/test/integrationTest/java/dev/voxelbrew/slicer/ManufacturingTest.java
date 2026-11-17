@@ -2,9 +2,10 @@ package dev.voxelbrew.slicer;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.mesh.*;
-import dev.voxelbrew.engine.model.BodyInstance;
-import dev.voxelbrew.engine.model.Transform;
+import dev.voxelbrew.api.model.BodyInstance;
+import dev.voxelbrew.api.model.Transform;
+import dev.voxelbrew.api.model.mesh.*;
+import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.exporter.ExportSelection;
 import dev.voxelbrew.exporter.ModelView;

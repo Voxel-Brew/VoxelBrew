@@ -2,6 +2,8 @@ package dev.voxelbrew.cli;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.importer.GcodeSource;

@@ -2,7 +2,7 @@ package dev.voxelbrew.cli;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.model.CadDocument;
+import dev.voxelbrew.api.model.CadDocument;
 import dev.voxelbrew.util.config.UserConfiguration;
 import dev.voxelbrew.util.di.ApplicationModule;
 import dev.voxelbrew.util.update.UpdateServiceFactory;

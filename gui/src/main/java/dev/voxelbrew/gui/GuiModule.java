@@ -3,8 +3,8 @@ package dev.voxelbrew.gui;
 import dagger.Module;
 import dagger.Provides;
 import dev.voxelbrew.api.exporter.ExporterProviderRegistry;
-import dev.voxelbrew.engine.model.CadDocument;
-import dev.voxelbrew.slicer.api.SlicerCatalog;
+import dev.voxelbrew.api.model.CadDocument;
+import dev.voxelbrew.api.slicer.SlicerCatalog;
 import java.util.concurrent.ExecutorService;
 import java.util.function.*;
 import javafx.application.Platform;
@@ -14,8 +14,8 @@ import javax.inject.Named;
 final class GuiModule {
     @Provides
     @javax.inject.Singleton
-    static dev.voxelbrew.printer.api.PrinterRuntime printersRuntime() {
-        return dev.voxelbrew.printer.api.PrinterRuntime.load();
+    static dev.voxelbrew.api.printer.PrinterRuntime printersRuntime() {
+        return dev.voxelbrew.api.printer.PrinterRuntime.load();
     }
 
     @Provides
@@ -36,7 +36,7 @@ final class GuiModule {
     }
 
     @Provides
-    static Function<dev.voxelbrew.engine.sketch.SketchGeometry, dev.voxelbrew.engine.sketch.SketchSolver.Result>
+    static Function<dev.voxelbrew.api.model.sketch.SketchGeometry, dev.voxelbrew.engine.sketch.SketchSolver.Result>
             sketchSolver() {
         return dev.voxelbrew.engine.sketch.SketchSolver::solve;
     }

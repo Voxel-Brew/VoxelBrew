@@ -1,5 +1,7 @@
 package dev.voxelbrew.engine.model;
 
+import dev.voxelbrew.api.model.CadDocument;
+import dev.voxelbrew.api.model.Feature;
 import dev.voxelbrew.engine.geometry.Solid;
 import java.util.List;
 
@@ -22,14 +24,14 @@ public final class Evaluation implements AutoCloseable {
     private final List<Solid> owned;
     private final List<Feature> resolvedFeatures;
     private boolean closed;
-    private java.util.Map<String, dev.voxelbrew.engine.construction.ConstructionGeometry.Datum> construction =
+    private java.util.Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction =
             java.util.Map.of();
 
-    void construction(java.util.Map<String, dev.voxelbrew.engine.construction.ConstructionGeometry.Datum> values) {
+    void construction(java.util.Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> values) {
         construction = java.util.Map.copyOf(values);
     }
 
-    public java.util.Map<String, dev.voxelbrew.engine.construction.ConstructionGeometry.Datum> construction() {
+    public java.util.Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction() {
         requireOpen();
         if (!valid()) throw new IllegalStateException("Construction geometry unavailable after failed rebuild");
         return construction;

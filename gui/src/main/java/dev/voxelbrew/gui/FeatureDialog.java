@@ -1,8 +1,8 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.model.Feature;
+import dev.voxelbrew.api.model.parameters.ParameterSet;
 import dev.voxelbrew.engine.feature.*;
-import dev.voxelbrew.engine.model.Feature;
-import dev.voxelbrew.engine.parameters.ParameterSet;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.*;

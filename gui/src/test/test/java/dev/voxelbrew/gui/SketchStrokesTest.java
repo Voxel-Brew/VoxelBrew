@@ -2,7 +2,7 @@ package dev.voxelbrew.gui;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.sketch.SketchGeometry.Vec;
+import dev.voxelbrew.api.model.sketch.SketchGeometry.Vec;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 

@@ -3,6 +3,7 @@ package dev.voxelbrew.importer;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.importer.*;
+import dev.voxelbrew.api.model.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import dev.voxelbrew.util.testing.FileImportWindows;
@@ -30,11 +31,11 @@ class ImportTest {
         };
     }
 
-    private static void collect(dev.voxelbrew.api.vui.Component component, Set<String> ids) {
-        if (component instanceof dev.voxelbrew.api.vui.Input input) ids.add(input.id());
-        else if (component instanceof dev.voxelbrew.api.vui.HorizontalLayout row)
+    private static void collect(dev.voxelbrew.api.model.vui.Component component, Set<String> ids) {
+        if (component instanceof dev.voxelbrew.api.model.vui.Input input) ids.add(input.id());
+        else if (component instanceof dev.voxelbrew.api.model.vui.HorizontalLayout row)
             row.children().forEach(child -> collect(child, ids));
-        else if (component instanceof dev.voxelbrew.api.vui.VerticalLayout column)
+        else if (component instanceof dev.voxelbrew.api.model.vui.VerticalLayout column)
             column.children().forEach(child -> collect(child, ids));
     }
 

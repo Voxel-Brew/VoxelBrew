@@ -1,16 +1,18 @@
 package dev.voxelbrew.gui;
 
 import dev.voxelbrew.api.exporter.ExporterProviderRegistry;
-import dev.voxelbrew.engine.mesh.*;
-import dev.voxelbrew.engine.model.BodyInstance;
-import dev.voxelbrew.engine.model.Transform;
+import dev.voxelbrew.api.model.BodyInstance;
+import dev.voxelbrew.api.model.Transform;
+import dev.voxelbrew.api.model.mesh.*;
+import dev.voxelbrew.api.model.parameters.*;
+import dev.voxelbrew.api.model.printing.*;
+import dev.voxelbrew.api.slicer.PrinterProfileCatalog;
+import dev.voxelbrew.api.slicer.SlicerBackend;
+import dev.voxelbrew.api.slicer.SlicerCatalog;
+import dev.voxelbrew.api.slicer.Slicing;
 import dev.voxelbrew.engine.parameters.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import dev.voxelbrew.engine.printing.*;
-import dev.voxelbrew.slicer.api.PrinterProfileCatalog;
-import dev.voxelbrew.slicer.api.SlicerBackend;
-import dev.voxelbrew.slicer.api.SlicerCatalog;
-import dev.voxelbrew.slicer.api.Slicing;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
@@ -92,9 +94,9 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     private final Label printerProfileLabel = new Label();
     private final ComboBox<String> printTarget = new ComboBox<>();
     private Map<String, String> printTargetNames = Map.of();
-    private Map<String, dev.voxelbrew.printer.api.Printer> printTargetDevices = Map.of();
+    private Map<String, dev.voxelbrew.api.printer.Printer> printTargetDevices = Map.of();
     private Runnable configureDevicesAction = () -> {};
-    private final dev.voxelbrew.printer.api.PrinterRuntime printerRuntime;
+    private final dev.voxelbrew.api.printer.PrinterRuntime printerRuntime;
     private final java.nio.file.Path connectionDirectory;
     private final Label printerDetails = new Label();
     private final FormulaField nozzle;
@@ -179,7 +181,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     @javax.inject.Inject
     PrintingPane(
             PrinterProfileCatalog printers,
-            dev.voxelbrew.printer.api.PrinterRuntime printerRuntime,
+            dev.voxelbrew.api.printer.PrinterRuntime printerRuntime,
             PrinterVisibility printerVisibility,
             DocumentController document,
             PrintController jobs,
@@ -1051,9 +1053,9 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
             m[3],
             m[7],
             m[11],
-            dev.voxelbrew.engine.units.Measurements.degrees(rx),
-            dev.voxelbrew.engine.units.Measurements.degrees(ry),
-            dev.voxelbrew.engine.units.Measurements.degrees(rz)
+            dev.voxelbrew.api.model.units.Measurements.degrees(rx),
+            dev.voxelbrew.api.model.units.Measurements.degrees(ry),
+            dev.voxelbrew.api.model.units.Measurements.degrees(rz)
         };
         for (int i = 0; i < names.length; i++)
             fields.get("print-" + names[i])
@@ -2308,15 +2310,15 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
             updating = true;
             printTargetNames = targets.stream()
                     .collect(java.util.stream.Collectors.toMap(
-                            dev.voxelbrew.printer.api.Printer::id, dev.voxelbrew.printer.api.Printer::name));
+                            dev.voxelbrew.api.printer.Printer::id, dev.voxelbrew.api.printer.Printer::name));
             printTargetDevices = targets.stream()
                     .collect(java.util.stream.Collectors.toMap(
-                            dev.voxelbrew.printer.api.Printer::id, java.util.function.Function.identity()));
+                            dev.voxelbrew.api.printer.Printer::id, java.util.function.Function.identity()));
             printTarget.getItems().setAll("");
             printTarget
                     .getItems()
                     .addAll(targets.stream()
-                            .map(dev.voxelbrew.printer.api.Printer::id)
+                            .map(dev.voxelbrew.api.printer.Printer::id)
                             .toList());
             printTarget.setValue(selectedTarget == null ? "" : selectedTarget);
             printTarget.getButtonCell().setText(printTarget.getConverter().toString(printTarget.getValue()));

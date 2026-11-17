@@ -2,6 +2,8 @@ package dev.voxelbrew.engine.model;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.CadDocument;
+import dev.voxelbrew.api.model.Feature;
 import dev.voxelbrew.engine.feature.*;
 import java.util.List;
 import org.junit.jupiter.api.Test;

@@ -21,8 +21,8 @@ abstract class CommandBindings {
     abstract Object preferenceCommands(PreferenceCommands command);
 
     @Provides
-    static dev.voxelbrew.printer.api.PrinterRuntime printerRuntime() {
-        return dev.voxelbrew.printer.api.PrinterRuntime.load();
+    static dev.voxelbrew.api.printer.PrinterRuntime printerRuntime() {
+        return dev.voxelbrew.api.printer.PrinterRuntime.load();
     }
 
     @Binds

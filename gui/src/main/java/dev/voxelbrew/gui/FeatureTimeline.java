@@ -1,8 +1,8 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.engine.model.CadDocument;
+import dev.voxelbrew.api.model.CadDocument;
+import dev.voxelbrew.api.model.Feature;
 import dev.voxelbrew.engine.model.Evaluation;
-import dev.voxelbrew.engine.model.Feature;
 import dev.voxelbrew.util.i18n.Translations;
 import java.util.List;
 import java.util.Objects;
@@ -364,7 +364,7 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
     }
 
     private static Node featureIcon(Feature feature) {
-        if (feature instanceof dev.voxelbrew.engine.model.ConstructionFeature construction)
+        if (feature instanceof dev.voxelbrew.api.model.ConstructionFeature construction)
             return ConstructionIcons.icon(construction.tool());
         if (feature instanceof Feature.Sketch)
             return new Group(

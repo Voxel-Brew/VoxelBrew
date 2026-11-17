@@ -2,7 +2,7 @@ package dev.voxelbrew.exporter;
 
 import dev.voxelbrew.api.exporter.ExporterProviderRegistry;
 import dev.voxelbrew.api.exporter.FileExportDialog;
-import dev.voxelbrew.engine.mesh.MeshOptions;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Map;

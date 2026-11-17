@@ -1,12 +1,14 @@
 package dev.voxelbrew.cli;
 
-import dev.voxelbrew.engine.mesh.MeshOptions;
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
+import dev.voxelbrew.api.model.printing.*;
+import dev.voxelbrew.api.slicer.PrinterProfileCatalog;
+import dev.voxelbrew.api.slicer.SlicerCatalog;
+import dev.voxelbrew.api.slicer.Slicing;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.importer.DocumentSource;
-import dev.voxelbrew.slicer.api.PrinterProfileCatalog;
-import dev.voxelbrew.slicer.api.SlicerCatalog;
-import dev.voxelbrew.slicer.api.Slicing;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
@@ -622,7 +624,7 @@ final class PrintingCommands {
                 String selectedPrinterId =
                         document.printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID);
                 if (printerConnection != null) {
-                    var connections = dev.voxelbrew.printer.api.PrinterRuntime.load()
+                    var connections = dev.voxelbrew.api.printer.PrinterRuntime.load()
                             .devices(dev.voxelbrew.util.config.ApplicationPaths.configuration()
                                     .resolveSibling("devices"));
                     var connection = connections.stream()

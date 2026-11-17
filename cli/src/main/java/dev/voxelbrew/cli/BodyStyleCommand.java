@@ -1,6 +1,6 @@
 package dev.voxelbrew.cli;
 
-import dev.voxelbrew.engine.model.BodyStyle;
+import dev.voxelbrew.api.model.BodyStyle;
 import dev.voxelbrew.importer.DocumentSource;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;

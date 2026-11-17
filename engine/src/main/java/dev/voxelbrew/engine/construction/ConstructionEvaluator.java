@@ -1,11 +1,11 @@
 package dev.voxelbrew.engine.construction;
 
-import static dev.voxelbrew.engine.construction.ConstructionGeometry.*;
-import static dev.voxelbrew.engine.construction.ConstructionTools.*;
+import static dev.voxelbrew.api.model.construction.ConstructionGeometry.*;
+import static dev.voxelbrew.api.model.construction.ConstructionTools.*;
 
+import dev.voxelbrew.api.model.ConstructionFeature;
+import dev.voxelbrew.api.model.Feature;
 import dev.voxelbrew.engine.geometry.Solid;
-import dev.voxelbrew.engine.model.ConstructionFeature;
-import dev.voxelbrew.engine.model.Feature;
 import java.util.Map;
 import java.util.function.Function;
 

@@ -2,6 +2,10 @@ package dev.voxelbrew.engine.parameters;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.parameters.Expressions;
+import dev.voxelbrew.api.model.parameters.ParameterSet;
+import dev.voxelbrew.api.model.parameters.ParameterUnit;
 import dev.voxelbrew.engine.model.*;
 import java.util.*;
 import org.junit.jupiter.api.Test;

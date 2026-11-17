@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.slicer.api.SlicerCatalog;
+import dev.voxelbrew.api.slicer.SlicerCatalog;
 import dev.voxelbrew.util.i18n.Translations;
 import java.io.IOException;
 import java.util.LinkedHashMap;

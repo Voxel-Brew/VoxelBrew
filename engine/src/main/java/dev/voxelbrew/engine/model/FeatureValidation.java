@@ -1,5 +1,9 @@
 package dev.voxelbrew.engine.model;
 
+import dev.voxelbrew.api.model.CadDocument;
+import dev.voxelbrew.api.model.Feature;
+import dev.voxelbrew.api.model.ModelException;
+
 /** Shared edit-time and replay-time validation. Broken references are diagnosed by replay. */
 final class FeatureValidation {
     private FeatureValidation() {}

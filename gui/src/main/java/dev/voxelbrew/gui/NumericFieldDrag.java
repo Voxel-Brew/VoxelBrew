@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.engine.parameters.Expressions;
+import dev.voxelbrew.api.model.parameters.Expressions;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import javafx.scene.input.KeyCode;

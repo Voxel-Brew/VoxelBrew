@@ -2,10 +2,11 @@ package dev.voxelbrew.slicer;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.mesh.MeshOptions;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
+import dev.voxelbrew.api.model.printing.*;
+import dev.voxelbrew.api.slicer.SlicerBackend;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.exporter.printing.*;
-import dev.voxelbrew.slicer.api.SlicerBackend;
 import dev.voxelbrew.slicer.prusa.PrusaSlicerBackend;
 import java.io.IOException;
 import java.nio.file.*;
@@ -41,7 +42,7 @@ class SliceLifecycleTest {
                             }
                             if (line.contains("Processing triangulated mesh")) cancellation.cancel();
                         },
-                        dev.voxelbrew.slicer.api.Slicing.DIRECT))
+                        dev.voxelbrew.api.slicer.Slicing.DIRECT))
                 .isInstanceOf(CancellationException.class);
         assertThat(Files.readString(output)).isEqualTo("original");
         assertThat(cancellation.cancelled()).isTrue();
@@ -80,7 +81,7 @@ class SliceLifecycleTest {
                         true,
                         new Cancellation(),
                         line -> {},
-                        dev.voxelbrew.slicer.api.Slicing.DIRECT),
+                        dev.voxelbrew.api.slicer.Slicing.DIRECT),
                 IOException.class);
         assertThat(failure.getMessage().contains("forced backend failure")).isTrue();
         assertThat(Files.readString(output)).isEqualTo("original");
@@ -107,7 +108,7 @@ class SliceLifecycleTest {
                         true,
                         new Cancellation(),
                         line -> {},
-                        dev.voxelbrew.slicer.api.Slicing.DIRECT))
+                        dev.voxelbrew.api.slicer.Slicing.DIRECT))
                 .isInstanceOf(IOException.class);
         session.setPrintSetup(
                 session.document().printSetup().withProfile("prusa-slicer", "missing", "PLA", ProcessSettings.DEFAULT));

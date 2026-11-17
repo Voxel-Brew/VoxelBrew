@@ -2,17 +2,20 @@ package dev.voxelbrew.gui;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.parameters.*;
+import dev.voxelbrew.api.model.printing.*;
+import dev.voxelbrew.api.model.sketch.SketchGeometry;
+import dev.voxelbrew.api.printer.Printer;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.parameters.*;
 import dev.voxelbrew.engine.persistence.proto.DocumentProto;
 import dev.voxelbrew.engine.printing.*;
-import dev.voxelbrew.engine.sketch.SketchGeometry;
 import dev.voxelbrew.engine.sketch.SketchTools;
 import dev.voxelbrew.engine.sketch.Sketches;
 import dev.voxelbrew.exporter.DocumentWriter;
 import dev.voxelbrew.importer.DocumentReader;
 import dev.voxelbrew.importer.GcodeReader;
-import dev.voxelbrew.printer.api.Printer;
 import dev.voxelbrew.slicer.prusa.PrusaSlicerBackend;
 import dev.voxelbrew.util.Version;
 import java.nio.ByteBuffer;
@@ -397,7 +400,7 @@ class WorkbenchUiTest {
             var matchingProfile = java.util.stream.IntStream.range(
                             0, profile.getItems().size())
                     .filter(index -> profile.getItems().get(index)
-                                    instanceof dev.voxelbrew.slicer.api.PrinterProfileCatalog.Entry entry
+                                    instanceof dev.voxelbrew.api.slicer.PrinterProfileCatalog.Entry entry
                             && !entry.definition().printer().id().equals(activeProfile))
                     .findFirst()
                     .orElseThrow();
@@ -2205,7 +2208,7 @@ class WorkbenchUiTest {
         assertThat(document().features().size()).isEqualTo(1);
         var feature = (ConstructionFeature) document().features().getFirst();
         assertThat(feature.value()).isEqualTo(12);
-        assertThat(fx(() -> ((dev.voxelbrew.engine.construction.ConstructionGeometry.Plane)
+        assertThat(fx(() -> ((dev.voxelbrew.api.model.construction.ConstructionGeometry.Plane)
                                 workbench.controller().build().construction().get(feature.id()))
                         .origin()
                         .z()))
@@ -2236,7 +2239,7 @@ class WorkbenchUiTest {
                                     "missing",
                                     "",
                                     0,
-                                    new dev.voxelbrew.engine.construction.ConstructionGeometry.Vector(0, 0, 0))),
+                                    new dev.voxelbrew.api.model.construction.ConstructionGeometry.Vector(0, 0, 0))),
                             12,
                             false));
             return null;

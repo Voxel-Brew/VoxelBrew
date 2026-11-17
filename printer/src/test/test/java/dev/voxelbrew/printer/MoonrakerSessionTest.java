@@ -3,7 +3,7 @@ package dev.voxelbrew.printer;
 import static org.assertj.core.api.Assertions.*;
 
 import com.sun.net.httpserver.HttpServer;
-import dev.voxelbrew.printer.api.*;
+import dev.voxelbrew.api.printer.*;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;

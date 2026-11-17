@@ -3,8 +3,8 @@ package dev.voxelbrew.exporter;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.exporter.*;
-import dev.voxelbrew.engine.mesh.MeshOptions;
-import dev.voxelbrew.engine.model.CadDocument;
+import dev.voxelbrew.api.model.CadDocument;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
 import dev.voxelbrew.engine.printing.ManufacturingModels;
 import java.nio.file.*;
 import java.util.*;
@@ -19,14 +19,14 @@ class UnifiedExportTest {
     @Test
     void prusaProjectUsesSlicerProcessAndPlacementEvenWhenDesignSpaceWasRequested() throws Exception {
         var base = ExportTest.reference();
-        var setup = dev.voxelbrew.engine.printing.PrintSetup.empty()
+        var setup = dev.voxelbrew.api.model.printing.PrintSetup.empty()
                 .withProfile(
                         "prusa-slicer",
                         "generic-marlin-200-0.4",
                         "PETG",
-                        new dev.voxelbrew.engine.printing.ProcessSettings(0.25, 4, 35, true, true, 55, 0.3, 4, 6, 2))
-                .withInstances(List.of(new dev.voxelbrew.engine.model.BodyInstance(
-                        "placed", "thickness.body", dev.voxelbrew.engine.model.Transform.translation(25, 35, 0))));
+                        new dev.voxelbrew.api.model.printing.ProcessSettings(0.25, 4, 35, true, true, 55, 0.3, 4, 6, 2))
+                .withInstances(List.of(new dev.voxelbrew.api.model.BodyInstance(
+                        "placed", "thickness.body", dev.voxelbrew.api.model.Transform.translation(25, 35, 0))));
         var document = new CadDocument(base.id(), base.features(), base.cursor(), setup);
         Path target = directory.resolve("native-project.3mf");
         var parent = window(target, false);
@@ -70,9 +70,9 @@ class UnifiedExportTest {
     @Test
     void threeMfPrefersSlicerPlateAndCarriesSettingsWhileObjKeepsDesignSpace() throws Exception {
         var base = ExportTest.reference();
-        var setup = dev.voxelbrew.engine.printing.PrintSetup.empty()
-                .withInstances(List.of(new dev.voxelbrew.engine.model.BodyInstance(
-                        "placed", "thickness.body", dev.voxelbrew.engine.model.Transform.translation(25, 35, 7))))
+        var setup = dev.voxelbrew.api.model.printing.PrintSetup.empty()
+                .withInstances(List.of(new dev.voxelbrew.api.model.BodyInstance(
+                        "placed", "thickness.body", dev.voxelbrew.api.model.Transform.translation(25, 35, 7))))
                 .withWorkspaceSettings(Map.of("print-output", "custom.gcode"));
         var document = new CadDocument(base.id(), base.features(), base.cursor(), setup);
         Path target = directory.resolve("plate.3mf");

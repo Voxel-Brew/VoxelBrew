@@ -3,11 +3,12 @@ package dev.voxelbrew.slicer;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.exporter.*;
-import dev.voxelbrew.engine.mesh.MeshOptions;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
+import dev.voxelbrew.api.model.printing.*;
+import dev.voxelbrew.api.slicer.SlicerBackend;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.exporter.*;
 import dev.voxelbrew.exporter.printing.*;
-import dev.voxelbrew.slicer.api.SlicerBackend;
 import dev.voxelbrew.slicer.prusa.PrusaSlicerBackend;
 import java.io.IOException;
 import java.nio.file.*;
@@ -63,7 +64,7 @@ class SlicerExportPipelineTest {
                                     true,
                                     new Cancellation(),
                                     line -> {},
-                                    dev.voxelbrew.slicer.api.Slicing.DIRECT),
+                                    dev.voxelbrew.api.slicer.Slicing.DIRECT),
                             IOException.class);
                     assertThat(failure.getMessage()).isEqualTo("Backend reached after export");
                     assertThat(runs.get()).isEqualTo(1);
@@ -109,7 +110,7 @@ class SlicerExportPipelineTest {
                                 true,
                                 new Cancellation(),
                                 line -> {},
-                                dev.voxelbrew.slicer.api.Slicing.DIRECT),
+                                dev.voxelbrew.api.slicer.Slicing.DIRECT),
                         Exception.class);
                 if (cancel) assertThat(failure).isInstanceOf(CancellationException.class);
                 else assertThat(failure).isInstanceOf(IOException.class);

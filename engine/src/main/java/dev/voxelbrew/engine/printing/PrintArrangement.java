@@ -1,7 +1,9 @@
 package dev.voxelbrew.engine.printing;
 
-import dev.voxelbrew.engine.model.BodyInstance;
-import dev.voxelbrew.engine.model.Transform;
+import dev.voxelbrew.api.model.BodyInstance;
+import dev.voxelbrew.api.model.Transform;
+import dev.voxelbrew.api.model.printing.ManufacturingModel;
+import dev.voxelbrew.api.model.printing.MeshGeometry;
 import java.awt.geom.Area;
 import java.awt.geom.Rectangle2D;
 import java.util.*;

@@ -1,6 +1,6 @@
 package dev.voxelbrew.exporter;
 
-import dev.voxelbrew.engine.printing.ManufacturingModel;
+import dev.voxelbrew.api.model.printing.ManufacturingModel;
 
 /**
  * Export input for a complete build-plate setup. The detached manufacturing snapshot includes

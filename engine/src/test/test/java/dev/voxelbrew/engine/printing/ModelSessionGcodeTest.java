@@ -2,6 +2,8 @@ package dev.voxelbrew.engine.printing;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.printing.PrintSetup;
 import dev.voxelbrew.engine.model.*;
 import java.util.*;
 import org.junit.jupiter.api.Test;

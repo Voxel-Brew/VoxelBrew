@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.slicer.api.PrinterProfileCatalog;
+import dev.voxelbrew.api.slicer.PrinterProfileCatalog;
 import dev.voxelbrew.util.i18n.Translations;
 import java.util.*;
 import javafx.scene.control.*;

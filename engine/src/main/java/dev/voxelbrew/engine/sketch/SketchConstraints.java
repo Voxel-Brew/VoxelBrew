@@ -1,7 +1,9 @@
 package dev.voxelbrew.engine.sketch;
 
-import static dev.voxelbrew.engine.sketch.SketchGeometry.*;
+import static dev.voxelbrew.api.model.sketch.SketchGeometry.*;
 
+import dev.voxelbrew.api.model.sketch.SketchCurves;
+import dev.voxelbrew.api.model.sketch.SketchGeometry;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -297,14 +299,14 @@ public final class SketchConstraints {
                     var entity = object(g, refs.getFirst());
                     if (entity.kind() == Kind.ELLIPSE || entity.kind() == Kind.TEXT) {
                         double delta = entity.value(entity.kind() == Kind.ELLIPSE ? 4 : 3)
-                                - dev.voxelbrew.engine.units.Measurements.radians(values.getFirst());
+                                - dev.voxelbrew.api.model.units.Measurements.radians(values.getFirst());
                         return new double[] {10 * Math.atan2(Math.sin(delta), Math.cos(delta))};
                     }
                 }
                 var a = n == 1 ? new Vec(1, 0) : direction(line(g, refs.get(0)));
                 var b = direction(line(g, refs.getLast()));
                 double delta = Math.atan2(a.cross(b), a.dot(b))
-                        - dev.voxelbrew.engine.units.Measurements.radians(values.getFirst());
+                        - dev.voxelbrew.api.model.units.Measurements.radians(values.getFirst());
                 return new double[] {10 * Math.atan2(Math.sin(delta), Math.cos(delta))};
             }
             case MAJOR_RADIUS, MINOR_RADIUS, RHO, TEXT_HEIGHT, TEXT_SPACING -> {

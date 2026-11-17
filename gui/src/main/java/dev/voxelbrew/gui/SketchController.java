@@ -1,5 +1,7 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.model.parameters.*;
+import dev.voxelbrew.api.model.sketch.*;
 import dev.voxelbrew.engine.parameters.*;
 import dev.voxelbrew.engine.sketch.*;
 import java.util.ArrayDeque;

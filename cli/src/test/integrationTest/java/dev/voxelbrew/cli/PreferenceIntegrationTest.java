@@ -2,7 +2,7 @@ package dev.voxelbrew.cli;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.slicer.api.*;
+import dev.voxelbrew.api.slicer.*;
 import dev.voxelbrew.util.config.UserConfiguration;
 import java.io.*;
 import java.nio.file.*;

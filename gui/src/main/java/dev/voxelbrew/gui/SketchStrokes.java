@@ -1,7 +1,7 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.engine.mesh.MeshData;
-import dev.voxelbrew.engine.sketch.SketchGeometry.Vec;
+import dev.voxelbrew.api.model.mesh.MeshData;
+import dev.voxelbrew.api.model.sketch.SketchGeometry.Vec;
 import java.util.List;
 
 /** Detached six-sided strokes: one mesh replaces thousands of JavaFX Cylinder nodes for text. */

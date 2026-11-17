@@ -170,9 +170,8 @@ final class WorkspaceCommands {
         path(root, route.substring(0, split)).addSubcommand(name, command);
     }
 
-    static dev.voxelbrew.engine.model.CadDocument selectPlate(
-            dev.voxelbrew.engine.model.CadDocument document, String plate) {
-        return new dev.voxelbrew.engine.model.CadDocument(
+    static dev.voxelbrew.api.model.CadDocument selectPlate(dev.voxelbrew.api.model.CadDocument document, String plate) {
+        return new dev.voxelbrew.api.model.CadDocument(
                 document.id(),
                 document.features(),
                 document.cursor(),

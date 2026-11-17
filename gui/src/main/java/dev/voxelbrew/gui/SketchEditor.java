@@ -1,8 +1,10 @@
 package dev.voxelbrew.gui;
 
-import static dev.voxelbrew.engine.sketch.SketchGeometry.*;
+import static dev.voxelbrew.api.model.sketch.SketchGeometry.*;
 
-import dev.voxelbrew.engine.model.Feature;
+import dev.voxelbrew.api.model.Feature;
+import dev.voxelbrew.api.model.parameters.*;
+import dev.voxelbrew.api.model.sketch.*;
 import dev.voxelbrew.engine.parameters.*;
 import dev.voxelbrew.engine.sketch.*;
 import java.util.*;
@@ -56,7 +58,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             double by) {}
 
     private final SketchController controller;
-    private final dev.voxelbrew.engine.model.UuidGenerator uuidGenerator;
+    private final dev.voxelbrew.api.model.UuidGenerator uuidGenerator;
     private final dev.voxelbrew.util.i18n.Translations translations;
     private final Canvas canvas = new Canvas();
     private final LinkedHashSet<Ref> selection = new LinkedHashSet<>();
@@ -868,7 +870,8 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                 textFont.evaluatedText().strip(),
                 textStyle.getSelectionModel().getSelectedIndex(),
                 value(textHeight, translations.text("gui.text_height")),
-                dev.voxelbrew.engine.units.Measurements.radians(value(textAngle, translations.text("gui.text_angle"))),
+                dev.voxelbrew.api.model.units.Measurements.radians(
+                        value(textAngle, translations.text("gui.text_angle"))),
                 value(textSpacing, translations.text("gui.text_spacing")));
     }
 

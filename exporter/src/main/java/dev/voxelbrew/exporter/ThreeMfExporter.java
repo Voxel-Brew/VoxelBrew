@@ -1,8 +1,8 @@
 package dev.voxelbrew.exporter;
 
-import dev.voxelbrew.engine.mesh.MeshOptions;
-import dev.voxelbrew.engine.mesh.MeshValidation;
-import dev.voxelbrew.engine.model.Transform;
+import dev.voxelbrew.api.model.Transform;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
+import dev.voxelbrew.api.model.mesh.MeshValidation;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -48,7 +48,7 @@ public final class ThreeMfExporter extends MeshExporter {
             MeshOptions meshOptions,
             Map<String, String> options,
             OutputStream output,
-            dev.voxelbrew.engine.printing.PrintSetup setup)
+            dev.voxelbrew.api.model.printing.PrintSetup setup)
             throws IOException {
         try (var zip = new ZipOutputStream(output, StandardCharsets.UTF_8)) {
             text(

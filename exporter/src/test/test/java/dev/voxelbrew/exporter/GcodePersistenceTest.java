@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.exporter.*;
 import dev.voxelbrew.api.importer.ServiceLoaderImporterProviderRegistry;
+import dev.voxelbrew.api.model.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import dev.voxelbrew.importer.*;
@@ -19,7 +20,7 @@ class GcodePersistenceTest {
         var base = CadDocument.empty();
         var plate = base.printSetup().activePlateId();
         var artifact =
-                dev.voxelbrew.engine.printing.PrintArtifact.of("gcode.3mf", bytes, Map.of("model", "Bambu Lab A1"));
+                dev.voxelbrew.api.model.printing.PrintArtifact.of("gcode.3mf", bytes, Map.of("model", "Bambu Lab A1"));
         var document = base.withGcode(Map.of(plate, LINES)).withPrintArtifacts(Map.of(plate, artifact));
         try (var exports = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory);
                 var imports = new ServiceLoaderImporterProviderRegistry(directory)) {

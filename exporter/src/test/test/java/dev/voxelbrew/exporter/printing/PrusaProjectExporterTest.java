@@ -2,13 +2,13 @@ package dev.voxelbrew.exporter.printing;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.model.BodyInstance;
-import dev.voxelbrew.engine.model.Transform;
-import dev.voxelbrew.engine.printing.ManufacturingModel;
-import dev.voxelbrew.engine.printing.MeshGeometry;
-import dev.voxelbrew.engine.printing.PrintProfile;
-import dev.voxelbrew.engine.printing.PrintSetup;
-import dev.voxelbrew.engine.printing.SupportVolume;
+import dev.voxelbrew.api.model.BodyInstance;
+import dev.voxelbrew.api.model.Transform;
+import dev.voxelbrew.api.model.printing.ManufacturingModel;
+import dev.voxelbrew.api.model.printing.MeshGeometry;
+import dev.voxelbrew.api.model.printing.PrintProfile;
+import dev.voxelbrew.api.model.printing.PrintSetup;
+import dev.voxelbrew.api.model.printing.SupportVolume;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;

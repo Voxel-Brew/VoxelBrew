@@ -1,7 +1,11 @@
 package dev.voxelbrew.engine.printing;
 
-import dev.voxelbrew.engine.geometry.Bounds;
-import dev.voxelbrew.engine.mesh.MeshValidation;
+import dev.voxelbrew.api.model.geometry.Bounds;
+import dev.voxelbrew.api.model.mesh.MeshValidation;
+import dev.voxelbrew.api.model.printing.ManufacturingModel;
+import dev.voxelbrew.api.model.printing.MeshGeometry;
+import dev.voxelbrew.api.model.printing.PrintProfile;
+import dev.voxelbrew.api.model.printing.SupportVolume;
 import java.awt.BasicStroke;
 import java.awt.geom.Area;
 import java.util.*;

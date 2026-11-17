@@ -2,7 +2,10 @@ package dev.voxelbrew.engine.printing;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.mesh.MeshData;
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.mesh.MeshData;
+import dev.voxelbrew.api.model.printing.MeshGeometry;
+import dev.voxelbrew.api.model.printing.SupportVolume;
 import dev.voxelbrew.engine.model.*;
 import org.junit.jupiter.api.Test;
 

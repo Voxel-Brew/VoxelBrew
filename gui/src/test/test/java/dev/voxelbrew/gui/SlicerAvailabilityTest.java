@@ -2,8 +2,8 @@ package dev.voxelbrew.gui;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.printing.Cancellation;
-import dev.voxelbrew.slicer.api.SlicerBackend;
+import dev.voxelbrew.api.model.printing.Cancellation;
+import dev.voxelbrew.api.slicer.SlicerBackend;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Set;

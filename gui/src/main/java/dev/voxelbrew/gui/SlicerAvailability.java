@@ -1,8 +1,8 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.engine.printing.Cancellation;
-import dev.voxelbrew.slicer.api.SlicerBackend;
-import dev.voxelbrew.slicer.api.SlicerCatalog;
+import dev.voxelbrew.api.model.printing.Cancellation;
+import dev.voxelbrew.api.slicer.SlicerBackend;
+import dev.voxelbrew.api.slicer.SlicerCatalog;
 import dev.voxelbrew.util.i18n.Translations;
 import java.util.concurrent.*;
 import javafx.application.Platform;

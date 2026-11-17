@@ -2,7 +2,7 @@ package dev.voxelbrew.engine.persistence;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.model.CadDocument;
+import dev.voxelbrew.api.model.CadDocument;
 import dev.voxelbrew.engine.persistence.proto.DocumentProto;
 import dev.voxelbrew.util.Version;
 import dev.voxelbrew.util.update.ReleaseVersion;

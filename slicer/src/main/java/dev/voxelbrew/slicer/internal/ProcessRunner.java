@@ -1,5 +1,6 @@
 package dev.voxelbrew.slicer.internal;
 
+import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.engine.printing.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;

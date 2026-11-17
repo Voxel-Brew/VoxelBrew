@@ -1,7 +1,8 @@
 package dev.voxelbrew.exporter.printing;
 
-import static dev.voxelbrew.engine.units.Measurements.*;
+import static dev.voxelbrew.api.model.units.Measurements.*;
 
+import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.engine.printing.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;

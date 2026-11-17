@@ -2,6 +2,10 @@ package dev.voxelbrew.engine.model;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.BodyStyle;
+import dev.voxelbrew.api.model.CadDocument;
+import dev.voxelbrew.api.model.Feature;
+import dev.voxelbrew.api.model.ModelException;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import dev.voxelbrew.engine.persistence.DocumentFormatException;
 import dev.voxelbrew.engine.persistence.proto.DocumentProto;

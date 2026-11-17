@@ -1,11 +1,12 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.engine.mesh.MeshOptions;
-import dev.voxelbrew.engine.model.CadDocument;
+import dev.voxelbrew.api.model.CadDocument;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
+import dev.voxelbrew.api.model.printing.*;
+import dev.voxelbrew.api.slicer.SlicerBackend;
+import dev.voxelbrew.api.slicer.Slicing;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import dev.voxelbrew.engine.printing.*;
-import dev.voxelbrew.slicer.api.SlicerBackend;
-import dev.voxelbrew.slicer.api.Slicing;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.*;
@@ -36,9 +37,9 @@ public final class PrintController implements AutoCloseable {
     private final Slicing slicing;
     private final dev.voxelbrew.importer.GcodeSource gcodeReader;
     private Map<String, List<String>> completedGcode = Map.of();
-    private Map<String, dev.voxelbrew.engine.printing.PrintArtifact> completedArtifacts = Map.of();
+    private Map<String, dev.voxelbrew.api.model.printing.PrintArtifact> completedArtifacts = Map.of();
 
-    Map<String, dev.voxelbrew.engine.printing.PrintArtifact> completedArtifacts() {
+    Map<String, dev.voxelbrew.api.model.printing.PrintArtifact> completedArtifacts() {
         return completedArtifacts;
     }
 
@@ -92,7 +93,7 @@ public final class PrintController implements AutoCloseable {
                 () -> java.util.ServiceLoader.load(dev.voxelbrew.api.exporter.ExporterProviderRegistry.class)
                         .findFirst()
                         .orElseThrow(() -> new IllegalStateException("No ExporterProviderRegistry service found")),
-                dev.voxelbrew.slicer.api.SlicerRuntime.load().slicing());
+                dev.voxelbrew.api.slicer.SlicerRuntime.load().slicing());
     }
 
     PrintController(
@@ -313,7 +314,7 @@ public final class PrintController implements AutoCloseable {
                 Slicing.Result selectedResult = null;
                 Slicing.Result lastResult = null;
                 var jobs = new LinkedHashMap<String, List<String>>();
-                var artifacts = new LinkedHashMap<String, dev.voxelbrew.engine.printing.PrintArtifact>();
+                var artifacts = new LinkedHashMap<String, dev.voxelbrew.api.model.printing.PrintArtifact>();
                 for (int i = 0; i < requests.size(); i++) {
                     token.check();
                     var request = requests.get(i);

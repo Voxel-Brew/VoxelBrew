@@ -1,8 +1,8 @@
 package dev.voxelbrew.slicer;
 
-import dev.voxelbrew.slicer.api.*;
-import dev.voxelbrew.slicer.api.SlicerCatalog;
-import dev.voxelbrew.slicer.api.Slicing;
+import dev.voxelbrew.api.slicer.*;
+import dev.voxelbrew.api.slicer.SlicerCatalog;
+import dev.voxelbrew.api.slicer.Slicing;
 import dev.voxelbrew.slicer.prusa.PrusaSlicerBackend;
 import java.nio.file.Path;
 

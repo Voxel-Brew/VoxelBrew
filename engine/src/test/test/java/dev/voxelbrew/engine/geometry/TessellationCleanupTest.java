@@ -2,8 +2,8 @@ package dev.voxelbrew.engine.geometry;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.mesh.MeshData;
-import dev.voxelbrew.engine.mesh.MeshValidation;
+import dev.voxelbrew.api.model.mesh.MeshData;
+import dev.voxelbrew.api.model.mesh.MeshValidation;
 import org.junit.jupiter.api.Test;
 
 class TessellationCleanupTest {

@@ -2,6 +2,9 @@ package dev.voxelbrew.engine.model;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.BodyStyle;
+import dev.voxelbrew.api.model.CadDocument;
+import dev.voxelbrew.api.model.Feature;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import java.util.List;
 import java.util.Map;
@@ -38,7 +41,7 @@ class BodyStyleTest {
         session.redo();
         assertThat(session.document()).isEqualTo(saved);
         session.setParameters(
-                saved.parameters().put("width", dev.voxelbrew.engine.parameters.ParameterUnit.MM, "10", ""));
+                saved.parameters().put("width", dev.voxelbrew.api.model.parameters.ParameterUnit.MM, "10", ""));
         assertThat(session.document().bodyStyles()).isEqualTo(saved.bodyStyles());
         session.setBodyStyle("one.body", null);
         assertThat(session.document().bodyStyle("one.body")).isEqualTo(BodyStyle.DEFAULT);
@@ -60,8 +63,8 @@ class BodyStyleTest {
                 "styles",
                 List.of(cut, split),
                 2,
-                dev.voxelbrew.engine.printing.PrintSetup.empty(),
-                dev.voxelbrew.engine.parameters.ParameterSet.empty(),
+                dev.voxelbrew.api.model.printing.PrintSetup.empty(),
+                dev.voxelbrew.api.model.parameters.ParameterSet.empty(),
                 Map.of("base.body", RED_PETG, "split.positive", BLUE_PLA));
         var reopened = DocumentCodec.decode(DocumentCodec.encode(document));
         assertThat(reopened).isEqualTo(document);

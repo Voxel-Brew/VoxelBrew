@@ -3,7 +3,7 @@ package dev.voxelbrew.exporter;
 import dev.voxelbrew.api.exporter.ExportWindow;
 import dev.voxelbrew.api.exporter.Exporter;
 import dev.voxelbrew.api.exporter.FileExportDialog;
-import dev.voxelbrew.engine.model.CadDocument;
+import dev.voxelbrew.api.model.CadDocument;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Optional;

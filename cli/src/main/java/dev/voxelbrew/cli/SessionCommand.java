@@ -1,7 +1,7 @@
 package dev.voxelbrew.cli;
 
 import com.google.gson.Gson;
-import dev.voxelbrew.engine.model.CadDocument;
+import dev.voxelbrew.api.model.CadDocument;
 import dev.voxelbrew.importer.DocumentSource;
 import dev.voxelbrew.importer.GcodeSource;
 import java.io.*;
@@ -246,7 +246,7 @@ final class SessionCommand implements Callable<Integer> {
                 job.fingerprint = dev.voxelbrew.engine.persistence.DocumentCodec.fingerprint(current);
                 job.target = current.printSetup()
                         .workspaceSettings()
-                        .get(dev.voxelbrew.engine.printing.PrintTarget.PRINTER_ID);
+                        .get(dev.voxelbrew.api.model.printing.PrintTarget.PRINTER_ID);
                 var command = new ArrayList<String>();
                 boolean windows =
                         System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win");
@@ -296,7 +296,7 @@ final class SessionCommand implements Callable<Integer> {
                                 job.target,
                                 current.printSetup()
                                         .workspaceSettings()
-                                        .get(dev.voxelbrew.engine.printing.PrintTarget.PRINTER_ID)))
+                                        .get(dev.voxelbrew.api.model.printing.PrintTarget.PRINTER_ID)))
                     job.state = "outdated";
                 else {
                     var result = source.load(job.snapshot);
@@ -351,7 +351,7 @@ final class SessionCommand implements Callable<Integer> {
             int cursor = followEnd
                     ? previous.features().size()
                     : Math.min(current.cursor(), previous.features().size());
-            var ids = new dev.voxelbrew.engine.model.UuidGenerator(Math.max(
+            var ids = new dev.voxelbrew.api.model.UuidGenerator(Math.max(
                     current.uuidGenerator().nextValue(),
                     previous.uuidGenerator().nextValue()));
             current = new CadDocument(

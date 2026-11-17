@@ -2,6 +2,8 @@ package dev.voxelbrew.engine.geometry;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.geometry.Bounds;
 import dev.voxelbrew.engine.feature.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.exporter.DocumentWriter;

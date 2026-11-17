@@ -1,5 +1,6 @@
 package dev.voxelbrew.exporter;
 
+import dev.voxelbrew.api.model.*;
 import dev.voxelbrew.engine.geometry.Solid;
 import dev.voxelbrew.engine.model.*;
 import java.io.IOException;

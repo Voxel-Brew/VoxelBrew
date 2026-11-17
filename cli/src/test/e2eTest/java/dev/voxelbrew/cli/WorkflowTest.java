@@ -2,7 +2,7 @@ package dev.voxelbrew.cli;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.model.Feature;
+import dev.voxelbrew.api.model.Feature;
 import dev.voxelbrew.engine.persistence.proto.DocumentProto;
 import dev.voxelbrew.exporter.DocumentWriter;
 import dev.voxelbrew.importer.DocumentReader;
@@ -1019,7 +1019,7 @@ class WorkflowTest {
         var document = DocumentReader.load(file);
         var features = new ArrayList<>(document.features());
         features.set(1, new Feature.Extrude("thickness", new Feature.ProfileRef("missing", "profile"), 8));
-        DocumentWriter.save(new dev.voxelbrew.engine.model.CadDocument(document.id(), features, 2), file, true);
+        DocumentWriter.save(new dev.voxelbrew.api.model.CadDocument(document.id(), features, 2), file, true);
         assertThat(run(1, "designer", "history", "list", file.toString()).contains("FAILED"))
                 .isTrue();
         run(0, "designer", "feature", "repair", file.toString(), "--feature", "thickness", "--sketch", "plate");

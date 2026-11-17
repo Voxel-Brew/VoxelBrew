@@ -1,6 +1,6 @@
 package dev.voxelbrew.printer;
 
-import dev.voxelbrew.printer.api.*;
+import dev.voxelbrew.api.printer.*;
 import java.io.*;
 import java.nio.file.*;
 import java.nio.file.attribute.*;

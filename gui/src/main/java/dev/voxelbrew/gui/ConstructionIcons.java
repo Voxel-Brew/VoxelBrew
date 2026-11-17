@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.engine.construction.ConstructionTools.Tool;
+import dev.voxelbrew.api.model.construction.ConstructionTools.Tool;
 import javafx.scene.Group;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.SVGPath;

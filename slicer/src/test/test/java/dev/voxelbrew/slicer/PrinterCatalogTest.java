@@ -2,11 +2,13 @@ package dev.voxelbrew.slicer;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.printing.*;
+import dev.voxelbrew.api.slicer.PrinterProfileCatalog;
+import dev.voxelbrew.api.slicer.SlicerRuntime;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import dev.voxelbrew.engine.printing.*;
-import dev.voxelbrew.slicer.api.PrinterProfileCatalog;
-import dev.voxelbrew.slicer.api.SlicerRuntime;
 import java.nio.file.*;
 import java.util.*;
 import org.junit.jupiter.api.Test;

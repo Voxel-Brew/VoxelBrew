@@ -1,7 +1,9 @@
 package dev.voxelbrew.cli;
 
-import static dev.voxelbrew.engine.sketch.SketchGeometry.*;
+import static dev.voxelbrew.api.model.sketch.SketchGeometry.*;
 
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.sketch.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.sketch.*;
 import dev.voxelbrew.importer.DocumentSource;
@@ -128,7 +130,7 @@ final class SketchCommands implements Runnable {
                                     font,
                                     style,
                                     height,
-                                    dev.voxelbrew.engine.units.Measurements.radians(angle),
+                                    dev.voxelbrew.api.model.units.Measurements.radians(angle),
                                     spacing)));
         }
     }

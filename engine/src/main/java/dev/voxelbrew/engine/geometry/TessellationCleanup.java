@@ -1,7 +1,7 @@
 package dev.voxelbrew.engine.geometry;
 
-import dev.voxelbrew.engine.mesh.MeshData;
-import dev.voxelbrew.engine.mesh.MeshValidation;
+import dev.voxelbrew.api.model.mesh.MeshData;
+import dev.voxelbrew.api.model.mesh.MeshValidation;
 import java.util.Arrays;
 
 /** Removes collapsed facets emitted at curved-surface singularities by the native mesher. */

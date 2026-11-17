@@ -2,10 +2,11 @@ package dev.voxelbrew.slicer;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.mesh.MeshOptions;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
+import dev.voxelbrew.api.model.printing.*;
+import dev.voxelbrew.api.slicer.SlicerRuntime;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.exporter.printing.PrusaConfiguration;
-import dev.voxelbrew.slicer.api.SlicerRuntime;
 import dev.voxelbrew.slicer.prusa.PrusaSlicerBackend;
 import java.nio.file.*;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,7 @@ class PrinterPresetSlicingTest {
                 false,
                 new Cancellation(),
                 ignored -> {},
-                dev.voxelbrew.slicer.api.Slicing.DIRECT);
+                dev.voxelbrew.api.slicer.Slicing.DIRECT);
         assertThat(result.job().modelLayers().isEmpty()).isFalse();
         for (String id : java.util.List.of("bambu-lab-a1-mini", "prusa-xl-5-tool")) {
             session.setPrintSetup(session.document().printSetup().withPrinter(catalog.require(id)));
@@ -55,7 +56,7 @@ class PrinterPresetSlicingTest {
                     true,
                     new Cancellation(),
                     ignored -> {},
-                    dev.voxelbrew.slicer.api.Slicing.DIRECT);
+                    dev.voxelbrew.api.slicer.Slicing.DIRECT);
             assertThat(sliced.job().modelLayers().isEmpty()).isFalse();
         }
         session.setPrintSetup(session.document()

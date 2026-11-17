@@ -1,7 +1,7 @@
 package dev.voxelbrew.importer;
 
 import dev.voxelbrew.api.importer.*;
-import dev.voxelbrew.engine.model.CadDocument;
+import dev.voxelbrew.api.model.CadDocument;
 import java.io.*;
 import java.util.Optional;
 

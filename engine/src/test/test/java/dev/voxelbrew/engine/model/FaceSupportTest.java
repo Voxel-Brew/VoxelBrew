@@ -2,7 +2,9 @@ package dev.voxelbrew.engine.model;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.geometry.PlanarFace;
+import dev.voxelbrew.api.model.FaceSupport;
+import dev.voxelbrew.api.model.Feature;
+import dev.voxelbrew.api.model.geometry.PlanarFace;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

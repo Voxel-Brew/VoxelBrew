@@ -1,6 +1,6 @@
 package dev.voxelbrew.exporter;
 
-import dev.voxelbrew.engine.model.CadDocument;
+import dev.voxelbrew.api.model.CadDocument;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

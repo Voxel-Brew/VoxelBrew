@@ -2,9 +2,9 @@ package dev.voxelbrew.slicer;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.printing.Cancellation;
+import dev.voxelbrew.api.model.printing.Cancellation;
+import dev.voxelbrew.api.slicer.SlicerRuntime;
 import dev.voxelbrew.exporter.printing.*;
-import dev.voxelbrew.slicer.api.SlicerRuntime;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;

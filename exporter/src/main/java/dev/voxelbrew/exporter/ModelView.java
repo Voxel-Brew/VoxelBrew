@@ -1,8 +1,8 @@
 package dev.voxelbrew.exporter;
 
-import dev.voxelbrew.engine.mesh.MeshData;
-import dev.voxelbrew.engine.mesh.MeshOptions;
-import dev.voxelbrew.engine.model.BodyInstance;
+import dev.voxelbrew.api.model.BodyInstance;
+import dev.voxelbrew.api.model.mesh.MeshData;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
 import java.util.List;
 import lombok.NonNull;
 

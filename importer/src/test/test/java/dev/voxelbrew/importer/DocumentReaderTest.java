@@ -2,7 +2,7 @@ package dev.voxelbrew.importer;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.model.Feature;
+import dev.voxelbrew.api.model.Feature;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import dev.voxelbrew.engine.persistence.DocumentFormatException;
 import java.io.RandomAccessFile;

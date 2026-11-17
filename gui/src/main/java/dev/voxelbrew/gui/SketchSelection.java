@@ -1,8 +1,8 @@
 package dev.voxelbrew.gui;
 
-import static dev.voxelbrew.engine.sketch.SketchGeometry.*;
+import static dev.voxelbrew.api.model.sketch.SketchGeometry.*;
 
-import dev.voxelbrew.engine.sketch.SketchGeometry;
+import dev.voxelbrew.api.model.sketch.SketchGeometry;
 import java.util.LinkedHashSet;
 import java.util.Set;
 

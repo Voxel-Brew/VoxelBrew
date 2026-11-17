@@ -1,8 +1,10 @@
 package dev.voxelbrew.engine.sketch;
 
-import static dev.voxelbrew.engine.sketch.SketchGeometry.*;
+import static dev.voxelbrew.api.model.sketch.SketchGeometry.*;
 
-import dev.voxelbrew.engine.geometry.PlanarProfile;
+import dev.voxelbrew.api.model.geometry.PlanarProfile;
+import dev.voxelbrew.api.model.sketch.SketchCurves;
+import dev.voxelbrew.api.model.sketch.SketchGeometry;
 import java.util.*;
 
 /**
@@ -48,8 +50,8 @@ public final class SketchProfiles {
         return profileId + "/region/" + region.id();
     }
 
-    public static List<Region> referencedRegions(dev.voxelbrew.engine.model.Feature.Sketch sketch, String profileId) {
-        var geometry = ((dev.voxelbrew.engine.model.Feature.Constrained) sketch.profile()).geometry();
+    public static List<Region> referencedRegions(dev.voxelbrew.api.model.Feature.Sketch sketch, String profileId) {
+        var geometry = ((dev.voxelbrew.api.model.Feature.Constrained) sketch.profile()).geometry();
         if (sketch.profileId().equals(profileId)) return regions(geometry);
         return List.of(selectableRegions(geometry).stream()
                 .filter(region -> regionProfileId(sketch.profileId(), region).equals(profileId))

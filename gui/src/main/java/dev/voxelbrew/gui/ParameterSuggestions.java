@@ -1,7 +1,7 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.engine.parameters.BuiltinParameters;
-import dev.voxelbrew.engine.parameters.ParameterSet;
+import dev.voxelbrew.api.model.parameters.BuiltinParameters;
+import dev.voxelbrew.api.model.parameters.ParameterSet;
 import dev.voxelbrew.util.i18n.Translations;
 import java.util.List;
 import java.util.function.Supplier;

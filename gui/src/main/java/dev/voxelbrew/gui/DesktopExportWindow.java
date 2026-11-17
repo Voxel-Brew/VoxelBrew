@@ -2,10 +2,10 @@ package dev.voxelbrew.gui;
 
 import dev.voxelbrew.api.exporter.ExportDialog;
 import dev.voxelbrew.api.exporter.ExportWindow;
-import dev.voxelbrew.api.vui.Component;
-import dev.voxelbrew.api.vui.FileDestination;
-import dev.voxelbrew.api.vui.HorizontalLayout;
-import dev.voxelbrew.api.vui.VerticalLayout;
+import dev.voxelbrew.api.model.vui.Component;
+import dev.voxelbrew.api.model.vui.FileDestination;
+import dev.voxelbrew.api.model.vui.HorizontalLayout;
+import dev.voxelbrew.api.model.vui.VerticalLayout;
 import dev.voxelbrew.util.i18n.Translations;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -163,8 +163,8 @@ public final class DesktopExportWindow implements ExportWindow {
             layout.children().forEach(child -> column.getChildren().add(render(child, inputs, onChange)));
             return column;
         }
-        if (component instanceof dev.voxelbrew.api.vui.Label label) return new Label(label.text());
-        if (component instanceof dev.voxelbrew.api.vui.Separator) return new Separator();
+        if (component instanceof dev.voxelbrew.api.model.vui.Label label) return new Label(label.text());
+        if (component instanceof dev.voxelbrew.api.model.vui.Separator) return new Separator();
         if (component instanceof FileDestination destination) {
             var path = new javafx.scene.control.TextField();
             path.setId("export-path");
@@ -201,7 +201,7 @@ public final class DesktopExportWindow implements ExportWindow {
                     path.textProperty(),
                     onChange);
         }
-        if (component instanceof dev.voxelbrew.api.vui.TextField field) {
+        if (component instanceof dev.voxelbrew.api.model.vui.TextField field) {
             var input = new javafx.scene.control.TextField(field.value());
             input.setId("export-" + field.id());
             input.setMaxWidth(Double.MAX_VALUE);
@@ -214,7 +214,7 @@ public final class DesktopExportWindow implements ExportWindow {
                     input.textProperty(),
                     onChange);
         }
-        if (component instanceof dev.voxelbrew.api.vui.TextArea area) {
+        if (component instanceof dev.voxelbrew.api.model.vui.TextArea area) {
             var input = new javafx.scene.control.TextArea(area.value());
             input.setId("export-" + area.id());
             input.setMaxWidth(Double.MAX_VALUE);
@@ -227,7 +227,7 @@ public final class DesktopExportWindow implements ExportWindow {
                     input.textProperty(),
                     onChange);
         }
-        if (component instanceof dev.voxelbrew.api.vui.CheckBox box) {
+        if (component instanceof dev.voxelbrew.api.model.vui.CheckBox box) {
             var input = new javafx.scene.control.CheckBox(box.label());
             input.setId("export-" + box.id());
             UiHelp.describe(input, translations.textOrDefault("help.export-" + box.id(), box.label()));
@@ -242,7 +242,7 @@ public final class DesktopExportWindow implements ExportWindow {
                     input.selectedProperty(),
                     onChange);
         }
-        if (component instanceof dev.voxelbrew.api.vui.ComboBox box) {
+        if (component instanceof dev.voxelbrew.api.model.vui.ComboBox box) {
             var input = new javafx.scene.control.ComboBox<String>();
             input.setId("export-" + box.id());
             input.getItems().setAll(box.choices());
@@ -257,7 +257,7 @@ public final class DesktopExportWindow implements ExportWindow {
                     input.valueProperty(),
                     onChange);
         }
-        if (component instanceof dev.voxelbrew.api.vui.RadioButtonGroup group) {
+        if (component instanceof dev.voxelbrew.api.model.vui.RadioButtonGroup group) {
             var buttons = new ToggleGroup();
             var container = new VBox(4, new Label(group.label()));
             for (String choice : group.choices()) {
@@ -279,7 +279,7 @@ public final class DesktopExportWindow implements ExportWindow {
                     buttons.selectedToggleProperty(),
                     onChange);
         }
-        if (component instanceof dev.voxelbrew.api.vui.Slider slider) {
+        if (component instanceof dev.voxelbrew.api.model.vui.Slider slider) {
             var input = new javafx.scene.control.Slider(slider.minimum(), slider.maximum(), slider.value());
             input.setId("export-" + slider.id());
             return bind(

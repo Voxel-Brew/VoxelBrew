@@ -3,7 +3,7 @@ package dev.voxelbrew.importer;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.importer.*;
-import dev.voxelbrew.engine.model.CadDocument;
+import dev.voxelbrew.api.model.CadDocument;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import dev.voxelbrew.util.testing.FileImportWindows;
 import java.io.IOException;

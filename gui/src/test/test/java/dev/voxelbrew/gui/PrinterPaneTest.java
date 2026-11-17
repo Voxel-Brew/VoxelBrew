@@ -2,8 +2,8 @@ package dev.voxelbrew.gui;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.printing.PrintArtifact;
-import dev.voxelbrew.printer.api.Printer;
+import dev.voxelbrew.api.model.printing.PrintArtifact;
+import dev.voxelbrew.api.printer.Printer;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;

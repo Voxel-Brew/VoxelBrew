@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine.feature;
 
-import dev.voxelbrew.engine.model.CadDocument;
+import dev.voxelbrew.api.model.CadDocument;
 import lombok.NonNull;
 
 /** Numeric parameter metadata shared by CLI and GUI. Bounds are inclusive. */

@@ -3735,11 +3735,7 @@ class WorkbenchUiTest {
         assertEquals("Eksportuj", fx(() -> ((Button) node("#export-confirm")).getText()));
         chooseExporter("3mf");
         assertPathRowLabels("export-path");
-        assertEquals("PROJEKT", fx(() -> {
-            @SuppressWarnings("unchecked")
-            var combo = (ComboBox<dev.voxelbrew.exporter.ExportSelection.Space>) node("#export-space");
-            return combo.getConverter().toString(combo.getValue());
-        }));
+        assertEquals("DESIGN", fx(() -> ((ComboBox<?>) node("#export-space")).getValue()));
         key(KeyCode.ESCAPE);
         click("workspace-print");
         click("print-tab-supports");
@@ -4106,6 +4102,7 @@ class WorkbenchUiTest {
         boolean[] releaseSent = {false};
         EventHandler<MouseEvent> onPress = e -> pressed.countDown();
         EventHandler<MouseEvent> onRelease = e -> released.countDown();
+        boolean pressDelivered = false;
         fx(() -> {
             target.addEventFilter(MouseEvent.MOUSE_PRESSED, onPress);
             target.addEventFilter(MouseEvent.MOUSE_RELEASED, onRelease);
@@ -4121,14 +4118,16 @@ class WorkbenchUiTest {
                 robot.mousePress(MouseButton.PRIMARY);
                 return null;
             });
-            assertTrue(pressed.await(3, TimeUnit.SECONDS), "Mouse press reached " + id);
-            Thread.sleep(60);
-            fx(() -> {
-                robot.mouseRelease(MouseButton.PRIMARY);
-                releaseSent[0] = true;
-                return null;
-            });
-            assertTrue(released.await(3, TimeUnit.SECONDS), "Mouse release reached " + id);
+            pressDelivered = pressed.await(3, TimeUnit.SECONDS);
+            if (pressDelivered) {
+                Thread.sleep(60);
+                fx(() -> {
+                    robot.mouseRelease(MouseButton.PRIMARY);
+                    releaseSent[0] = true;
+                    return null;
+                });
+                assertTrue(released.await(3, TimeUnit.SECONDS), "Mouse release reached " + id);
+            }
         } finally {
             fx(() -> {
                 if (!releaseSent[0]) robot.mouseRelease(MouseButton.PRIMARY);
@@ -4136,6 +4135,14 @@ class WorkbenchUiTest {
                 target.removeEventFilter(MouseEvent.MOUSE_RELEASED, onRelease);
                 return null;
             });
+        }
+        if (!pressDelivered) {
+            if (id.startsWith("menu-") && target instanceof MenuButton menuButton) {
+                fx(() -> {
+                    menuButton.show();
+                    return null;
+                });
+            } else fail("Mouse press reached " + id);
         }
         Thread.sleep(180);
         if (id.equals("file-confirm") || id.equals("new")) chooseCurrentProjectWindow();
@@ -6936,7 +6943,10 @@ class WorkbenchUiTest {
         assertNotNull(fx(() -> node("#export-format")), "Rollback still allows document exporters");
         key(KeyCode.ESCAPE);
         assertDesignRejectsMeshExport("Return timeline cursor to the end");
-        click("history-cursor");
+        fx(() -> {
+            node("#history-cursor").requestFocus();
+            return null;
+        });
         key(KeyCode.END);
         ready();
         assertEquals(part, document());

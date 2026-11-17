@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.sketch.SketchGeometry.Vec;
 import java.util.*;
@@ -26,7 +26,7 @@ class SketchStrokesTest {
                 int v = mesh.vertexIndex(t, c), next = mesh.vertexIndex(t, (c + 1) % 3);
                 edges.merge(Math.min(v, next) + ":" + Math.max(v, next), 1, Integer::sum);
                 for (int axis = 0; axis < 3; axis++) vertices[c][axis] = mesh.coordinate(v, axis);
-                assertTrue(vertices[c][2] >= 9.5 && vertices[c][2] <= 10.5);
+                assertThat(vertices[c][2] >= 9.5 && vertices[c][2] <= 10.5).isTrue();
             }
             var p = vertices[0];
             var q = vertices[1];
@@ -36,8 +36,9 @@ class SketchStrokesTest {
                             + p[2] * (q[0] * r[1] - q[1] * r[0]))
                     / 6;
         }
-        assertTrue(edges.values().stream().allMatch(count -> count == 2));
-        assertEquals(2 * 3 * Math.sqrt(3) / 2 * .25 * a.distance(b), volume, 1e-9);
-        assertThrows(IllegalArgumentException.class, () -> SketchStrokes.mesh(List.of(), 0, 1));
+        assertThat(edges.values().stream().allMatch(count -> count == 2)).isTrue();
+        assertThat(volume)
+                .isCloseTo(2 * 3 * Math.sqrt(3) / 2 * .25 * a.distance(b), org.assertj.core.data.Offset.offset(1e-9));
+        assertThatThrownBy(() -> SketchStrokes.mesh(List.of(), 0, 1)).isInstanceOf(IllegalArgumentException.class);
     }
 }

@@ -1,6 +1,6 @@
 package dev.voxelbrew.cli;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.CadDocument;
 import dev.voxelbrew.util.config.UserConfiguration;
@@ -29,23 +29,21 @@ class DependencyInjectionTest {
         });
         var listing = new StringWriter();
         var command = quiet(graph.commandLine()).setOut(new PrintWriter(listing));
-        assertEquals(0, command.execute("slicer", "profile", "list"));
-        assertTrue(listing.toString().contains("bambu-lab-a1-mini"));
-        assertEquals(
-                0,
-                quiet(graph.commandLine())
-                        .execute("slicer", "process", "set", "virtual.vxb", "--printer-profile", "bambu-lab-a1-mini"));
+        assertThat(command.execute("slicer", "profile", "list")).isEqualTo(0);
+        assertThat(listing.toString().contains("bambu-lab-a1-mini")).isTrue();
+        assertThat(quiet(graph.commandLine())
+                        .execute("slicer", "process", "set", "virtual.vxb", "--printer-profile", "bambu-lab-a1-mini"))
+                .isEqualTo(0);
         var saved = document.get().printSetup();
-        assertEquals(4, saved.version());
-        assertEquals(180, saved.printerSnapshot().printer().usableHeight());
-        assertEquals(
-                0, quiet(graph.commandLine()).execute("slicer", "process", "set", "virtual.vxb", "--material", "PETG"));
-        assertEquals(saved.printerSnapshot(), document.get().printSetup().printerSnapshot());
-        assertEquals(
-                1,
-                quiet(graph.commandLine())
-                        .execute("slicer", "process", "set", "virtual.vxb", "--printer-profile", "missing-printer"));
-        assertEquals(saved.printerSnapshot(), document.get().printSetup().printerSnapshot());
+        assertThat(saved.version()).isEqualTo(4);
+        assertThat(saved.printerSnapshot().printer().usableHeight()).isEqualTo(180);
+        assertThat(quiet(graph.commandLine()).execute("slicer", "process", "set", "virtual.vxb", "--material", "PETG"))
+                .isEqualTo(0);
+        assertThat(document.get().printSetup().printerSnapshot()).isEqualTo(saved.printerSnapshot());
+        assertThat(quiet(graph.commandLine())
+                        .execute("slicer", "process", "set", "virtual.vxb", "--printer-profile", "missing-printer"))
+                .isEqualTo(1);
+        assertThat(document.get().printSetup().printerSnapshot()).isEqualTo(saved.printerSnapshot());
     }
 
     @Test
@@ -70,35 +68,39 @@ class DependencyInjectionTest {
         });
         var first = quiet(graph.commandLine());
         Path destination = directory.resolve("virtual design.vxb");
-        assertEquals(0, first.execute("document", "new", destination.toString(), "--overwrite"));
+        assertThat(first.execute("document", "new", destination.toString(), "--overwrite"))
+                .isEqualTo(0);
         var second = quiet(graph.commandLine());
-        assertEquals(0, second.execute("document", "new", destination.toString()));
-        assertEquals(List.of(true, false), overwrites);
-        assertFalse(Files.exists(destination), "Injected sink must replace filesystem I/O");
-        assertNotSame(
-                first.getSubcommands()
-                        .get("document")
-                        .getSubcommands()
-                        .get("new")
-                        .getCommand(),
-                second.getSubcommands()
-                        .get("document")
-                        .getSubcommands()
-                        .get("new")
-                        .getCommand());
-        assertEquals(0, quiet(graph.commandLine()).execute("designer", "parameter", "list", destination.toString()));
-        assertEquals(1, reads.get());
-        assertEquals(1, quiet(graph.commandLine()).execute("slicer", "job", "inspect", "injected.gcode"));
-        assertSame(graph.commands(), first.getFactory());
-        assertSame(
-                first.getFactory(),
-                first.getSubcommands()
+        assertThat(second.execute("document", "new", destination.toString())).isEqualTo(0);
+        assertThat(overwrites).isEqualTo(List.of(true, false));
+        assertThat(Files.exists(destination))
+                .as("Injected sink must replace filesystem I/O")
+                .isFalse();
+        assertThat(second.getSubcommands()
+                                .get("document")
+                                .getSubcommands()
+                                .get("new")
+                                .getCommand()
+                        != first.getSubcommands()
+                                .get("document")
+                                .getSubcommands()
+                                .get("new")
+                                .getCommand())
+                .isTrue();
+        assertThat(quiet(graph.commandLine()).execute("designer", "parameter", "list", destination.toString()))
+                .isEqualTo(0);
+        assertThat(reads.get()).isEqualTo(1);
+        assertThat(quiet(graph.commandLine()).execute("slicer", "job", "inspect", "injected.gcode"))
+                .isEqualTo(1);
+        assertThat(first.getFactory()).isSameAs(graph.commands());
+        assertThat(first.getSubcommands()
                         .get("designer")
                         .getSubcommands()
                         .get("sketch")
                         .getSubcommands()
                         .get("draw")
-                        .getFactory());
+                        .getFactory())
+                .isSameAs(first.getFactory());
     }
 
     @Test
@@ -111,15 +113,19 @@ class DependencyInjectionTest {
         var english = graph("en", new FileIoModule(), () -> {
             throw new AssertionError("Other graph's updater was called");
         });
-        assertEquals("pl", polish.translations().locale().getLanguage());
-        assertEquals("en", english.translations().locale().getLanguage());
-        assertSame(polish.translations(), polish.translations());
-        assertNotSame(polish.translations(), english.translations());
-        assertEquals(0, quiet(polish.commandLine()).execute("settings", "update", "--help"));
-        assertEquals(0, updates.get(), "Help and graph construction must not create the updater");
-        assertEquals(1, quiet(polish.commandLine()).execute("settings", "update", "check"));
-        assertEquals(1, updates.get());
-        assertEquals(0, quiet(english.commandLine()).execute("--help"));
+        assertThat(polish.translations().locale().getLanguage()).isEqualTo("pl");
+        assertThat(english.translations().locale().getLanguage()).isEqualTo("en");
+        assertThat(polish.translations()).isSameAs(polish.translations());
+        assertThat(english.translations()).isNotSameAs(polish.translations());
+        assertThat(quiet(polish.commandLine()).execute("settings", "update", "--help"))
+                .isEqualTo(0);
+        assertThat(updates.get())
+                .as("Help and graph construction must not create the updater")
+                .isEqualTo(0);
+        assertThat(quiet(polish.commandLine()).execute("settings", "update", "check"))
+                .isEqualTo(1);
+        assertThat(updates.get()).isEqualTo(1);
+        assertThat(quiet(english.commandLine()).execute("--help")).isEqualTo(0);
     }
 
     private CliComponent graph(String language, FileIoModule files, UpdateServiceFactory updates) throws IOException {

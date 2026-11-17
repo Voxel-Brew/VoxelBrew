@@ -1,7 +1,7 @@
 package dev.voxelbrew.engine.model;
 
 import static dev.voxelbrew.engine.units.Measurements.*;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.geometry.Solid;
 import dev.voxelbrew.engine.mesh.MeshOptions;
@@ -25,14 +25,20 @@ class MeasurementIntegrationTest {
                         zero, zero, zero, quantity(6, CENTIMETRE), quantity(.04, METRE), quantity(.8, CENTIMETRE));
                 var part = plate.cutThroughCircle(
                         quantity(1, CENTIMETRE), quantity(10, MILLIMETRE), quantity(.4, CENTIMETRE))) {
-            assertEquals(19.099469035085127, value(part.volumeQuantity(), CUBIC_CENTIMETRE), .00001);
-            assertEquals(6, value(part.bounds().width(), CENTIMETRE), 1e-4);
-            assertEquals(40, value(part.bounds().height(), MILLIMETRE), .001);
-            assertEquals(8, value(part.bounds().depth(), MILLIMETRE), .001);
-            assertFalse(part.contains(quantity(1, CENTIMETRE), quantity(1, CENTIMETRE), quantity(.004, METRE)));
-            assertTrue(part.tessellate(new MeshOptions(quantity(.002, CENTIMETRE), quantity(Math.PI / 36, RADIAN)))
-                            .triangleCount()
-                    > 12);
+            assertThat(value(part.volumeQuantity(), CUBIC_CENTIMETRE))
+                    .isCloseTo(19.099469035085127, org.assertj.core.data.Offset.offset(.00001));
+            assertThat(value(part.bounds().width(), CENTIMETRE))
+                    .isCloseTo(6, org.assertj.core.data.Offset.offset(1e-4));
+            assertThat(value(part.bounds().height(), MILLIMETRE))
+                    .isCloseTo(40, org.assertj.core.data.Offset.offset(.001));
+            assertThat(value(part.bounds().depth(), MILLIMETRE))
+                    .isCloseTo(8, org.assertj.core.data.Offset.offset(.001));
+            assertThat(part.contains(quantity(1, CENTIMETRE), quantity(1, CENTIMETRE), quantity(.004, METRE)))
+                    .isFalse();
+            assertThat(part.tessellate(new MeshOptions(quantity(.002, CENTIMETRE), quantity(Math.PI / 36, RADIAN)))
+                                    .triangleCount()
+                            > 12)
+                    .isTrue();
         }
         var session = new ModelSession(CadDocument.empty());
         var xy = new Feature.Plane("origin-xy", zero);
@@ -52,12 +58,12 @@ class MeasurementIntegrationTest {
                 "cut", new Feature.ProfileRef("hole", "profile"), new Feature.BodyRef("thickness", "body")));
         session.editDimension("thickness", "distance", quantity(.8, CENTIMETRE));
         var before = session.snapshot();
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> session.editDimension("thickness", "distance", quantity(8, DEGREE)));
-        assertEquals(before, session.snapshot());
+        assertThatThrownBy(() -> session.editDimension("thickness", "distance", quantity(8, DEGREE)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(session.snapshot()).isEqualTo(before);
         try (var e = session.evaluate()) {
-            assertEquals(19099.469035085127, e.bodies().getFirst().solid().volume(), .01);
+            assertThat(e.bodies().getFirst().solid().volume())
+                    .isCloseTo(19099.469035085127, org.assertj.core.data.Offset.offset(.01));
         }
     }
 
@@ -65,16 +71,17 @@ class MeasurementIntegrationTest {
     void currentFixturePreservesMeasurementsWhenSavingWithCurrentWriterVersion() throws Exception {
         byte[] original;
         try (var resource = getClass().getResourceAsStream("/parameters/schema10-configurations.vxb")) {
-            assertNotNull(resource);
+            assertThat(resource).isNotNull();
             original = resource.readAllBytes();
         }
         var file = directory.resolve("old parameter versions.vxb");
         Files.write(file, original);
         var document = DocumentReader.load(file);
-        assertEquals("Large", document.parameters().activeName());
+        assertThat(document.parameters().activeName()).isEqualTo("Large");
         var session = new ModelSession(document);
         try (var e = session.evaluate()) {
-            assertEquals(25600, e.bodies().getFirst().solid().volume(), .02);
+            assertThat(e.bodies().getFirst().solid().volume())
+                    .isCloseTo(25600, org.assertj.core.data.Offset.offset(.02));
         }
         DocumentWriter.save(document, file, true);
         byte[] saved = Files.readAllBytes(file);
@@ -91,11 +98,12 @@ class MeasurementIntegrationTest {
                         .addAllFrame(Arrays.stream(Transform.IDENTITY.matrix())
                                 .boxed()
                                 .toList());
-        assertEquals(migrated.build(), after);
-        assertEquals(document, DocumentReader.load(file));
+        assertThat(after).isEqualTo(migrated.build());
+        assertThat(DocumentReader.load(file)).isEqualTo(document);
         session.selectConfiguration("Default");
         try (var e = session.evaluate()) {
-            assertEquals(12000, e.bodies().getFirst().solid().volume(), .02);
+            assertThat(e.bodies().getFirst().solid().volume())
+                    .isCloseTo(12000, org.assertj.core.data.Offset.offset(.02));
         }
     }
 }

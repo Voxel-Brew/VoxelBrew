@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine.persistence;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.parameters.ParameterUnit;
@@ -14,7 +14,7 @@ class UuidPersistenceTest {
         session.setParameters(session.document().parameters().put("width", ParameterUnit.MM, "10 mm", ""));
         long expected = session.document().uuidGenerator().nextValue();
         var reopened = DocumentCodec.decode(DocumentCodec.encode(session.document()));
-        assertEquals(expected, reopened.uuidGenerator().next());
-        assertEquals(expected + 1, reopened.parameters().uuidGenerator().next());
+        assertThat(reopened.uuidGenerator().next()).isEqualTo(expected);
+        assertThat(reopened.parameters().uuidGenerator().next()).isEqualTo(expected + 1);
     }
 }

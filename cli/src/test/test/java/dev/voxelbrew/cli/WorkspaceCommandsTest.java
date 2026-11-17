@@ -1,6 +1,6 @@
 package dev.voxelbrew.cli;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.CadDocument;
 import dev.voxelbrew.util.config.UserConfiguration;
@@ -29,21 +29,18 @@ class WorkspaceCommandsTest {
         var document = new AtomicReference<>(
                 new CadDocument("doc", List.of(), 0, setup).withGcode(Map.of("plate-1", List.of("G1 X1"))));
         var saves = new ArrayList<CadDocument>();
-        assertEquals(0, parser(document, saves).execute("--document", "virtual.vxb", "slicer", "supports", "disable"));
-        assertTrue(document.get().printSetup().supportsDisabled());
-        assertEquals(List.of(support), document.get().printSetup().supports());
-        assertTrue(document.get().gcode().isEmpty());
-        assertEquals(
-                0,
-                parser(document, saves)
-                        .execute("--document", "virtual.vxb", "slicer", "plate", "add", "--plate", "second"));
-        assertEquals(
-                0,
-                parser(document, saves)
-                        .execute("--document", "virtual.vxb", "slicer", "plate", "select", "--plate", "plate-1"));
-        assertEquals(
-                0,
-                parser(document, saves)
+        assertThat(parser(document, saves).execute("--document", "virtual.vxb", "slicer", "supports", "disable"))
+                .isEqualTo(0);
+        assertThat(document.get().printSetup().supportsDisabled()).isTrue();
+        assertThat(document.get().printSetup().supports()).isEqualTo(List.of(support));
+        assertThat(document.get().gcode().isEmpty()).isTrue();
+        assertThat(parser(document, saves)
+                        .execute("--document", "virtual.vxb", "slicer", "plate", "add", "--plate", "second"))
+                .isEqualTo(0);
+        assertThat(parser(document, saves)
+                        .execute("--document", "virtual.vxb", "slicer", "plate", "select", "--plate", "plate-1"))
+                .isEqualTo(0);
+        assertThat(parser(document, saves)
                         .execute(
                                 "--document",
                                 "virtual.vxb",
@@ -53,12 +50,13 @@ class WorkspaceCommandsTest {
                                 "--instance",
                                 "first",
                                 "--plate",
-                                "second"));
-        assertTrue(document.get().printSetup().instances().isEmpty());
-        assertTrue(document.get().printSetup().supports().isEmpty());
+                                "second"))
+                .isEqualTo(0);
+        assertThat(document.get().printSetup().instances().isEmpty()).isTrue();
+        assertThat(document.get().printSetup().supports().isEmpty()).isTrue();
         var destination = document.get().printSetup().selectPlate("second");
-        assertEquals(List.of(owner), destination.instances());
-        assertEquals(List.of(support), destination.supports());
+        assertThat(destination.instances()).isEqualTo(List.of(owner));
+        assertThat(destination.supports()).isEqualTo(List.of(support));
     }
 
     private int script(AtomicReference<CadDocument> document, List<CadDocument> saves, String json) throws Exception {
@@ -71,21 +69,21 @@ class WorkspaceCommandsTest {
     void sketchFinishCreatesOneDocumentUndoStepAndCancelDiscardsLocalUndoRedo() throws Exception {
         var document = new AtomicReference<>(CadDocument.empty());
         var saves = new ArrayList<CadDocument>();
-        assertEquals(0, script(document, saves, """
+        assertThat(script(document, saves, """
                 [["designer","sketch","begin"],
                  ["designer","sketch","new","--id","a"],
                  ["designer","sketch","new","--id","b"],
                  ["designer","sketch","finish"],["undo"],["document","save"]]
-                """));
-        assertTrue(document.get().features().isEmpty());
-        assertEquals(1, saves.size());
+                """)).isEqualTo(0);
+        assertThat(document.get().features().isEmpty()).isTrue();
+        assertThat(saves.size()).isEqualTo(1);
         saves.clear();
-        assertEquals(0, script(document, saves, """
+        assertThat(script(document, saves, """
                 [["designer","sketch","begin"],["designer","sketch","new","--id","a"],
                  ["undo"],["redo"],["designer","sketch","cancel"],["document","save"]]
-                """));
-        assertTrue(document.get().features().isEmpty());
-        assertEquals(1, saves.size());
+                """)).isEqualTo(0);
+        assertThat(document.get().features().isEmpty()).isTrue();
+        assertThat(saves.size()).isEqualTo(1);
     }
 
     @Test
@@ -94,9 +92,10 @@ class WorkspaceCommandsTest {
             var initial = CadDocument.empty();
             var document = new AtomicReference<>(initial);
             var saves = new ArrayList<CadDocument>();
-            assertEquals(1, script(document, saves, "[[\"designer\",\"sketch\",\"begin\"]," + command + "]"));
-            assertTrue(saves.isEmpty());
-            assertEquals(initial, document.get());
+            assertThat(script(document, saves, "[[\"designer\",\"sketch\",\"begin\"]," + command + "]"))
+                    .isEqualTo(1);
+            assertThat(saves.isEmpty()).isTrue();
+            assertThat(document.get()).isEqualTo(initial);
         }
     }
 
@@ -112,14 +111,14 @@ class WorkspaceCommandsTest {
         long ids = initial.uuidGenerator().nextValue();
         var document = new AtomicReference<>(initial);
         var saves = new ArrayList<CadDocument>();
-        assertEquals(0, script(document, saves, """
+        assertThat(script(document, saves, """
                 [["designer","parameter","set","--name","width","--unit","mm","--expression","10"],
                  ["designer","history","cursor","--position","0"],["undo"],["document","save"]]
-                """));
-        assertEquals(0, document.get().cursor());
-        assertTrue(document.get().parameters().parameters().isEmpty());
-        assertTrue(document.get().gcode().isEmpty());
-        assertTrue(document.get().uuidGenerator().nextValue() > ids);
+                """)).isEqualTo(0);
+        assertThat(document.get().cursor()).isEqualTo(0);
+        assertThat(document.get().parameters().parameters().isEmpty()).isTrue();
+        assertThat(document.get().gcode().isEmpty()).isTrue();
+        assertThat(document.get().uuidGenerator().nextValue() > ids).isTrue();
     }
 
     @Test
@@ -127,12 +126,12 @@ class WorkspaceCommandsTest {
         var initial = CadDocument.empty();
         var document = new AtomicReference<>(initial);
         var saves = new ArrayList<CadDocument>();
-        assertEquals(1, script(document, saves, """
+        assertThat(script(document, saves, """
                 [["slicer","plate","add","--plate","a"],["undo"],
                  ["slicer","plate","add","--plate","b"],["redo"],["document","save"]]
-                """));
-        assertTrue(saves.isEmpty());
-        assertEquals(initial, document.get());
+                """)).isEqualTo(1);
+        assertThat(saves.isEmpty()).isTrue();
+        assertThat(document.get()).isEqualTo(initial);
     }
 
     @Test
@@ -140,10 +139,12 @@ class WorkspaceCommandsTest {
         var cli = parser(new AtomicReference<>(CadDocument.empty()), new ArrayList<>());
         var output = new StringWriter();
         cli.setOut(new PrintWriter(output));
-        assertEquals(0, cli.execute("--output-format", "json", "--document", "virtual.vxb", "slicer", "plate", "list"));
+        assertThat(cli.execute("--output-format", "json", "--document", "virtual.vxb", "slicer", "plate", "list"))
+                .isEqualTo(0);
         var result = com.google.gson.JsonParser.parseString(output.toString()).getAsJsonObject();
-        assertEquals(0, result.get("exitCode").getAsInt());
-        assertTrue(result.getAsJsonArray("output").get(0).getAsString().contains("plate-1"));
+        assertThat(result.get("exitCode").getAsInt()).isEqualTo(0);
+        assertThat(result.getAsJsonArray("output").get(0).getAsString().contains("plate-1"))
+                .isTrue();
     }
 
     private CommandLine parser(AtomicReference<CadDocument> document, List<CadDocument> saves) {
@@ -170,11 +171,10 @@ class WorkspaceCommandsTest {
     @Test
     void workspaceTreeRejectsFlatCommandsAndEveryLeafHasUsableHelp() {
         var cli = parser(new AtomicReference<>(CadDocument.empty()), new ArrayList<>());
-        assertEquals(
-                Set.of("document", "designer", "slicer", "printer", "settings", "session"),
-                cli.getSubcommands().keySet());
-        assertEquals(2, cli.execute("new", "obsolete.vxb"));
-        assertEquals(2, cli.execute("designer", "inspect"));
+        assertThat(cli.getSubcommands().keySet())
+                .isEqualTo(Set.of("document", "designer", "slicer", "printer", "settings", "session"));
+        assertThat(cli.execute("new", "obsolete.vxb")).isEqualTo(2);
+        assertThat(cli.execute("designer", "inspect")).isEqualTo(2);
         verifyHelp(cli, new ArrayList<>());
     }
 
@@ -182,11 +182,10 @@ class WorkspaceCommandsTest {
         if (command.getSubcommands().isEmpty()) {
             var args = new ArrayList<>(path);
             args.add("--help");
-            assertEquals(
-                    0,
-                    parser(new AtomicReference<>(CadDocument.empty()), new ArrayList<>())
-                            .execute(args.toArray(String[]::new)),
-                    path.toString());
+            assertThat(parser(new AtomicReference<>(CadDocument.empty()), new ArrayList<>())
+                            .execute(args.toArray(String[]::new)))
+                    .as(path.toString())
+                    .isEqualTo(0);
         } else
             command.getSubcommands().forEach((name, child) -> {
                 var next = new ArrayList<>(path);
@@ -199,14 +198,11 @@ class WorkspaceCommandsTest {
     void documentOptionAndPlateMutationsPreserveUnrelatedSetupAndProtectLastPlate() {
         var document = new AtomicReference<>(CadDocument.empty());
         var saves = new ArrayList<CadDocument>();
-        assertEquals(
-                0,
-                parser(document, saves)
-                        .execute("--document", "part with spaces.vxb", "slicer", "plate", "add", "--plate", "second"));
-        assertEquals(2, document.get().printSetup().plates().size());
-        assertEquals(
-                0,
-                parser(document, saves)
+        assertThat(parser(document, saves)
+                        .execute("--document", "part with spaces.vxb", "slicer", "plate", "add", "--plate", "second"))
+                .isEqualTo(0);
+        assertThat(document.get().printSetup().plates().size()).isEqualTo(2);
+        assertThat(parser(document, saves)
                         .execute(
                                 "--document",
                                 "part with spaces.vxb",
@@ -216,16 +212,14 @@ class WorkspaceCommandsTest {
                                 "--plate",
                                 "second",
                                 "--name",
-                                "Second plate"));
-        assertEquals("Second plate", document.get().printSetup().activePlate().name());
-        assertEquals(
-                0,
-                parser(document, saves)
-                        .execute("slicer", "plate", "remove", "part with spaces.vxb", "--plate", "second"));
+                                "Second plate"))
+                .isEqualTo(0);
+        assertThat(document.get().printSetup().activePlate().name()).isEqualTo("Second plate");
+        assertThat(parser(document, saves)
+                        .execute("slicer", "plate", "remove", "part with spaces.vxb", "--plate", "second"))
+                .isEqualTo(0);
         var before = document.get();
-        assertEquals(
-                1,
-                parser(document, saves)
+        assertThat(parser(document, saves)
                         .execute(
                                 "--document",
                                 "part with spaces.vxb",
@@ -233,9 +227,11 @@ class WorkspaceCommandsTest {
                                 "plate",
                                 "remove",
                                 "--plate",
-                                "plate-1"));
-        assertEquals(before, document.get());
-        assertEquals(2, parser(document, saves).execute("--document", "a.vxb", "document", "new", "b.vxb"));
+                                "plate-1"))
+                .isEqualTo(1);
+        assertThat(document.get()).isEqualTo(before);
+        assertThat(parser(document, saves).execute("--document", "a.vxb", "document", "new", "b.vxb"))
+                .isEqualTo(2);
     }
 
     @Test
@@ -246,15 +242,15 @@ class WorkspaceCommandsTest {
         Path script = directory.resolve("session.json");
         Files.writeString(
                 script, "[[\"slicer\",\"plate\",\"add\",\"--plate\",\"second\"],[\"undo\"],[\"document\",\"save\"]]");
-        assertEquals(
-                0,
-                parser(document, saves).execute("--document", "session.vxb", "session", "--script", script.toString()));
-        assertEquals(List.of(initial), saves);
+        assertThat(parser(document, saves)
+                        .execute("--document", "session.vxb", "session", "--script", script.toString()))
+                .isEqualTo(0);
+        assertThat(saves).isEqualTo(List.of(initial));
         saves.clear();
         Files.writeString(script, "[[\"document\",\"new\"],[\"unknown\"],[\"document\",\"save\"]]");
-        assertEquals(
-                2,
-                parser(document, saves).execute("--document", "session.vxb", "session", "--script", script.toString()));
-        assertTrue(saves.isEmpty());
+        assertThat(parser(document, saves)
+                        .execute("--document", "session.vxb", "session", "--script", script.toString()))
+                .isEqualTo(2);
+        assertThat(saves.isEmpty()).isTrue();
     }
 }

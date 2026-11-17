@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine.geometry;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.mesh.MeshData;
 import dev.voxelbrew.engine.mesh.MeshValidation;
@@ -14,20 +14,21 @@ class TessellationCleanupTest {
                 new int[] {0, 3, 1, 0, 1, 2, 0, 1, 4},
                 new int[] {7, 8, 9});
         var cleaned = TessellationCleanup.removeCollapsedTriangles(mesh);
-        assertEquals(1, cleaned.triangleCount());
-        assertArrayEquals(new int[] {0, 1, 2}, cleaned.triangles());
-        assertArrayEquals(new int[] {8}, cleaned.faceIndices());
-        assertArrayEquals(mesh.vertices(), cleaned.vertices());
-        assertEquals(3, mesh.triangleCount(), "input stays immutable");
+        assertThat(cleaned.triangleCount()).isEqualTo(1);
+        assertThat(cleaned.triangles()).containsExactly(new int[] {0, 1, 2});
+        assertThat(cleaned.faceIndices()).containsExactly(new int[] {8});
+        assertThat(cleaned.vertices()).containsExactly(mesh.vertices());
+        assertThat(mesh.triangleCount()).as("input stays immutable").isEqualTo(3);
         var report = MeshValidation.inspect(cleaned);
-        assertEquals(0, report.degenerateTriangles());
-        assertEquals(3, report.boundaryEdges());
-        assertFalse(report.closed(), "cleanup must not conceal an open mesh");
+        assertThat(report.degenerateTriangles()).isEqualTo(0);
+        assertThat(report.boundaryEdges()).isEqualTo(3);
+        assertThat(report.closed()).as("cleanup must not conceal an open mesh").isFalse();
     }
 
     @Test
     void rejectsEntirelyCollapsedMesh() {
         var mesh = new MeshData(new double[] {0, 0, 0}, new int[] {0, 0, 0}, new int[] {0});
-        assertThrows(GeometryException.class, () -> TessellationCleanup.removeCollapsedTriangles(mesh));
+        assertThatThrownBy(() -> TessellationCleanup.removeCollapsedTriangles(mesh))
+                .isInstanceOf(GeometryException.class);
     }
 }

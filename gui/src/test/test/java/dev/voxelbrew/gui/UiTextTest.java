@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.engine.sketch.*;
@@ -17,12 +17,12 @@ class UiTextTest {
     void aboutMessagesFormatVersionsAndPolishLegalHelpWithoutAWindow() {
         var en = new Translations(Locale.ENGLISH);
         var pl = new Translations(Locale.forLanguageTag("pl"));
-        assertEquals("Version 1.2.3", en.text("about.version", "1.2.3"));
-        assertEquals("Wersja 1.2.3", pl.text("about.version", "1.2.3"));
-        assertEquals("New version available: 1.1.0", en.text("about.available", "1.1.0"));
-        assertEquals("Dostępna nowa wersja: 1.1.0", pl.text("about.available", "1.1.0"));
-        assertEquals("Otwórz aktualizator…", pl.text("about.updates"));
-        assertTrue(pl.text("help.about-license").contains("licencję"));
+        assertThat(en.text("about.version", "1.2.3")).isEqualTo("Version 1.2.3");
+        assertThat(pl.text("about.version", "1.2.3")).isEqualTo("Wersja 1.2.3");
+        assertThat(en.text("about.available", "1.1.0")).isEqualTo("New version available: 1.1.0");
+        assertThat(pl.text("about.available", "1.1.0")).isEqualTo("Dostępna nowa wersja: 1.1.0");
+        assertThat(pl.text("about.updates")).isEqualTo("Otwórz aktualizator…");
+        assertThat(pl.text("help.about-license").contains("licencję")).isTrue();
     }
 
     @Test
@@ -31,11 +31,11 @@ class UiTextTest {
                         "LICENSE", "GNU AFFERO GENERAL PUBLIC LICENSE", "THIRD_PARTY_NOTICES.md", "Open CASCADE")
                 .entrySet()) {
             try (var stream = AboutDialog.class.getResourceAsStream("legal/" + entry.getKey())) {
-                assertNotNull(stream, entry.getKey());
-                assertTrue(
-                        new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)
-                                .contains(entry.getValue()),
-                        entry.getKey());
+                assertThat(stream).as(entry.getKey()).isNotNull();
+                assertThat(new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)
+                                .contains(entry.getValue()))
+                        .as(entry.getKey())
+                        .isTrue();
             }
         }
     }
@@ -50,7 +50,9 @@ class UiTextTest {
                     var matcher = Pattern.compile("translations\\.text\\(\"([^\"]+)\"\\s*[,)]")
                             .matcher(Files.readString(file));
                     while (matcher.find())
-                        assertFalse(t.text(matcher.group(1)).isBlank(), file + ": " + matcher.group(1));
+                        assertThat(t.text(matcher.group(1)).isBlank())
+                                .as(file + ": " + matcher.group(1))
+                                .isFalse();
                 }
             }
             choices(t, "constraint.", SketchGeometry.Type.values());
@@ -65,8 +67,8 @@ class UiTextTest {
             choices(t, "export.contents.", ExportSelection.Contents.values());
             for (var style : Rendering.Style.values()) {
                 String name = style.name().toLowerCase(Locale.ROOT);
-                assertFalse(t.text("rendering." + name).isBlank());
-                assertFalse(t.text("help.rendering-" + name).isBlank());
+                assertThat(t.text("rendering." + name).isBlank()).isFalse();
+                assertThat(t.text("help.rendering-" + name).isBlank()).isFalse();
             }
         }
     }
@@ -74,12 +76,14 @@ class UiTextTest {
     @Test
     void compositeViewNamesTranslateWithoutChangingNavigationIdentifiers() {
         var pl = new Translations(Locale.forLanguageTag("pl"));
-        assertEquals("Góra Przód Prawo", UiText.view(pl, "Top Front Right"));
-        assertEquals("Top Front Right", UiText.view(new Translations(Locale.ENGLISH), "Top Front Right"));
+        assertThat(UiText.view(pl, "Top Front Right")).isEqualTo("Góra Przód Prawo");
+        assertThat(UiText.view(new Translations(Locale.ENGLISH), "Top Front Right"))
+                .isEqualTo("Top Front Right");
     }
 
     private static void choices(Translations t, String prefix, Enum<?>[] values) {
-        for (var value : values) assertFalse(t.text(prefix + value.name()).isBlank());
+        for (var value : values)
+            assertThat(t.text(prefix + value.name()).isBlank()).isFalse();
     }
 
     @Test
@@ -93,7 +97,9 @@ class UiTextTest {
                 while (matcher.find()) ids.add(matcher.group(1));
             }
         }
-        assertTrue(ids.size() > 50, "Audit the actual production action factories");
+        assertThat(ids.size() > 50)
+                .as("Audit the actual production action factories")
+                .isTrue();
         ids.addAll(List.of(
                 "support",
                 "timeline-first",
@@ -105,24 +111,32 @@ class UiTextTest {
                 "history-cursor"));
         for (var locale : List.of(Locale.ENGLISH, Locale.forLanguageTag("pl"))) {
             var translations = new Translations(locale);
-            for (var id : ids) assertFalse(UiHelp.description(translations, id).isBlank(), id);
+            for (var id : ids)
+                assertThat(UiHelp.description(translations, id).isBlank())
+                        .as(id)
+                        .isFalse();
             for (var draw : SketchEditor.Draw.values()) {
                 if (draw != SketchEditor.Draw.ADVANCED)
-                    assertFalse(UiHelp.description(
-                                    translations, "sketch-tool-" + draw.name().toLowerCase(Locale.ROOT))
-                            .isBlank());
+                    assertThat(UiHelp.description(
+                                            translations,
+                                            "sketch-tool-" + draw.name().toLowerCase(Locale.ROOT))
+                                    .isBlank())
+                            .isFalse();
             }
             for (var type : SketchGeometry.Type.values()) {
                 if (!type.dimension()) {
                     var id = type.name().toLowerCase(Locale.ROOT);
-                    assertFalse(
-                            UiHelp.description(translations, "constraint-" + id).isBlank());
-                    assertFalse(UiHelp.description(translations, "constraint-menu-" + id)
-                            .isBlank());
+                    assertThat(UiHelp.description(translations, "constraint-" + id)
+                                    .isBlank())
+                            .isFalse();
+                    assertThat(UiHelp.description(translations, "constraint-menu-" + id)
+                                    .isBlank())
+                            .isFalse();
                 }
             }
-            assertFalse(UiHelp.description(translations, "history-52").isBlank());
-            assertFalse(UiHelp.description(translations, "apply-plugin-width").isBlank());
+            assertThat(UiHelp.description(translations, "history-52").isBlank()).isFalse();
+            assertThat(UiHelp.description(translations, "apply-plugin-width").isBlank())
+                    .isFalse();
         }
     }
 }

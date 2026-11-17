@@ -1,6 +1,6 @@
 package dev.voxelbrew.exporter;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.exporter.*;
 import dev.voxelbrew.engine.mesh.MeshOptions;
@@ -49,7 +49,8 @@ class UnifiedExportTest {
                     "support_material_interface_layers = 4",
                     "brim_width = 6.0",
                     "raft_layers = 2",
-                    "filament_type = PETG")) assertTrue(config.contains("; " + setting + "\n"), setting);
+                    "filament_type = PETG"))
+                assertThat(config.contains("; " + setting + "\n")).as(setting).isTrue();
             try (var input = zip.getInputStream(zip.getEntry("3D/3dmodel.model"))) {
                 var factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
                 factory.setNamespaceAware(true);
@@ -60,8 +61,8 @@ class UnifiedExportTest {
                     minX = Math.min(minX, Double.parseDouble(vertex.getAttribute("x")));
                     minY = Math.min(minY, Double.parseDouble(vertex.getAttribute("y")));
                 }
-                assertEquals(25, minX, 0.001);
-                assertEquals(35, minY, 0.001);
+                assertThat(minX).isCloseTo(25, org.assertj.core.data.Offset.offset(0.001));
+                assertThat(minY).isCloseTo(35, org.assertj.core.data.Offset.offset(0.001));
             }
         }
     }
@@ -84,12 +85,12 @@ class UnifiedExportTest {
             var xml = factory.newDocumentBuilder().parse(input);
             var item = (org.w3c.dom.Element)
                     xml.getElementsByTagNameNS("*", "item").item(0);
-            assertEquals("1.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 1.0 25.0 35.0 7.0", item.getAttribute("transform"));
+            assertThat(item.getAttribute("transform")).isEqualTo("1.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 1.0 25.0 35.0 7.0");
             var metadata = xml.getElementsByTagNameNS("*", "metadata").item(0).getTextContent();
             var proto = dev.voxelbrew.engine.persistence.proto.DocumentProto.PrintSetup.newBuilder();
             com.google.protobuf.util.JsonFormat.parser().merge(metadata, proto);
-            assertEquals("custom.gcode", proto.getWorkspaceSettingsOrThrow("print-output"));
-            assertEquals(25, proto.getInstances(0).getTransform(3));
+            assertThat(proto.getWorkspaceSettingsOrThrow("print-output")).isEqualTo("custom.gcode");
+            assertThat(proto.getInstances(0).getTransform(3)).isEqualTo(25);
         }
         Path obj = directory.resolve("design.obj");
         var objParent = window(obj, false);
@@ -100,8 +101,8 @@ class UnifiedExportTest {
                 .filter(line -> line.startsWith("v "))
                 .mapToDouble(line -> Double.parseDouble(line.split("\\s+")[1]))
                 .summaryStatistics();
-        assertEquals(0, xs.getMin(), 0.001);
-        assertEquals(60, xs.getMax(), 0.001);
+        assertThat(xs.getMin()).isCloseTo(0, org.assertj.core.data.Offset.offset(0.001));
+        assertThat(xs.getMax()).isCloseTo(60, org.assertj.core.data.Offset.offset(0.001));
     }
 
     @Test
@@ -116,12 +117,12 @@ class UnifiedExportTest {
                 var destination = accepted instanceof FileExportDialog.Destination file
                         ? file
                         : ((MeshExportDialog.Settings) accepted).destination();
-                assertEquals(target, destination.path());
+                assertThat(destination.path()).isEqualTo(target);
                 byte[] original = Files.readAllBytes(target);
-                assertTrue(original.length > 100);
+                assertThat(original.length > 100).isTrue();
                 var rollback = new CadDocument(document.id(), document.features(), document.cursor() - 1);
-                assertThrows(Exception.class, () -> exporter.export(rollback, parent));
-                assertArrayEquals(original, Files.readAllBytes(target));
+                assertThatThrownBy(() -> exporter.export(rollback, parent)).isInstanceOf(Exception.class);
+                assertThat(Files.readAllBytes(target)).containsExactly(original);
             }
         }
     }
@@ -137,7 +138,7 @@ class UnifiedExportTest {
                         return Optional.empty();
                     }
                 };
-                assertEquals(Optional.empty(), exporter.export(CadDocument.empty(), parent));
+                assertThat(exporter.export(CadDocument.empty(), parent)).isEqualTo(Optional.empty());
             }
         }
     }
@@ -162,8 +163,9 @@ class UnifiedExportTest {
             }
         };
 
-        assertThrows(IllegalArgumentException.class, () -> new BinaryStlExporter().export(CadDocument.empty(), window));
-        assertFalse(Files.exists(target));
+        assertThatThrownBy(() -> new BinaryStlExporter().export(CadDocument.empty(), window))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(Files.exists(target)).isFalse();
     }
 
     private static ExportWindow window(Path target, boolean overwrite) {

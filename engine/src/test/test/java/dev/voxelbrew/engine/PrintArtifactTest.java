@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
@@ -14,22 +14,24 @@ class PrintArtifactTest {
         byte[] bytes = {1, 2, 3};
         var artifact = PrintArtifact.of("gcode.3mf", bytes, Map.of("model", "Bambu Lab A1"));
         bytes[0] = 9;
-        assertArrayEquals(new byte[] {1, 2, 3}, artifact.bytes());
+        assertThat(artifact.bytes()).containsExactly(new byte[] {1, 2, 3});
         var document = new CadDocument("test", List.of(), 0)
                 .withGcode(Map.of("plate", List.of("G1 X1")))
                 .withPrintArtifacts(Map.of("plate", artifact));
         var session = new ModelSession(document);
-        assertEquals(document, DocumentCodec.decode(DocumentCodec.encode(document)));
-        assertEquals(document, DocumentCodec.decodeJson(DocumentCodec.encodeJson(document)));
-        assertEquals(document.printArtifacts(), session.document().printArtifacts());
-        assertEquals(DocumentCodec.fingerprint(document), DocumentCodec.fingerprint(document.withGcode(Map.of())));
+        assertThat(DocumentCodec.decode(DocumentCodec.encode(document))).isEqualTo(document);
+        assertThat(DocumentCodec.decodeJson(DocumentCodec.encodeJson(document))).isEqualTo(document);
+        assertThat(session.document().printArtifacts()).isEqualTo(document.printArtifacts());
+        assertThat(DocumentCodec.fingerprint(document.withGcode(Map.of())))
+                .isEqualTo(DocumentCodec.fingerprint(document));
         session.invalidateGcode();
-        assertTrue(session.document().printArtifacts().isEmpty());
-        assertTrue(session.document().gcode().isEmpty());
+        assertThat(session.document().printArtifacts().isEmpty()).isTrue();
+        assertThat(session.document().gcode().isEmpty()).isTrue();
     }
 
     @Test
     void checksumMismatchIsRejected() {
-        assertThrows(IllegalArgumentException.class, () -> new PrintArtifact("gcode.3mf", "AQID", "wrong", Map.of()));
+        assertThatThrownBy(() -> new PrintArtifact("gcode.3mf", "AQID", "wrong", Map.of()))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

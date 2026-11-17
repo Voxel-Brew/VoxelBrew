@@ -1,6 +1,6 @@
 package dev.voxelbrew.util.config;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -17,30 +17,30 @@ class UserConfigurationTest {
     void defaultSaveFolderUsesHomeAndExpandsConfiguredPaths() throws Exception {
         var config = new UserConfiguration(directory.resolve("save.properties"));
         Path home = Path.of(System.getProperty("user.home")).toAbsolutePath();
-        assertEquals(home.resolve("VoxelBrew"), config.defaultSaveFolder());
-        assertFalse(Files.exists(config.path()));
+        assertThat(config.defaultSaveFolder()).isEqualTo(home.resolve("VoxelBrew"));
+        assertThat(Files.exists(config.path())).isFalse();
         config.set("save.folder", " ");
-        assertEquals(home.resolve("VoxelBrew"), config.defaultSaveFolder());
+        assertThat(config.defaultSaveFolder()).isEqualTo(home.resolve("VoxelBrew"));
         config.set("save.folder", directory.resolve("my designs").toString());
-        assertEquals(directory.resolve("my designs"), new UserConfiguration(config.path()).defaultSaveFolder());
+        assertThat(new UserConfiguration(config.path()).defaultSaveFolder()).isEqualTo(directory.resolve("my designs"));
         config.set("save.folder", "~/Designs");
-        assertEquals(home.resolve("Designs"), config.defaultSaveFolder());
+        assertThat(config.defaultSaveFolder()).isEqualTo(home.resolve("Designs"));
     }
 
     @Test
     void utf8RoundTripMergesUnknownKeysAndSupportsRemovalAndMigration() throws Exception {
         var config = new UserConfiguration(directory.resolve("settings with spaces/config.properties"));
-        assertEquals(Map.of(), config.read());
-        assertFalse(Files.exists(config.path().getParent()));
+        assertThat(config.read()).isEqualTo(Map.of());
+        assertThat(Files.exists(config.path().getParent())).isFalse();
         config.update(Map.of("language", "pl", "plugin.vendor", "Zażółć gęślą jaźń ☕\nnext=line"), Set.of());
         new UserConfiguration(config.path()).set("appearance", "DARK");
         config.setIfAbsent("appearance", "LIGHT");
-        assertEquals("DARK", config.get("appearance", "SYSTEM"));
-        assertEquals("Zażółć gęślą jaźń ☕\nnext=line", config.get("plugin.vendor", ""));
-        assertThrows(UnsupportedOperationException.class, () -> config.read().put("key", "value"));
+        assertThat(config.get("appearance", "SYSTEM")).isEqualTo("DARK");
+        assertThat(config.get("plugin.vendor", "")).isEqualTo("Zażółć gęślą jaźń ☕\nnext=line");
+        assertThatThrownBy(() -> config.read().put("key", "value")).isInstanceOf(UnsupportedOperationException.class);
         config.remove("language");
-        assertEquals("en", config.get("language", "en"));
-        assertEquals(2, config.read().size());
+        assertThat(config.get("language", "en")).isEqualTo("en");
+        assertThat(config.read().size()).isEqualTo(2);
     }
 
     @Test
@@ -49,14 +49,15 @@ class UserConfigurationTest {
         Files.writeString(file, "bad=\\uZZZZ\n");
         byte[] before = Files.readAllBytes(file);
         var config = new UserConfiguration(file);
-        assertThrows(IOException.class, config::read);
-        assertThrows(IOException.class, () -> config.set("appearance", "DARK"));
-        assertArrayEquals(before, Files.readAllBytes(file));
+        assertThatThrownBy(config::read).isInstanceOf(IOException.class);
+        assertThatThrownBy(() -> config.set("appearance", "DARK")).isInstanceOf(IOException.class);
+        assertThat(Files.readAllBytes(file)).containsExactly(before);
         Files.writeString(file, "unknown=keep\n");
-        assertThrows(IllegalArgumentException.class, () -> config.set(" ", "value"));
-        assertEquals("unknown=keep\n", Files.readString(file));
+        assertThatThrownBy(() -> config.set(" ", "value")).isInstanceOf(IllegalArgumentException.class);
+        assertThat(Files.readString(file)).isEqualTo("unknown=keep\n");
         try (var entries = Files.list(directory)) {
-            assertTrue(entries.noneMatch(path -> path.toString().endsWith(".tmp")));
+            assertThat(entries.noneMatch(path -> path.toString().endsWith(".tmp")))
+                    .isTrue();
         }
     }
 
@@ -75,7 +76,7 @@ class UserConfigurationTest {
             for (var future : futures) future.get(20, TimeUnit.SECONDS);
         }
         var values = new UserConfiguration(file).read();
-        assertEquals(40, values.size());
-        values.forEach((key, value) -> assertEquals(key, value));
+        assertThat(values.size()).isEqualTo(40);
+        values.forEach((key, value) -> assertThat(value).isEqualTo(key));
     }
 }

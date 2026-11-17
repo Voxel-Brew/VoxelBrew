@@ -1,6 +1,6 @@
 package dev.voxelbrew.cli;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.CadDocument;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
@@ -29,14 +29,12 @@ class DocumentImportTest {
             cli.setErr(new PrintWriter(new StringWriter()));
             String[] args = {"document", "import", source.toString(), "--format", format, "--output", target.toString()
             };
-            assertEquals(0, cli.execute(args));
-            assertEquals(expected.id(), DocumentReader.load(target).id());
+            assertThat(cli.execute(args)).isEqualTo(0);
+            assertThat(DocumentReader.load(target).id()).isEqualTo(expected.id());
             byte[] output = Files.readAllBytes(target);
-            assertNotEquals(0, cli.execute(args));
-            assertArrayEquals(output, Files.readAllBytes(target));
-            assertNotEquals(
-                    0,
-                    cli.execute(
+            assertThat(cli.execute(args)).isNotEqualTo(0);
+            assertThat(Files.readAllBytes(target)).containsExactly(output);
+            assertThat(cli.execute(
                             "document",
                             "import",
                             source.toString(),
@@ -44,8 +42,9 @@ class DocumentImportTest {
                             format,
                             "--output",
                             source.toString(),
-                            "--overwrite"));
-            assertArrayEquals(original, Files.readAllBytes(source));
+                            "--overwrite"))
+                    .isNotEqualTo(0);
+            assertThat(Files.readAllBytes(source)).containsExactly(original);
         }
     }
 }

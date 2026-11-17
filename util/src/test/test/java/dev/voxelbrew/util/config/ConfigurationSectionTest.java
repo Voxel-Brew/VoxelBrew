@@ -1,6 +1,6 @@
 package dev.voxelbrew.util.config;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -17,12 +17,11 @@ class ConfigurationSectionTest {
         previous.update(Map.of("executable", "previous", "definition", "machine.json"), java.util.Set.of());
         var target = new UserConfiguration(directory.resolve("slicers/cura.properties"));
         target.set("executable", "current");
-        assertEquals(
-                Map.of("executable", "current", "definition", "machine.json"),
-                main.section("slicer", "cura").read());
-        assertFalse(Files.exists(previous.path()));
-        assertTrue(main.read().isEmpty());
-        assertEquals(target.read(), main.section("slicer", "cura").read());
+        assertThat(main.section("slicer", "cura").read())
+                .isEqualTo(Map.of("executable", "current", "definition", "machine.json"));
+        assertThat(Files.exists(previous.path())).isFalse();
+        assertThat(main.read().isEmpty()).isTrue();
+        assertThat(main.section("slicer", "cura").read()).isEqualTo(target.read());
     }
 
     @Test
@@ -31,8 +30,8 @@ class ConfigurationSectionTest {
         var previous = new UserConfiguration(directory.resolve("config-slicer-cura.properties"));
         previous.set("executable", "kept");
         Files.createDirectories(directory.resolve("slicers/cura.properties"));
-        assertThrows(IOException.class, () -> main.section("slicer", "cura"));
-        assertEquals("kept", previous.get("executable", ""));
+        assertThatThrownBy(() -> main.section("slicer", "cura")).isInstanceOf(IOException.class);
+        assertThat(previous.get("executable", "")).isEqualTo("kept");
     }
 
     @TempDir
@@ -54,11 +53,10 @@ class ConfigurationSectionTest {
                 java.util.Set.of());
         var separate = new UserConfiguration(directory.resolve("slicers/prusa-slicer.properties"));
         separate.set("executable", "new");
-        assertEquals(
-                Map.of("executable", "new", "custom", "kept"),
-                main.section("slicer", "prusa-slicer").read());
-        assertEquals(Map.of("slicer.cura.executable", "cura", "appearance", "dark"), main.read());
-        assertEquals(separate.read(), main.section("slicer", "prusa-slicer").read());
+        assertThat(main.section("slicer", "prusa-slicer").read())
+                .isEqualTo(Map.of("executable", "new", "custom", "kept"));
+        assertThat(main.read()).isEqualTo(Map.of("slicer.cura.executable", "cura", "appearance", "dark"));
+        assertThat(main.section("slicer", "prusa-slicer").read()).isEqualTo(separate.read());
     }
 
     @Test
@@ -66,16 +64,16 @@ class ConfigurationSectionTest {
         var main = new UserConfiguration(directory.resolve("config.properties"));
         main.set("slicer.cura.executable", "kept");
         Files.createDirectories(directory.resolve("slicers/cura.properties"));
-        assertThrows(IOException.class, () -> main.section("slicer", "cura"));
-        assertEquals("kept", main.get("slicer.cura.executable", ""));
+        assertThatThrownBy(() -> main.section("slicer", "cura")).isInstanceOf(IOException.class);
+        assertThat(main.get("slicer.cura.executable", "")).isEqualTo("kept");
     }
 
     @Test
     void rejectsTraversalAndDoesNotCreateUnusedFiles() throws Exception {
         var main = new UserConfiguration(directory.resolve("config.properties"));
-        assertThrows(IllegalArgumentException.class, () -> main.section("slicer", "../outside"));
-        assertTrue(main.section("slicer", "cura").read().isEmpty());
-        assertFalse(Files.exists(directory.resolve("slicers/cura.properties")));
-        assertFalse(Files.exists(main.path()));
+        assertThatThrownBy(() -> main.section("slicer", "../outside")).isInstanceOf(IllegalArgumentException.class);
+        assertThat(main.section("slicer", "cura").read().isEmpty()).isTrue();
+        assertThat(Files.exists(directory.resolve("slicers/cura.properties"))).isFalse();
+        assertThat(Files.exists(main.path())).isFalse();
     }
 }

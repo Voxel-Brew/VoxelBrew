@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.util.config.UserConfiguration;
 import java.nio.file.Path;
@@ -16,13 +16,13 @@ class RenderingTest {
         var configuration = new UserConfiguration(directory.resolve("config.properties"));
         configuration.set("language", "pl");
         var rendering = new Rendering(configuration);
-        assertEquals(Rendering.Style.SHADED, rendering.load());
+        assertThat(rendering.load()).isEqualTo(Rendering.Style.SHADED);
         rendering.save(Rendering.Style.TECHNICAL);
-        assertEquals(Rendering.Style.TECHNICAL, new Rendering(configuration).load());
-        assertEquals("pl", configuration.get("language", ""));
+        assertThat(new Rendering(configuration).load()).isEqualTo(Rendering.Style.TECHNICAL);
+        assertThat(configuration.get("language", "")).isEqualTo("pl");
         configuration.set("rendering.style", "UNSUPPORTED");
-        assertEquals(Rendering.Style.SHADED, rendering.load());
+        assertThat(rendering.load()).isEqualTo(Rendering.Style.SHADED);
         rendering.save(Rendering.Style.TECHNICAL);
-        assertEquals(Rendering.Style.TECHNICAL, rendering.load());
+        assertThat(rendering.load()).isEqualTo(Rendering.Style.TECHNICAL);
     }
 }

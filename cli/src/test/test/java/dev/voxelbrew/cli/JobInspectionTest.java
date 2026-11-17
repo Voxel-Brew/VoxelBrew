@@ -1,6 +1,6 @@
 package dev.voxelbrew.cli;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.printing.*;
@@ -62,9 +62,7 @@ class JobInspectionTest {
 
     @Test
     void layerAndRoleFiltersSelectActualSegmentsAndRetainEstimates() {
-        assertEquals(
-                0,
-                run(
+        assertThat(run(
                         CadDocument.empty(),
                         "inspect",
                         "job.gcode",
@@ -74,14 +72,15 @@ class JobInspectionTest {
                         "2",
                         "--role",
                         "SUPPORT",
-                        "--paths"));
-        assertEquals(List.of("file:job.gcode"), reads);
-        assertTrue(output.contains("filtered_segments=1"));
-        assertTrue(output.contains("role=SUPPORT"));
-        assertFalse(output.contains("role=PERIMETER"));
-        assertFalse(output.contains("role=TRAVEL"));
-        assertTrue(output.contains("estimated_time=1 minute"));
-        assertTrue(output.contains("filament_mm=12.0"));
+                        "--paths"))
+                .isEqualTo(0);
+        assertThat(reads).isEqualTo(List.of("file:job.gcode"));
+        assertThat(output.contains("filtered_segments=1")).isTrue();
+        assertThat(output.contains("role=SUPPORT")).isTrue();
+        assertThat(output.contains("role=PERIMETER")).isFalse();
+        assertThat(output.contains("role=TRAVEL")).isFalse();
+        assertThat(output.contains("estimated_time=1 minute")).isTrue();
+        assertThat(output.contains("filament_mm=12.0")).isTrue();
     }
 
     @Test
@@ -90,28 +89,37 @@ class JobInspectionTest {
         var setup = initial.printSetup().addPlate("second");
         var document = new CadDocument(initial.id(), List.of(), 0, setup)
                 .withGcode(Map.of("plate-1", List.of("first"), "second", List.of("second")));
-        assertEquals(0, run(document, "--document", "design.vxb", "inspect"));
-        assertEquals(List.of("second"), reads);
+        assertThat(run(document, "--document", "design.vxb", "inspect")).isEqualTo(0);
+        assertThat(reads).isEqualTo(List.of("second"));
         reads.clear();
-        assertEquals(0, run(document, "--document", "design.vxb", "inspect", "--plate", "plate-1"));
-        assertEquals(List.of("first"), reads);
+        assertThat(run(document, "--document", "design.vxb", "inspect", "--plate", "plate-1"))
+                .isEqualTo(0);
+        assertThat(reads).isEqualTo(List.of("first"));
     }
 
     @Test
     void invalidRangesFailRatherThanReturningAnEmptySuccessfulPreview() {
         for (String[] range : new String[][] {{"0", "1"}, {"2", "1"}, {"1", "3"}}) {
-            assertEquals(
-                    1,
-                    run(CadDocument.empty(), "inspect", "job.gcode", "--from-layer", range[0], "--to-layer", range[1]));
-            assertTrue(output.contains("Invalid layer range"));
+            assertThat(run(
+                            CadDocument.empty(),
+                            "inspect",
+                            "job.gcode",
+                            "--from-layer",
+                            range[0],
+                            "--to-layer",
+                            range[1]))
+                    .isEqualTo(1);
+            assertThat(output.contains("Invalid layer range")).isTrue();
         }
     }
 
     @Test
     void ambiguousInputAndMissingStoredJobAreRejectedBeforeReadingToolpaths() {
-        assertEquals(1, run(CadDocument.empty(), "--document", "design.vxb", "inspect", "job.gcode"));
-        assertTrue(reads.isEmpty());
-        assertEquals(1, run(CadDocument.empty(), "--document", "design.vxb", "inspect"));
-        assertTrue(reads.isEmpty());
+        assertThat(run(CadDocument.empty(), "--document", "design.vxb", "inspect", "job.gcode"))
+                .isEqualTo(1);
+        assertThat(reads.isEmpty()).isTrue();
+        assertThat(run(CadDocument.empty(), "--document", "design.vxb", "inspect"))
+                .isEqualTo(1);
+        assertThat(reads.isEmpty()).isTrue();
     }
 }

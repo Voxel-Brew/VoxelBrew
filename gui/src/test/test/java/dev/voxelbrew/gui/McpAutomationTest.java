@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -21,11 +21,10 @@ class McpAutomationTest {
             args.put("generation", before.get("generation"));
             args.putAll(Map.of("id", "plate", "plane", "XY", "x", 0, "y", 0, "width", 60, "height", 40));
             automation.call("sketch_rectangle", args).get();
-            assertEquals(1, controller.snapshot().document().features().size());
-            assertTrue(controller.dirty());
-            assertThrows(
-                    ExecutionException.class,
-                    () -> automation.call("sketch_rectangle", args).get());
+            assertThat(controller.snapshot().document().features().size()).isEqualTo(1);
+            assertThat(controller.dirty()).isTrue();
+            assertThatThrownBy(() -> automation.call("sketch_rectangle", args).get())
+                    .isInstanceOf(ExecutionException.class);
             var current = automation.call("document_inspect", Map.of()).get();
             var revision = Map.of(
                     "documentId",
@@ -35,13 +34,12 @@ class McpAutomationTest {
                     "generation",
                     current.get("generation"));
             busy.set(true);
-            assertThrows(
-                    ExecutionException.class,
-                    () -> automation.call("history_undo", revision).get());
-            assertEquals(1, controller.snapshot().document().features().size());
+            assertThatThrownBy(() -> automation.call("history_undo", revision).get())
+                    .isInstanceOf(ExecutionException.class);
+            assertThat(controller.snapshot().document().features().size()).isEqualTo(1);
             busy.set(false);
             automation.call("history_undo", revision).get();
-            assertTrue(controller.snapshot().document().features().isEmpty());
+            assertThat(controller.snapshot().document().features().isEmpty()).isTrue();
         }
     }
 }

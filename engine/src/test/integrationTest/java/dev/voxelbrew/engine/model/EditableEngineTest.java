@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine.model;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import dev.voxelbrew.engine.persistence.DocumentFormatException;
@@ -17,6 +17,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+@SuppressWarnings("deprecation")
 class EditableEngineTest {
     @Test
     void solidModificationsSurviveDocumentRoundTrip() throws Exception {
@@ -32,7 +33,8 @@ class EditableEngineTest {
                 java.util.List.of(1)));
         session.add(new Feature.Shell("hollow", new Feature.BodyRef("round", "body"), 1, 1));
         var document = DocumentCodec.decode(DocumentCodec.encode(session.document()));
-        org.junit.jupiter.api.Assertions.assertEquals(session.document().features(), document.features());
+        org.assertj.core.api.Assertions.assertThat(document.features())
+                .isEqualTo(session.document().features());
         try (var evaluation = new ModelSession(document).evaluate()) {
             evaluation.requireCompleteDocument();
         }
@@ -60,10 +62,10 @@ class EditableEngineTest {
         session.setBodyStyle("thickness.body", red);
         session.editDimension("thickness", "distance", 8);
         try (var evaluation = session.evaluate()) {
-            assertTrue(evaluation.valid());
-            assertEquals("thickness.body", evaluation.bodies().getFirst().id());
-            assertEquals(
-                    19099.469035085127, evaluation.bodies().getFirst().solid().volume(), .01);
+            assertThat(evaluation.valid()).isTrue();
+            assertThat(evaluation.bodies().getFirst().id()).isEqualTo("thickness.body");
+            assertThat(evaluation.bodies().getFirst().solid().volume())
+                    .isCloseTo(19099.469035085127, org.assertj.core.data.Offset.offset(.01));
         }
         session.add(new Feature.SplitBody(
                 "split", new Feature.BodyRef("cut", "body"), new Feature.SplitPlane(1, 0, 0, 30)));
@@ -72,27 +74,28 @@ class EditableEngineTest {
         DocumentWriter.save(session.document(), file, false);
         var reopened = new ModelSession(DocumentReader.load(file));
         try (var evaluation = reopened.evaluate()) {
-            assertTrue(evaluation.valid());
-            assertEquals(2, evaluation.bodies().size());
-            assertEquals(
-                    19099.469035085127,
-                    evaluation.bodies().stream()
+            assertThat(evaluation.valid()).isTrue();
+            assertThat(evaluation.bodies().size()).isEqualTo(2);
+            assertThat(evaluation.bodies().stream()
                             .mapToDouble(b -> b.solid().volume())
-                            .sum(),
-                    .01);
-            assertEquals(red, reopened.document().bodyStyle("split.negative"));
-            assertEquals("PLA", reopened.document().bodyStyle("split.positive").material());
+                            .sum())
+                    .isCloseTo(19099.469035085127, org.assertj.core.data.Offset.offset(.01));
+            assertThat(reopened.document().bodyStyle("split.negative")).isEqualTo(red);
+            assertThat(reopened.document().bodyStyle("split.positive").material())
+                    .isEqualTo("PLA");
         }
         reopened.setCursor(3);
         try (var evaluation = reopened.evaluate()) {
-            assertEquals(
-                    red,
-                    reopened.document().bodyStyle(evaluation.bodies().getFirst().id()));
-            assertEquals(19200, evaluation.bodies().getFirst().solid().volume(), .01);
+            assertThat(reopened.document()
+                            .bodyStyle(evaluation.bodies().getFirst().id()))
+                    .isEqualTo(red);
+            assertThat(evaluation.bodies().getFirst().solid().volume())
+                    .isCloseTo(19200, org.assertj.core.data.Offset.offset(.01));
         }
         reopened.setCursor(5);
         reopened.editDimension("thickness", "distance", 10);
-        assertEquals(session.document().bodyStyles(), reopened.document().bodyStyles());
+        assertThat(reopened.document().bodyStyles())
+                .isEqualTo(session.document().bodyStyles());
     }
 
     @Test
@@ -105,14 +108,15 @@ class EditableEngineTest {
         reopened.editDimension("thickness", "distance", 8);
         DocumentWriter.save(reopened.document(), file, true);
         var edited = DocumentReader.load(file);
-        assertEquals(ids, edited.features().stream().map(Feature::id).toList());
-        assertEquals(session.document().id(), edited.id());
+        assertThat(edited.features().stream().map(Feature::id).toList()).isEqualTo(ids);
+        assertThat(edited.id()).isEqualTo(session.document().id());
         assertReference(reopened, 8, 4);
         reopened.setCursor(3);
         try (var result = reopened.evaluate()) {
-            assertEquals(19200, result.bodies().getFirst().solid().volume(), 0.01);
-            assertTrue(result.bodies().getFirst().solid().contains(10, 10, 4));
-            assertThrows(IllegalStateException.class, result::requireCompleteDocument);
+            assertThat(result.bodies().getFirst().solid().volume())
+                    .isCloseTo(19200, org.assertj.core.data.Offset.offset(0.01));
+            assertThat(result.bodies().getFirst().solid().contains(10, 10, 4)).isTrue();
+            assertThatThrownBy(result::requireCompleteDocument).isInstanceOf(IllegalStateException.class);
         }
         reopened.setCursor(4);
         assertReference(reopened, 8, 4);
@@ -123,27 +127,29 @@ class EditableEngineTest {
         var session = reference();
         session.editDimension("thickness", "distance", 8);
         session.setCursor(2);
-        assertTrue(session.undo());
-        assertEquals(2, session.document().cursor());
-        assertEquals(5, ((Feature.Extrude) session.document().features().get(1)).distance());
-        assertTrue(session.redo());
-        assertEquals(2, session.document().cursor());
+        assertThat(session.undo()).isTrue();
+        assertThat(session.document().cursor()).isEqualTo(2);
+        assertThat(((Feature.Extrude) session.document().features().get(1)).distance())
+                .isEqualTo(5);
+        assertThat(session.redo()).isTrue();
+        assertThat(session.document().cursor()).isEqualTo(2);
         session.setCursor(4);
         assertReference(session, 8, 4);
         var valid = session.document();
         for (double bad : new double[] {0, -1, Double.NaN, Double.POSITIVE_INFINITY}) {
-            var failure = assertThrows(ModelException.class, () -> session.editDimension("hole", "diameter", bad));
-            assertTrue(failure.getMessage().contains("hole"));
-            assertTrue(failure.getMessage().contains("diameter"));
-            assertEquals(valid, session.document());
+            var failure = org.assertj.core.api.Assertions.catchThrowableOfType(
+                    () -> session.editDimension("hole", "diameter", bad), ModelException.class);
+            assertThat(failure.getMessage().contains("hole")).isTrue();
+            assertThat(failure.getMessage().contains("diameter")).isTrue();
+            assertThat(session.document()).isEqualTo(valid);
         }
         session.editDimension("hole", "diameter", 6);
         var circle =
                 (Feature.Circle) ((Feature.Sketch) session.document().features().get(2)).profile();
-        assertEquals(10, circle.centerX());
-        assertEquals(10, circle.centerY());
+        assertThat(circle.centerX()).isEqualTo(10);
+        assertThat(circle.centerY()).isEqualTo(10);
         assertReference(session, 8, 6);
-        assertTrue(session.undo());
+        assertThat(session.undo()).isTrue();
         assertReference(session, 8, 4);
     }
 
@@ -155,14 +161,15 @@ class EditableEngineTest {
         DocumentWriter.save(session.document(), file, false);
         var reopened = new ModelSession(DocumentReader.load(file));
         try (var result = reopened.evaluate()) {
-            assertEquals(Evaluation.State.FAILED, result.diagnostics().get(1).state());
-            assertTrue(result.diagnostics().get(1).message().contains("missing"));
-            assertEquals(Evaluation.State.BLOCKED, result.diagnostics().get(3).state());
-            assertThrows(IllegalStateException.class, result::bodies);
-            assertThrows(IllegalStateException.class, result::requireCompleteDocument);
+            assertThat(result.diagnostics().get(1).state()).isEqualTo(Evaluation.State.FAILED);
+            assertThat(result.diagnostics().get(1).message().contains("missing"))
+                    .isTrue();
+            assertThat(result.diagnostics().get(3).state()).isEqualTo(Evaluation.State.BLOCKED);
+            assertThatThrownBy(result::bodies).isInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(result::requireCompleteDocument).isInstanceOf(IllegalStateException.class);
         }
         reopened.replace(new Feature.Extrude("thickness", new Feature.ProfileRef("plate", "plate.profile"), 5));
-        assertEquals(4, reopened.document().features().size());
+        assertThat(reopened.document().features().size()).isEqualTo(4);
         assertReference(reopened, 5, 4);
     }
 
@@ -171,14 +178,16 @@ class EditableEngineTest {
         var session = reference();
         session.replace(new Feature.Extrude("thickness", new Feature.ProfileRef("hole", "hole.profile"), 5));
         try (var result = session.evaluate()) {
-            assertEquals(Evaluation.State.FAILED, result.diagnostics().get(1).state());
-            assertTrue(result.diagnostics().get(1).message().contains("non-earlier"));
+            assertThat(result.diagnostics().get(1).state()).isEqualTo(Evaluation.State.FAILED);
+            assertThat(result.diagnostics().get(1).message().contains("non-earlier"))
+                    .isTrue();
         }
         session.undo();
         session.replace(new Feature.ThroughCut(
                 "cut", new Feature.ProfileRef("hole", "hole.profile"), new Feature.BodyRef("thickness", "wrong")));
         try (var result = session.evaluate()) {
-            assertTrue(result.diagnostics().get(3).message().contains("missing body output"));
+            assertThat(result.diagnostics().get(3).message().contains("missing body output"))
+                    .isTrue();
         }
     }
 
@@ -192,11 +201,11 @@ class EditableEngineTest {
             Path file = directory.resolve("offset-" + z + ".vxb");
             DocumentWriter.save(session.document(), file, false);
             var reopened = DocumentReader.load(file);
-            assertEquals(session.document(), reopened);
+            assertThat(reopened).isEqualTo(session.document());
             try (var result = Evaluator.evaluate(reopened)) {
                 var bounds = result.bodies().getFirst().solid().bounds();
-                assertEquals(z, bounds.minZ(), 0.001);
-                assertEquals(z + 5, bounds.maxZ(), 0.001);
+                assertThat(bounds.minZ()).isCloseTo(z, org.assertj.core.data.Offset.offset(0.001));
+                assertThat(bounds.maxZ()).isCloseTo(z + 5, org.assertj.core.data.Offset.offset(0.001));
             }
         }
         var circle = new ModelSession(CadDocument.empty());
@@ -205,9 +214,9 @@ class EditableEngineTest {
         circle.add(new Feature.Extrude("extrude", new Feature.ProfileRef("circle", "profile"), -3));
         try (var result = circle.evaluate()) {
             var solid = result.bodies().getFirst().solid();
-            assertEquals(27 * Math.PI, solid.volume(), 0.01);
-            assertEquals(9, solid.bounds().minZ(), 0.001);
-            assertEquals(12, solid.bounds().maxZ(), 0.001);
+            assertThat(solid.volume()).isCloseTo(27 * Math.PI, org.assertj.core.data.Offset.offset(0.01));
+            assertThat(solid.bounds().minZ()).isCloseTo(9, org.assertj.core.data.Offset.offset(0.001));
+            assertThat(solid.bounds().maxZ()).isCloseTo(12, org.assertj.core.data.Offset.offset(0.001));
         }
     }
 
@@ -216,15 +225,14 @@ class EditableEngineTest {
         var session = reference();
         session.editDimension("hole", "diameter", 1000);
         try (var result = session.evaluate()) {
-            assertFalse(result.valid());
-            assertThrows(IllegalStateException.class, result::requireCompleteDocument);
+            assertThat(result.valid()).isFalse();
+            assertThatThrownBy(result::requireCompleteDocument).isInstanceOf(IllegalStateException.class);
         }
-        assertEquals(
-                1000,
-                ((Feature.Circle)
+        assertThat(((Feature.Circle)
                                 ((Feature.Sketch) session.document().features().get(2)).profile())
-                        .diameter());
-        assertTrue(session.undo());
+                        .diameter())
+                .isEqualTo(1000);
+        assertThat(session.undo()).isTrue();
         assertReference(session, 5, 4);
     }
 
@@ -234,22 +242,26 @@ class EditableEngineTest {
         var document = reference().document();
         DocumentWriter.save(document, file, false);
         byte[] valid = Files.readAllBytes(file);
-        assertThrows(java.io.IOException.class, () -> DocumentWriter.save(CadDocument.empty(), file, false));
-        assertArrayEquals(valid, Files.readAllBytes(file));
+        assertThatThrownBy(() -> DocumentWriter.save(CadDocument.empty(), file, false))
+                .isInstanceOf(java.io.IOException.class);
+        assertThat(Files.readAllBytes(file)).containsExactly(valid);
         for (int length : new int[] {0, 10, 43, valid.length - 1}) {
             Files.write(file, Arrays.copyOf(valid, length));
-            var failure = assertThrows(DocumentFormatException.class, () -> DocumentReader.load(file));
-            assertTrue(failure.getMessage().toLowerCase().contains("truncated"));
+            var failure = org.assertj.core.api.Assertions.catchThrowableOfType(
+                    () -> DocumentReader.load(file), DocumentFormatException.class);
+            assertThat(failure.getMessage().toLowerCase().contains("truncated")).isTrue();
         }
         valid[valid.length - 1] ^= 1;
         Files.write(file, valid);
-        assertTrue(assertThrows(DocumentFormatException.class, () -> DocumentReader.load(file))
-                .getMessage()
-                .contains("checksum"));
-        assertThrows(DocumentFormatException.class, () -> DocumentWriter.save(document, file, true));
-        assertArrayEquals(valid, Files.readAllBytes(file));
+        assertThat(org.assertj.core.api.Assertions.catchThrowableOfType(
+                                () -> DocumentReader.load(file), DocumentFormatException.class)
+                        .getMessage()
+                        .contains("checksum"))
+                .isTrue();
+        assertThatThrownBy(() -> DocumentWriter.save(document, file, true)).isInstanceOf(DocumentFormatException.class);
+        assertThat(Files.readAllBytes(file)).containsExactly(valid);
         try (var files = Files.list(directory)) {
-            assertEquals(1, files.count());
+            assertThat(files.count()).isEqualTo(1);
         }
     }
 
@@ -279,11 +291,14 @@ class EditableEngineTest {
                     .put(payload)
                     .array();
             Files.write(file, future);
-            assertTrue(assertThrows(DocumentFormatException.class, () -> DocumentReader.load(file))
-                    .getMessage()
-                    .contains("read-only"));
-            assertThrows(DocumentFormatException.class, () -> DocumentWriter.save(CadDocument.empty(), file, true));
-            assertArrayEquals(future, Files.readAllBytes(file));
+            assertThat(org.assertj.core.api.Assertions.catchThrowableOfType(
+                                    () -> DocumentReader.load(file), DocumentFormatException.class)
+                            .getMessage()
+                            .contains("read-only"))
+                    .isTrue();
+            assertThatThrownBy(() -> DocumentWriter.save(CadDocument.empty(), file, true))
+                    .isInstanceOf(DocumentFormatException.class);
+            assertThat(Files.readAllBytes(file)).containsExactly(future);
         }
     }
 
@@ -307,9 +322,10 @@ class EditableEngineTest {
                             .put(payload)
                             .array());
             byte[] originalBytes = Files.readAllBytes(file);
-            assertThrows(DocumentFormatException.class, () -> DocumentReader.load(file));
-            assertThrows(DocumentFormatException.class, () -> DocumentWriter.save(original, file, true));
-            assertArrayEquals(originalBytes, Files.readAllBytes(file));
+            assertThatThrownBy(() -> DocumentReader.load(file)).isInstanceOf(DocumentFormatException.class);
+            assertThatThrownBy(() -> DocumentWriter.save(original, file, true))
+                    .isInstanceOf(DocumentFormatException.class);
+            assertThat(Files.readAllBytes(file)).containsExactly(originalBytes);
         }
     }
 
@@ -339,40 +355,41 @@ class EditableEngineTest {
                     successes++;
                 }
             }
-            assertEquals(1, successes);
+            assertThat(successes).isEqualTo(1);
         }
-        assertTrue(List.of(first.id(), second.id())
-                .contains(DocumentReader.load(file).id()));
+        assertThat(List.of(first.id(), second.id())
+                        .contains(DocumentReader.load(file).id()))
+                .isTrue();
         try (var files = Files.list(directory)) {
-            assertEquals(1, files.count());
+            assertThat(files.count()).isEqualTo(1);
         }
     }
 
     @Test
     void undoRedoFeatureCreationKeepsCursorAtEnd() {
         var session = reference();
-        assertTrue(session.undo());
-        assertEquals(3, session.document().cursor());
-        assertTrue(session.redo());
-        assertEquals(4, session.document().cursor());
+        assertThat(session.undo()).isTrue();
+        assertThat(session.document().cursor()).isEqualTo(3);
+        assertThat(session.redo()).isTrue();
+        assertThat(session.document().cursor()).isEqualTo(4);
         assertReference(session, 5, 4);
     }
 
     private static void assertReference(ModelSession session, double thickness, double diameter) {
         try (var result = session.evaluate()) {
-            assertTrue(result.valid(), result.diagnostics().toString());
-            assertEquals(1, result.requireCompleteDocument().size());
+            assertThat(result.valid()).as(result.diagnostics().toString()).isTrue();
+            assertThat(result.requireCompleteDocument().size()).isEqualTo(1);
             var body = result.bodies().getFirst();
-            assertEquals("thickness.body", body.id());
-            assertEquals(
-                    (2400 - Math.PI * diameter * diameter / 4) * thickness,
-                    body.solid().volume(),
-                    0.01);
-            assertFalse(body.solid().contains(10, 10, thickness / 2));
-            assertTrue(body.solid().contains(15, 10, thickness / 2));
-            assertEquals(60, body.solid().bounds().maxX(), 0.001);
-            assertEquals(40, body.solid().bounds().maxY(), 0.001);
-            assertEquals(thickness, body.solid().bounds().maxZ(), 0.001);
+            assertThat(body.id()).isEqualTo("thickness.body");
+            assertThat(body.solid().volume())
+                    .isCloseTo(
+                            (2400 - Math.PI * diameter * diameter / 4) * thickness,
+                            org.assertj.core.data.Offset.offset(0.01));
+            assertThat(body.solid().contains(10, 10, thickness / 2)).isFalse();
+            assertThat(body.solid().contains(15, 10, thickness / 2)).isTrue();
+            assertThat(body.solid().bounds().maxX()).isCloseTo(60, org.assertj.core.data.Offset.offset(0.001));
+            assertThat(body.solid().bounds().maxY()).isCloseTo(40, org.assertj.core.data.Offset.offset(0.001));
+            assertThat(body.solid().bounds().maxZ()).isCloseTo(thickness, org.assertj.core.data.Offset.offset(0.001));
         }
     }
 }

@@ -1,6 +1,6 @@
 package dev.voxelbrew.util.i18n;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.util.config.UserConfiguration;
 import java.nio.file.*;
@@ -20,11 +20,11 @@ class TranslationsTest {
                 catalogs.resolve("messages_de-DE.properties"),
                 "language.name=Deutsch\nlanguage.i18n=de-DE\naction.save=Speichern\n");
         var german = new Translations(Locale.forLanguageTag("de-DE"), catalogs);
-        assertEquals("Speichern", german.text("action.save"));
-        assertEquals("Application language", german.text("language.title"));
-        assertEquals("Deutsch", german.languages().get("de-DE"));
-        assertEquals("English", german.languages().get("en-EN"));
-        assertEquals("Polski", german.languages().get("pl-PL"));
+        assertThat(german.text("action.save")).isEqualTo("Speichern");
+        assertThat(german.text("language.title")).isEqualTo("Application language");
+        assertThat(german.languages().get("de-DE")).isEqualTo("Deutsch");
+        assertThat(german.languages().get("en-EN")).isEqualTo("English");
+        assertThat(german.languages().get("pl-PL")).isEqualTo("Polski");
     }
 
     private Locale previousDefault, previousDisplay, previousFormat;
@@ -48,20 +48,20 @@ class TranslationsTest {
         var config = new UserConfiguration(directory.resolve("config.properties"));
         Locale.setDefault(Locale.ENGLISH);
         Locale.setDefault(Locale.Category.DISPLAY, Locale.forLanguageTag("pl-PL"));
-        assertEquals("Zapisz", Translations.configured(config).text("action.save"));
-        assertFalse(Files.exists(config.path()));
-        assertEquals(Locale.ENGLISH, Locale.getDefault(Locale.Category.FORMAT));
+        assertThat(Translations.configured(config).text("action.save")).isEqualTo("Zapisz");
+        assertThat(Files.exists(config.path())).isFalse();
+        assertThat(Locale.getDefault(Locale.Category.FORMAT)).isEqualTo(Locale.ENGLISH);
 
         config.set("external.setting", "preserve me");
         var before = config.read();
-        assertEquals("Zapisz", Translations.configured(config).text("action.save"));
-        assertEquals(before, config.read());
+        assertThat(Translations.configured(config).text("action.save")).isEqualTo("Zapisz");
+        assertThat(config.read()).isEqualTo(before);
         config.set("language", "  ");
-        assertEquals("Zapisz", Translations.configured(config).text("action.save"));
+        assertThat(Translations.configured(config).text("action.save")).isEqualTo("Zapisz");
 
         Locale.setDefault(Locale.Category.DISPLAY, Locale.UK);
         Locale.setDefault(Locale.Category.FORMAT, Locale.forLanguageTag("pl-PL"));
-        assertEquals("Save", Translations.configured(config).text("action.save"));
+        assertThat(Translations.configured(config).text("action.save")).isEqualTo("Save");
     }
 
     @Test
@@ -70,20 +70,20 @@ class TranslationsTest {
         Locale.setDefault(Locale.forLanguageTag("pl-PL"));
         for (var unsupported : List.of(Locale.ROOT, Locale.GERMAN, Locale.JAPANESE)) {
             Locale.setDefault(Locale.Category.DISPLAY, unsupported);
-            assertEquals(Locale.ENGLISH, Translations.configured(config).locale());
+            assertThat(Translations.configured(config).locale()).isEqualTo(Locale.ENGLISH);
         }
         config.set("language", "pl-PL");
-        assertEquals("Zapisz", Translations.configured(config).text("action.save"));
+        assertThat(Translations.configured(config).text("action.save")).isEqualTo("Zapisz");
         Locale.setDefault(Locale.Category.DISPLAY, Locale.forLanguageTag("pl-PL"));
         for (var saved : List.of("en", "en-GB", "de-DE", "not_a_tag")) {
             config.set("language", saved);
-            assertEquals(Locale.ENGLISH, Translations.configured(config).locale());
+            assertThat(Translations.configured(config).locale()).isEqualTo(Locale.ENGLISH);
         }
         config.set("language", " SYSTEM ");
-        assertEquals("Zapisz", Translations.configured(config).text("action.save"));
+        assertThat(Translations.configured(config).text("action.save")).isEqualTo("Zapisz");
         Files.writeString(config.path(), "language=\\uXXXX");
-        assertEquals(Locale.ENGLISH, Translations.configured(config).locale());
-        assertEquals("language=\\uXXXX", Files.readString(config.path()));
+        assertThat(Translations.configured(config).locale()).isEqualTo(Locale.ENGLISH);
+        assertThat(Files.readString(config.path())).isEqualTo("language=\\uXXXX");
     }
 
     @Test
@@ -124,13 +124,16 @@ class TranslationsTest {
                     .filter(r -> r.getLevel() == Level.INFO)
                     .map(LogRecord::getMessage)
                     .toList();
-            assertEquals(5, messages.size());
-            assertTrue(messages.get(0).contains("language pl from system display locale (pl-PL)"));
-            assertTrue(messages.get(1).contains("language en from saved language preference (en)"));
-            assertTrue(messages.get(2).contains("English fallback"));
-            assertTrue(messages.get(2).contains("system display locale (und)"));
-            assertTrue(messages.get(3).contains("system display locale (de)"));
-            assertTrue(messages.get(4).contains("English fallback for unreadable or invalid"));
+            assertThat(messages.size()).isEqualTo(5);
+            assertThat(messages.get(0).contains("language pl from system display locale (pl-PL)"))
+                    .isTrue();
+            assertThat(messages.get(1).contains("language en from saved language preference (en)"))
+                    .isTrue();
+            assertThat(messages.get(2).contains("English fallback")).isTrue();
+            assertThat(messages.get(2).contains("system display locale (und)")).isTrue();
+            assertThat(messages.get(3).contains("system display locale (de)")).isTrue();
+            assertThat(messages.get(4).contains("English fallback for unreadable or invalid"))
+                    .isTrue();
         } finally {
             logger.removeHandler(capture);
             logger.setLevel(previousLevel);
@@ -144,15 +147,16 @@ class TranslationsTest {
         try {
             Locale.setDefault(Locale.forLanguageTag("pl-PL"));
             var polish = new Translations(Locale.forLanguageTag("pl-PL"));
-            assertEquals(polish.locale(), polish.bundle().getLocale());
-            assertEquals("Otwórz…", polish.text("action.open"));
-            assertEquals("Zainstalowano: 1.2.3", polish.text("update.installed", "1.2.3"));
-            assertEquals("Open…", new Translations(Locale.JAPANESE).text("action.open"));
-            assertEquals(Locale.ENGLISH, new Translations(Locale.JAPANESE).locale());
-            assertEquals("Widok: Góra", polish.text("view.accessible", "Góra"));
-            assertEquals("Provider-owned caption", polish.textOrDefault("external.caption", "Provider-owned caption"));
-            assertEquals("Otwórz…", polish.textOrDefault("action.open", "ignored"));
-            assertThrows(MissingResourceException.class, () -> polish.text("missing.key"));
+            assertThat(polish.bundle().getLocale()).isEqualTo(polish.locale());
+            assertThat(polish.text("action.open")).isEqualTo("Otwórz…");
+            assertThat(polish.text("update.installed", "1.2.3")).isEqualTo("Zainstalowano: 1.2.3");
+            assertThat(new Translations(Locale.JAPANESE).text("action.open")).isEqualTo("Open…");
+            assertThat(new Translations(Locale.JAPANESE).locale()).isEqualTo(Locale.ENGLISH);
+            assertThat(polish.text("view.accessible", "Góra")).isEqualTo("Widok: Góra");
+            assertThat(polish.textOrDefault("external.caption", "Provider-owned caption"))
+                    .isEqualTo("Provider-owned caption");
+            assertThat(polish.textOrDefault("action.open", "ignored")).isEqualTo("Otwórz…");
+            assertThatThrownBy(() -> polish.text("missing.key")).isInstanceOf(MissingResourceException.class);
         } finally {
             Locale.setDefault(previous);
         }
@@ -162,11 +166,11 @@ class TranslationsTest {
     void configurationSelectsLanguageAndEveryCatalogHasTheSameKeysAndValidFormats() throws Exception {
         var config = new UserConfiguration(directory.resolve("config.properties"));
         config.set("language", "en");
-        assertEquals("Save", Translations.configured(config).text("action.save"));
+        assertThat(Translations.configured(config).text("action.save")).isEqualTo("Save");
         config.set("language", "pl");
-        assertEquals("Zapisz", Translations.configured(config).text("action.save"));
+        assertThat(Translations.configured(config).text("action.save")).isEqualTo("Zapisz");
         config.set("language", "not_a_tag");
-        assertEquals("Save", Translations.configured(config).text("action.save"));
+        assertThat(Translations.configured(config).text("action.save")).isEqualTo("Save");
         var english = new Translations(Locale.ENGLISH);
         var polish = new Translations(Locale.forLanguageTag("pl"));
         // Read the files directly so ResourceBundle's inherited keys cannot hide an omission.
@@ -179,11 +183,13 @@ class TranslationsTest {
             translated.load(new java.io.InputStreamReader(
                     Objects.requireNonNull(local), java.nio.charset.StandardCharsets.UTF_8));
         }
-        assertEquals(keys.keySet(), translated.keySet());
+        assertThat(translated.keySet()).isEqualTo(keys.keySet());
         for (String key : keys.stringPropertyNames()) {
-            assertFalse(english.text(key, "test").isBlank());
-            assertFalse(polish.text(key, "test").isBlank());
-            assertEquals(placeholders(keys.getProperty(key)), placeholders(translated.getProperty(key)), key);
+            assertThat(english.text(key, "test").isBlank()).isFalse();
+            assertThat(polish.text(key, "test").isBlank()).isFalse();
+            assertThat(placeholders(translated.getProperty(key)))
+                    .as(key)
+                    .isEqualTo(placeholders(keys.getProperty(key)));
         }
     }
 
@@ -201,17 +207,17 @@ class TranslationsTest {
         var english = Translations.configured(config);
         config.set("language", "pl-PL");
         var polish = Translations.configured(config);
-        assertEquals("Language…", english.text("language.label"));
-        assertEquals("Język…", polish.text("language.label"));
-        assertEquals("Result: 1.5 mm", english.text("formula.result", "1.5", " mm"));
-        assertEquals("Wynik: 1.5 mm", polish.text("formula.result", "1.5", " mm"));
+        assertThat(english.text("language.label")).isEqualTo("Language…");
+        assertThat(polish.text("language.label")).isEqualTo("Język…");
+        assertThat(english.text("formula.result", "1.5", " mm")).isEqualTo("Result: 1.5 mm");
+        assertThat(polish.text("formula.result", "1.5", " mm")).isEqualTo("Wynik: 1.5 mm");
         Locale previous = Locale.getDefault();
         try {
             config.set("language", "system");
             Locale.setDefault(Locale.forLanguageTag("pl-PL"));
-            assertEquals("Zapisz", Translations.configured(config).text("action.save"));
+            assertThat(Translations.configured(config).text("action.save")).isEqualTo("Zapisz");
             Locale.setDefault(Locale.GERMAN);
-            assertEquals("Save", Translations.configured(config).text("action.save"));
+            assertThat(Translations.configured(config).text("action.save")).isEqualTo("Save");
         } finally {
             Locale.setDefault(previous);
         }

@@ -1,6 +1,6 @@
 package dev.voxelbrew.exporter;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.geometry.Solid;
 import dev.voxelbrew.engine.mesh.*;
@@ -19,10 +19,10 @@ class AdditionalFormatsTest {
     void allFourFormatsAreDiscoveredAndObjPreservesMultiplePlacedInstances() throws Exception {
         try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory);
                 var evaluation = Evaluator.evaluate(ExportTest.reference())) {
-            assertNotNull(registry.require("stl"));
-            assertNotNull(registry.require("3mf"));
-            assertNotNull(registry.require("obj"));
-            assertNotNull(registry.require("step"));
+            assertThat(registry.require("stl")).isNotNull();
+            assertThat(registry.require("3mf")).isNotNull();
+            assertThat(registry.require("obj")).isNotNull();
+            assertThat(registry.require("step")).isNotNull();
             String body = evaluation.bodies().getFirst().id();
             var view = ModelViews.placed(
                     evaluation,
@@ -38,18 +38,18 @@ class AdditionalFormatsTest {
                 String[] fields = line.split("\\s+");
                 if (fields[0].equals("o")) objects++;
                 else if (fields[0].equals("v")) {
-                    assertEquals(4, fields.length);
+                    assertThat(fields.length).isEqualTo(4);
                     for (int i = 1; i < 4; i++) points.add(Double.parseDouble(fields[i]));
                 } else if (fields[0].equals("f")) {
-                    assertEquals(4, fields.length);
+                    assertThat(fields.length).isEqualTo(4);
                     for (int i = 1; i < 4; i++) {
                         int index = Integer.parseInt(fields[i]);
-                        assertTrue(index > 0 && index <= points.size() / 3);
+                        assertThat(index > 0 && index <= points.size() / 3).isTrue();
                         indices.add(index - 1);
                     }
                 }
             }
-            assertEquals(2, objects);
+            assertThat(objects).isEqualTo(2);
             var mesh = new MeshData(
                     points.stream().mapToDouble(Double::doubleValue).toArray(),
                     indices.stream().mapToInt(Integer::intValue).toArray(),
@@ -72,14 +72,14 @@ class AdditionalFormatsTest {
                 double cx = mesh.coordinate(c, 0), cy = mesh.coordinate(c, 1), cz = mesh.coordinate(c, 2);
                 volume += (ax * (by * cz - bz * cy) + ay * (bz * cx - bx * cz) + az * (bx * cy - by * cx)) / 6;
             }
-            assertArrayEquals(new double[] {25, -7, 0}, min, .001);
-            assertArrayEquals(new double[] {160, 60, 11}, max, .001);
-            assertEquals(2 * 19099.469035085127, volume, 1.0);
+            assertThat(min).usingComparatorWithPrecision(.001).containsExactly(new double[] {25, -7, 0});
+            assertThat(max).usingComparatorWithPrecision(.001).containsExactly(new double[] {160, 60, 11});
+            assertThat(volume).isCloseTo(2 * 19099.469035085127, org.assertj.core.data.Offset.offset(1.0));
             byte[] original = Files.readAllBytes(target);
-            assertThrows(
-                    java.io.IOException.class,
-                    () -> FormatTestSupport.write(registry, "obj", view, MeshOptions.DEFAULT, Map.of(), target, false));
-            assertArrayEquals(original, Files.readAllBytes(target));
+            assertThatThrownBy(() -> FormatTestSupport.write(
+                            registry, "obj", view, MeshOptions.DEFAULT, Map.of(), target, false))
+                    .isInstanceOf(java.io.IOException.class);
+            assertThat(Files.readAllBytes(target)).containsExactly(original);
         }
     }
 
@@ -93,25 +93,27 @@ class AdditionalFormatsTest {
                     .export(document, dev.voxelbrew.util.testing.FileExportWindows.destination(target, false));
         }
         var metrics = inspectStep(target);
-        assertEquals("1", metrics.getProperty("solids"));
-        assertEquals(19099.469035085127, Double.parseDouble(metrics.getProperty("volume")), .01);
-        assertArrayEquals(
-                new double[] {0, 0, 0, 60, 40, 8},
-                Arrays.stream(metrics.getProperty("bounds").split(","))
+        assertThat(metrics.getProperty("solids")).isEqualTo("1");
+        assertThat(Double.parseDouble(metrics.getProperty("volume")))
+                .isCloseTo(19099.469035085127, org.assertj.core.data.Offset.offset(.01));
+        assertThat(Arrays.stream(metrics.getProperty("bounds").split(","))
                         .mapToDouble(Double::parseDouble)
-                        .toArray(),
-                .001);
-        assertEquals("0", metrics.getProperty("holeContainsMaterial"));
-        assertEquals(0, document.parameters().builtins().fileVersion());
+                        .toArray())
+                .usingComparatorWithPrecision(.001)
+                .containsExactly(new double[] {0, 0, 0, 60, 40, 8});
+        assertThat(metrics.getProperty("holeContainsMaterial")).isEqualTo("0");
+        assertThat(document.parameters().builtins().fileVersion()).isEqualTo(0);
         String text = Files.readString(target);
-        assertTrue(text.contains("ADVANCED_FACE"));
-        assertTrue(text.contains("CYLINDRICAL_SURFACE"));
+        assertThat(text.contains("ADVANCED_FACE")).isTrue();
+        assertThat(text.contains("CYLINDRICAL_SURFACE")).isTrue();
         byte[] previous = Files.readAllBytes(target);
         var rollback = new CadDocument(document.id(), document.features(), document.cursor() - 1);
-        assertThrows(IllegalStateException.class, () -> StepDocumentWriter.save(rollback, target, true, directory));
-        assertArrayEquals(previous, Files.readAllBytes(target));
-        assertThrows(java.io.IOException.class, () -> StepDocumentWriter.save(document, target, false, directory));
-        assertArrayEquals(previous, Files.readAllBytes(target));
+        assertThatThrownBy(() -> StepDocumentWriter.save(rollback, target, true, directory))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(Files.readAllBytes(target)).containsExactly(previous);
+        assertThatThrownBy(() -> StepDocumentWriter.save(document, target, false, directory))
+                .isInstanceOf(java.io.IOException.class);
+        assertThat(Files.readAllBytes(target)).containsExactly(previous);
     }
 
     @Test
@@ -122,10 +124,11 @@ class AdditionalFormatsTest {
             Path target = directory.resolve("two.step");
             Files.write(target, Solid.encodeStep(List.of(a, b)));
             var metrics = inspectStep(target);
-            assertEquals("2", metrics.getProperty("solids"));
-            assertEquals(84, Double.parseDouble(metrics.getProperty("volume")), .001);
+            assertThat(metrics.getProperty("solids")).isEqualTo("2");
+            assertThat(Double.parseDouble(metrics.getProperty("volume")))
+                    .isCloseTo(84, org.assertj.core.data.Offset.offset(.001));
             a.close();
-            assertThrows(IllegalStateException.class, () -> Solid.encodeStep(List.of(a, b)));
+            assertThatThrownBy(() -> Solid.encodeStep(List.of(a, b))).isInstanceOf(IllegalStateException.class);
         }
     }
 
@@ -142,8 +145,10 @@ class AdditionalFormatsTest {
                                 + builder.environment().getOrDefault("PATH", ""));
         var process = builder.start();
         try {
-            assertTrue(process.waitFor(30, TimeUnit.SECONDS), "STEP reader timed out");
-            assertEquals(0, process.exitValue(), Files.readString(transcript));
+            assertThat(process.waitFor(30, TimeUnit.SECONDS))
+                    .as("STEP reader timed out")
+                    .isTrue();
+            assertThat(process.exitValue()).as(Files.readString(transcript)).isEqualTo(0);
         } finally {
             process.destroyForcibly();
         }

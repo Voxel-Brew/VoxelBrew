@@ -1,6 +1,6 @@
 package dev.voxelbrew.exporter.printing;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.BodyInstance;
 import dev.voxelbrew.engine.model.Transform;
@@ -22,10 +22,12 @@ class PrusaProjectExporterTest {
         var model = model(setup);
 
         var settings = PrusaConfiguration.settings(model);
-        assertEquals("1", settings.get("support_material"));
-        assertEquals("0", settings.get("support_material_auto"));
-        assertTrue(PrusaConfiguration.ini(model).contains("support_material = 1\n"));
-        assertThrows(UnsupportedOperationException.class, () -> settings.put("support_material", "0"));
+        assertThat(settings.get("support_material")).isEqualTo("1");
+        assertThat(settings.get("support_material_auto")).isEqualTo("0");
+        assertThat(PrusaConfiguration.ini(model).contains("support_material = 1\n"))
+                .isTrue();
+        assertThatThrownBy(() -> settings.put("support_material", "0"))
+                .isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
@@ -38,13 +40,12 @@ class PrusaProjectExporterTest {
         var setup = PrintSetup.empty().withInstances(List.of(instance)).withSupports(supports);
 
         var volumes = PrusaProjectExporter.volumes(model(setup), instance);
-        assertEquals(
-                List.of("ModelPart", "SupportBlocker", "SupportEnforcer", "ModelPart"),
-                volumes.stream().map(PrusaProjectExporter.Volume::type).toList());
-        assertEquals(
-                List.of("part/body", "part/block", "part/enforce", "part/solid"),
-                volumes.stream().map(PrusaProjectExporter.Volume::name).toList());
-        assertTrue(volumes.stream().allMatch(volume -> volume.mesh().triangleCount() > 0));
+        assertThat(volumes.stream().map(PrusaProjectExporter.Volume::type).toList())
+                .isEqualTo(List.of("ModelPart", "SupportBlocker", "SupportEnforcer", "ModelPart"));
+        assertThat(volumes.stream().map(PrusaProjectExporter.Volume::name).toList())
+                .isEqualTo(List.of("part/body", "part/block", "part/enforce", "part/solid"));
+        assertThat(volumes.stream().allMatch(volume -> volume.mesh().triangleCount() > 0))
+                .isTrue();
     }
 
     private static ManufacturingModel model(PrintSetup setup) {

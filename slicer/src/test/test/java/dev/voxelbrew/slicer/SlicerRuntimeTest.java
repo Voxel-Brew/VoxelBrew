@@ -1,6 +1,6 @@
 package dev.voxelbrew.slicer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.printing.Cancellation;
 import dev.voxelbrew.exporter.printing.*;
@@ -18,16 +18,15 @@ class SlicerRuntimeTest {
     void runtimeDiscoversBuiltinsAndIndependentApiOnlyProvider() throws Exception {
         Files.copy(Path.of(System.getProperty("voxelbrew.test.plugin")), directory.resolve("provider.jar"));
         var runtime = SlicerRuntime.load();
-        assertInstanceOf(DefaultSlicerRuntime.class, runtime);
-        assertNotNull(runtime.slicing());
-        assertNotNull(runtime.defaultSlicerExecutable());
+        assertThat(runtime).isInstanceOf(DefaultSlicerRuntime.class);
+        assertThat(runtime.slicing()).isNotNull();
+        assertThat(runtime.defaultSlicerExecutable()).isNotNull();
         try (var catalog = runtime.slicers().open(directory)) {
-            assertNotNull(catalog.require("prusa-slicer"));
+            assertThat(catalog.require("prusa-slicer")).isNotNull();
             var external = catalog.require("probe-slicer");
-            assertEquals(
-                    "fixture",
-                    external.probe(Path.of("unused"), new Cancellation()).actualVersion());
-            assertTrue(catalog.diagnostics().isEmpty());
+            assertThat(external.probe(Path.of("unused"), new Cancellation()).actualVersion())
+                    .isEqualTo("fixture");
+            assertThat(catalog.diagnostics().isEmpty()).isTrue();
         }
     }
 }

@@ -1,6 +1,6 @@
 package dev.voxelbrew.util.testing;
 
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.assertj.core.api.Assertions.*;
 
 import java.io.IOException;
 import java.nio.file.Files;

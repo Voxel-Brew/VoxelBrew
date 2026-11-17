@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.*;
 import org.junit.jupiter.api.Test;
@@ -16,10 +16,12 @@ class PrintPlacementTest {
         var oriented = PrintPlacement.autoOrient(mesh, current);
         var after = dev.voxelbrew.engine.printing.MeshGeometry.bounds(
                 dev.voxelbrew.engine.printing.MeshGeometry.transform(mesh, oriented));
-        assertEquals(0, after.minZ(), 1e-6);
-        assertEquals(5, after.maxZ(), 1e-6);
-        assertEquals(before.minX() + before.maxX(), after.minX() + after.maxX(), 1e-6);
-        assertEquals(before.minY() + before.maxY(), after.minY() + after.maxY(), 1e-6);
+        assertThat(after.minZ()).isCloseTo(0, org.assertj.core.data.Offset.offset(1e-6));
+        assertThat(after.maxZ()).isCloseTo(5, org.assertj.core.data.Offset.offset(1e-6));
+        assertThat(after.minX() + after.maxX())
+                .isCloseTo(before.minX() + before.maxX(), org.assertj.core.data.Offset.offset(1e-6));
+        assertThat(after.minY() + after.maxY())
+                .isCloseTo(before.minY() + before.maxY(), org.assertj.core.data.Offset.offset(1e-6));
     }
 
     @Test
@@ -29,15 +31,14 @@ class PrintPlacementTest {
                 .addPlate("third")
                 .withWorkspaceSettings(java.util.Map.of("print-overwrite", "true"));
         var reordered = PrintPlacement.reorder(setup, "plate-1", "third");
-        assertEquals(
-                java.util.List.of("second", "third", "plate-1"),
-                reordered.plates().stream()
+        assertThat(reordered.plates().stream()
                         .map(dev.voxelbrew.engine.printing.PrintPlate::id)
-                        .toList());
-        assertEquals(setup.activePlateId(), reordered.activePlateId());
-        assertEquals(setup.workspaceSettings(), reordered.workspaceSettings());
-        assertEquals(setup.plates().getFirst(), reordered.plates().getLast());
-        assertEquals(setup, PrintPlacement.reorder(reordered, "plate-1", "second"));
+                        .toList())
+                .isEqualTo(java.util.List.of("second", "third", "plate-1"));
+        assertThat(reordered.activePlateId()).isEqualTo(setup.activePlateId());
+        assertThat(reordered.workspaceSettings()).isEqualTo(setup.workspaceSettings());
+        assertThat(reordered.plates().getLast()).isEqualTo(setup.plates().getFirst());
+        assertThat(PrintPlacement.reorder(reordered, "plate-1", "second")).isEqualTo(setup);
     }
 
     @Test
@@ -45,24 +46,28 @@ class PrintPlacementTest {
         var source = new BodyInstance(
                 "part", "body", Transform.translation(10, 20, 3).compose(Transform.rotation(0, 0, 30)));
         var top = PrintPlacement.move(source, 12, 8, false, false).transform().matrix();
-        assertEquals(22, top[3], 1e-9);
-        assertEquals(28, top[7], 1e-9);
-        assertEquals(3, top[11], 1e-9);
+        assertThat(top[3]).isCloseTo(22, org.assertj.core.data.Offset.offset(1e-9));
+        assertThat(top[7]).isCloseTo(28, org.assertj.core.data.Offset.offset(1e-9));
+        assertThat(top[11]).isCloseTo(3, org.assertj.core.data.Offset.offset(1e-9));
         var iso = PrintPlacement.move(source, 4, 10, true, false).transform().matrix();
-        assertEquals(22, iso[3], 1e-9);
-        assertEquals(28, iso[7], 1e-9);
-        assertEquals(source.transform().matrix()[0], iso[0], 1e-9);
+        assertThat(iso[3]).isCloseTo(22, org.assertj.core.data.Offset.offset(1e-9));
+        assertThat(iso[7]).isCloseTo(28, org.assertj.core.data.Offset.offset(1e-9));
+        assertThat(iso[0]).isCloseTo(source.transform().matrix()[0], org.assertj.core.data.Offset.offset(1e-9));
         var snapped =
                 PrintPlacement.move(source, 1.2, -2.6, false, true).transform().matrix();
-        assertEquals(11, snapped[3], 1e-9);
-        assertEquals(17, snapped[7], 1e-9);
+        assertThat(snapped[3]).isCloseTo(11, org.assertj.core.data.Offset.offset(1e-9));
+        assertThat(snapped[7]).isCloseTo(17, org.assertj.core.data.Offset.offset(1e-9));
     }
 
     @Test
     void pickingRejectsEmptySpaceAndEdgeOnTriangles() {
-        assertTrue(PrintPlacement.contains(2, 2, new double[] {0, 10, 0}, new double[] {0, 0, 10}));
-        assertTrue(PrintPlacement.contains(2, 2, new double[] {0, 0, 10}, new double[] {0, 10, 0}));
-        assertFalse(PrintPlacement.contains(8, 8, new double[] {0, 10, 0}, new double[] {0, 0, 10}));
-        assertFalse(PrintPlacement.contains(2, 0, new double[] {0, 10, 20}, new double[] {0, 0, 0}));
+        assertThat(PrintPlacement.contains(2, 2, new double[] {0, 10, 0}, new double[] {0, 0, 10}))
+                .isTrue();
+        assertThat(PrintPlacement.contains(2, 2, new double[] {0, 0, 10}, new double[] {0, 10, 0}))
+                .isTrue();
+        assertThat(PrintPlacement.contains(8, 8, new double[] {0, 10, 0}, new double[] {0, 0, 10}))
+                .isFalse();
+        assertThat(PrintPlacement.contains(2, 0, new double[] {0, 10, 20}, new double[] {0, 0, 0}))
+                .isFalse();
     }
 }

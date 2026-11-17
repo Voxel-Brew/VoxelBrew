@@ -1,6 +1,6 @@
 package dev.voxelbrew.importer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.CadDocument;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+@SuppressWarnings("deprecation")
 class DocumentImportersTest {
     @TempDir
     Path directory;
@@ -33,11 +34,11 @@ class DocumentImportersTest {
             try (var registry = new ImporterRegistry(directory)) {
                 var actual =
                         ((ImportResult.Document) ImportService.read(registry, format, source, Map.of())).document();
-                assertArrayEquals(DocumentCodec.encode(document), DocumentCodec.encode(actual));
-                assertEquals(17, actual.parameters().builtins().fileVersion());
-                assertEquals(4, actual.features().size());
+                assertThat(DocumentCodec.encode(actual)).containsExactly(DocumentCodec.encode(document));
+                assertThat(actual.parameters().builtins().fileVersion()).isEqualTo(17);
+                assertThat(actual.features().size()).isEqualTo(4);
             }
-            assertArrayEquals(original, Files.readAllBytes(source));
+            assertThat(Files.readAllBytes(source)).containsExactly(original);
         }
     }
 
@@ -47,17 +48,16 @@ class DocumentImportersTest {
             var tasks = new AtomicInteger();
             var importer = provider.create(task -> tasks.incrementAndGet());
             var host = new ImportDialogs().register(FileImportDialog.class, request -> Optional.empty());
-            assertThrows(
-                    CancellationException.class, () -> importer.importFrom(host).join());
-            assertEquals(0, tasks.get());
+            assertThatThrownBy(() -> importer.importFrom(host).join()).isInstanceOf(CancellationException.class);
+            assertThat(tasks.get()).isEqualTo(0);
             var failure = new RejectedExecutionException("closed");
             var rejected = provider.create(task -> {
                         throw failure;
                     })
                     .importFrom(FileImportDialog.source(directory.resolve("missing")));
-            assertSame(
-                    failure,
-                    assertThrows(CompletionException.class, rejected::join).getCause());
+            assertThat(org.assertj.core.api.Assertions.catchThrowableOfType(rejected::join, CompletionException.class)
+                            .getCause())
+                    .isSameAs(failure);
         }
     }
 
@@ -72,12 +72,11 @@ class DocumentImportersTest {
                 valid.replace("MILLIMETERS", "UNRECOGNIZED"))) {
             Path source = directory.resolve("bad.json");
             Files.writeString(source, invalid);
-            assertThrows(
-                    CompletionException.class,
-                    () -> new JsonImporter(Runnable::run)
+            assertThatThrownBy(() -> new JsonImporter(Runnable::run)
                             .importFrom(FileImportDialog.source(source))
-                            .join());
-            assertEquals(invalid, Files.readString(source));
+                            .join())
+                    .isInstanceOf(CompletionException.class);
+            assertThat(Files.readString(source)).isEqualTo(invalid);
         }
     }
 
@@ -86,11 +85,11 @@ class DocumentImportersTest {
         var queued = new ArrayList<Runnable>();
         var importer = new JsonImporter(queued::add);
         var result = importer.importFrom(FileImportDialog.source(directory.resolve("missing.json")));
-        assertFalse(result.isDone());
-        assertEquals(1, queued.size());
+        assertThat(result.isDone()).isFalse();
+        assertThat(queued.size()).isEqualTo(1);
         queued.removeFirst().run();
-        assertInstanceOf(
-                java.io.IOException.class,
-                assertThrows(CompletionException.class, result::join).getCause());
+        assertThat(org.assertj.core.api.Assertions.catchThrowableOfType(result::join, CompletionException.class)
+                        .getCause())
+                .isInstanceOf(java.io.IOException.class);
     }
 }

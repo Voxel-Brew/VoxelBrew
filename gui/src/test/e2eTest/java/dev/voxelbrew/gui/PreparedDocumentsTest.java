@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.Evaluator;
 import dev.voxelbrew.engine.model.Feature;
@@ -17,26 +17,23 @@ class PreparedDocumentsTest {
     void savedInputsReopenWithEditableProfilesAndExactPlateGeometry() throws Exception {
         for (int offset : new int[] {0, 12}) {
             var document = DocumentReader.load(PreparedDocuments.copy("rectangle-" + offset + ".vxb", directory));
-            assertEquals(1, document.cursor());
-            var sketch =
-                    assertInstanceOf(Feature.Sketch.class, document.features().getFirst());
-            assertEquals(offset, sketch.plane().offsetZ());
-            assertEquals(
-                    4,
-                    assertInstanceOf(Feature.Constrained.class, sketch.profile())
-                            .geometry()
-                            .entities()
-                            .size());
+            assertThat(document.cursor()).isEqualTo(1);
+            assertThat(document.features().getFirst()).isInstanceOf(Feature.Sketch.class);
+            var sketch = (Feature.Sketch) document.features().getFirst();
+            assertThat(sketch.plane().offsetZ()).isEqualTo(offset);
+            assertThat(sketch.profile()).isInstanceOf(Feature.Constrained.class);
+            assertThat(((Feature.Constrained) sketch.profile()).geometry().entities())
+                    .hasSize(4);
         }
         var plate = DocumentReader.load(PreparedDocuments.copy("plate-5mm.vxb", directory));
-        assertEquals(2, plate.cursor());
+        assertThat(plate.cursor()).isEqualTo(2);
         try (var evaluation = Evaluator.evaluate(plate)) {
-            assertEquals(1, evaluation.bodies().size());
+            assertThat(evaluation.bodies().size()).isEqualTo(1);
             var solid = evaluation.bodies().getFirst().solid();
-            assertEquals(12000, solid.volume(), .01);
-            assertEquals(60, solid.bounds().maxX(), .001);
-            assertEquals(40, solid.bounds().maxY(), .001);
-            assertEquals(5, solid.bounds().maxZ(), .001);
+            assertThat(solid.volume()).isCloseTo(12000, org.assertj.core.data.Offset.offset(.01));
+            assertThat(solid.bounds().maxX()).isCloseTo(60, org.assertj.core.data.Offset.offset(.001));
+            assertThat(solid.bounds().maxY()).isCloseTo(40, org.assertj.core.data.Offset.offset(.001));
+            assertThat(solid.bounds().maxZ()).isCloseTo(5, org.assertj.core.data.Offset.offset(.001));
         }
     }
 }

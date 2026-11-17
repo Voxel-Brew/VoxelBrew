@@ -1,6 +1,6 @@
 package dev.voxelbrew.slicer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
@@ -22,56 +22,61 @@ class PrinterProfileCatalogTest {
 
     @Test
     void exportsEditableDefaultsWithMatchingImagesWithoutOverwritingUserFiles() throws Exception {
-        assertEquals(0, catalog().exportDefaults(Set.of()));
+        assertThat(catalog().exportDefaults(Set.of())).isEqualTo(0);
         try (var files = Files.list(directory)) {
-            assertEquals(0, files.count());
+            assertThat(files.count()).isEqualTo(0);
         }
         var selected = Set.of("bambu-lab-a1-mini", "prusa-mk4");
-        assertEquals(2, catalog().exportDefaults(selected));
+        assertThat(catalog().exportDefaults(selected)).isEqualTo(2);
         var loaded = catalog().load();
-        assertTrue(loaded.diagnostics().isEmpty(), loaded.diagnostics().toString());
-        assertEquals(64, loaded.entries().size());
-        assertFalse(Files.exists(directory.resolve("custom-bambu-lab-a1.json")));
-        assertFalse(Files.exists(directory.resolve("custom-bambu-lab-a1.png")));
+        assertThat(loaded.diagnostics().isEmpty())
+                .as(loaded.diagnostics().toString())
+                .isTrue();
+        assertThat(loaded.entries().size()).isEqualTo(64);
+        assertThat(Files.exists(directory.resolve("custom-bambu-lab-a1.json"))).isFalse();
+        assertThat(Files.exists(directory.resolve("custom-bambu-lab-a1.png"))).isFalse();
         var copy = loaded.entries().stream()
                 .filter(entry -> entry.definition().printer().id().equals("custom-bambu-lab-a1-mini"))
                 .findFirst()
                 .orElseThrow();
-        assertFalse(copy.bundled());
-        assertEquals(directory.resolve("custom-bambu-lab-a1-mini.png").toUri().toString(), copy.image());
-        assertEquals(
-                loaded.require("bambu-lab-a1-mini").printer().bed(),
-                copy.definition().printer().bed());
+        assertThat(copy.bundled()).isFalse();
+        assertThat(copy.image())
+                .isEqualTo(directory
+                        .resolve("custom-bambu-lab-a1-mini.png")
+                        .toUri()
+                        .toString());
+        assertThat(copy.definition().printer().bed())
+                .isEqualTo(loaded.require("bambu-lab-a1-mini").printer().bed());
         var json = directory.resolve("custom-bambu-lab-a1-mini.json");
         Files.writeString(json, Files.readString(json).replace("A1 mini", "My edited printer"));
         var edited = Files.readAllBytes(json);
         var picture = directory.resolve("custom-bambu-lab-a1-mini.png");
         Files.write(picture, new byte[] {1, 2, 3});
-        assertEquals(0, catalog().exportDefaults(selected));
-        assertArrayEquals(edited, Files.readAllBytes(json));
-        assertArrayEquals(new byte[] {1, 2, 3}, Files.readAllBytes(picture));
-        assertTrue(Files.exists(directory.resolve("PHOTO-LICENSE.txt")));
-        assertTrue(Files.exists(directory.resolve("photo-sources.txt")));
+        assertThat(catalog().exportDefaults(selected)).isEqualTo(0);
+        assertThat(Files.readAllBytes(json)).containsExactly(edited);
+        assertThat(Files.readAllBytes(picture)).containsExactly(new byte[] {1, 2, 3});
+        assertThat(Files.exists(directory.resolve("PHOTO-LICENSE.txt"))).isTrue();
+        assertThat(Files.exists(directory.resolve("photo-sources.txt"))).isTrue();
     }
 
     @Test
     void bundledCatalogIsCompleteAndHasImages() throws Exception {
         try (var image = java.net.URI.create(catalog().fallbackImage()).toURL().openStream()) {
-            assertTrue(image.readAllBytes().length > 0);
+            assertThat(image.readAllBytes().length > 0).isTrue();
         }
         var result = catalog().load();
-        assertEquals(List.of(), result.diagnostics());
-        assertEquals(62, result.entries().size());
+        assertThat(result.diagnostics()).isEqualTo(List.of());
+        assertThat(result.entries().size()).isEqualTo(62);
         for (var entry : result.entries()) {
-            assertTrue(entry.bundled());
-            assertNotNull(entry.image(), entry.toString());
+            assertThat(entry.bundled()).isTrue();
+            assertThat(entry.image()).as(entry.toString()).isNotNull();
             try (var image = new java.net.URI(entry.image()).toURL().openStream()) {
-                assertTrue(image.readAllBytes().length > 0);
+                assertThat(image.readAllBytes().length > 0).isTrue();
             }
         }
-        assertEquals(180, result.require("bambu-lab-a1-mini").printer().usableHeight());
-        assertEquals(4, result.require("snapmaker-u1").toolCount());
-        assertEquals(128, result.require("prusa-pro-ht90").printer().bed().size());
+        assertThat(result.require("bambu-lab-a1-mini").printer().usableHeight()).isEqualTo(180);
+        assertThat(result.require("snapmaker-u1").toolCount()).isEqualTo(4);
+        assertThat(result.require("prusa-pro-ht90").printer().bed().size()).isEqualTo(128);
     }
 
     @Test
@@ -85,20 +90,22 @@ class PrinterProfileCatalogTest {
                 .selectPlate("plate-1")
                 .moveInstance("part", "second")
                 .withProfile("prusa-slicer", preset.printer().id(), "PETG", ProcessSettings.DEFAULT);
-        assertEquals(preset, setup.printerSnapshot());
+        assertThat(setup.printerSnapshot()).isEqualTo(preset);
         var doc = new CadDocument("doc", List.of(), 0, setup);
-        assertEquals(doc, DocumentCodec.decode(DocumentCodec.encode(doc)));
-        assertEquals(doc, DocumentCodec.decodeJson(DocumentCodec.encodeJson(doc)));
-        assertEquals(preset, setup.removeActivePlate().printerSnapshot());
-        assertEquals(180, PrintProfile.resolve(setup).printer().usableHeight());
+        assertThat(DocumentCodec.decode(DocumentCodec.encode(doc))).isEqualTo(doc);
+        assertThat(DocumentCodec.decodeJson(DocumentCodec.encodeJson(doc))).isEqualTo(doc);
+        assertThat(setup.removeActivePlate().printerSnapshot()).isEqualTo(preset);
+        assertThat(PrintProfile.resolve(setup).printer().usableHeight()).isEqualTo(180);
         var session = new ModelSession(doc);
         session.setPrintSetup(setup.withPrinter(preset.rectangular(220, 240, 260)));
-        assertEquals(
-                260,
-                PrintProfile.resolve(session.document().printSetup()).printer().usableHeight());
+        assertThat(PrintProfile.resolve(session.document().printSetup())
+                        .printer()
+                        .usableHeight())
+                .isEqualTo(260);
         session.undo();
-        assertEquals(setup, session.document().printSetup());
-        assertEquals(200, PrintProfile.resolve(PrintSetup.empty()).printer().usableHeight());
+        assertThat(session.document().printSetup()).isEqualTo(setup);
+        assertThat(PrintProfile.resolve(PrintSetup.empty()).printer().usableHeight())
+                .isEqualTo(200);
     }
 
     private String custom(String id) throws Exception {
@@ -112,28 +119,27 @@ class PrinterProfileCatalogTest {
     @Test
     void badFilesAndDuplicateIdsAreIsolatedAndReloadDoesNotChangeSnapshots() throws Exception {
         Files.writeString(directory.resolve("custom.json"), custom("my-printer"));
-        assertFalse(catalog().load().entries().stream()
-                .filter(entry -> entry.definition().printer().id().equals("my-printer"))
-                .findFirst()
-                .orElseThrow()
-                .bundled());
+        assertThat(catalog().load().entries().stream()
+                        .filter(entry -> entry.definition().printer().id().equals("my-printer"))
+                        .findFirst()
+                        .orElseThrow()
+                        .bundled())
+                .isFalse();
         var saved = PrintSetup.empty().withPrinter(catalog().load().require("my-printer"));
         Files.writeString(directory.resolve("broken.json"), "not json");
         Files.writeString(directory.resolve("collision.json"), custom("generic-marlin-200-0.4"));
         var loaded = catalog().load();
-        assertEquals(2, loaded.diagnostics().size());
-        assertEquals(
-                "my-printer", loaded.entries().getFirst().definition().printer().id());
-        assertEquals(saved.printerSnapshot(), loaded.require("my-printer"));
+        assertThat(loaded.diagnostics().size()).isEqualTo(2);
+        assertThat(loaded.entries().getFirst().definition().printer().id()).isEqualTo("my-printer");
+        assertThat(loaded.require("my-printer")).isEqualTo(saved.printerSnapshot());
         Files.writeString(directory.resolve("duplicate.json"), custom("my-printer"));
-        assertThrows(IllegalArgumentException.class, () -> catalog().load().require("my-printer"));
+        assertThatThrownBy(() -> catalog().load().require("my-printer")).isInstanceOf(IllegalArgumentException.class);
         Files.delete(directory.resolve("custom.json"));
         Files.delete(directory.resolve("duplicate.json"));
-        assertEquals(200, PrintProfile.resolve(saved).printer().usableHeight());
-        assertEquals(
-                saved,
-                DocumentCodec.decode(DocumentCodec.encode(new CadDocument("doc", List.of(), 0, saved)))
-                        .printSetup());
+        assertThat(PrintProfile.resolve(saved).printer().usableHeight()).isEqualTo(200);
+        assertThat(DocumentCodec.decode(DocumentCodec.encode(new CadDocument("doc", List.of(), 0, saved)))
+                        .printSetup())
+                .isEqualTo(saved);
     }
 
     private String customImage() {
@@ -149,27 +155,31 @@ class PrinterProfileCatalogTest {
         Files.writeString(directory.resolve("custom.printer.json"), custom("pictured"));
         Files.write(directory.resolve("generic.png"), new byte[] {1});
         Files.write(directory.resolve("pictured.png"), new byte[] {1});
-        assertNull(customImage(), "Neither the JSON image field nor the printer ID selects the image");
+        assertThat(customImage())
+                .as("Neither the JSON image field nor the printer ID selects the image")
+                .isNull();
         var extensions = List.of("PNG", "jpg", "jpeg", "webp", "gif", "bmp");
         for (var extension : extensions) Files.write(directory.resolve("custom.printer." + extension), new byte[] {1});
         for (var extension : extensions) {
             var expected = directory.resolve("custom.printer." + extension);
-            assertEquals(expected.toUri().toString(), customImage());
+            assertThat(customImage()).isEqualTo(expected.toUri().toString());
             Files.delete(expected);
         }
         Files.write(directory.resolve("custom.printer.svg"), new byte[] {1});
-        assertNull(customImage(), "Unsupported formats retain the default illustration");
+        assertThat(customImage())
+                .as("Unsupported formats retain the default illustration")
+                .isNull();
     }
 
     @Test
     void customImageFieldIsIgnoredAndOversizeCandidatesDoNotHideJpeg() throws Exception {
         Files.writeString(directory.resolve("foo.json"), custom("pictured").replace("\"generic.png\"", "{}"));
-        assertEquals(List.of(), catalog().load().diagnostics());
+        assertThat(catalog().load().diagnostics()).isEqualTo(List.of());
         Files.write(directory.resolve("foo.png"), new byte[5 * 1024 * 1024 + 1]);
         Files.write(directory.resolve("foo.jpg"), new byte[] {1});
-        assertEquals(directory.resolve("foo.jpg").toUri().toString(), customImage());
+        assertThat(customImage()).isEqualTo(directory.resolve("foo.jpg").toUri().toString());
         Files.delete(directory.resolve("foo.jpg"));
-        assertNull(customImage());
+        assertThat(customImage()).isNull();
     }
 
     @Test
@@ -177,7 +187,7 @@ class PrinterProfileCatalogTest {
         Files.writeString(
                 directory.resolve("bad.json"),
                 custom("bad").replace("\"usableHeightMm\": 200", "\"usableHeightMm\": -1"));
-        assertEquals(1, catalog().load().diagnostics().size());
-        assertThrows(IllegalArgumentException.class, () -> catalog().load().require("bad"));
+        assertThat(catalog().load().diagnostics().size()).isEqualTo(1);
+        assertThatThrownBy(() -> catalog().load().require("bad")).isInstanceOf(IllegalArgumentException.class);
     }
 }

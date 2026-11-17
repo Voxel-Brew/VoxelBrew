@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.printing.*;
@@ -47,8 +47,8 @@ class PrintControllerTest {
             var future = controller.startEmbedded(session.document(), new PrusaSlicerBackend(), false);
             await(future::isDone);
             var sliced = future.get();
-            assertFalse(Files.exists(sliced.output()));
-            assertFalse(sliced.job().lines().isEmpty());
+            assertThat(Files.exists(sliced.output())).isFalse();
+            assertThat(sliced.job().lines().isEmpty()).isFalse();
             session.setGcode(controller.completedGcode());
         }
         var reopened = dev.voxelbrew.engine.persistence.DocumentCodec.decode(
@@ -56,8 +56,8 @@ class PrintControllerTest {
         try (var controller = new PrintController(callbacks::add, () -> reopened)) {
             controller.restoreEmbedded(reopened);
             await(() -> controller.state() == PrintController.State.SUCCEEDED);
-            assertEquals(reopened.activeGcode(), controller.result().job().lines());
-            assertEquals(40, controller.result().job().modelLayers().size());
+            assertThat(controller.result().job().lines()).isEqualTo(reopened.activeGcode());
+            assertThat(controller.result().job().modelLayers().size()).isEqualTo(40);
         }
     }
 
@@ -114,14 +114,12 @@ class PrintControllerTest {
                     destinations(session.document(), "batch"),
                     false);
             await(() -> !controller.running());
-            assertEquals(PrintController.State.SUCCEEDED, controller.state(), controller.message());
-            assertTrue(Files.exists(directory.resolve("batch-plate-1.gcode")));
-            assertTrue(Files.exists(directory.resolve("batch-plate-2.gcode")));
-            assertFalse(Files.exists(directory.resolve("batch-plate-3.gcode")));
-            assertEquals(
-                    directory.resolve("batch-plate-1.gcode"),
-                    controller.result().output());
-            assertEquals(original, session.document());
+            assertThat(controller.state()).as(controller.message()).isEqualTo(PrintController.State.SUCCEEDED);
+            assertThat(Files.exists(directory.resolve("batch-plate-1.gcode"))).isTrue();
+            assertThat(Files.exists(directory.resolve("batch-plate-2.gcode"))).isTrue();
+            assertThat(Files.exists(directory.resolve("batch-plate-3.gcode"))).isFalse();
+            assertThat(controller.result().output()).isEqualTo(directory.resolve("batch-plate-1.gcode"));
+            assertThat(session.document()).isEqualTo(original);
         }
     }
 
@@ -141,8 +139,8 @@ class PrintControllerTest {
                     destinations(session.document(), "bad"),
                     false);
             await(() -> !controller.running());
-            assertEquals(PrintController.State.FAILED, controller.state());
-            assertFalse(Files.exists(directory.resolve("bad-plate-1.gcode")));
+            assertThat(controller.state()).isEqualTo(PrintController.State.FAILED);
+            assertThat(Files.exists(directory.resolve("bad-plate-1.gcode"))).isFalse();
         }
     }
 
@@ -179,12 +177,12 @@ class PrintControllerTest {
                     destinations(session.document(), "cancel"),
                     false);
             await(() -> held.entered.getCount() == 0);
-            assertTrue(Files.exists(directory.resolve("cancel-plate-1.gcode")));
+            assertThat(Files.exists(directory.resolve("cancel-plate-1.gcode"))).isTrue();
             controller.cancel();
             held.release.countDown();
             await(() -> !controller.running());
-            assertEquals(PrintController.State.CANCELLED, controller.state());
-            assertFalse(Files.exists(directory.resolve("cancel-plate-2.gcode")));
+            assertThat(controller.state()).isEqualTo(PrintController.State.CANCELLED);
+            assertThat(Files.exists(directory.resolve("cancel-plate-2.gcode"))).isFalse();
         }
     }
 
@@ -204,15 +202,16 @@ class PrintControllerTest {
                     directory.resolve("selected-plate.gcode"),
                     false);
             await(() -> !controller.running());
-            assertEquals(PrintController.State.SUCCEEDED, controller.state(), controller.message());
-            assertFalse(future.get().job().segments().isEmpty());
-            assertTrue(future.get().job().segments().stream()
-                    .filter(GcodeJob.Segment::deposits)
-                    .allMatch(segment -> segment.x1() < 200 && segment.y1() < 200));
+            assertThat(controller.state()).as(controller.message()).isEqualTo(PrintController.State.SUCCEEDED);
+            assertThat(future.get().job().segments().isEmpty()).isFalse();
+            assertThat(future.get().job().segments().stream()
+                            .filter(GcodeJob.Segment::deposits)
+                            .allMatch(segment -> segment.x1() < 200 && segment.y1() < 200))
+                    .isTrue();
             session.setPrintSetup(session.document().printSetup().selectPlate("off-bed"));
             controller.documentChanged(session.document());
-            assertEquals(PrintController.State.OUTDATED, controller.state());
-            assertNull(controller.result());
+            assertThat(controller.state()).isEqualTo(PrintController.State.OUTDATED);
+            assertThat(controller.result()).isNull();
         }
     }
 
@@ -226,7 +225,7 @@ class PrintControllerTest {
                     PrintController.State.CANCELLED, PrintController.State.OUTDATED, PrintController.State.FAILED)) {
                 var backend = new HeldBackend();
                 var future = controller.start(session.document(), backend, Path.of("unused"), output, true);
-                assertTrue(backend.entered.await(5, TimeUnit.SECONDS));
+                assertThat(backend.entered.await(5, TimeUnit.SECONDS)).isTrue();
                 if (expected == PrintController.State.CANCELLED) controller.cancel();
                 if (expected == PrintController.State.OUTDATED) {
                     session.setPrintSetup(session.document()
@@ -236,10 +235,10 @@ class PrintControllerTest {
                 }
                 backend.release.countDown();
                 await(() -> !controller.running());
-                assertEquals(expected, controller.state());
-                assertNull(controller.result());
-                assertTrue(future.isCompletedExceptionally());
-                assertEquals("original", Files.readString(output));
+                assertThat(controller.state()).isEqualTo(expected);
+                assertThat(controller.result()).isNull();
+                assertThat(future.isCompletedExceptionally()).isTrue();
+                assertThat(Files.readString(output)).isEqualTo("original");
             }
         }
     }
@@ -256,10 +255,10 @@ class PrintControllerTest {
             session.editDimension("height", "distance", 5);
             controller.documentChanged(session.document());
             await(() -> !controller.running());
-            assertEquals(PrintController.State.OUTDATED, controller.state());
-            assertNull(controller.result());
-            assertEquals("original", Files.readString(output));
-            assertTrue(future.isCompletedExceptionally());
+            assertThat(controller.state()).isEqualTo(PrintController.State.OUTDATED);
+            assertThat(controller.result()).isNull();
+            assertThat(Files.readString(output)).isEqualTo("original");
+            assertThat(future.isCompletedExceptionally()).isTrue();
         }
     }
 
@@ -272,23 +271,23 @@ class PrintControllerTest {
             var completed = controller.start(
                     unchanged, new PrusaSlicerBackend(), PrusaSlicerBackend.defaultExecutable(), output, false);
             await(() -> !controller.running());
-            assertEquals(PrintController.State.SUCCEEDED, controller.state());
-            assertNotNull(completed.join());
+            assertThat(controller.state()).isEqualTo(PrintController.State.SUCCEEDED);
+            assertThat(completed.join()).isNotNull();
             byte[] published = Files.readAllBytes(output);
             controller.invalidateGeometry();
-            assertEquals(PrintController.State.OUTDATED, controller.state());
-            assertNull(controller.result());
-            assertEquals(unchanged, session.document());
+            assertThat(controller.state()).isEqualTo(PrintController.State.OUTDATED);
+            assertThat(controller.result()).isNull();
+            assertThat(session.document()).isEqualTo(unchanged);
             var held = new HeldBackend();
             var future = controller.start(unchanged, held, Path.of("unused"), output, true);
-            assertTrue(held.entered.await(5, TimeUnit.SECONDS));
+            assertThat(held.entered.await(5, TimeUnit.SECONDS)).isTrue();
             controller.invalidateGeometry();
             held.release.countDown();
             await(() -> !controller.running());
-            assertEquals(PrintController.State.OUTDATED, controller.state());
-            assertNull(controller.result());
-            assertTrue(future.isCompletedExceptionally());
-            assertArrayEquals(published, Files.readAllBytes(output));
+            assertThat(controller.state()).isEqualTo(PrintController.State.OUTDATED);
+            assertThat(controller.result()).isNull();
+            assertThat(future.isCompletedExceptionally()).isTrue();
+            assertThat(Files.readAllBytes(output)).containsExactly(published);
         }
     }
 }

@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine.model;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.geometry.PlanarFace;
 import java.util.List;
@@ -14,14 +14,14 @@ class FaceSupportTest {
                 output,
                 List.of(new PlanarFace(7, 0, 0, 1, 5), new PlanarFace(8, 0, 0, 1, 5), new PlanarFace(3, 0, 0, -1, 0)),
                 8);
-        assertEquals(1, plane.support().count());
+        assertThat(plane.support().count()).isEqualTo(1);
         var moved = plane.support().resolve(List.of(new PlanarFace(33, 0, 0, 1, 8)), plane.frame());
-        assertArrayEquals(new double[] {2, 3, 8}, moved.apply(2, 3, 0), 1e-12);
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> plane.support()
-                        .resolve(List.of(new PlanarFace(7, 0, 0, 1, 5), new PlanarFace(8, 0, 0, 1, 8)), plane.frame()));
-        assertThrows(IllegalArgumentException.class, () -> plane.support().resolve(List.of(), plane.frame()));
-        assertThrows(IllegalArgumentException.class, () -> FaceSupport.attach(output, List.of(), 0));
+        assertThat(moved.apply(2, 3, 0)).usingComparatorWithPrecision(1e-12).containsExactly(new double[] {2, 3, 8});
+        assertThatThrownBy(() -> plane.support()
+                        .resolve(List.of(new PlanarFace(7, 0, 0, 1, 5), new PlanarFace(8, 0, 0, 1, 8)), plane.frame()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> plane.support().resolve(List.of(), plane.frame()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> FaceSupport.attach(output, List.of(), 0)).isInstanceOf(IllegalArgumentException.class);
     }
 }

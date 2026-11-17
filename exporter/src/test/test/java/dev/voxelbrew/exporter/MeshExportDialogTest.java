@@ -1,9 +1,6 @@
 package dev.voxelbrew.exporter;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.*;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -30,10 +27,12 @@ class MeshExportDialogTest {
 
         var errors = dialog.validate(values);
 
-        assertEquals(5, errors.size());
-        assertTrue(errors.keySet()
-                .containsAll(List.of("destination", "space", "chord-tolerance", "angular-tolerance", "option.mode")));
-        assertThrows(IllegalArgumentException.class, () -> dialog.buildSettings(values));
+        assertThat(errors.size()).isEqualTo(5);
+        assertThat(errors.keySet()
+                        .containsAll(
+                                List.of("destination", "space", "chord-tolerance", "angular-tolerance", "option.mode")))
+                .isTrue();
+        assertThatThrownBy(() -> dialog.buildSettings(values)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -49,19 +48,19 @@ class MeshExportDialogTest {
         var path = Path.of("part.stl");
         var settings = dialog.buildSettings(Map.of("destination", path.toString()));
 
-        assertEquals(ExportSelection.design(null), settings.selection());
-        assertEquals(path, settings.destination().path());
-        assertFalse(settings.destination().overwrite());
-        assertEquals(Map.of("mode", "fast"), settings.options());
-        assertThrows(
-                UnsupportedOperationException.class, () -> settings.options().put("mode", "fine"));
+        assertThat(settings.selection()).isEqualTo(ExportSelection.design(null));
+        assertThat(settings.destination().path()).isEqualTo(path);
+        assertThat(settings.destination().overwrite()).isFalse();
+        assertThat(settings.options()).isEqualTo(Map.of("mode", "fast"));
+        assertThatThrownBy(() -> settings.options().put("mode", "fine"))
+                .isInstanceOf(UnsupportedOperationException.class);
 
         var errors = dialog.validate(Map.of("destination", path.toString(), "option.unknown", "x"));
-        assertEquals("Unknown exporter option: option.unknown", errors.get("option.unknown"));
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> dialog.buildSettings(Map.of("destination", path.toString(), "option.unknown", "x")));
-        assertTrue(dialog.validate(Map.of("destination", path.toString(), "overwrite", "yes"))
-                .containsKey("overwrite"));
+        assertThat(errors.get("option.unknown")).isEqualTo("Unknown exporter option: option.unknown");
+        assertThatThrownBy(() -> dialog.buildSettings(Map.of("destination", path.toString(), "option.unknown", "x")))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(dialog.validate(Map.of("destination", path.toString(), "overwrite", "yes"))
+                        .containsKey("overwrite"))
+                .isTrue();
     }
 }

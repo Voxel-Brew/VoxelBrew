@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.exporter.DocumentWriter;
@@ -43,26 +43,29 @@ class DocumentControllerTest {
             await(() -> !controller.rebuilding());
             controller.previewExtrusion(sketch, profileId, "5");
             await(() -> !controller.rebuilding());
-            assertEquals(1000, controller.build().bodies().getFirst().volume(), .001);
+            assertThat(controller.build().bodies().getFirst().volume())
+                    .isCloseTo(1000, org.assertj.core.data.Offset.offset(.001));
             controller.cancelPreview();
             await(() -> !controller.rebuilding());
-            assertEquals(List.of(sketch), controller.snapshot().document().features());
+            assertThat(controller.snapshot().document().features()).isEqualTo(List.of(sketch));
             controller.previewExtrusion(sketch, profileId, "8");
             await(() -> !controller.rebuilding());
             controller.commitPreview();
             await(() -> !controller.rebuilding());
-            assertEquals(1600, controller.build().bodies().getFirst().volume(), .001);
+            assertThat(controller.build().bodies().getFirst().volume())
+                    .isCloseTo(1600, org.assertj.core.data.Offset.offset(.001));
             var saving = controller.save(directory.resolve("region.vxb"), false);
             await(saving::isDone);
             saving.join();
             controller.undo();
             await(() -> !controller.rebuilding());
-            assertEquals(List.of(sketch), controller.snapshot().document().features());
+            assertThat(controller.snapshot().document().features()).isEqualTo(List.of(sketch));
             var opening = controller.open(directory.resolve("region.vxb"));
             await(() -> opening.isDone() && !controller.rebuilding());
             opening.join();
-            assertEquals(1600, controller.build().bodies().getFirst().volume(), .001);
-            assertEquals(sketch, controller.snapshot().document().features().getFirst());
+            assertThat(controller.build().bodies().getFirst().volume())
+                    .isCloseTo(1600, org.assertj.core.data.Offset.offset(.001));
+            assertThat(controller.snapshot().document().features().getFirst()).isEqualTo(sketch);
         }
     }
 
@@ -74,7 +77,7 @@ class DocumentControllerTest {
         byte[] saved = Files.readAllBytes(file);
         var message = dev.voxelbrew.engine.persistence.proto.DocumentProto.Document.parseFrom(
                 java.util.Arrays.copyOfRange(saved, 44, saved.length));
-        assertEquals(dev.voxelbrew.util.Version.version(), message.getApplicationVersion());
+        assertThat(message.getApplicationVersion()).isEqualTo(dev.voxelbrew.util.Version.version());
         byte[] older = versionedDocument(message, "0.0.0");
         Files.write(file, older);
         Path futureFile = directory.resolve("future version design.vxb");
@@ -84,19 +87,18 @@ class DocumentControllerTest {
             var opened = controller.open(file);
             await(() -> opened.isDone() && !controller.rebuilding());
             opened.join();
-            assertEquals(original, controller.snapshot().document());
-            assertFalse(controller.dirty());
-            assertArrayEquals(older, Files.readAllBytes(file));
+            assertThat(controller.snapshot().document()).isEqualTo(original);
+            assertThat(controller.dirty()).isFalse();
+            assertThat(Files.readAllBytes(file)).containsExactly(older);
             var saving = controller.save(file, true);
             await(saving::isDone);
             saving.join();
             byte[] upgraded = Files.readAllBytes(file);
-            assertEquals(
-                    dev.voxelbrew.util.Version.version(),
-                    dev.voxelbrew.engine.persistence.proto.DocumentProto.Document.parseFrom(
+            assertThat(dev.voxelbrew.engine.persistence.proto.DocumentProto.Document.parseFrom(
                                     java.util.Arrays.copyOfRange(upgraded, 44, upgraded.length))
-                            .getApplicationVersion());
-            assertEquals(original, DocumentReader.load(file));
+                            .getApplicationVersion())
+                    .isEqualTo(dev.voxelbrew.util.Version.version());
+            assertThat(DocumentReader.load(file)).isEqualTo(original);
             for (boolean dirty : List.of(false, true)) {
                 if (dirty) {
                     controller.edit("plate", "width", 61);
@@ -105,16 +107,18 @@ class DocumentControllerTest {
                 var before = controller.snapshot();
                 var failed = controller.open(futureFile);
                 await(failed::isDone);
-                assertTrue(failed.isCompletedExceptionally());
-                assertFalse(controller.ioBusy());
-                assertEquals(before, controller.snapshot());
-                assertEquals(file.toAbsolutePath(), controller.path());
-                assertEquals(dirty, controller.dirty());
-                assertTrue(controller.error().contains("VoxelBrew 65534.65534.65534"));
-                assertTrue(controller.error().contains("supported version " + dev.voxelbrew.util.Version.version()));
-                assertTrue(controller.error().contains("Update VoxelBrew"));
-                assertArrayEquals(future, Files.readAllBytes(futureFile));
-                assertArrayEquals(upgraded, Files.readAllBytes(file));
+                assertThat(failed.isCompletedExceptionally()).isTrue();
+                assertThat(controller.ioBusy()).isFalse();
+                assertThat(controller.snapshot()).isEqualTo(before);
+                assertThat(controller.path()).isEqualTo(file.toAbsolutePath());
+                assertThat(controller.dirty()).isEqualTo(dirty);
+                assertThat(controller.error().contains("VoxelBrew 65534.65534.65534"))
+                        .isTrue();
+                assertThat(controller.error().contains("supported version " + dev.voxelbrew.util.Version.version()))
+                        .isTrue();
+                assertThat(controller.error().contains("Update VoxelBrew")).isTrue();
+                assertThat(Files.readAllBytes(futureFile)).containsExactly(future);
+                assertThat(Files.readAllBytes(file)).containsExactly(upgraded);
             }
         }
     }
@@ -140,26 +144,28 @@ class DocumentControllerTest {
             Path file = directory.resolve("body style.vxb");
             controller.save(file, false);
             await(() -> !controller.ioBusy());
-            assertFalse(controller.dirty());
+            assertThat(controller.dirty()).isFalse();
             var red = new BodyStyle("PETG", "#FF0000");
             controller.bodyStyle("solid.body", red);
-            assertTrue(controller.dirty());
-            assertThrows(IllegalStateException.class, () -> controller.bodyStyle("solid.body", red));
+            assertThat(controller.dirty()).isTrue();
+            assertThatThrownBy(() -> controller.bodyStyle("solid.body", red)).isInstanceOf(IllegalStateException.class);
             await(() -> !controller.rebuilding());
-            assertEquals(12000, controller.build().bodies().getFirst().volume(), .01);
-            assertThrows(IllegalStateException.class, () -> controller.bodyStyle("missing.body", red));
+            assertThat(controller.build().bodies().getFirst().volume())
+                    .isCloseTo(12000, org.assertj.core.data.Offset.offset(.01));
+            assertThatThrownBy(() -> controller.bodyStyle("missing.body", red))
+                    .isInstanceOf(IllegalStateException.class);
             controller.undo();
             await(() -> !controller.rebuilding());
-            assertFalse(controller.dirty());
+            assertThat(controller.dirty()).isFalse();
             controller.redo();
             await(() -> !controller.rebuilding());
-            assertEquals(red, controller.snapshot().document().bodyStyle("solid.body"));
+            assertThat(controller.snapshot().document().bodyStyle("solid.body")).isEqualTo(red);
             controller.save(file, true);
             await(() -> !controller.ioBusy());
-            assertEquals(red, DocumentReader.load(file).bodyStyle("solid.body"));
+            assertThat(DocumentReader.load(file).bodyStyle("solid.body")).isEqualTo(red);
             controller.cursor(1);
             await(() -> !controller.rebuilding());
-            assertThrows(IllegalStateException.class, () -> controller.bodyStyle("solid.body", red));
+            assertThatThrownBy(() -> controller.bodyStyle("solid.body", red)).isInstanceOf(IllegalStateException.class);
         }
     }
 
@@ -172,28 +178,30 @@ class DocumentControllerTest {
         try (var controller = new DocumentController(callbacks::add, plugins)) {
             var imported = controller.importFile(
                     dev.voxelbrew.importer.ImporterRegistry::new, "plate", source, java.util.Map.of("scale", "2"));
-            assertTrue(controller.ioBusy());
+            assertThat(controller.ioBusy()).isTrue();
             await(() -> imported.isDone() && !controller.rebuilding());
             imported.join();
-            assertTrue(controller.dirty());
-            assertNull(controller.path());
-            assertEquals(76800, controller.build().bodies().getFirst().volume(), .01);
+            assertThat(controller.dirty()).isTrue();
+            assertThat(controller.path()).isNull();
+            assertThat(controller.build().bodies().getFirst().volume())
+                    .isCloseTo(76800, org.assertj.core.data.Offset.offset(.01));
             Path saved = directory.resolve("saved.vxb");
             controller.save(saved, false);
             await(() -> !controller.ioBusy());
-            assertFalse(controller.dirty());
+            assertThat(controller.dirty()).isFalse();
             controller.edit("thickness", "distance", 9);
             await(() -> !controller.rebuilding());
             var before = controller.snapshot();
             var failed = controller.importFile(
                     dev.voxelbrew.importer.ImporterRegistry::new, "failing", source, java.util.Map.of());
             await(failed::isDone);
-            assertTrue(failed.isCompletedExceptionally());
-            assertEquals(before, controller.snapshot());
-            assertEquals(saved.toAbsolutePath(), controller.path());
-            assertTrue(controller.dirty());
-            assertTrue(controller.error().contains("Deliberate importer failure"));
-            assertEquals("60,40,4", Files.readString(source));
+            assertThat(failed.isCompletedExceptionally()).isTrue();
+            assertThat(controller.snapshot()).isEqualTo(before);
+            assertThat(controller.path()).isEqualTo(saved.toAbsolutePath());
+            assertThat(controller.dirty()).isTrue();
+            assertThat(controller.error().contains("Deliberate importer failure"))
+                    .isTrue();
+            assertThat(Files.readString(source)).isEqualTo("60,40,4");
         }
     }
 
@@ -233,30 +241,34 @@ class DocumentControllerTest {
             await(() -> !controller.rebuilding());
             controller.cancelPreview();
             await(() -> !controller.rebuilding());
-            assertTrue(controller.snapshot().document().parameters().bindings().isEmpty());
+            assertThat(controller.snapshot().document().parameters().bindings().isEmpty())
+                    .isTrue();
             controller.previewExtrusion(sketch, "thickness");
             controller.commitPreview();
             await(() -> !controller.rebuilding());
-            assertEquals(12000, controller.build().bodies().getFirst().volume(), .01);
+            assertThat(controller.build().bodies().getFirst().volume())
+                    .isCloseTo(12000, org.assertj.core.data.Offset.offset(.01));
             controller.undo();
             await(() -> !controller.rebuilding());
-            assertEquals(1, controller.snapshot().document().features().size());
+            assertThat(controller.snapshot().document().features().size()).isEqualTo(1);
             controller.redo();
             await(() -> !controller.rebuilding());
-            assertEquals(
-                    1, controller.snapshot().document().parameters().bindings().size());
+            assertThat(controller.snapshot().document().parameters().bindings().size())
+                    .isEqualTo(1);
             controller.configuration("Thick");
-            assertFalse(controller.canExport());
+            assertThat(controller.canExport()).isFalse();
             await(() -> !controller.rebuilding());
-            assertEquals(19200, controller.build().bodies().getFirst().volume(), .01);
-            assertEquals(8, ((Feature.Extrude) controller.effectiveFeatures().getLast()).distance());
+            assertThat(controller.build().bodies().getFirst().volume())
+                    .isCloseTo(19200, org.assertj.core.data.Offset.offset(.01));
+            assertThat(((Feature.Extrude) controller.effectiveFeatures().getLast()).distance())
+                    .isEqualTo(8);
             controller.configuration("Invalid");
             await(() -> !controller.rebuilding());
-            assertFalse(controller.canExport());
-            assertTrue(controller.build().bodies().isEmpty());
+            assertThat(controller.canExport()).isFalse();
+            assertThat(controller.build().bodies().isEmpty()).isTrue();
             controller.undo();
             await(() -> !controller.rebuilding());
-            assertTrue(controller.canExport());
+            assertThat(controller.canExport()).isTrue();
         }
     }
 
@@ -272,34 +284,34 @@ class DocumentControllerTest {
         try (var controller = new DocumentController(callbacks::add, plugins)) {
             controller.add(custom);
             await(() -> !controller.rebuilding());
-            assertTrue(controller.canExport());
-            assertEquals(
-                    Math.PI * 96 * 8, controller.build().bodies().getFirst().volume(), 0.01);
+            assertThat(controller.canExport()).isTrue();
+            assertThat(controller.build().bodies().getFirst().volume())
+                    .isCloseTo(Math.PI * 96 * 8, org.assertj.core.data.Offset.offset(0.01));
             controller.edit("spacer", "height", 12);
             await(() -> !controller.rebuilding());
-            assertEquals(
-                    Math.PI * 96 * 12, controller.build().bodies().getFirst().volume(), 0.01);
+            assertThat(controller.build().bodies().getFirst().volume())
+                    .isCloseTo(Math.PI * 96 * 12, org.assertj.core.data.Offset.offset(0.01));
             var before = controller.snapshot();
             Files.delete(jar);
             controller.rebuild();
-            assertFalse(controller.canExport());
+            assertThat(controller.canExport()).isFalse();
             await(() -> !controller.rebuilding());
-            assertFalse(controller.build().valid());
-            assertTrue(controller.build().bodies().isEmpty());
-            assertEquals(before, controller.snapshot());
+            assertThat(controller.build().valid()).isFalse();
+            assertThat(controller.build().bodies().isEmpty()).isTrue();
+            assertThat(controller.snapshot()).isEqualTo(before);
             Path file = directory.resolve("missing plugin.vxb");
             controller.save(file, false);
             await(() -> !controller.ioBusy());
-            assertEquals(before.document(), DocumentReader.load(file));
+            assertThat(DocumentReader.load(file)).isEqualTo(before.document());
             Files.copy(Path.of(System.getProperty("voxelbrew.test.plugin")), jar);
             controller.rebuild();
             await(() -> !controller.rebuilding());
-            assertTrue(controller.canExport());
-            assertEquals(before, controller.snapshot());
+            assertThat(controller.canExport()).isTrue();
+            assertThat(controller.snapshot()).isEqualTo(before);
             controller.undo();
             await(() -> !controller.rebuilding());
-            assertEquals(
-                    Math.PI * 96 * 8, controller.build().bodies().getFirst().volume(), 0.01);
+            assertThat(controller.build().bodies().getFirst().volume())
+                    .isCloseTo(Math.PI * 96 * 8, org.assertj.core.data.Offset.offset(0.01));
         }
     }
 
@@ -312,36 +324,38 @@ class DocumentControllerTest {
             var saved = controller.snapshot();
             controller.previewExtrusion(sketch, -3);
             await(() -> !controller.rebuilding());
-            assertEquals(1, controller.snapshot().document().features().size());
-            assertFalse(controller.canExport());
-            assertEquals(7200, controller.build().bodies().getFirst().volume(), 0.01);
+            assertThat(controller.snapshot().document().features().size()).isEqualTo(1);
+            assertThat(controller.canExport()).isFalse();
+            assertThat(controller.build().bodies().getFirst().volume())
+                    .isCloseTo(7200, org.assertj.core.data.Offset.offset(0.01));
             controller.cancelPreview();
             await(() -> !controller.rebuilding());
-            assertEquals(saved, controller.snapshot());
-            assertTrue(controller.build().bodies().isEmpty());
+            assertThat(controller.snapshot()).isEqualTo(saved);
+            assertThat(controller.build().bodies().isEmpty()).isTrue();
             controller.previewExtrusion(sketch, 5);
             controller.previewExtrusion(sketch, 8);
             controller.commitPreview();
             await(() -> !controller.rebuilding());
-            assertEquals(2, controller.snapshot().document().features().size());
-            assertTrue(controller.snapshot().canUndo());
-            assertTrue(controller.canExport());
+            assertThat(controller.snapshot().document().features().size()).isEqualTo(2);
+            assertThat(controller.snapshot().canUndo()).isTrue();
+            assertThat(controller.canExport()).isTrue();
             controller.undo();
             await(() -> !controller.rebuilding());
-            assertEquals(1, controller.snapshot().document().features().size());
-            assertTrue(controller.snapshot().canRedo());
+            assertThat(controller.snapshot().document().features().size()).isEqualTo(1);
+            assertThat(controller.snapshot().canRedo()).isTrue();
             controller.redo();
             await(() -> !controller.rebuilding());
-            assertEquals(19200, controller.build().bodies().getFirst().volume(), 0.01);
+            assertThat(controller.build().bodies().getFirst().volume())
+                    .isCloseTo(19200, org.assertj.core.data.Offset.offset(0.01));
             long revision = controller.snapshot().revision();
             controller.cursor(1);
             await(() -> !controller.rebuilding());
-            assertTrue(controller.snapshot().revision() > revision);
-            assertFalse(controller.canExport());
+            assertThat(controller.snapshot().revision() > revision).isTrue();
+            assertThat(controller.canExport()).isFalse();
             controller.cursor(2);
             controller.undo();
             await(() -> !controller.rebuilding());
-            assertEquals(1, controller.snapshot().document().features().size());
+            assertThat(controller.snapshot().document().features().size()).isEqualTo(1);
         }
     }
 
@@ -362,21 +376,21 @@ class DocumentControllerTest {
             return DocumentController.evaluate(document);
         })) {
             controller.add(sketch("old", 0));
-            assertTrue(entered.await(5, TimeUnit.SECONDS));
+            assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
             var oldDocument = controller.snapshot().document();
             controller.newDocument();
             controller.add(sketch("new", 0));
             controller.add(new Feature.Extrude("new-solid", new Feature.ProfileRef("new", "new.profile"), 8));
             release.countDown();
             await(() -> !controller.rebuilding());
-            assertNotSame(oldDocument, controller.snapshot().document());
+            assertThat(controller.snapshot().document()).isNotSameAs(oldDocument);
             // Document-local counters can reuse IDs; stale work must still be discarded.
-            assertEquals(oldDocument.id(), controller.snapshot().document().id());
-            assertEquals(2, calls.get());
-            assertEquals(
-                    "new-solid.body", controller.build().bodies().getFirst().id());
-            assertTrue(controller.build().diagnostics().stream()
-                    .noneMatch(d -> d.featureId().equals("old")));
+            assertThat(controller.snapshot().document().id()).isEqualTo(oldDocument.id());
+            assertThat(calls.get()).isEqualTo(2);
+            assertThat(controller.build().bodies().getFirst().id()).isEqualTo("new-solid.body");
+            assertThat(controller.build().diagnostics().stream()
+                            .noneMatch(d -> d.featureId().equals("old")))
+                    .isTrue();
         } finally {
             release.countDown();
         }
@@ -390,25 +404,25 @@ class DocumentControllerTest {
             controller.previewExtrusion(s, 8);
             controller.commitPreview();
             await(() -> !controller.rebuilding());
-            assertTrue(controller.dirty());
+            assertThat(controller.dirty()).isTrue();
             Path file = directory.resolve("saved design.vxb");
             var saving = controller.save(file, false);
             await(saving::isDone);
-            assertFalse(controller.dirty());
+            assertThat(controller.dirty()).isFalse();
             var original = controller.snapshot().document();
             controller.edit(original.features().getLast().id(), "distance", 5);
             await(() -> !controller.rebuilding());
-            assertTrue(controller.dirty());
+            assertThat(controller.dirty()).isTrue();
             var opening = controller.open(file);
             await(() -> opening.isDone() && !controller.rebuilding());
-            assertEquals(original, controller.snapshot().document());
-            assertFalse(controller.dirty());
+            assertThat(controller.snapshot().document()).isEqualTo(original);
+            assertThat(controller.dirty()).isFalse();
             Files.write(directory.resolve("bad.vxb"), new byte[] {1, 2, 3});
             var failed = controller.open(directory.resolve("bad.vxb"));
             await(failed::isDone);
-            assertTrue(failed.isCompletedExceptionally());
-            assertEquals(original, controller.snapshot().document());
-            assertEquals(original, DocumentReader.load(file));
+            assertThat(failed.isCompletedExceptionally()).isTrue();
+            assertThat(controller.snapshot().document()).isEqualTo(original);
+            assertThat(DocumentReader.load(file)).isEqualTo(original);
         }
     }
 
@@ -421,13 +435,14 @@ class DocumentControllerTest {
         try (var controller = new DocumentController(callbacks::add)) {
             var opening = controller.open(file);
             await(() -> opening.isDone() && !controller.rebuilding());
-            assertFalse(controller.build().valid());
-            assertTrue(controller.build().bodies().isEmpty());
-            assertFalse(controller.canExport());
+            assertThat(controller.build().valid()).isFalse();
+            assertThat(controller.build().bodies().isEmpty()).isTrue();
+            assertThat(controller.canExport()).isFalse();
             controller.replaceFeature(new Feature.Extrude("solid", new Feature.ProfileRef(s.id(), s.profileId()), 8));
             await(() -> !controller.rebuilding());
-            assertTrue(controller.canExport());
-            assertEquals(19200, controller.build().bodies().getFirst().volume(), 0.01);
+            assertThat(controller.canExport()).isTrue();
+            assertThat(controller.build().bodies().getFirst().volume())
+                    .isCloseTo(19200, org.assertj.core.data.Offset.offset(0.01));
         }
     }
 
@@ -441,17 +456,16 @@ class DocumentControllerTest {
             var saving = controller.save(file, false);
             controller.edit("plate", "width", 61);
             await(() -> saving.isDone() && !controller.rebuilding());
-            assertEquals(captured, DocumentReader.load(file));
-            assertTrue(controller.dirty());
-            assertEquals(
-                    61,
-                    ((Feature.Rectangle) ((Feature.Sketch) controller
+            assertThat(DocumentReader.load(file)).isEqualTo(captured);
+            assertThat(controller.dirty()).isTrue();
+            assertThat(((Feature.Rectangle) ((Feature.Sketch) controller
                                             .snapshot()
                                             .document()
                                             .features()
                                             .getFirst())
                                     .profile())
-                            .width());
+                            .width())
+                    .isEqualTo(61);
         }
     }
 }

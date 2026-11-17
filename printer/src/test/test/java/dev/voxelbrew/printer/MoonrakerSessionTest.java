@@ -1,6 +1,6 @@
 package dev.voxelbrew.printer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import com.sun.net.httpserver.HttpServer;
 import dev.voxelbrew.printer.api.*;
@@ -27,15 +27,15 @@ class MoonrakerSessionTest {
                 return;
             }
             calls.add(exchange.getRequestURI().getPath());
-            assertEquals("key", exchange.getRequestHeaders().getFirst("X-Api-Key"));
+            assertThat(exchange.getRequestHeaders().getFirst("X-Api-Key")).isEqualTo("key");
             String response;
             if (exchange.getRequestURI().getPath().endsWith("query"))
                 response = "{\"result\":{\"status\":{\"print_stats\":{\"state\":\"" + state.get()
                         + "\"},\"virtual_sdcard\":{\"progress\":0.25}}}}";
             else if (exchange.getRequestURI().getPath().endsWith("upload")) {
                 String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-                assertTrue(body.contains("G1 X10"));
-                assertFalse(body.contains("name=\"print\""));
+                assertThat(body.contains("G1 X10")).isTrue();
+                assertThat(body.contains("name=\"print\"")).isFalse();
                 response = "{\"result\":{\"item\":{\"path\":\"stored.gcode\"}}}";
             } else response = "{\"result\":\"ok\"}";
             byte[] data = response.getBytes(StandardCharsets.UTF_8);
@@ -57,14 +57,14 @@ class MoonrakerSessionTest {
             Path file = directory.resolve("job.gcode");
             Files.writeString(file, "G1 X10\n");
             var receipt = session.upload(file, fraction -> {});
-            assertEquals(List.of("/server/files/upload"), calls);
+            assertThat(calls).isEqualTo(List.of("/server/files/upload"));
             session.start(receipt);
-            assertTrue(calls.contains("/printer/print/start"));
+            assertThat(calls.contains("/printer/print/start")).isTrue();
             state.set("printing");
-            assertThrows(java.io.IOException.class, () -> session.start(receipt));
+            assertThatThrownBy(() -> session.start(receipt)).isInstanceOf(java.io.IOException.class);
             session.command(PrinterSession.Command.PAUSE);
-            assertEquals("/printer/print/pause", calls.getLast());
-            assertEquals(0.25, session.status().progress().orElseThrow());
+            assertThat(calls.getLast()).isEqualTo("/printer/print/pause");
+            assertThat(session.status().progress().orElseThrow()).isEqualTo(0.25);
         } finally {
             server.stop(0);
         }

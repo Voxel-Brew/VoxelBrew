@@ -1,6 +1,6 @@
 package dev.voxelbrew.cli;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.CadDocument;
 import dev.voxelbrew.exporter.DocumentWriter;
@@ -26,11 +26,13 @@ class DocumentExportTest {
         cli.setOut(new PrintWriter(out));
         cli.setErr(new PrintWriter(err));
 
-        assertNotEquals(
-                0, cli.execute("document", "export", source.toString(), "--format", "json", "--export-no-prompt"));
+        assertThat(cli.execute("document", "export", source.toString(), "--format", "json", "--export-no-prompt"))
+                .isNotEqualTo(0);
 
-        assertEquals("", out.toString());
-        assertTrue(err.toString().contains("--export.json.destination"), err::toString);
+        assertThat(out.toString()).isEqualTo("");
+        assertThat(err.toString().contains("--export.json.destination"))
+                .as(err::toString)
+                .isTrue();
     }
 
     @Test
@@ -40,37 +42,34 @@ class DocumentExportTest {
         Path target = directory.resolve("report.json");
         DocumentWriter.save(document, source, false);
         var cli = VoxelBrew.commandLine();
-        assertEquals(
-                0,
-                cli.execute(
+        assertThat(cli.execute(
                         "document",
                         "export",
                         source.toString(),
                         "--format",
                         "json",
                         "--export.json.destination",
-                        target.toString()));
+                        target.toString()))
+                .isEqualTo(0);
         byte[] original = Files.readAllBytes(target);
-        assertNotEquals(
-                0,
-                cli.execute(
+        assertThat(cli.execute(
                         "document",
                         "export",
                         source.toString(),
                         "--format",
                         "json",
-                        "--export.json.destination=" + target));
-        assertArrayEquals(original, Files.readAllBytes(target));
-        assertEquals(
-                0,
-                cli.execute(
+                        "--export.json.destination=" + target))
+                .isNotEqualTo(0);
+        assertThat(Files.readAllBytes(target)).containsExactly(original);
+        assertThat(cli.execute(
                         "document",
                         "export",
                         source.toString(),
                         "--format",
                         "json",
                         "--export.json.destination=" + target,
-                        "--export.json.overwrite=true"));
+                        "--export.json.overwrite=true"))
+                .isEqualTo(0);
     }
 
     @Test
@@ -96,16 +95,16 @@ class DocumentExportTest {
                 var output = new StringWriter();
                 cli.setOut(new PrintWriter(output));
                 cli.setErr(new PrintWriter(new StringWriter()));
-                assertEquals(0, cli.execute(listing.getKey().split(" ")));
-                assertTrue(output.toString().contains(listing.getValue()), output::toString);
+                assertThat(cli.execute(listing.getKey().split(" "))).isEqualTo(0);
+                assertThat(output.toString().contains(listing.getValue()))
+                        .as(output::toString)
+                        .isTrue();
             }
             var document = CadDocument.empty();
             Path source = directory.resolve("source.vxb");
             Path target = directory.resolve("report.txt");
             DocumentWriter.save(document, source, false);
-            assertEquals(
-                    0,
-                    VoxelBrew.commandLine()
+            assertThat(VoxelBrew.commandLine()
                             .execute(
                                     "document",
                                     "export",
@@ -113,8 +112,9 @@ class DocumentExportTest {
                                     "--format",
                                     "document-probe",
                                     "--output",
-                                    target.toString()));
-            assertEquals("document=" + document.id(), Files.readString(target));
+                                    target.toString()))
+                    .isEqualTo(0);
+            assertThat(Files.readString(target)).isEqualTo("document=" + document.id());
         } finally {
             System.setProperty("user.home", home);
             if (override == null) System.clearProperty("voxelbrew.home");
@@ -133,14 +133,14 @@ class DocumentExportTest {
         var output = new StringWriter();
         cli.setOut(new PrintWriter(output));
         cli.setErr(new PrintWriter(new StringWriter()));
-        assertEquals(0, cli.execute("document", "exporters", "--plugin-dir", plugins.toString()));
-        assertTrue(output.toString().contains("document-probe"));
-        assertTrue(output.toString().contains("Document probe (1.0)"));
-        assertTrue(output.toString().lines().anyMatch(line -> line.equals("json\tJSON")));
+        assertThat(cli.execute("document", "exporters", "--plugin-dir", plugins.toString()))
+                .isEqualTo(0);
+        assertThat(output.toString().contains("document-probe")).isTrue();
+        assertThat(output.toString().contains("Document probe (1.0)")).isTrue();
+        assertThat(output.toString().lines().anyMatch(line -> line.equals("json\tJSON")))
+                .isTrue();
         Path target = directory.resolve("report.txt");
-        assertEquals(
-                0,
-                cli.execute(
+        assertThat(cli.execute(
                         "document",
                         "export",
                         source.toString(),
@@ -149,8 +149,9 @@ class DocumentExportTest {
                         "--plugin-dir",
                         plugins.toString(),
                         "--output",
-                        target.toString()));
-        assertEquals("document=" + document.id(), Files.readString(target));
+                        target.toString()))
+                .isEqualTo(0);
+        assertThat(Files.readString(target)).isEqualTo("document=" + document.id());
     }
 
     @Test
@@ -165,13 +166,11 @@ class DocumentExportTest {
             cli.setErr(new PrintWriter(new StringWriter()));
             String[] args = {"document", "export", source.toString(), "--format", format, "--output", target.toString()
             };
-            assertEquals(0, cli.execute(args));
+            assertThat(cli.execute(args)).isEqualTo(0);
             byte[] original = Files.readAllBytes(target);
-            assertNotEquals(0, cli.execute(args));
-            assertArrayEquals(original, Files.readAllBytes(target));
-            assertEquals(
-                    0,
-                    cli.execute(
+            assertThat(cli.execute(args)).isNotEqualTo(0);
+            assertThat(Files.readAllBytes(target)).containsExactly(original);
+            assertThat(cli.execute(
                             "document",
                             "export",
                             source.toString(),
@@ -179,10 +178,11 @@ class DocumentExportTest {
                             format,
                             "--output",
                             target.toString(),
-                            "--overwrite"));
+                            "--overwrite"))
+                    .isEqualTo(0);
             if (format.equals("vxb"))
-                assertEquals(document.id(), DocumentReader.load(target).id());
-            else assertTrue(Files.readString(target).contains("\"documentId\""));
+                assertThat(DocumentReader.load(target).id()).isEqualTo(document.id());
+            else assertThat(Files.readString(target).contains("\"documentId\"")).isTrue();
         }
     }
 }

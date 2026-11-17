@@ -1,6 +1,6 @@
 package dev.voxelbrew.util.config;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import java.nio.file.*;
 import java.util.*;
@@ -58,14 +58,17 @@ class ConfigurationProcessTest {
             }
             for (int index = 0; index < processes.size(); index++) {
                 var process = processes.get(index);
-                assertTrue(process.waitFor(45, TimeUnit.SECONDS));
-                assertEquals(0, process.exitValue(), Files.readString(directory.resolve("writer-" + index + ".log")));
+                assertThat(process.waitFor(45, TimeUnit.SECONDS)).isTrue();
+                assertThat(process.exitValue())
+                        .as(Files.readString(directory.resolve("writer-" + index + ".log")))
+                        .isEqualTo(0);
             }
-            assertEquals(81, config.read().size());
-            assertEquals("preserved", config.get("unrelated", ""));
+            assertThat(config.read().size()).isEqualTo(81);
+            assertThat(config.get("unrelated", "")).isEqualTo("preserved");
             for (int process = 0; process < 4; process++) {
                 for (int index = 0; index < 20; index++)
-                    assertEquals("value." + index, config.get("process." + process + "." + index, ""));
+                    assertThat(config.get("process." + process + "." + index, ""))
+                            .isEqualTo("value." + index);
             }
         } finally {
             for (var process : processes) if (process.isAlive()) process.destroyForcibly();

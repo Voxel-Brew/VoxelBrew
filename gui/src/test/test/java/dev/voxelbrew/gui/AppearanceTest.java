@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.util.config.UserConfiguration;
 import java.nio.file.Path;
@@ -16,25 +16,25 @@ class AppearanceTest {
         var config = new UserConfiguration(directory.resolve("config.properties"));
         config.set("language", "pl");
         var appearance = new Appearance(config, () -> "DARK");
-        assertEquals(Appearance.Choice.DARK, appearance.load());
-        assertEquals("DARK", config.get("appearance", ""));
+        assertThat(appearance.load()).isEqualTo(Appearance.Choice.DARK);
+        assertThat(config.get("appearance", "")).isEqualTo("DARK");
         appearance.save(Appearance.Choice.LIGHT);
         var reopened = new Appearance(new UserConfiguration(config.path()), () -> {
             fail("Legacy preference should not be consulted again");
             return null;
         });
-        assertEquals(Appearance.Choice.LIGHT, reopened.load());
-        assertEquals("pl", config.get("language", ""));
+        assertThat(reopened.load()).isEqualTo(Appearance.Choice.LIGHT);
+        assertThat(config.get("language", "")).isEqualTo("pl");
     }
 
     @Test
     void missingOrInvalidPreferenceUsesSystemAndAllowsRepair() throws Exception {
         var config = new UserConfiguration(directory.resolve("config.properties"));
         var appearance = new Appearance(config, () -> null);
-        assertEquals(Appearance.Choice.SYSTEM, appearance.load());
+        assertThat(appearance.load()).isEqualTo(Appearance.Choice.SYSTEM);
         config.set("appearance", "UNKNOWN");
-        assertEquals(Appearance.Choice.SYSTEM, appearance.load());
+        assertThat(appearance.load()).isEqualTo(Appearance.Choice.SYSTEM);
         appearance.save(Appearance.Choice.DARK);
-        assertEquals(Appearance.Choice.DARK, appearance.load());
+        assertThat(appearance.load()).isEqualTo(Appearance.Choice.DARK);
     }
 }

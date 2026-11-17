@@ -1,7 +1,7 @@
 package dev.voxelbrew.engine.construction;
 
 import static dev.voxelbrew.engine.construction.ConstructionGeometry.*;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.ConstructionFeature;
 import dev.voxelbrew.engine.model.Feature;
@@ -22,10 +22,11 @@ class ConstructionFrameTest {
                     new ConstructionFeature("plane", ConstructionTools.Tool.OFFSET_PLANE, List.of(input), 0, false);
             var plane = (Plane)
                     ConstructionEvaluator.evaluate(feature, Map.of("frame", new CoordinateSystem(frame)), ref -> null);
-            assertArrayEquals(
-                    frame.compose(Feature.Plane.origin(names.get(i)).frame()).matrix(),
-                    plane.frame().matrix(),
-                    1e-9);
+            assertThat(plane.frame().matrix())
+                    .usingComparatorWithPrecision(1e-9)
+                    .containsExactly(
+                            frame.compose(Feature.Plane.origin(names.get(i)).frame())
+                                    .matrix());
             var origin = new ConstructionFeature(
                     "origin",
                     ConstructionTools.Tool.OFFSET_PLANE,
@@ -33,10 +34,9 @@ class ConstructionFrameTest {
                     0,
                     false);
             var originPlane = (Plane) ConstructionEvaluator.evaluate(origin, Map.of(), ref -> null);
-            assertArrayEquals(
-                    Feature.Plane.origin(names.get(i)).frame().matrix(),
-                    originPlane.frame().matrix(),
-                    1e-9);
+            assertThat(originPlane.frame().matrix())
+                    .usingComparatorWithPrecision(1e-9)
+                    .containsExactly(Feature.Plane.origin(names.get(i)).frame().matrix());
         }
     }
 }

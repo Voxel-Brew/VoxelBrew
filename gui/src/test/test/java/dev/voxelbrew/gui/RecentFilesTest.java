@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.util.config.UserConfiguration;
 import java.nio.file.Files;
@@ -17,7 +17,7 @@ class RecentFilesTest {
         var configuration = new UserConfiguration(directory.resolve("config.properties"));
         configuration.set("unrelated", "preserved");
         var recent = new RecentFiles(configuration);
-        assertTrue(recent.paths().isEmpty());
+        assertThat(recent.paths().isEmpty()).isTrue();
         for (int i = 0; i < 12; i++) {
             Files.createFile(directory.resolve("part " + i + ".vxb"));
             recent.remember(directory.resolve("part " + i + ".vxb"));
@@ -25,13 +25,13 @@ class RecentFilesTest {
         recent.remember(directory.resolve("folder/../part 5.vxb"));
         recent.save();
         var reopened = new RecentFiles(configuration).paths();
-        assertEquals(recent.paths(), reopened);
-        assertEquals(10, reopened.size());
-        assertEquals(directory.resolve("part 5.vxb"), reopened.getFirst());
-        assertEquals(directory.resolve("part 11.vxb"), reopened.get(1));
-        assertFalse(reopened.contains(directory.resolve("part 0.vxb")));
-        assertEquals("preserved", configuration.get("unrelated", ""));
-        assertThrows(UnsupportedOperationException.class, () -> reopened.clear());
+        assertThat(reopened).isEqualTo(recent.paths());
+        assertThat(reopened.size()).isEqualTo(10);
+        assertThat(reopened.getFirst()).isEqualTo(directory.resolve("part 5.vxb"));
+        assertThat(reopened.get(1)).isEqualTo(directory.resolve("part 11.vxb"));
+        assertThat(reopened.contains(directory.resolve("part 0.vxb"))).isFalse();
+        assertThat(configuration.get("unrelated", "")).isEqualTo("preserved");
+        assertThatThrownBy(() -> reopened.clear()).isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
@@ -47,6 +47,6 @@ class RecentFilesTest {
         recent.save();
         Files.delete(deleted);
 
-        assertEquals(java.util.List.of(existing), new RecentFiles(configuration).paths());
+        assertThat(new RecentFiles(configuration).paths()).isEqualTo(java.util.List.of(existing));
     }
 }

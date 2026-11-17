@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import javafx.geometry.Point3D;
 import javafx.scene.transform.Rotate;
@@ -10,9 +10,11 @@ class ViewOrientationTest {
     @Test
     void viewportBasisPreservesMillimetersAndOrientation() {
         var point = new Point3D(10, 20, 30);
-        assertEquals(point, Viewport.toModel(Viewport.toView(point.getX(), point.getY(), point.getZ())));
-        assertEquals(new Point3D(0, -1, 0), Viewport.toView(0, 0, 1));
-        assertEquals(Viewport.toView(0, 0, 1), Viewport.toView(1, 0, 0).crossProduct(Viewport.toView(0, 1, 0)));
+        assertThat(Viewport.toModel(Viewport.toView(point.getX(), point.getY(), point.getZ())))
+                .isEqualTo(point);
+        assertThat(Viewport.toView(0, 0, 1)).isEqualTo(new Point3D(0, -1, 0));
+        assertThat(Viewport.toView(1, 0, 0).crossProduct(Viewport.toView(0, 1, 0)))
+                .isEqualTo(Viewport.toView(0, 0, 1));
     }
 
     @Test
@@ -24,13 +26,13 @@ class ViewOrientationTest {
                 .compose(dev.voxelbrew.engine.model.Transform.rotation(21, 33, 47)));
         for (var frame : frames) {
             var model = frame.apply(4, -8, 12);
-            assertEquals(
-                    0,
-                    Viewport.viewTransform(frame)
+            assertThat(Viewport.viewTransform(frame)
                             .transform(Viewport.toView(4, -8, 12))
-                            .distance(Viewport.toView(model[0], model[1], model[2])),
-                    1e-12);
-            assertArrayEquals(new double[] {4, -8, 12}, frame.inverse().apply(model[0], model[1], model[2]), 1e-12);
+                            .distance(Viewport.toView(model[0], model[1], model[2])))
+                    .isCloseTo(0, org.assertj.core.data.Offset.offset(1e-12));
+            assertThat(frame.inverse().apply(model[0], model[1], model[2]))
+                    .usingComparatorWithPrecision(1e-12)
+                    .containsExactly(new double[] {4, -8, 12});
         }
     }
 
@@ -44,50 +46,58 @@ class ViewOrientationTest {
                     var yaw = new Rotate(view.orbit(), Rotate.Y_AXIS);
                     var pitch = new Rotate(view.tilt(), Rotate.X_AXIS);
                     var direction = new Point3D(x, -z, y).normalize();
-                    assertEquals(0, pitch.transform(yaw.transform(direction)).distance(new Point3D(0, 0, -1)), 1e-12);
+                    assertThat(pitch.transform(yaw.transform(direction)).distance(new Point3D(0, 0, -1)))
+                            .isCloseTo(0, org.assertj.core.data.Offset.offset(1e-12));
                     // Independently compare the cube projection with the main scene's FX
                     // transforms.
                     var point = new Point3D(17, -23, 41);
-                    assertEquals(
-                            0,
-                            view.project(point).distance(pitch.transform(yaw.transform(new Point3D(17, -41, -23)))),
-                            1e-12);
+                    assertThat(view.project(point).distance(pitch.transform(yaw.transform(new Point3D(17, -41, -23)))))
+                            .isCloseTo(0, org.assertj.core.data.Offset.offset(1e-12));
                 }
     }
 
     @Test
     void standardViewsKeepZUpAndCorrectLeftRightHandedness() {
-        assertEquals(new ViewOrientation(90, 0), ViewOrientation.named("Top"));
-        assertEquals(new ViewOrientation(-90, 0), ViewOrientation.named("Bottom"));
-        assertEquals(new ViewOrientation(0, 0), ViewOrientation.named("Front"));
-        assertEquals(new ViewOrientation(0, -180), ViewOrientation.named("Back"));
-        assertEquals(new ViewOrientation(0, 90), ViewOrientation.named("Right"));
-        assertEquals(new ViewOrientation(0, -90), ViewOrientation.named("Left"));
-        assertEquals(new Point3D(1, 0, 0), ViewOrientation.named("Front").project(new Point3D(1, 0, 0)));
+        assertThat(ViewOrientation.named("Top")).isEqualTo(new ViewOrientation(90, 0));
+        assertThat(ViewOrientation.named("Bottom")).isEqualTo(new ViewOrientation(-90, 0));
+        assertThat(ViewOrientation.named("Front")).isEqualTo(new ViewOrientation(0, 0));
+        assertThat(ViewOrientation.named("Back")).isEqualTo(new ViewOrientation(0, -180));
+        assertThat(ViewOrientation.named("Right")).isEqualTo(new ViewOrientation(0, 90));
+        assertThat(ViewOrientation.named("Left")).isEqualTo(new ViewOrientation(0, -90));
+        assertThat(ViewOrientation.named("Front").project(new Point3D(1, 0, 0))).isEqualTo(new Point3D(1, 0, 0));
         for (String name : new String[] {"Isometric", "Top", "Bottom", "Front", "Back", "Right", "Left"})
-            assertEquals(name, ViewOrientation.named(name).name());
-        assertEquals("Custom", new ViewOrientation(12, 34).name());
+            assertThat(ViewOrientation.named(name).name()).isEqualTo(name);
+        assertThat(new ViewOrientation(12, 34).name()).isEqualTo("Custom");
     }
 
     @Test
     void draggingMovesTheFacingSurfaceWithThePointer() {
         var front = ViewOrientation.named("Front");
         var facingPoint = new Point3D(0, -10, 0);
-        assertTrue(front.dragged(20, 0).project(facingPoint).getX() > 0, "Drag right");
-        assertTrue(front.dragged(-20, 0).project(facingPoint).getX() < 0, "Drag left");
-        assertTrue(front.dragged(0, 20).project(facingPoint).getY() > 0, "Drag down");
-        assertTrue(front.dragged(0, -20).project(facingPoint).getY() < 0, "Drag up");
-        assertEquals(front, front.dragged(20, 30).dragged(-20, -30));
+        assertThat(front.dragged(20, 0).project(facingPoint).getX() > 0)
+                .as("Drag right")
+                .isTrue();
+        assertThat(front.dragged(-20, 0).project(facingPoint).getX() < 0)
+                .as("Drag left")
+                .isTrue();
+        assertThat(front.dragged(0, 20).project(facingPoint).getY() > 0)
+                .as("Drag down")
+                .isTrue();
+        assertThat(front.dragged(0, -20).project(facingPoint).getY() < 0)
+                .as("Drag up")
+                .isTrue();
+        assertThat(front.dragged(20, 30).dragged(-20, -30)).isEqualTo(front);
     }
 
     @Test
     void orbitWrapsAndRejectsInvalidAngles() {
-        assertEquals(new ViewOrientation(20, -35), new ViewOrientation(20, 685));
-        assertEquals(new ViewOrientation(-89, -10), new ViewOrientation(0, 0).dragged(20, -1000));
-        assertEquals(new ViewOrientation(89, 10), new ViewOrientation(0, 0).dragged(-20, 1000));
-        assertThrows(IllegalArgumentException.class, () -> new ViewOrientation(Double.NaN, 0));
-        assertThrows(IllegalArgumentException.class, () -> new ViewOrientation(0, Double.POSITIVE_INFINITY));
-        assertThrows(IllegalArgumentException.class, () -> new ViewOrientation(91, 0));
-        assertThrows(IllegalArgumentException.class, () -> ViewOrientation.lookingFrom(0, 0, 0));
+        assertThat(new ViewOrientation(20, 685)).isEqualTo(new ViewOrientation(20, -35));
+        assertThat(new ViewOrientation(0, 0).dragged(20, -1000)).isEqualTo(new ViewOrientation(-89, -10));
+        assertThat(new ViewOrientation(0, 0).dragged(-20, 1000)).isEqualTo(new ViewOrientation(89, 10));
+        assertThatThrownBy(() -> new ViewOrientation(Double.NaN, 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ViewOrientation(0, Double.POSITIVE_INFINITY))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ViewOrientation(91, 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ViewOrientation.lookingFrom(0, 0, 0)).isInstanceOf(IllegalArgumentException.class);
     }
 }

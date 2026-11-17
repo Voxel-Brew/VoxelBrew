@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import java.net.URI;
 import java.net.http.*;
@@ -16,19 +16,17 @@ class McpServerHostTest {
                 var client = HttpClient.newHttpClient()) {
             server.start(new McpSettings(false, 0, 4, 30, 100));
             var endpoint = URI.create(server.endpoint());
-            assertEquals(
-                    401,
-                    client.send(HttpRequest.newBuilder(endpoint).GET().build(), HttpResponse.BodyHandlers.ofString())
-                            .statusCode());
-            assertEquals(
-                    403,
-                    client.send(
+            assertThat(client.send(HttpRequest.newBuilder(endpoint).GET().build(), HttpResponse.BodyHandlers.ofString())
+                            .statusCode())
+                    .isEqualTo(401);
+            assertThat(client.send(
                                     HttpRequest.newBuilder(endpoint)
                                             .header("Origin", "https://example.org")
                                             .GET()
                                             .build(),
                                     HttpResponse.BodyHandlers.ofString())
-                            .statusCode());
+                            .statusCode())
+                    .isEqualTo(403);
             var request = HttpRequest.newBuilder(endpoint)
                     .header("Authorization", "Bearer " + server.credential())
                     .header("Content-Type", "application/json")
@@ -38,8 +36,8 @@ class McpServerHostTest {
                         """))
                     .build();
             var response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            assertEquals(200, response.statusCode());
-            assertTrue(response.body().contains("voxelbrew"));
+            assertThat(response.statusCode()).isEqualTo(200);
+            assertThat(response.body().contains("voxelbrew")).isTrue();
             String session = response.headers().firstValue("Mcp-Session-Id").orElseThrow();
             var inspect = HttpRequest.newBuilder(endpoint)
                     .header("Authorization", "Bearer " + server.credential())
@@ -52,8 +50,10 @@ class McpServerHostTest {
                         """))
                     .build();
             var inspected = client.send(inspect, HttpResponse.BodyHandlers.ofString());
-            assertEquals(200, inspected.statusCode());
-            assertTrue(inspected.body().contains("documentId"), inspected.body());
+            assertThat(inspected.statusCode()).isEqualTo(200);
+            assertThat(inspected.body().contains("documentId"))
+                    .as(inspected.body())
+                    .isTrue();
         }
     }
 }

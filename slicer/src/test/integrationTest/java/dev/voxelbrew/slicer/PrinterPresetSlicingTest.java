@@ -1,6 +1,6 @@
 package dev.voxelbrew.slicer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.mesh.MeshOptions;
 import dev.voxelbrew.engine.printing.*;
@@ -23,10 +23,9 @@ class PrinterPresetSlicingTest {
                 .printSetup()
                 .withPrinter(catalog.require("generic-marlin-200-0.4").rectangular(240, 230, 260)));
         var model = ManufacturingModels.evaluate(session.document(), MeshOptions.DEFAULT);
-        assertEquals(
-                "0.0x0.0,240.0x0.0,240.0x230.0,0.0x230.0",
-                PrusaConfiguration.settings(model).get("bed_shape"));
-        assertEquals("260.0", PrusaConfiguration.settings(model).get("max_print_height"));
+        assertThat(PrusaConfiguration.settings(model).get("bed_shape"))
+                .isEqualTo("0.0x0.0,240.0x0.0,240.0x230.0,0.0x230.0");
+        assertThat(PrusaConfiguration.settings(model).get("max_print_height")).isEqualTo("260.0");
         var target = directory.resolve("printer.gcode");
         var result = SliceService.slice(
                 new PrusaSlicerBackend(),
@@ -38,15 +37,15 @@ class PrinterPresetSlicingTest {
                 new Cancellation(),
                 ignored -> {},
                 dev.voxelbrew.slicer.api.Slicing.DIRECT);
-        assertFalse(result.job().modelLayers().isEmpty());
+        assertThat(result.job().modelLayers().isEmpty()).isFalse();
         for (String id : java.util.List.of("bambu-lab-a1-mini", "prusa-xl-5-tool")) {
             session.setPrintSetup(session.document().printSetup().withPrinter(catalog.require(id)));
             var vendorModel = ManufacturingModels.evaluate(session.document(), MeshOptions.DEFAULT);
             var settings = PrusaConfiguration.settings(vendorModel);
-            assertEquals("marlin2", settings.get("gcode_flavor"));
-            assertEquals(id, settings.get("printer_settings_id"));
-            assertEquals(
-                    Double.toString(catalog.require(id).printer().usableHeight()), settings.get("max_print_height"));
+            assertThat(settings.get("gcode_flavor")).isEqualTo("marlin2");
+            assertThat(settings.get("printer_settings_id")).isEqualTo(id);
+            assertThat(settings.get("max_print_height"))
+                    .isEqualTo(Double.toString(catalog.require(id).printer().usableHeight()));
             var sliced = SliceService.slice(
                     new PrusaSlicerBackend(),
                     session.document(),
@@ -57,13 +56,14 @@ class PrinterPresetSlicingTest {
                     new Cancellation(),
                     ignored -> {},
                     dev.voxelbrew.slicer.api.Slicing.DIRECT);
-            assertFalse(sliced.job().modelLayers().isEmpty());
+            assertThat(sliced.job().modelLayers().isEmpty()).isFalse();
         }
         session.setPrintSetup(session.document()
                 .printSetup()
                 .withPrinter(catalog.require("generic-marlin-200-0.4").rectangular(10, 10, 5)));
-        assertFalse(PrintValidation.validate(ManufacturingModels.evaluate(session.document(), MeshOptions.DEFAULT))
-                .diagnostics()
-                .isEmpty());
+        assertThat(PrintValidation.validate(ManufacturingModels.evaluate(session.document(), MeshOptions.DEFAULT))
+                        .diagnostics()
+                        .isEmpty())
+                .isFalse();
     }
 }

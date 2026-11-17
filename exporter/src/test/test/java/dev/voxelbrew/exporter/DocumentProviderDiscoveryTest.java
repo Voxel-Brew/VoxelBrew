@@ -1,6 +1,6 @@
 package dev.voxelbrew.exporter;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.CadDocument;
 import java.nio.file.*;
@@ -21,11 +21,10 @@ class DocumentProviderDiscoveryTest {
         try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory)) {
             for (String id : java.util.List.of(
                     "vxb", "json", "gcode", "gcode-package", "step", "stl", "3mf", "obj", "prusa-project")) {
-                assertEquals(id, registry.require(id).descriptor().id());
-                assertEquals(
-                        dev.voxelbrew.util.update.BuildVersion.current(),
-                        registry.require(id).descriptor().version());
-                assertNotNull(registry.require(id).create());
+                assertThat(registry.require(id).descriptor().id()).isEqualTo(id);
+                assertThat(registry.require(id).descriptor().version())
+                        .isEqualTo(dev.voxelbrew.util.update.BuildVersion.current());
+                assertThat(registry.require(id).create()).isNotNull();
             }
         }
     }
@@ -34,19 +33,21 @@ class DocumentProviderDiscoveryTest {
     void newlyInstalledApiOnlyJarIsDiscoveredByANewRegistry() throws Exception {
         var document = CadDocument.empty();
         try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory)) {
-            assertTrue(registry.descriptors().stream()
-                    .noneMatch(descriptor -> descriptor.id().equals("document-probe")));
+            assertThat(registry.descriptors().stream()
+                            .noneMatch(descriptor -> descriptor.id().equals("document-probe")))
+                    .isTrue();
         }
         Files.copy(Path.of(System.getProperty("voxelbrew.test.plugin")), directory.resolve("provider.jar"));
         try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory)) {
             var provider = registry.require("document-probe");
-            assertEquals("Document probe", provider.descriptor().name());
-            assertEquals("1.0", provider.descriptor().version());
-            assertNotSame(getClass().getClassLoader(), provider.getClass().getClassLoader());
+            assertThat(provider.descriptor().name()).isEqualTo("Document probe");
+            assertThat(provider.descriptor().version()).isEqualTo("1.0");
+            assertThat(provider.getClass().getClassLoader())
+                    .isNotSameAs(getClass().getClassLoader());
             Path target = directory.resolve("report.txt");
             provider.create().export(document, dev.voxelbrew.util.testing.FileExportWindows.destination(target, false));
-            assertEquals("document=" + document.id(), Files.readString(target));
-            assertSame(provider, registry.require("document-probe"));
+            assertThat(Files.readString(target)).isEqualTo("document=" + document.id());
+            assertThat(registry.require("document-probe")).isSameAs(provider);
         }
         // Closing the registry releases the JAR for replacement on Windows.
         Files.delete(directory.resolve("provider.jar"));
@@ -77,13 +78,14 @@ class DocumentProviderDiscoveryTest {
         };
         logger.addHandler(handler);
         try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory)) {
-            assertEquals("vxb", registry.require("vxb").descriptor().id());
-            assertEquals("json", registry.require("json").descriptor().id());
+            assertThat(registry.require("vxb").descriptor().id()).isEqualTo("vxb");
+            assertThat(registry.require("json").descriptor().id()).isEqualTo("json");
         } finally {
             logger.removeHandler(handler);
         }
-        assertTrue(warnings.stream()
-                .anyMatch(record -> record.getThrown() != null
-                        && record.getThrown().toString().contains("missing.Provider")));
+        assertThat(warnings.stream()
+                        .anyMatch(record -> record.getThrown() != null
+                                && record.getThrown().toString().contains("missing.Provider")))
+                .isTrue();
     }
 }

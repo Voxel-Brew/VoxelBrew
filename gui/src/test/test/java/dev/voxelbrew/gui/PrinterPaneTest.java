@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.printing.PrintArtifact;
 import dev.voxelbrew.printer.api.Printer;
@@ -20,9 +20,9 @@ class PrinterPaneTest {
                 PrintArtifact.of("gcode", new byte[] {1}, Map.of("target_kind", "printer", "target_id", "deleted"));
         var profileOnly = PrintArtifact.of("gcode", new byte[] {1}, Map.of("target_kind", "profile"));
 
-        assertSame(target, PrinterPane.deviceForJob(sliced, devices));
-        assertNull(PrinterPane.deviceForJob(missing, devices));
-        assertNull(PrinterPane.deviceForJob(profileOnly, devices));
-        assertNull(PrinterPane.deviceForJob(null, devices));
+        assertThat(PrinterPane.deviceForJob(sliced, devices)).isSameAs(target);
+        assertThat(PrinterPane.deviceForJob(missing, devices)).isNull();
+        assertThat(PrinterPane.deviceForJob(profileOnly, devices)).isNull();
+        assertThat(PrinterPane.deviceForJob(null, devices)).isNull();
     }
 }

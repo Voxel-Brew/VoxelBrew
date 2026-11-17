@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.printing.Cancellation;
 import dev.voxelbrew.slicer.api.SlicerBackend;
@@ -13,14 +13,15 @@ class SlicerAvailabilityTest {
     @Test
     void reportsActualVersionInsteadOfAdvertisedVersion() throws Exception {
         var result = SlicerAvailability.check(backend("Installed 3.4.5", false));
-        assertTrue(result.working());
-        assertEquals("Installed 3.4.5", result.detail());
+        assertThat(result.working()).isTrue();
+        assertThat(result.detail()).isEqualTo("Installed 3.4.5");
     }
 
     @Test
     void rejectsFailedProbeAndMissingVersion() {
-        assertThrows(IOException.class, () -> SlicerAvailability.check(backend("3.4.5", true)));
-        assertThrows(IOException.class, () -> SlicerAvailability.check(backend("", false)));
+        assertThatThrownBy(() -> SlicerAvailability.check(backend("3.4.5", true)))
+                .isInstanceOf(IOException.class);
+        assertThatThrownBy(() -> SlicerAvailability.check(backend("", false))).isInstanceOf(IOException.class);
     }
 
     private SlicerBackend backend(String version, boolean fails) {
@@ -34,7 +35,7 @@ class SlicerAvailabilityTest {
             }
 
             public Probe probe(Path executable, Cancellation cancellation) throws IOException {
-                assertEquals(executable(), executable);
+                assertThat(executable).isEqualTo(executable());
                 if (fails) throw new IOException("Executable is unavailable");
                 return new Probe(version, Set.of());
             }

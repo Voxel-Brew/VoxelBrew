@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine.printing;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.*;
 import java.util.*;
@@ -23,21 +23,24 @@ class PrintArrangementTest {
         var model = model(60, 4);
         var result = PrintArrangement.arrange(model, 5).orElseThrow();
         for (int i = 0; i < result.size(); i++) {
-            assertEquals(model.instances().get(i).id(), result.get(i).id());
+            assertThat(result.get(i).id()).isEqualTo(model.instances().get(i).id());
             var before = model.instances().get(i).transform().matrix();
             var after = result.get(i).transform().matrix();
-            for (int j = 0; j < 12; j++) if (j != 3 && j != 7) assertEquals(before[j], after[j]);
+            for (int j = 0; j < 12; j++)
+                if (j != 3 && j != 7) assertThat(after[j]).isEqualTo(before[j]);
             var bounds = MeshGeometry.bounds(model.placedMesh(result.get(i)));
-            assertTrue(bounds.minX() >= 5 - 1e-8
-                    && bounds.minY() >= 5 - 1e-8
-                    && bounds.maxX() <= 195 + 1e-8
-                    && bounds.maxY() <= 195 + 1e-8);
+            assertThat(bounds.minX() >= 5 - 1e-8
+                            && bounds.minY() >= 5 - 1e-8
+                            && bounds.maxX() <= 195 + 1e-8
+                            && bounds.maxY() <= 195 + 1e-8)
+                    .isTrue();
             for (int j = 0; j < i; j++) {
                 var other = MeshGeometry.bounds(model.placedMesh(result.get(j)));
-                assertTrue(bounds.minX() >= other.maxX() + 5 - 1e-8
-                        || other.minX() >= bounds.maxX() + 5 - 1e-8
-                        || bounds.minY() >= other.maxY() + 5 - 1e-8
-                        || other.minY() >= bounds.maxY() + 5 - 1e-8);
+                assertThat(bounds.minX() >= other.maxX() + 5 - 1e-8
+                                || other.minX() >= bounds.maxX() + 5 - 1e-8
+                                || bounds.minY() >= other.maxY() + 5 - 1e-8
+                                || other.minY() >= bounds.maxY() + 5 - 1e-8)
+                        .isTrue();
             }
         }
     }
@@ -56,8 +59,8 @@ class PrintArrangementTest {
                 maxX = Math.max(maxX, bounds.maxX());
                 maxY = Math.max(maxY, bounds.maxY());
             }
-            assertEquals(100, (minX + maxX) / 2, 1e-8);
-            assertEquals(100, (minY + maxY) / 2, 1e-8);
+            assertThat((minX + maxX) / 2).isCloseTo(100, org.assertj.core.data.Offset.offset(1e-8));
+            assertThat((minY + maxY) / 2).isCloseTo(100, org.assertj.core.data.Offset.offset(1e-8));
         }
     }
 
@@ -65,7 +68,7 @@ class PrintArrangementTest {
     void oversizedObjectLeavesOriginalUntouched() {
         var model = model(300, 1);
         var initial = model.instances();
-        assertTrue(PrintArrangement.arrange(model, 5).isEmpty());
-        assertEquals(initial, model.instances());
+        assertThat(PrintArrangement.arrange(model, 5).isEmpty()).isTrue();
+        assertThat(model.instances()).isEqualTo(initial);
     }
 }

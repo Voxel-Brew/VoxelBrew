@@ -2,7 +2,7 @@ package dev.voxelbrew.engine.model;
 
 import static dev.voxelbrew.engine.construction.ConstructionGeometry.*;
 import static dev.voxelbrew.engine.construction.ConstructionTools.Tool.*;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.geometry.Solid;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
@@ -26,33 +26,33 @@ class ConstructionIntegrationTest {
         session.add(new Feature.Extrude("solid", new Feature.ProfileRef("sketch", "profile"), 8));
         session = new ModelSession(DocumentCodec.decode(DocumentCodec.encode(session.document())));
         try (var result = Evaluator.evaluate(session.document())) {
-            assertTrue(result.valid(), result.diagnostics().toString());
-            assertEquals(19200, result.bodies().getFirst().solid().volume(), .01);
-            assertEquals(
-                    5, ((Plane) result.construction().get("offset")).origin().z(), 1e-9);
+            assertThat(result.valid()).as(result.diagnostics().toString()).isTrue();
+            assertThat(result.bodies().getFirst().solid().volume())
+                    .isCloseTo(19200, org.assertj.core.data.Offset.offset(.01));
+            assertThat(((Plane) result.construction().get("offset")).origin().z())
+                    .isCloseTo(5, org.assertj.core.data.Offset.offset(1e-9));
             var sketch = (Feature.Sketch) result.resolvedFeatures().get(1);
-            assertEquals(5, sketch.plane().placement().apply(0, 0, 0)[2], 1e-9);
+            assertThat(sketch.plane().placement().apply(0, 0, 0)[2])
+                    .isCloseTo(5, org.assertj.core.data.Offset.offset(1e-9));
         }
         session.replace(new ConstructionFeature("offset", OFFSET_PLANE, offset.inputs(), 12, false));
         try (var result = Evaluator.evaluate(session.document())) {
-            assertTrue(result.valid());
-            assertEquals(
-                    12,
-                    ((Feature.Sketch) result.resolvedFeatures().get(1))
+            assertThat(result.valid()).isTrue();
+            assertThat(((Feature.Sketch) result.resolvedFeatures().get(1))
                             .plane()
                             .placement()
-                            .apply(0, 0, 0)[2],
-                    1e-9);
+                            .apply(0, 0, 0)[2])
+                    .isCloseTo(12, org.assertj.core.data.Offset.offset(1e-9));
         }
         session.undo();
         try (var result = Evaluator.evaluate(session.document())) {
-            assertEquals(
-                    5, ((Plane) result.construction().get("offset")).origin().z(), 1e-9);
+            assertThat(((Plane) result.construction().get("offset")).origin().z())
+                    .isCloseTo(5, org.assertj.core.data.Offset.offset(1e-9));
         }
         session.setCursor(0);
         try (var result = Evaluator.evaluate(session.document())) {
-            assertTrue(result.construction().isEmpty());
-            assertTrue(result.bodies().isEmpty());
+            assertThat(result.construction().isEmpty()).isTrue();
+            assertThat(result.bodies().isEmpty()).isTrue();
         }
     }
 
@@ -73,8 +73,8 @@ class ConstructionIntegrationTest {
                     break;
                 }
         }
-        assertTrue(side >= 0);
-        assertTrue(circle >= 0);
+        assertThat(side >= 0).isTrue();
+        assertThat(circle >= 0).isTrue();
         var face = new ConstructionFeature.Input(ConstructionFeature.Selection.FACE, "cylinder", "body", side, ZERO);
         var edge = new ConstructionFeature.Input(ConstructionFeature.Selection.EDGE, "cylinder", "body", circle, ZERO);
         session.add(new ConstructionFeature("axis", AXIS_SURFACE, List.of(face), 0, false));
@@ -92,22 +92,22 @@ class ConstructionIntegrationTest {
         session.add(new ConstructionFeature("path", POINT_ALONG_PATH, List.of(edge), .25, false));
         session.add(new ConstructionFeature("path-plane", PLANE_ALONG_PATH, List.of(edge), .25, false));
         var document = DocumentCodec.decode(DocumentCodec.encode(session.document()));
-        assertEquals(session.document(), document);
+        assertThat(document).isEqualTo(session.document());
         try (var result = Evaluator.evaluate(document)) {
-            assertTrue(result.valid(), result.diagnostics().toString());
+            assertThat(result.valid()).as(result.diagnostics().toString()).isTrue();
             var axis = (Axis) result.construction().get("axis");
-            assertEquals(10, axis.origin().x(), 1e-8);
-            assertEquals(20, axis.origin().y(), 1e-8);
-            assertEquals(1, Math.abs(axis.direction().z()), 1e-8);
-            assertEquals(
-                    1, ((Axis) result.construction().get("normal")).direction().x(), 1e-8);
+            assertThat(axis.origin().x()).isCloseTo(10, org.assertj.core.data.Offset.offset(1e-8));
+            assertThat(axis.origin().y()).isCloseTo(20, org.assertj.core.data.Offset.offset(1e-8));
+            assertThat(Math.abs(axis.direction().z())).isCloseTo(1, org.assertj.core.data.Offset.offset(1e-8));
+            assertThat(((Axis) result.construction().get("normal")).direction().x())
+                    .isCloseTo(1, org.assertj.core.data.Offset.offset(1e-8));
             var point = ((Point) result.construction().get("path")).position();
             var center = ((Point) result.construction().get("center")).position();
-            assertEquals(4, point.distance(center), 1e-7);
+            assertThat(point.distance(center)).isCloseTo(4, org.assertj.core.data.Offset.offset(1e-7));
             var plane = (Plane) result.construction().get("path-plane");
-            assertEquals(0, plane.normal().dot(point.minus(center)), 1e-7);
-            assertEquals(
-                    0, ((Plane) result.construction().get("tangent")).normal().z(), 1e-7);
+            assertThat(plane.normal().dot(point.minus(center))).isCloseTo(0, org.assertj.core.data.Offset.offset(1e-7));
+            assertThat(((Plane) result.construction().get("tangent")).normal().z())
+                    .isCloseTo(0, org.assertj.core.data.Offset.offset(1e-7));
         }
     }
 
@@ -120,7 +120,7 @@ class ConstructionIntegrationTest {
                     edge = i + 1;
                     break;
                 }
-            assertTrue(edge > 0);
+            assertThat(edge > 0).isTrue();
             for (boolean fillet : List.of(false, true)) {
                 try (var finished = cylinder.edgeFinish(fillet, 1, new int[] {edge})) {
                     int face = -1;
@@ -129,20 +129,22 @@ class ConstructionIntegrationTest {
                             face = i;
                             break;
                         }
-                    assertTrue(face >= 0, "Expected analytic " + (fillet ? "torus" : "cone"));
+                    assertThat(face >= 0)
+                            .as("Expected analytic " + (fillet ? "torus" : "cone"))
+                            .isTrue();
                     var input = new ConstructionFeature.Input(
                             ConstructionFeature.Selection.FACE, "body", "body", face, ZERO);
                     var feature = new ConstructionFeature("axis", AXIS_SURFACE, List.of(input), 0, false);
                     var axis = (Axis) dev.voxelbrew.engine.construction.ConstructionEvaluator.evaluate(
                             feature, java.util.Map.of(), ref -> finished);
-                    assertEquals(10, axis.origin().x(), 1e-8);
-                    assertEquals(20, axis.origin().y(), 1e-8);
-                    assertEquals(1, Math.abs(axis.direction().z()), 1e-8);
+                    assertThat(axis.origin().x()).isCloseTo(10, org.assertj.core.data.Offset.offset(1e-8));
+                    assertThat(axis.origin().y()).isCloseTo(20, org.assertj.core.data.Offset.offset(1e-8));
+                    assertThat(Math.abs(axis.direction().z())).isCloseTo(1, org.assertj.core.data.Offset.offset(1e-8));
                     if (fillet) {
                         var center = new ConstructionFeature("center", POINT_CENTER, List.of(input), 0, false);
                         var point = (Point) dev.voxelbrew.engine.construction.ConstructionEvaluator.evaluate(
                                 center, java.util.Map.of(), ref -> finished);
-                        assertEquals(axis.origin(), point.position());
+                        assertThat(point.position()).isEqualTo(axis.origin());
                     }
                 }
             }
@@ -162,7 +164,7 @@ class ConstructionIntegrationTest {
                 var packet = solid.constructionInput(0, face, .5);
                 if (packet[0] == 1 && packet[15] < -.99) bottom = face;
             }
-            assertTrue(bottom >= 0);
+            assertThat(bottom >= 0).isTrue();
             var feature = new ConstructionFeature(
                     "offset",
                     OFFSET_PLANE,
@@ -172,8 +174,8 @@ class ConstructionIntegrationTest {
                     false);
             var plane = (Plane) dev.voxelbrew.engine.construction.ConstructionEvaluator.evaluate(
                     feature, java.util.Map.of(), ref -> solid);
-            assertEquals(-1, plane.normal().z(), 1e-9);
-            assertEquals(-3, plane.origin().z(), 1e-9);
+            assertThat(plane.normal().z()).isCloseTo(-1, org.assertj.core.data.Offset.offset(1e-9));
+            assertThat(plane.origin().z()).isCloseTo(-3, org.assertj.core.data.Offset.offset(1e-9));
         }
     }
 
@@ -193,10 +195,10 @@ class ConstructionIntegrationTest {
                 2,
                 false));
         try (var result = Evaluator.evaluate(session.document())) {
-            assertFalse(result.valid());
-            assertEquals(Evaluation.State.FAILED, result.diagnostics().get(0).state());
-            assertEquals(Evaluation.State.BLOCKED, result.diagnostics().get(1).state());
-            assertThrows(IllegalStateException.class, result::construction);
+            assertThat(result.valid()).isFalse();
+            assertThat(result.diagnostics().get(0).state()).isEqualTo(Evaluation.State.FAILED);
+            assertThat(result.diagnostics().get(1).state()).isEqualTo(Evaluation.State.BLOCKED);
+            assertThatThrownBy(result::construction).isInstanceOf(IllegalStateException.class);
         }
     }
 }

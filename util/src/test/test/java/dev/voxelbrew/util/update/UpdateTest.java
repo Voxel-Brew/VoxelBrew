@@ -1,6 +1,6 @@
 package dev.voxelbrew.util.update;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -11,6 +11,7 @@ import org.apache.commons.compress.archivers.zip.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 
+@SuppressWarnings("deprecation")
 class UpdateTest {
     @TempDir
     Path directory;
@@ -29,17 +30,16 @@ class UpdateTest {
                 default -> module + ".jar";
             };
             Files.writeString(marker, Files.readString(marker) + module + "Jar=" + artifactName + "\n");
-            assertThrows(
-                    IOException.class, () -> ApplicationImage.open(image.root(), image.component(), image.platform()));
+            assertThatThrownBy(() -> ApplicationImage.open(image.root(), image.component(), image.platform()))
+                    .isInstanceOf(IOException.class);
             Path artifact = image.appDirectory().resolve(artifactName);
             jar(artifact, "voxelbrew-" + module + "-version.properties", "version=9.9.9");
-            assertThrows(
-                    IOException.class, () -> ApplicationImage.open(image.root(), image.component(), image.platform()));
+            assertThatThrownBy(() -> ApplicationImage.open(image.root(), image.component(), image.platform()))
+                    .isInstanceOf(IOException.class);
             jar(artifact, "voxelbrew-" + module + "-version.properties", "version=" + current);
-            assertEquals(
-                    current,
-                    ApplicationImage.open(image.root(), image.component(), image.platform())
-                            .version());
+            assertThat(ApplicationImage.open(image.root(), image.component(), image.platform())
+                            .version())
+                    .isEqualTo(current);
         }
     }
 
@@ -52,52 +52,54 @@ class UpdateTest {
                 Files.readString(marker) + "model-apiJar=model-0.1.0-SNAPSHOT.jar\nmodel-apiVersion=0.1.0-SNAPSHOT\n");
         Path artifact = image.appDirectory().resolve("model-0.1.0-SNAPSHOT.jar");
         jar(artifact, "voxelbrew-model-api-version.properties", "version=0.1.0-SNAPSHOT");
-        assertEquals(
-                current,
-                ApplicationImage.open(image.root(), image.component(), image.platform())
-                        .version());
+        assertThat(ApplicationImage.open(image.root(), image.component(), image.platform())
+                        .version())
+                .isEqualTo(current);
         jar(artifact, "voxelbrew-model-api-version.properties", "version=0.2.0-SNAPSHOT");
-        assertThrows(IOException.class, () -> ApplicationImage.open(image.root(), image.component(), image.platform()));
+        assertThatThrownBy(() -> ApplicationImage.open(image.root(), image.component(), image.platform()))
+                .isInstanceOf(IOException.class);
     }
 
     @Test
     void utilityIdentityIsRequiredWhenDeclaredAndLegacyMetadataStillOpens() throws Exception {
         var image = image(directory.resolve("installation"), current);
-        assertEquals("util.jar", image.updaterJar());
+        assertThat(image.updaterJar()).isEqualTo("util.jar");
         Path utility = image.appDirectory().resolve("util.jar");
         Files.delete(utility);
-        assertThrows(IOException.class, () -> ApplicationImage.open(image.root(), image.component(), image.platform()));
+        assertThatThrownBy(() -> ApplicationImage.open(image.root(), image.component(), image.platform()))
+                .isInstanceOf(IOException.class);
         jar(utility, "voxelbrew-util-version.properties", "version=9.9.9");
-        assertThrows(IOException.class, () -> ApplicationImage.open(image.root(), image.component(), image.platform()));
+        assertThatThrownBy(() -> ApplicationImage.open(image.root(), image.component(), image.platform()))
+                .isInstanceOf(IOException.class);
         Path marker = image.appDirectory().resolve(ApplicationImage.MARKER);
         Files.writeString(marker, Files.readString(marker).replace("utilJar=util.jar\n", ""));
-        assertEquals(
-                "engine.jar",
-                ApplicationImage.open(image.root(), image.component(), image.platform())
-                        .updaterJar());
+        assertThat(ApplicationImage.open(image.root(), image.component(), image.platform())
+                        .updaterJar())
+                .isEqualTo("engine.jar");
     }
 
     @Test
     void versionsAndReleaseSelection() throws Exception {
-        assertTrue(ReleaseVersion.release("1.10.0").compareTo(ReleaseVersion.release("1.9.99")) > 0);
-        assertTrue(ReleaseVersion.parse("1.2.3-SNAPSHOT").compareTo(current) < 0);
+        assertThat(ReleaseVersion.release("1.10.0").compareTo(ReleaseVersion.release("1.9.99")) > 0)
+                .isTrue();
+        assertThat(ReleaseVersion.parse("1.2.3-SNAPSHOT").compareTo(current) < 0)
+                .isTrue();
         for (String invalid : List.of("01.2.3", "1.2", "1.2.3-rc1", "65535.0.0", "1.2.3/path"))
-            assertThrows(IllegalArgumentException.class, () -> ReleaseVersion.parse(invalid));
-        assertThrows(IllegalArgumentException.class, () -> ReleaseVersion.release("1.2.3-SNAPSHOT"));
-        assertFalse(check("1.2.3", null, false).available());
-        assertTrue(check("1.2.3", null, true).available());
-        assertFalse(check("1.0.0", null, true).available());
-        assertTrue(check("1.0.0", "1.0.0", false).available());
-        assertTrue(check("1.3.0", null, false).available());
-        assertFalse(check("1.3.0", null, false).installable());
+            assertThatThrownBy(() -> ReleaseVersion.parse(invalid)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ReleaseVersion.release("1.2.3-SNAPSHOT")).isInstanceOf(IllegalArgumentException.class);
+        assertThat(check("1.2.3", null, false).available()).isFalse();
+        assertThat(check("1.2.3", null, true).available()).isTrue();
+        assertThat(check("1.0.0", null, true).available()).isFalse();
+        assertThat(check("1.0.0", "1.0.0", false).available()).isTrue();
+        assertThat(check("1.3.0", null, false).available()).isTrue();
+        assertThat(check("1.3.0", null, false).installable()).isFalse();
     }
 
     @Test
     void rejectsUnsafeReleaseMetadataAndMissingAssets() throws Exception {
-        assertEquals(
-                current,
-                GitHubReleaseSource.parse(metadata("v1.2.3", "false", "false", "SHA256SUMS"), current)
-                        .version());
+        assertThat(GitHubReleaseSource.parse(metadata("v1.2.3", "false", "false", "SHA256SUMS"), current)
+                        .version())
+                .isEqualTo(current);
         for (String metadata : List.of(
                 metadata("v1.2.3", "true", "false"),
                 metadata("v1.2.3", "false", "true"),
@@ -111,16 +113,17 @@ class UpdateTest {
                 "{broken",
                 "[]",
                 metadata("v1.2.3", "false", "false") + " {}"))
-            assertThrows(IOException.class, () -> GitHubReleaseSource.parse(metadata, current));
+            assertThatThrownBy(() -> GitHubReleaseSource.parse(metadata, current))
+                    .isInstanceOf(IOException.class);
         var missing = new ReleaseSource.Release(current, Set.of("SHA256SUMS"));
-        assertThrows(
-                IOException.class,
-                () -> service(missing, Optional.empty()).check(new UpdateService.Request(null, true), cancellation));
+        assertThatThrownBy(() ->
+                        service(missing, Optional.empty()).check(new UpdateService.Request(null, true), cancellation))
+                .isInstanceOf(IOException.class);
         var noChecksum =
                 new ReleaseSource.Release(current, Set.of(ApplicationImage.Component.CLI.asset(current, "linux-x64")));
-        assertThrows(
-                IOException.class,
-                () -> service(noChecksum, Optional.empty()).check(new UpdateService.Request(null, true), cancellation));
+        assertThatThrownBy(() -> service(noChecksum, Optional.empty())
+                        .check(new UpdateService.Request(null, true), cancellation))
+                .isInstanceOf(IOException.class);
     }
 
     @Test
@@ -130,11 +133,13 @@ class UpdateTest {
                 directory.resolve("SHA256SUMS"), UpdateArchive.sha256(archive, cancellation) + "  app.zip\n");
         UpdateArchive.verify(archive, checksums, "app.zip", cancellation);
         Files.writeString(archive, "corrupt");
-        assertThrows(IOException.class, () -> UpdateArchive.verify(archive, checksums, "app.zip", cancellation));
+        assertThatThrownBy(() -> UpdateArchive.verify(archive, checksums, "app.zip", cancellation))
+                .isInstanceOf(IOException.class);
         Files.writeString(checksums, "0".repeat(64) + "  app.zip\n" + "0".repeat(64) + "  app.zip\n");
-        assertThrows(IOException.class, () -> UpdateArchive.verify(archive, checksums, "app.zip", cancellation));
+        assertThatThrownBy(() -> UpdateArchive.verify(archive, checksums, "app.zip", cancellation))
+                .isInstanceOf(IOException.class);
         cancellation.cancel();
-        assertThrows(CancellationException.class, () -> UpdateArchive.sha256(archive, cancellation));
+        assertThatThrownBy(() -> UpdateArchive.sha256(archive, cancellation)).isInstanceOf(CancellationException.class);
     }
 
     @Test
@@ -151,31 +156,29 @@ class UpdateTest {
                 "VoxelBrewCLI/a./file")) {
             Path archive = zip("bad" + attempt + ".zip", List.of(path), 0100644);
             Path destination = directory.resolve("bad" + attempt++);
-            assertThrows(
-                    IOException.class,
-                    () -> UpdateArchive.extract(archive, destination, "VoxelBrewCLI", cancellation),
-                    path);
+            assertThatThrownBy(() -> UpdateArchive.extract(archive, destination, "VoxelBrewCLI", cancellation))
+                    .isInstanceOf(IOException.class);
         }
         Path links = zip("links.zip", List.of("VoxelBrewCLI/link"), 0120777);
-        assertThrows(
-                IOException.class,
-                () -> UpdateArchive.extract(links, directory.resolve("links"), "VoxelBrewCLI", cancellation));
+        assertThatThrownBy(() -> UpdateArchive.extract(links, directory.resolve("links"), "VoxelBrewCLI", cancellation))
+                .isInstanceOf(IOException.class);
         Path duplicates = zip("duplicates.zip", List.of("VoxelBrewCLI/Name", "VoxelBrewCLI/name"), 0100644);
-        assertThrows(
-                IOException.class,
-                () -> UpdateArchive.extract(duplicates, directory.resolve("duplicates"), "VoxelBrewCLI", cancellation));
-        assertFalse(Files.exists(directory.resolve("escape")));
+        assertThatThrownBy(() -> UpdateArchive.extract(
+                        duplicates, directory.resolve("duplicates"), "VoxelBrewCLI", cancellation))
+                .isInstanceOf(IOException.class);
+        assertThat(Files.exists(directory.resolve("escape"))).isFalse();
     }
 
     @Test
     void extractionPreservesOnlySafeExecutablePermissions() throws Exception {
         Path archive = zip("good.zip", List.of("VoxelBrewCLI/bin/VoxelBrewCLI"), 0107777);
         Path result = UpdateArchive.extract(archive, directory.resolve("good"), "VoxelBrewCLI", cancellation);
-        assertEquals("data", Files.readString(result.resolve("bin/VoxelBrewCLI")));
+        assertThat(Files.readString(result.resolve("bin/VoxelBrewCLI"))).isEqualTo("data");
         if (Files.getFileStore(result).supportsFileAttributeView("posix")) {
-            assertTrue(Files.isExecutable(result.resolve("bin/VoxelBrewCLI")));
-            assertFalse(Files.getPosixFilePermissions(result.resolve("bin/VoxelBrewCLI"))
-                    .contains(java.nio.file.attribute.PosixFilePermission.OTHERS_WRITE));
+            assertThat(Files.isExecutable(result.resolve("bin/VoxelBrewCLI"))).isTrue();
+            assertThat(Files.getPosixFilePermissions(result.resolve("bin/VoxelBrewCLI"))
+                            .contains(java.nio.file.attribute.PosixFilePermission.OTHERS_WRITE))
+                    .isFalse();
         }
     }
 
@@ -186,20 +189,19 @@ class UpdateTest {
         Path backup = directory.resolve("backup");
         Files.writeString(target.resolve("version"), "old");
         Files.writeString(source.resolve("version"), "new");
-        var failure = assertThrows(
-                IOException.class,
+        var failure = org.assertj.core.api.Assertions.catchThrowableOfType(
                 () -> UpdateHelper.replace(target, source, backup, (from, to) -> {
                     if (from.equals(source)) throw new IOException("simulated locked directory");
                     Files.move(from, to);
-                }));
-        assertTrue(failure.getMessage().contains("restored"));
-        assertEquals("old", Files.readString(target.resolve("version")));
+                }),
+                IOException.class);
+        assertThat(failure.getMessage().contains("restored")).isTrue();
+        assertThat(Files.readString(target.resolve("version"))).isEqualTo("old");
         UpdateHelper.replace(target, source, backup, (from, to) -> Files.move(from, to));
-        assertEquals("new", Files.readString(target.resolve("version")));
-        assertEquals("old", Files.readString(backup.resolve("version")));
-        assertThrows(
-                IOException.class,
-                () -> UpdateHelper.replace(target, source, backup, (from, to) -> fail("must not move")));
+        assertThat(Files.readString(target.resolve("version"))).isEqualTo("new");
+        assertThat(Files.readString(backup.resolve("version"))).isEqualTo("old");
+        assertThatThrownBy(() -> UpdateHelper.replace(target, source, backup, (from, to) -> fail("must not move")))
+                .isInstanceOf(IOException.class);
     }
 
     @SuppressWarnings("try")
@@ -210,19 +212,20 @@ class UpdateTest {
         var service = service(release, Optional.of(image));
         var selected = service.check(new UpdateService.Request(null, false), cancellation);
         try (var lock = ApplicationImage.lock(image.updateLock(), false)) {
-            assertThrows(IOException.class, () -> service.prepare(selected, cancellation, ignored -> {}));
+            assertThatThrownBy(() -> service.prepare(selected, cancellation, ignored -> {}))
+                    .isInstanceOf(IOException.class);
         }
-        assertThrows(IOException.class, () -> service.prepare(selected, cancellation, ignored -> {}));
-        assertEquals(
-                current,
-                ApplicationImage.open(image.root(), ApplicationImage.Component.CLI, "linux-x64")
-                        .version());
+        assertThatThrownBy(() -> service.prepare(selected, cancellation, ignored -> {}))
+                .isInstanceOf(IOException.class);
+        assertThat(ApplicationImage.open(image.root(), ApplicationImage.Component.CLI, "linux-x64")
+                        .version())
+                .isEqualTo(current);
         try (var children = Files.list(image.root().getParent())) {
-            assertTrue(children.noneMatch(path -> path.getFileName().toString().startsWith(".VoxelBrew-update-")));
+            assertThat(children.noneMatch(path -> path.getFileName().toString().startsWith(".VoxelBrew-update-")))
+                    .isTrue();
         }
-        assertThrows(
-                IOException.class,
-                () -> service(release, Optional.empty()).prepare(selected, cancellation, ignored -> {}));
+        assertThatThrownBy(() -> service(release, Optional.empty()).prepare(selected, cancellation, ignored -> {}))
+                .isInstanceOf(IOException.class);
     }
 
     private UpdateService.Check check(String release, String requested, boolean force) throws IOException {
@@ -254,10 +257,10 @@ class UpdateTest {
                 file, java.nio.file.attribute.DosFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
         if (dos != null) dos.setReadOnly(true);
         UpdateFiles.deleteStage(stage);
-        assertFalse(Files.exists(stage));
+        assertThat(Files.exists(stage)).isFalse();
         Path unrelated = Files.createDirectory(directory.resolve("installation"));
-        assertThrows(IOException.class, () -> UpdateFiles.deleteStage(unrelated));
-        assertTrue(Files.isDirectory(unrelated));
+        assertThatThrownBy(() -> UpdateFiles.deleteStage(unrelated)).isInstanceOf(IOException.class);
+        assertThat(Files.isDirectory(unrelated)).isTrue();
     }
 
     private ReleaseSource.Release release(String value) {

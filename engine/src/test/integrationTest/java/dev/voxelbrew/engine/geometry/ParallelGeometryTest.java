@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine.geometry;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.mesh.*;
 import dev.voxelbrew.engine.model.*;
@@ -24,29 +24,30 @@ class ParallelGeometryTest {
             var volumes = bodies.stream().map(b -> b.solid().volume()).toList();
             detached =
                     dev.voxelbrew.engine.printing.ManufacturingModels.from(document, evaluation, MeshOptions.DEFAULT);
-            assertEquals(
-                    bodies.stream().map(Evaluation.Body::id).toList(),
-                    new ArrayList<>(detached.meshes().keySet()));
+            assertThat(new ArrayList<>(detached.meshes().keySet()))
+                    .isEqualTo(bodies.stream().map(Evaluation.Body::id).toList());
             for (int repeat = 0; repeat < 3; repeat++) {
                 var meshes = CpuWork.map(bodies, b -> b.solid().tessellate(MeshOptions.DEFAULT));
                 for (int i = 0; i < bodies.size(); i++) {
-                    assertArrayEquals(serial.get(i).vertices(), meshes.get(i).vertices());
-                    assertArrayEquals(serial.get(i).triangles(), meshes.get(i).triangles());
-                    assertArrayEquals(serial.get(i).faceIndices(), meshes.get(i).faceIndices());
-                    assertEquals(volumes.get(i), bodies.get(i).solid().volume());
-                    assertTrue(MeshValidation.inspect(meshes.get(i)).closed());
+                    assertThat(meshes.get(i).vertices())
+                            .containsExactly(serial.get(i).vertices());
+                    assertThat(meshes.get(i).triangles())
+                            .containsExactly(serial.get(i).triangles());
+                    assertThat(meshes.get(i).faceIndices())
+                            .containsExactly(serial.get(i).faceIndices());
+                    assertThat(bodies.get(i).solid().volume()).isEqualTo(volumes.get(i));
+                    assertThat(MeshValidation.inspect(meshes.get(i)).closed()).isTrue();
                 }
             }
-            assertThrows(
-                    IllegalStateException.class,
-                    () -> CpuWork.map(bodies, body -> {
+            assertThatThrownBy(() -> CpuWork.map(bodies, body -> {
                         var mesh = body.solid().tessellate(MeshOptions.DEFAULT);
                         if (body.id().equals(bodies.getFirst().id()))
                             throw new IllegalStateException("injected batch failure");
                         return mesh;
-                    }));
+                    }))
+                    .isInstanceOf(IllegalStateException.class);
         }
-        assertEquals(before, NativeKernel.liveHandles());
-        assertTrue(PrintValidation.validate(detached).valid());
+        assertThat(NativeKernel.liveHandles()).isEqualTo(before);
+        assertThat(PrintValidation.validate(detached).valid()).isTrue();
     }
 }

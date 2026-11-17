@@ -1,6 +1,6 @@
 package dev.voxelbrew.exporter;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.exporter.FileExportDialog;
 import dev.voxelbrew.engine.mesh.MeshData;
@@ -28,16 +28,15 @@ class MeshExporterTest {
                 Map.of(),
                 new FileExportDialog.Destination(target, false));
 
-        assertThrows(IllegalArgumentException.class, () -> exporter.writeFile(view(List.of()), base));
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> exporter.writeFile(view(List.of(instance("one"), instance("two"))), base));
+        assertThatThrownBy(() -> exporter.writeFile(view(List.of()), base))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> exporter.writeFile(view(List.of(instance("one"), instance("two"))), base))
+                .isInstanceOf(IllegalArgumentException.class);
         var unknownOption = new MeshExportDialog.Settings(
                 base.selection(), base.mesh(), Map.of("missing", "value"), base.destination());
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> exporter.writeFile(view(List.of(instance("one"))), unknownOption));
-        assertFalse(Files.exists(target));
+        assertThatThrownBy(() -> exporter.writeFile(view(List.of(instance("one"))), unknownOption))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(Files.exists(target)).isFalse();
     }
 
     private static BodyInstance instance(String id) {

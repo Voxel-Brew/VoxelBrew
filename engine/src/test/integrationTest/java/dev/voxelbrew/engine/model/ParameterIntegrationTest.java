@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine.model;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.parameters.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
@@ -39,23 +39,23 @@ class ParameterIntegrationTest {
         s.selectConfiguration("Raised");
         try (var e = s.evaluate()) {
             e.requireCompleteDocument();
-            assertEquals(
-                    19200,
-                    e.bodies().stream().mapToDouble(b -> b.solid().volume()).sum(),
-                    .01);
+            assertThat(e.bodies().stream().mapToDouble(b -> b.solid().volume()).sum())
+                    .isCloseTo(19200, org.assertj.core.data.Offset.offset(.01));
             var bounds = e.bodies().getFirst().solid().bounds();
-            assertEquals(12, bounds.minZ(), .001);
-            assertEquals(20, bounds.maxZ(), .001);
-            assertEquals(20, bounds.maxX(), .001);
+            assertThat(bounds.minZ()).isCloseTo(12, org.assertj.core.data.Offset.offset(.001));
+            assertThat(bounds.maxZ()).isCloseTo(20, org.assertj.core.data.Offset.offset(.001));
+            assertThat(bounds.maxX()).isCloseTo(20, org.assertj.core.data.Offset.offset(.001));
             for (var f : e.resolvedFeatures())
                 if (f instanceof Feature.Sketch sketch)
-                    assertEquals(20, sketch.plane().offsetZ());
+                    assertThat(sketch.plane().offsetZ()).isEqualTo(20);
         }
         s.editDimension("plate", "offsetZ", 30);
-        assertTrue(s.document().parameters().bindings().stream()
-                .noneMatch(b -> b.target().field().equals("offsetZ")));
+        assertThat(s.document().parameters().bindings().stream()
+                        .noneMatch(b -> b.target().field().equals("offsetZ")))
+                .isTrue();
         try (var e = s.evaluate()) {
-            assertEquals(30, e.bodies().getFirst().solid().bounds().maxZ(), .001);
+            assertThat(e.bodies().getFirst().solid().bounds().maxZ())
+                    .isCloseTo(30, org.assertj.core.data.Offset.offset(.001));
         }
     }
 
@@ -88,18 +88,15 @@ class ParameterIntegrationTest {
             s.selectConfiguration("Moved");
             try (var e = s.evaluate()) {
                 var bounds = e.requireCompleteDocument().getFirst().solid().bounds();
-                assertEquals(rectangle ? -15 : -17, bounds.minX(), .001);
-                assertEquals(rectangle ? -30 : -32, bounds.minY(), .001);
+                assertThat(bounds.minX()).isCloseTo(rectangle ? -15 : -17, org.assertj.core.data.Offset.offset(.001));
+                assertThat(bounds.minY()).isCloseTo(rectangle ? -30 : -32, org.assertj.core.data.Offset.offset(.001));
             }
             s.editDimension("sketch", dimension, rectangle ? 70 : 6);
-            assertEquals(
-                    "",
-                    s.document().parameters().binding(new ParameterSet.Target("sketch", "constraint:" + dimension)));
+            assertThat(s.document().parameters().binding(new ParameterSet.Target("sketch", "constraint:" + dimension)))
+                    .isEqualTo("");
             try (var e = s.evaluate()) {
-                assertEquals(
-                        rectangle ? 14000 : Math.PI * 9 * 5,
-                        e.requireCompleteDocument().getFirst().solid().volume(),
-                        .01);
+                assertThat(e.requireCompleteDocument().getFirst().solid().volume())
+                        .isCloseTo(rectangle ? 14000 : Math.PI * 9 * 5, org.assertj.core.data.Offset.offset(.01));
             }
         }
     }
@@ -138,32 +135,35 @@ class ParameterIntegrationTest {
             s.bindExpression(target[0], target[1], binding.getValue());
         }
         try (var e = s.evaluate()) {
-            assertEquals((2400 - Math.PI * 4) * 5, e.bodies().getFirst().solid().volume(), 1e-6);
+            assertThat(e.bodies().getFirst().solid().volume())
+                    .isCloseTo((2400 - Math.PI * 4) * 5, org.assertj.core.data.Offset.offset(1e-6));
         }
         var ids = s.document().features().stream().map(Feature::id).toList();
         String before = DocumentCodec.fingerprint(s.document());
         s.selectConfiguration("Thick");
-        assertNotEquals(before, DocumentCodec.fingerprint(s.document()));
+        assertThat(DocumentCodec.fingerprint(s.document())).isNotEqualTo(before);
         var file = directory.resolve("parameter versions.vxb");
         DocumentWriter.save(s.document(), file, false);
-        assertEquals(s.document(), DocumentReader.load(file));
+        assertThat(DocumentReader.load(file)).isEqualTo(s.document());
         try (var e = new ModelSession(DocumentReader.load(file)).evaluate()) {
             e.requireCompleteDocument();
             var body = e.bodies().getFirst();
-            assertEquals("thickness.body", body.id());
-            assertEquals(19099.469035085127, body.solid().volume(), .01);
-            assertFalse(body.solid().contains(10, 10, 4));
-            assertEquals(8, body.solid().bounds().maxZ(), .001);
-            assertEquals(ids, e.resolvedFeatures().stream().map(Feature::id).toList());
+            assertThat(body.id()).isEqualTo("thickness.body");
+            assertThat(body.solid().volume()).isCloseTo(19099.469035085127, org.assertj.core.data.Offset.offset(.01));
+            assertThat(body.solid().contains(10, 10, 4)).isFalse();
+            assertThat(body.solid().bounds().maxZ()).isCloseTo(8, org.assertj.core.data.Offset.offset(.001));
+            assertThat(e.resolvedFeatures().stream().map(Feature::id).toList()).isEqualTo(ids);
         }
         s.setCursor(3);
         try (var e = s.evaluate()) {
-            assertEquals(19200, e.bodies().getFirst().solid().volume(), .01);
+            assertThat(e.bodies().getFirst().solid().volume())
+                    .isCloseTo(19200, org.assertj.core.data.Offset.offset(.01));
         }
-        assertTrue(s.undo());
-        assertEquals(3, s.document().cursor());
+        assertThat(s.undo()).isTrue();
+        assertThat(s.document().cursor()).isEqualTo(3);
         try (var e = s.evaluate()) {
-            assertEquals(12000, e.bodies().getFirst().solid().volume(), .01);
+            assertThat(e.bodies().getFirst().solid().volume())
+                    .isCloseTo(12000, org.assertj.core.data.Offset.offset(.01));
         }
     }
 
@@ -189,17 +189,19 @@ class ParameterIntegrationTest {
         s.bindExpression("square", "constraint:height", "size");
         s.selectConfiguration("Large");
         try (var e = s.evaluate()) {
-            assertEquals(12800, e.bodies().getFirst().solid().volume(), .01);
+            assertThat(e.bodies().getFirst().solid().volume())
+                    .isCloseTo(12800, org.assertj.core.data.Offset.offset(.01));
         }
         s.selectConfiguration("Invalid");
         try (var e = s.evaluate()) {
-            assertFalse(e.valid());
-            assertThrows(IllegalStateException.class, e::bodies);
-            assertEquals(Evaluation.State.BLOCKED, e.diagnostics().getLast().state());
+            assertThat(e.valid()).isFalse();
+            assertThatThrownBy(e::bodies).isInstanceOf(IllegalStateException.class);
+            assertThat(e.diagnostics().getLast().state()).isEqualTo(Evaluation.State.BLOCKED);
         }
         s.undo();
         try (var e = s.evaluate()) {
-            assertEquals(12800, e.bodies().getFirst().solid().volume(), .01);
+            assertThat(e.bodies().getFirst().solid().volume())
+                    .isCloseTo(12800, org.assertj.core.data.Offset.offset(.01));
         }
     }
 }

@@ -1,6 +1,6 @@
 package dev.voxelbrew.slicer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.exporter.*;
 import dev.voxelbrew.engine.mesh.MeshOptions;
@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+@SuppressWarnings("deprecation")
 class SlicerExportPipelineTest {
     @TempDir
     Path directory;
@@ -36,22 +37,21 @@ class SlicerExportPipelineTest {
                     throw new AssertionError("Expected geometry exporter");
                 ExporterProvider<?> tracked =
                         new GeometryExporterProvider(original.descriptor(), plugins -> (doc, window) -> {
-                            assertSame(document, doc);
+                            assertThat(doc).isSameAs(document);
                             exports.incrementAndGet();
                             return geometry.create().export(doc, window);
                         });
                 try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(
                         directory, List.of(tracked))) {
                     var backend = backend(format, request -> {
-                        assertEquals(1, exports.get());
-                        assertTrue(Files.size(request.input()) > 100);
-                        assertEquals(request.workingDirectory(), request.input().getParent());
-                        assertSame(model, request.model());
+                        assertThat(exports.get()).isEqualTo(1);
+                        assertThat(Files.size(request.input()) > 100).isTrue();
+                        assertThat(request.input().getParent()).isEqualTo(request.workingDirectory());
+                        assertThat(request.model()).isSameAs(model);
                         runs.incrementAndGet();
                         throw new IOException("Backend reached after export");
                     });
-                    var failure = assertThrows(
-                            IOException.class,
+                    var failure = org.assertj.core.api.Assertions.catchThrowableOfType(
                             () -> SliceService.slice(
                                     backend,
                                     document,
@@ -63,12 +63,13 @@ class SlicerExportPipelineTest {
                                     true,
                                     new Cancellation(),
                                     line -> {},
-                                    dev.voxelbrew.slicer.api.Slicing.DIRECT));
-                    assertEquals("Backend reached after export", failure.getMessage());
-                    assertEquals(1, runs.get());
-                    assertEquals("original", Files.readString(output));
+                                    dev.voxelbrew.slicer.api.Slicing.DIRECT),
+                            IOException.class);
+                    assertThat(failure.getMessage()).isEqualTo("Backend reached after export");
+                    assertThat(runs.get()).isEqualTo(1);
+                    assertThat(Files.readString(output)).isEqualTo("original");
                     try (var files = Files.list(directory)) {
-                        assertEquals(List.of(output), files.toList());
+                        assertThat(files.toList()).isEqualTo(List.of(output));
                     }
                 }
             }
@@ -96,8 +97,7 @@ class SlicerExportPipelineTest {
                     fail("Backend started before a successful export");
                     return null;
                 });
-                var failure = assertThrows(
-                        Exception.class,
+                var failure = org.assertj.core.api.Assertions.catchThrowableOfType(
                         () -> SliceService.slice(
                                 backend,
                                 document,
@@ -109,12 +109,13 @@ class SlicerExportPipelineTest {
                                 true,
                                 new Cancellation(),
                                 line -> {},
-                                dev.voxelbrew.slicer.api.Slicing.DIRECT));
-                if (cancel) assertInstanceOf(CancellationException.class, failure);
-                else assertInstanceOf(IOException.class, failure);
-                assertEquals("original", Files.readString(output));
+                                dev.voxelbrew.slicer.api.Slicing.DIRECT),
+                        Exception.class);
+                if (cancel) assertThat(failure).isInstanceOf(CancellationException.class);
+                else assertThat(failure).isInstanceOf(IOException.class);
+                assertThat(Files.readString(output)).isEqualTo("original");
                 try (var files = Files.list(directory)) {
-                    assertEquals(List.of(output), files.toList());
+                    assertThat(files.toList()).isEqualTo(List.of(output));
                 }
             }
         }

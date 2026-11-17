@@ -1,6 +1,6 @@
 package dev.voxelbrew.slicer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.mesh.*;
 import dev.voxelbrew.engine.model.BodyInstance;
@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.w3c.dom.Element;
 
+@SuppressWarnings("deprecation")
 class ManufacturingTest {
     @TempDir
     Path directory;
@@ -56,23 +57,21 @@ class ManufacturingTest {
                     var xml = DocumentBuilderFactory.newInstance()
                             .newDocumentBuilder()
                             .parse(zip.getInputStream(zip.getEntry("Metadata/Slic3r_PE_model.config")));
-                    assertEquals(
-                            includeSolids ? 3 : 2,
-                            xml.getElementsByTagName("volume").getLength());
+                    assertThat(xml.getElementsByTagName("volume").getLength()).isEqualTo(includeSolids ? 3 : 2);
                     var metadata = xml.getElementsByTagName("metadata");
                     var values = new ArrayList<String>();
                     for (int i = 0; i < metadata.getLength(); i++)
                         values.add(((Element) metadata.item(i)).getAttribute("value"));
-                    assertTrue(values.contains("part/thickness.body"));
-                    assertTrue(values.contains("part/block"));
-                    assertTrue(values.contains("SupportBlocker"));
-                    assertEquals(includeSolids, values.contains("part/pillar"));
+                    assertThat(values.contains("part/thickness.body")).isTrue();
+                    assertThat(values.contains("part/block")).isTrue();
+                    assertThat(values.contains("SupportBlocker")).isTrue();
+                    assertThat(values.contains("part/pillar")).isEqualTo(includeSolids);
                     var config = new String(
                             zip.getInputStream(zip.getEntry("Metadata/Slic3r_PE.config"))
                                     .readAllBytes(),
                             java.nio.charset.StandardCharsets.UTF_8);
-                    assertTrue(config.contains("; filament_type = PLA\n"));
-                    assertTrue(config.contains("; nozzle_diameter = 0.6\n"));
+                    assertThat(config.contains("; filament_type = PLA\n")).isTrue();
+                    assertThat(config.contains("; nozzle_diameter = 0.6\n")).isTrue();
                 }
             }
         }
@@ -90,16 +89,17 @@ class ManufacturingTest {
                     ModelViews.select(view, "thickness.body"),
                     ModelViews.selectInstance(view, "part"),
                     ModelViews.from(model, ExportSelection.Contents.ALL))) {
-                var failure = assertThrows(
-                        java.io.IOException.class,
+                var failure = org.assertj.core.api.Assertions.catchThrowableOfType(
                         () -> FormatTestSupport.write(
-                                registry, "prusa-project", filtered, MeshOptions.DEFAULT, Map.of(), output, true));
-                assertTrue(failure.getMessage().contains("complete build-plate setup"));
-                assertEquals("original project", Files.readString(output));
+                                registry, "prusa-project", filtered, MeshOptions.DEFAULT, Map.of(), output, true),
+                        java.io.IOException.class);
+                assertThat(failure.getMessage().contains("complete build-plate setup"))
+                        .isTrue();
+                assertThat(Files.readString(output)).isEqualTo("original project");
             }
         }
         try (var entries = Files.list(directory)) {
-            assertEquals(List.of(output), entries.toList());
+            assertThat(entries.toList()).isEqualTo(List.of(output));
         }
     }
 
@@ -136,17 +136,17 @@ class ManufacturingTest {
                         List.of(new SupportVolume("lost", "missing", SupportVolume.Role.BLOCKER, 0, 0, 0, 3, 3, 3)));
         var model = new ManufacturingModel("fixture", "rev", setup, profile, base.meshes());
         var report = PrintValidation.validate(model);
-        assertSame(report.meshes().get("rotated"), report.meshes().get("tall"));
-        assertEquals(report, PrintValidation.validate(model));
+        assertThat(report.meshes().get("tall")).isSameAs(report.meshes().get("rotated"));
+        assertThat(PrintValidation.validate(model)).isEqualTo(report);
         for (var expected : List.of(
                 "rotated:OUTSIDE_BED",
                 "rotated:EXCLUDED_ZONE",
                 "rotated:OVERLAP",
                 "tall:OVER_HEIGHT",
                 "lost:MISSING_INSTANCE"))
-            assertTrue(
-                    report.diagnostics().stream().anyMatch(d -> (d.objectId() + ":" + d.code()).equals(expected)),
-                    report.toString());
+            assertThat(report.diagnostics().stream().anyMatch(d -> (d.objectId() + ":" + d.code()).equals(expected)))
+                    .as(report.toString())
+                    .isTrue();
     }
 
     @Test
@@ -165,22 +165,21 @@ class ManufacturingTest {
         var model = new ManufacturingModel(
                 "mesh", "rev", setup, PrintProfile.resolve(setup), Map.of("open", open, "degenerate", degenerate));
         var report = PrintValidation.validate(model);
-        assertEquals(3, report.meshes().get("open").boundaryEdges());
-        assertEquals(1, report.meshes().get("degenerate").degenerateTriangles());
+        assertThat(report.meshes().get("open").boundaryEdges()).isEqualTo(3);
+        assertThat(report.meshes().get("degenerate").degenerateTriangles()).isEqualTo(1);
         try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory)) {
             Path file = directory.resolve("bad.stl");
             Files.writeString(file, "original");
-            assertThrows(
-                    java.io.IOException.class,
-                    () -> FormatTestSupport.write(
+            assertThatThrownBy(() -> FormatTestSupport.write(
                             registry,
                             "stl",
                             ModelViews.selectInstance(ModelViews.from(model), "open"),
                             MeshOptions.DEFAULT,
                             Map.of(),
                             file,
-                            true));
-            assertEquals("original", Files.readString(file));
+                            true))
+                    .isInstanceOf(java.io.IOException.class);
+            assertThat(Files.readString(file)).isEqualTo("original");
         }
     }
 
@@ -200,27 +199,28 @@ class ManufacturingTest {
                 for (int t = 0; t < placed.triangleCount(); t++)
                     if (placed.faceIndex(t) == face)
                         for (int c = 0; c < 3; c++)
-                            assertEquals(0, placed.coordinate(placed.vertexIndex(t, c), 2), .001);
-                assertEquals(0, MeshGeometry.bounds(placed).minZ(), .001);
+                            assertThat(placed.coordinate(placed.vertexIndex(t, c), 2))
+                                    .isCloseTo(0, org.assertj.core.data.Offset.offset(.001));
+                assertThat(MeshGeometry.bounds(placed).minZ()).isCloseTo(0, org.assertj.core.data.Offset.offset(.001));
                 planar++;
             } catch (IllegalArgumentException curved) {
-                assertTrue(curved.getMessage().contains("not planar"));
+                assertThat(curved.getMessage().contains("not planar")).isTrue();
             }
         }
-        assertEquals(6, planar);
+        assertThat(planar).isEqualTo(6);
         session.setPrintSetup(session.document()
                 .printSetup()
                 .withSupports(List.of(
                         new SupportVolume("pillar", "part", SupportVolume.Role.SOLID_SUPPORT, 15, 5, 0, 4, 4, 7.8))));
         var model = dev.voxelbrew.engine.printing.ManufacturingModels.evaluate(session.document(), MeshOptions.DEFAULT);
-        assertEquals(
-                1,
-                ModelViews.from(model, ExportSelection.Contents.MODEL).bodies().size());
-        assertEquals(
-                1,
-                ModelViews.from(model, ExportSelection.Contents.SUPPORTS)
+        assertThat(ModelViews.from(model, ExportSelection.Contents.MODEL)
                         .bodies()
-                        .size());
+                        .size())
+                .isEqualTo(1);
+        assertThat(ModelViews.from(model, ExportSelection.Contents.SUPPORTS)
+                        .bodies()
+                        .size())
+                .isEqualTo(1);
         try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory)) {
             Path file = directory.resolve("supports.stl");
             FormatTestSupport.write(
@@ -233,7 +233,7 @@ class ManufacturingTest {
                     false);
             var data = ByteBuffer.wrap(Files.readAllBytes(file)).order(ByteOrder.LITTLE_ENDIAN);
             data.position(80);
-            assertEquals(12, data.getInt());
+            assertThat(data.getInt()).isEqualTo(12);
             double minX = Double.POSITIVE_INFINITY, maxX = Double.NEGATIVE_INFINITY;
             for (int t = 0; t < 12; t++) {
                 data.position(data.position() + 12);
@@ -241,13 +241,13 @@ class ManufacturingTest {
                     double x = data.getFloat(), y = data.getFloat(), z = data.getFloat();
                     minX = Math.min(minX, x);
                     maxX = Math.max(maxX, x);
-                    assertTrue(y >= 35 && y <= 39);
-                    assertTrue(z >= 0 && z <= 7.801);
+                    assertThat(y >= 35 && y <= 39).isTrue();
+                    assertThat(z >= 0 && z <= 7.801).isTrue();
                 }
                 data.getShort();
             }
-            assertEquals(35, minX, .001);
-            assertEquals(39, maxX, .001);
+            assertThat(minX).isCloseTo(35, org.assertj.core.data.Offset.offset(.001));
+            assertThat(maxX).isCloseTo(39, org.assertj.core.data.Offset.offset(.001));
             Path packageFile = directory.resolve("assembly.3mf");
             FormatTestSupport.write(
                     registry,
@@ -262,13 +262,12 @@ class ManufacturingTest {
                 factory.setNamespaceAware(true);
                 var xml = factory.newDocumentBuilder().parse(zip.getInputStream(zip.getEntry("3D/3dmodel.model")));
                 var objects = xml.getElementsByTagNameNS("*", "object");
-                assertEquals(2, objects.getLength());
-                assertEquals("solidsupport", ((Element) objects.item(1)).getAttribute("type"));
+                assertThat(objects.getLength()).isEqualTo(2);
+                assertThat(((Element) objects.item(1)).getAttribute("type")).isEqualTo("solidsupport");
                 var items = xml.getElementsByTagNameNS("*", "item");
-                assertEquals(2, items.getLength());
-                assertEquals(
-                        ((Element) items.item(0)).getAttribute("transform"),
-                        ((Element) items.item(1)).getAttribute("transform"));
+                assertThat(items.getLength()).isEqualTo(2);
+                assertThat(((Element) items.item(1)).getAttribute("transform"))
+                        .isEqualTo(((Element) items.item(0)).getAttribute("transform"));
             }
         }
     }

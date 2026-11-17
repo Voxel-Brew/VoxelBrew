@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.model.CadDocument;
 import dev.voxelbrew.engine.printing.GcodeJob;
@@ -66,8 +66,8 @@ class EmbeddedPreviewTest {
             work.remove().run();
             controller.clear();
             ui.remove().run();
-            assertEquals(PrintController.State.IDLE, controller.state());
-            assertNull(controller.result());
+            assertThat(controller.state()).isEqualTo(PrintController.State.IDLE);
+            assertThat(controller.result()).isNull();
             controller.restoreEmbedded(current.get());
             finish();
             controller.clear();
@@ -75,8 +75,8 @@ class EmbeddedPreviewTest {
             work.remove().run();
             controller.invalidateGeometry();
             ui.remove().run();
-            assertEquals(PrintController.State.OUTDATED, controller.state());
-            assertNull(controller.result());
+            assertThat(controller.state()).isEqualTo(PrintController.State.OUTDATED);
+            assertThat(controller.result()).isNull();
         }
     }
 
@@ -95,8 +95,8 @@ class EmbeddedPreviewTest {
             controller.documentChanged(current.get());
             controller.restoreEmbedded(current.get());
             finish();
-            assertEquals(PrintController.State.SUCCEEDED, controller.state());
-            assertNotNull(controller.result());
+            assertThat(controller.state()).isEqualTo(PrintController.State.SUCCEEDED);
+            assertThat(controller.result()).isNotNull();
         }
     }
 
@@ -108,7 +108,7 @@ class EmbeddedPreviewTest {
             current.set(current.get().withGcode(Map.of("plate-1", List.of("G21", "G90"))));
             controller.restoreEmbedded(current.get());
             finish();
-            assertEquals(List.of("G21", "G90"), controller.result().job().lines());
+            assertThat(controller.result().job().lines()).isEqualTo(List.of("G21", "G90"));
         }
     }
 
@@ -118,18 +118,18 @@ class EmbeddedPreviewTest {
             failRead = true;
             controller.restoreEmbedded(current.get());
             finish();
-            assertTrue(controller.message().contains("broken job"));
+            assertThat(controller.message().contains("broken job")).isTrue();
             failRead = false;
             controller.restoreEmbedded(current.get());
             finish();
-            assertEquals(PrintController.State.SUCCEEDED, controller.state());
+            assertThat(controller.state()).isEqualTo(PrintController.State.SUCCEEDED);
             controller.clear();
             failRead = true;
             controller.restoreEmbedded(current.get());
             work.remove().run();
             controller.clear();
             ui.remove().run();
-            assertEquals("Ready to slice", controller.message());
+            assertThat(controller.message()).isEqualTo("Ready to slice");
         }
     }
 }

@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -9,15 +9,16 @@ import org.junit.jupiter.api.Test;
 class UiTestShardTest {
     @Test
     void everyRobotMethodBelongsToExactlyOneNonemptyShard() {
-        assertTrue(Arrays.asList(WorkbenchUiTest.class
-                        .getAnnotation(org.junit.jupiter.api.extension.ExtendWith.class)
-                        .value())
-                .contains(UiTestShard.class));
+        assertThat(Arrays.asList(WorkbenchUiTest.class
+                                .getAnnotation(org.junit.jupiter.api.extension.ExtendWith.class)
+                                .value())
+                        .contains(UiTestShard.class))
+                .isTrue();
         var methods = Arrays.stream(WorkbenchUiTest.class.getDeclaredMethods())
                 .filter(method -> method.isAnnotationPresent(Test.class))
                 .map(method -> method.getName())
                 .toList();
-        assertFalse(methods.isEmpty());
+        assertThat(methods.isEmpty()).isFalse();
         for (int count : new int[] {4, 5}) {
             var assigned = new HashSet<String>();
             int minimum = Integer.MAX_VALUE, maximum = 0;
@@ -26,16 +27,21 @@ class UiTestShardTest {
                 var selected = methods.stream()
                         .filter(name -> UiTestShard.shardFor(name, count) == selectedShard)
                         .toList();
-                assertFalse(selected.isEmpty(), "Empty shard " + shard + "/" + count);
+                assertThat(selected.isEmpty())
+                        .as("Empty shard " + shard + "/" + count)
+                        .isFalse();
                 minimum = Math.min(minimum, selected.size());
                 maximum = Math.max(maximum, selected.size());
-                for (String name : selected) assertTrue(assigned.add(name), "Duplicate test " + name);
+                for (String name : selected)
+                    assertThat(assigned.add(name)).as("Duplicate test " + name).isTrue();
             }
-            assertEquals(new HashSet<>(methods), assigned);
-            assertTrue(maximum - minimum <= 1, "Shard sizes must differ by at most one test");
+            assertThat(assigned).isEqualTo(new HashSet<>(methods));
+            assertThat(maximum - minimum <= 1)
+                    .as("Shard sizes must differ by at most one test")
+                    .isTrue();
         }
-        for (String name : methods) assertEquals(1, UiTestShard.shardFor(name, 1));
-        assertThrows(IllegalArgumentException.class, () -> UiTestShard.shardFor("test", 0));
-        assertThrows(IllegalArgumentException.class, () -> UiTestShard.shardFor("missingTest", 5));
+        for (String name : methods) assertThat(UiTestShard.shardFor(name, 1)).isEqualTo(1);
+        assertThatThrownBy(() -> UiTestShard.shardFor("test", 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> UiTestShard.shardFor("missingTest", 5)).isInstanceOf(IllegalArgumentException.class);
     }
 }

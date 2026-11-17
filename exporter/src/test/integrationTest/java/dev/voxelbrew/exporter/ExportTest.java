@@ -1,6 +1,6 @@
 package dev.voxelbrew.exporter;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.exporter.ExporterDescriptor;
 import dev.voxelbrew.engine.geometry.Solid;
@@ -51,18 +51,19 @@ class ExportTest {
             double volume = cut.volume();
             var bounds = cut.bounds();
             detached = cut.tessellate(MeshOptions.DEFAULT);
-            assertEquals(volume, cut.volume(), 1e-10);
-            assertEquals(bounds, cut.bounds());
-            assertEquals(19200, plate.volume(), 1e-9);
+            assertThat(cut.volume()).isCloseTo(volume, org.assertj.core.data.Offset.offset(1e-10));
+            assertThat(cut.bounds()).isEqualTo(bounds);
+            assertThat(plate.volume()).isCloseTo(19200, org.assertj.core.data.Offset.offset(1e-9));
             var coarse = cut.tessellate(new MeshOptions(0.1, 20));
-            assertTrue(detached.triangleCount() > coarse.triangleCount());
+            assertThat(detached.triangleCount() > coarse.triangleCount()).isTrue();
         }
         MeshValidation.requireClosed(detached);
-        assertTrue(Arrays.stream(detached.faceIndices()).distinct().count() >= 7);
+        assertThat(Arrays.stream(detached.faceIndices()).distinct().count() >= 7)
+                .isTrue();
         var original = detached.coordinate(0, 0);
         var vertices = detached.vertices();
         vertices[0] = 999;
-        assertEquals(original, detached.coordinate(0, 0));
+        assertThat(detached.coordinate(0, 0)).isEqualTo(original);
         verifyTriangles(triangles(detached), 0, 0, 0);
     }
 
@@ -79,15 +80,17 @@ class ExportTest {
             var buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
             buffer.position(80);
             int count = buffer.getInt();
-            assertEquals(84 + 50 * count, bytes.length);
+            assertThat(bytes.length).isEqualTo(84 + 50 * count);
             var triangles = new ArrayList<double[][]>();
             for (int i = 0; i < count; i++) {
                 double[] normal = {buffer.getFloat(), buffer.getFloat(), buffer.getFloat()};
                 var points = new double[3][3];
                 for (var point : points) for (int axis = 0; axis < 3; axis++) point[axis] = buffer.getFloat();
-                assertEquals(0, buffer.getShort());
+                assertThat(buffer.getShort()).isEqualTo(0);
                 var cross = cross(points);
-                assertTrue(dot(normal, cross) > 0, "outward normal agrees with winding");
+                assertThat(dot(normal, cross) > 0)
+                        .as("outward normal agrees with winding")
+                        .isTrue();
                 triangles.add(points);
             }
             verifyTriangles(triangles, 25, -7, 3);
@@ -109,8 +112,8 @@ class ExportTest {
             Path destination = directory.resolve("reference.3mf");
             FormatTestSupport.write(registry, "3mf", view, MeshOptions.DEFAULT, Map.of(), destination, false);
             try (var zip = new ZipFile(destination.toFile())) {
-                assertNotNull(zip.getEntry("[Content_Types].xml"));
-                assertNotNull(zip.getEntry("_rels/.rels"));
+                assertThat(zip.getEntry("[Content_Types].xml")).isNotNull();
+                assertThat(zip.getEntry("_rels/.rels")).isNotNull();
                 var factory = DocumentBuilderFactory.newInstance();
                 factory.setNamespaceAware(true);
                 factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
@@ -118,13 +121,15 @@ class ExportTest {
                 var rels = builder.parse(zip.getInputStream(zip.getEntry("_rels/.rels")));
                 var relationship = (Element)
                         rels.getElementsByTagNameNS("*", "Relationship").item(0);
-                assertEquals("/3D/3dmodel.model", relationship.getAttribute("Target"));
+                assertThat(relationship.getAttribute("Target")).isEqualTo("/3D/3dmodel.model");
                 var model = builder.parse(zip.getInputStream(zip.getEntry("3D/3dmodel.model")));
-                assertEquals("millimeter", model.getDocumentElement().getAttribute("unit"));
-                assertEquals(1, model.getElementsByTagNameNS("*", "object").getLength());
-                assertEquals(
-                        "thickness.body",
-                        ((Element) model.getElementsByTagNameNS("*", "object").item(0)).getAttribute("name"));
+                assertThat(model.getDocumentElement().getAttribute("unit")).isEqualTo("millimeter");
+                assertThat(model.getElementsByTagNameNS("*", "object").getLength())
+                        .isEqualTo(1);
+                assertThat(((Element) model.getElementsByTagNameNS("*", "object")
+                                        .item(0))
+                                .getAttribute("name"))
+                        .isEqualTo("thickness.body");
                 var vertexNodes = model.getElementsByTagNameNS("*", "vertex");
                 var points = new ArrayList<double[]>();
                 for (int i = 0; i < vertexNodes.getLength(); i++) {
@@ -147,15 +152,16 @@ class ExportTest {
                 }
                 verifyTriangles(triangles, 0, 0, 0);
                 var items = model.getElementsByTagNameNS("*", "item");
-                assertEquals(2, items.getLength());
+                assertThat(items.getLength()).isEqualTo(2);
                 for (int i = 0; i < items.getLength(); i++)
-                    assertEquals("1", ((Element) items.item(i)).getAttribute("objectid"));
+                    assertThat(((Element) items.item(i)).getAttribute("objectid"))
+                            .isEqualTo("1");
                 double[] m = Arrays.stream(((Element) items.item(1))
                                 .getAttribute("transform")
                                 .split(" "))
                         .mapToDouble(Double::parseDouble)
                         .toArray();
-                assertEquals(12, m.length);
+                assertThat(m.length).isEqualTo(12);
                 double[] min = {Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY},
                         max = {-1e99, -1e99, -1e99};
                 for (var p : points)
@@ -164,8 +170,8 @@ class ExportTest {
                         min[axis] = Math.min(min[axis], value);
                         max[axis] = Math.max(max[axis], value);
                     }
-                assertArrayEquals(new double[] {60, 20, 3}, min, 0.001);
-                assertArrayEquals(new double[] {100, 80, 11}, max, 0.001);
+                assertThat(min).usingComparatorWithPrecision(0.001).containsExactly(new double[] {60, 20, 3});
+                assertThat(max).usingComparatorWithPrecision(0.001).containsExactly(new double[] {100, 80, 11});
             }
         }
     }
@@ -175,8 +181,10 @@ class ExportTest {
         Path plugins = Files.createDirectory(directory.resolve("plugins with spaces"));
         Files.copy(Path.of(System.getProperty("voxelbrew.test.plugin")), plugins.resolve("external provider.jar"));
         try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(plugins)) {
-            assertEquals(
-                    List.of(
+            assertThat(registry.descriptors().stream()
+                            .map(ExporterDescriptor::id)
+                            .toList())
+                    .isEqualTo(List.of(
                             "3mf",
                             "document-probe",
                             "failing",
@@ -187,27 +195,24 @@ class ExportTest {
                             "prusa-project",
                             "step",
                             "stl",
-                            "vxb"),
-                    registry.descriptors().stream().map(ExporterDescriptor::id).toList());
+                            "vxb"));
             var doc = reference();
             Path target = directory.resolve("report.txt");
             registry.require("document-probe")
                     .create()
                     .export(doc, dev.voxelbrew.util.testing.FileExportWindows.destination(target, false));
-            assertEquals("document=" + doc.id(), Files.readString(target));
+            assertThat(Files.readString(target)).isEqualTo("document=" + doc.id());
             byte[] expected = Files.readAllBytes(target);
-            assertThrows(
-                    java.io.IOException.class,
-                    () -> registry.require("failing")
+            assertThatThrownBy(() -> registry.require("failing")
                             .create()
-                            .export(doc, dev.voxelbrew.util.testing.FileExportWindows.destination(target, true)));
-            assertArrayEquals(expected, Files.readAllBytes(target));
-            assertThrows(
-                    IllegalArgumentException.class,
-                    () -> registry.require("document-probe")
+                            .export(doc, dev.voxelbrew.util.testing.FileExportWindows.destination(target, true)))
+                    .isInstanceOf(java.io.IOException.class);
+            assertThat(Files.readAllBytes(target)).containsExactly(expected);
+            assertThatThrownBy(() -> registry.require("document-probe")
                             .create()
-                            .export(doc, dev.voxelbrew.util.testing.FileExportWindows.destination(target, false)));
-            assertArrayEquals(expected, Files.readAllBytes(target));
+                            .export(doc, dev.voxelbrew.util.testing.FileExportWindows.destination(target, false)))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThat(Files.readAllBytes(target)).containsExactly(expected);
         }
     }
 
@@ -215,11 +220,11 @@ class ExportTest {
     void incompleteDocumentsAreRejected() {
         var doc = reference();
         try (var evaluation = Evaluator.evaluate(new CadDocument(doc.id(), doc.features(), 3))) {
-            assertThrows(IllegalStateException.class, () -> ModelViews.from(evaluation));
+            assertThatThrownBy(() -> ModelViews.from(evaluation)).isInstanceOf(IllegalStateException.class);
         }
         try (var evaluation = Evaluator.evaluate(new CadDocument(
                 "bad", List.of(new Feature.Extrude("bad", new Feature.ProfileRef("missing", "p"), 8)), 1))) {
-            assertThrows(IllegalStateException.class, () -> ModelViews.from(evaluation));
+            assertThatThrownBy(() -> ModelViews.from(evaluation)).isInstanceOf(IllegalStateException.class);
         }
     }
 
@@ -245,13 +250,13 @@ class ExportTest {
             double[][] p = new double[3][3];
             for (int c = 0; c < 3; c++)
                 for (int a = 0; a < 3; a++) {
-                    assertTrue(Double.isFinite(world[c][a]));
+                    assertThat(Double.isFinite(world[c][a])).isTrue();
                     p[c][a] = world[c][a] - new double[] {dx, dy, dz}[a];
                     min[a] = Math.min(min[a], p[c][a]);
                     max[a] = Math.max(max[a], p[c][a]);
                 }
             double[] cross = cross(p);
-            assertTrue(dot(cross, cross) > 1e-20);
+            assertThat(dot(cross, cross) > 1e-20).isTrue();
             volume += dot(p[0], new double[] {
                         p[1][1] * p[2][2] - p[1][2] * p[2][1],
                         p[1][2] * p[2][0] - p[1][0] * p[2][2],
@@ -276,16 +281,16 @@ class ExportTest {
                 for (double fraction : new double[] {0, 0.5, 1}) {
                     double x = section.get(0)[0] * (1 - fraction) + section.get(1)[0] * fraction,
                             y = section.get(0)[1] * (1 - fraction) + section.get(1)[1] * fraction;
-                    assertEquals(2, Math.hypot(x - 10, y - 10), 0.021);
+                    assertThat(Math.hypot(x - 10, y - 10)).isCloseTo(2, org.assertj.core.data.Offset.offset(0.021));
                 }
             }
         }
-        assertArrayEquals(new double[] {0, 0, 0}, min, 0.001);
-        assertArrayEquals(new double[] {60, 40, 8}, max, 0.001);
-        assertEquals(19099.469035085127, volume, 0.5);
-        assertTrue(holeSegments >= 16);
-        assertTrue(undirected.values().stream().allMatch(n -> n == 2));
-        assertTrue(directed.values().stream().allMatch(n -> n == 0));
+        assertThat(min).usingComparatorWithPrecision(0.001).containsExactly(new double[] {0, 0, 0});
+        assertThat(max).usingComparatorWithPrecision(0.001).containsExactly(new double[] {60, 40, 8});
+        assertThat(volume).isCloseTo(19099.469035085127, org.assertj.core.data.Offset.offset(0.5));
+        assertThat(holeSegments >= 16).isTrue();
+        assertThat(undirected.values().stream().allMatch(n -> n == 2)).isTrue();
+        assertThat(directed.values().stream().allMatch(n -> n == 0)).isTrue();
     }
 
     private static String key(double[] p) {

@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine.model;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import java.util.List;
@@ -13,11 +13,11 @@ class BodyStyleTest {
 
     @Test
     void validatesOpaqueColorsAndCustomMaterialLabels() {
-        assertEquals(new BodyStyle("Nylon CF", "#ABCDEF"), new BodyStyle("  Nylon CF  ", "#abcdef"));
-        assertThrows(IllegalArgumentException.class, () -> new BodyStyle("PLA", "red"));
-        assertThrows(IllegalArgumentException.class, () -> new BodyStyle("PLA", "#FF000080"));
-        assertThrows(IllegalArgumentException.class, () -> new BodyStyle("PET\nG", "#FF0000"));
-        assertThrows(IllegalArgumentException.class, () -> new BodyStyle("x".repeat(65), "#FF0000"));
+        assertThat(new BodyStyle("  Nylon CF  ", "#abcdef")).isEqualTo(new BodyStyle("Nylon CF", "#ABCDEF"));
+        assertThatThrownBy(() -> new BodyStyle("PLA", "red")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new BodyStyle("PLA", "#FF000080")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new BodyStyle("PET\nG", "#FF0000")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new BodyStyle("x".repeat(65), "#FF0000")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -26,27 +26,28 @@ class BodyStyleTest {
         session.setBodyStyle("one.body", RED_PETG);
         long revision = session.revision();
         session.setBodyStyle("one.body", RED_PETG);
-        assertEquals(revision, session.revision(), "Identical assignments create no history entry");
+        assertThat(session.revision())
+                .as("Identical assignments create no history entry")
+                .isEqualTo(revision);
         session.setBodyStyle("two.body", BLUE_PLA);
         var saved = session.document();
         session.setCursor(0);
         session.undo();
-        assertEquals(RED_PETG, session.document().bodyStyle("one.body"));
-        assertEquals(BodyStyle.DEFAULT, session.document().bodyStyle("two.body"));
+        assertThat(session.document().bodyStyle("one.body")).isEqualTo(RED_PETG);
+        assertThat(session.document().bodyStyle("two.body")).isEqualTo(BodyStyle.DEFAULT);
         session.redo();
-        assertEquals(saved, session.document());
+        assertThat(session.document()).isEqualTo(saved);
         session.setParameters(
                 saved.parameters().put("width", dev.voxelbrew.engine.parameters.ParameterUnit.MM, "10", ""));
-        assertEquals(saved.bodyStyles(), session.document().bodyStyles());
+        assertThat(session.document().bodyStyles()).isEqualTo(saved.bodyStyles());
         session.setBodyStyle("one.body", null);
-        assertEquals(BodyStyle.DEFAULT, session.document().bodyStyle("one.body"));
+        assertThat(session.document().bodyStyle("one.body")).isEqualTo(BodyStyle.DEFAULT);
         session.undo();
-        assertEquals(RED_PETG, session.document().bodyStyle("one.body"));
-        assertThrows(
-                UnsupportedOperationException.class, () -> saved.bodyStyles().clear());
+        assertThat(session.document().bodyStyle("one.body")).isEqualTo(RED_PETG);
+        assertThatThrownBy(() -> saved.bodyStyles().clear()).isInstanceOf(UnsupportedOperationException.class);
         String longestFeatureBody = "a".repeat(128) + ".body";
         session.setBodyStyle(longestFeatureBody, BLUE_PLA);
-        assertEquals(BLUE_PLA, session.document().bodyStyle(longestFeatureBody));
+        assertThat(session.document().bodyStyle(longestFeatureBody)).isEqualTo(BLUE_PLA);
     }
 
     @Test
@@ -63,31 +64,30 @@ class BodyStyleTest {
                 dev.voxelbrew.engine.parameters.ParameterSet.empty(),
                 Map.of("base.body", RED_PETG, "split.positive", BLUE_PLA));
         var reopened = DocumentCodec.decode(DocumentCodec.encode(document));
-        assertEquals(document, reopened);
-        assertEquals(RED_PETG, reopened.bodyStyle("split.negative"));
-        assertEquals(BLUE_PLA, reopened.bodyStyle("split.positive"));
+        assertThat(reopened).isEqualTo(document);
+        assertThat(reopened.bodyStyle("split.negative")).isEqualTo(RED_PETG);
+        assertThat(reopened.bodyStyle("split.positive")).isEqualTo(BLUE_PLA);
         var session = new ModelSession(reopened);
         session.setBodyStyle("split.positive", null);
-        assertEquals(RED_PETG, session.document().bodyStyle("split.positive"));
-        assertNotEquals(DocumentCodec.fingerprint(document), DocumentCodec.fingerprint(session.document()));
+        assertThat(session.document().bodyStyle("split.positive")).isEqualTo(RED_PETG);
+        assertThat(DocumentCodec.fingerprint(session.document())).isNotEqualTo(DocumentCodec.fingerprint(document));
         session.setBodyStyle("base.body", new BodyStyle("TPU", "#00FF00"));
-        assertEquals("TPU", session.document().bodyStyle("split.negative").material());
+        assertThat(session.document().bodyStyle("split.negative").material()).isEqualTo("TPU");
         var reverse = new java.util.LinkedHashMap<String, BodyStyle>();
         reverse.put("split.positive", BLUE_PLA);
         reverse.put("base.body", RED_PETG);
-        assertArrayEquals(
-                DocumentCodec.encode(document),
-                DocumentCodec.encode(new CadDocument(
+        assertThat(DocumentCodec.encode(new CadDocument(
                         document.id(),
                         document.features(),
                         document.cursor(),
                         document.printSetup(),
                         document.parameters(),
-                        reverse)));
+                        reverse)))
+                .containsExactly(DocumentCodec.encode(document));
         var cyclic = new CadDocument(
                 "cyclic",
                 List.of(new Feature.SplitBody("split", new Feature.BodyRef("split", "negative"), split.plane())),
                 1);
-        assertEquals(BodyStyle.DEFAULT, cyclic.bodyStyle("split.negative"));
+        assertThat(cyclic.bodyStyle("split.negative")).isEqualTo(BodyStyle.DEFAULT);
     }
 }

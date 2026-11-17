@@ -1,6 +1,6 @@
 package dev.voxelbrew.slicer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.mesh.*;
 import dev.voxelbrew.engine.model.*;
@@ -114,31 +114,35 @@ class SlicerAcceptanceTest {
     @Test
     void automaticManualAndBlockedSupportsSurviveProjectAndDocumentRoundTrip() throws Exception {
         var shelf = shelf(false);
-        assertTrue(support(slice(shelf, "shelf-off")).isEmpty());
+        assertThat(support(slice(shelf, "shelf-off")).isEmpty()).isTrue();
         process(shelf, 2, 20, true, false, .2, 3, 0, 0, "PLA");
         var automatic = slice(shelf, "shelf-auto");
-        assertTrue(support(automatic).stream().anyMatch(s -> s.z1() > 4 && s.z1() < 6 && inside(s, 35, 33, 45, 67)));
+        assertThat(support(automatic).stream().anyMatch(s -> s.z1() > 4 && s.z1() < 6 && inside(s, 35, 33, 45, 67)))
+                .isTrue();
         var cube = cube();
         process(cube, 2, 20, true, false, .2, 3, 0, 0, "PLA");
-        assertTrue(support(slice(cube, "cube-auto")).isEmpty());
+        assertThat(support(slice(cube, "cube-auto")).isEmpty()).isTrue();
         process(shelf, 2, 20, false, false, .2, 3, 0, 0, "PLA");
         shelf.setPrintSetup(shelf.document()
                 .printSetup()
                 .withSupports(List.of(
                         new SupportVolume("region-A", "roof", SupportVolume.Role.ENFORCER, 10, 0, 0, 20, 20, 12))));
         var enforced = slice(shelf, "shelf-enforced-A");
-        assertTrue(support(enforced).stream().anyMatch(s -> s.z1() > 4 && s.z1() < 6 && inside(s, 35, 33, 45, 47)));
-        assertFalse(support(enforced).stream().anyMatch(s -> s.z1() > 4 && s.z1() < 6 && inside(s, 35, 55, 45, 65)));
+        assertThat(support(enforced).stream().anyMatch(s -> s.z1() > 4 && s.z1() < 6 && inside(s, 35, 33, 45, 47)))
+                .isTrue();
+        assertThat(support(enforced).stream().anyMatch(s -> s.z1() > 4 && s.z1() < 6 && inside(s, 35, 55, 45, 65)))
+                .isFalse();
         process(shelf, 2, 20, true, false, .2, 3, 0, 0, "PLA");
         shelf.setPrintSetup(shelf.document()
                 .printSetup()
                 .withSupports(List.of(
                         new SupportVolume("region-B", "roof", SupportVolume.Role.BLOCKER, 10, 20, 0, 20, 20, 12))));
         var blocked = slice(shelf, "shelf-blocked-B");
-        assertFalse(support(blocked).stream().anyMatch(s -> s.z1() > 4 && s.z1() < 6 && inside(s, 35, 55, 45, 65)));
+        assertThat(support(blocked).stream().anyMatch(s -> s.z1() > 4 && s.z1() < 6 && inside(s, 35, 55, 45, 65)))
+                .isFalse();
         var reopened = new ModelSession(DocumentReader.load(artifacts.resolve("shelf-blocked-B.vxb")));
         var again = slice(reopened, "shelf-reopened");
-        assertEquals(support(blocked), support(again));
+        assertThat(support(again)).isEqualTo(support(blocked));
         var model =
                 dev.voxelbrew.engine.printing.ManufacturingModels.evaluate(reopened.document(), MeshOptions.DEFAULT);
         Path project = artifacts.resolve("shelf-project.3mf");
@@ -162,8 +166,8 @@ class SlicerAcceptanceTest {
                     new Cancellation(),
                     line -> {});
             var job = GcodeReader.read(output);
-            assertEquals(support(blocked), support(job));
-            assertEquals(blocked.modelLayers(), job.modelLayers());
+            assertThat(support(job)).isEqualTo(support(blocked));
+            assertThat(job.modelLayers()).isEqualTo(blocked.modelLayers());
         }
     }
 
@@ -172,15 +176,18 @@ class SlicerAcceptanceTest {
         var shelf = shelf(true);
         process(shelf, 2, 20, true, true, .2, 3, 0, 0, "PLA");
         var bed = slice(shelf, "recess-bed-only");
-        assertFalse(support(bed).stream().anyMatch(s -> inside(s, 35, 35, 45, 65)));
+        assertThat(support(bed).stream().anyMatch(s -> inside(s, 35, 35, 45, 65)))
+                .isFalse();
         process(shelf, 2, 20, true, false, .2, 3, 0, 0, "PLA");
         var everywhere = slice(shelf, "recess-everywhere");
         var region = support(everywhere).stream()
                 .filter(s -> inside(s, 35, 35, 45, 65))
                 .toList();
-        assertFalse(region.isEmpty());
+        assertThat(region.isEmpty()).isFalse();
         double first = region.stream().mapToDouble(GcodeJob.Segment::z1).min().orElseThrow();
-        assertTrue(first > 2 && first < 3, "support starts above lower shelf: " + first);
+        assertThat(first > 2 && first < 3)
+                .as("support starts above lower shelf: " + first)
+                .isTrue();
         var open = shelf(false);
         process(open, 2, 20, true, false, .2, 3, 0, 0, "PLA");
         var close = slice(open, "gap-02-interface-3");
@@ -192,23 +199,21 @@ class SlicerAcceptanceTest {
                 .mapToDouble(GcodeJob.Segment::z1)
                 .max()
                 .orElseThrow();
-        assertEquals(.2, 10 - closeTop, .001);
-        assertEquals(.6, 10 - distantTop, .001);
+        assertThat(10 - closeTop).isCloseTo(.2, org.assertj.core.data.Offset.offset(.001));
+        assertThat(10 - distantTop).isCloseTo(.6, org.assertj.core.data.Offset.offset(.001));
         // With independent support heights, the pinned slicer emits three slab levels plus contact.
-        assertEquals(
-                4,
-                support(close).stream()
+        assertThat(support(close).stream()
                         .filter(s -> s.role() == GcodeJob.Role.INTERFACE)
                         .map(GcodeJob.Segment::z1)
                         .distinct()
-                        .count());
-        assertEquals(
-                2,
-                support(distant).stream()
+                        .count())
+                .isEqualTo(4);
+        assertThat(support(distant).stream()
                         .filter(s -> s.role() == GcodeJob.Role.INTERFACE)
                         .map(GcodeJob.Segment::z1)
                         .distinct()
-                        .count());
+                        .count())
+                .isEqualTo(2);
     }
 
     @Test
@@ -218,23 +223,27 @@ class SlicerAcceptanceTest {
         var two = slice(cube, "cube-two-walls");
         process(cube, 4, 0, false, false, .2, 3, 0, 0, "PETG");
         var four = slice(cube, "cube-four-walls-petg");
-        assertEquals(2, wallCrossings(two));
-        assertEquals(4, wallCrossings(four));
-        assertFalse(interior(two).stream().anyMatch(s -> s.role() == GcodeJob.Role.INFILL));
-        assertEquals("PETG", four.report().get("material"));
-        assertEquals("240.0", four.report().get("process.temperature"));
+        assertThat(wallCrossings(two)).isEqualTo(2);
+        assertThat(wallCrossings(four)).isEqualTo(4);
+        assertThat(interior(two).stream().anyMatch(s -> s.role() == GcodeJob.Role.INFILL))
+                .isFalse();
+        assertThat(four.report().get("material")).isEqualTo("PETG");
+        assertThat(four.report().get("process.temperature")).isEqualTo("240.0");
         process(cube, 4, 20, false, false, .2, 3, 0, 0, "PLA");
         var filled = slice(cube, "cube-filled");
-        assertTrue(interior(filled).stream().anyMatch(s -> s.role() == GcodeJob.Role.INFILL));
+        assertThat(interior(filled).stream().anyMatch(s -> s.role() == GcodeJob.Role.INFILL))
+                .isTrue();
         process(cube, 2, 20, false, false, .2, 3, 3, 0, "PLA");
         var brim = slice(cube, "cube-brim");
-        assertTrue(brim.segments().stream()
-                .anyMatch(s -> s.deposits() && s.role() == GcodeJob.Role.SKIRT_BRIM && s.x1() < 20));
+        assertThat(brim.segments().stream()
+                        .anyMatch(s -> s.deposits() && s.role() == GcodeJob.Role.SKIRT_BRIM && s.x1() < 20))
+                .isTrue();
         process(cube, 2, 20, false, false, .2, 3, 0, 3, "PLA");
         var raft = slice(cube, "cube-raft");
-        assertTrue(raft.modelLayers().getFirst() > .2);
-        assertTrue(
-                support(raft).stream().anyMatch(s -> s.z1() < raft.modelLayers().getFirst()));
+        assertThat(raft.modelLayers().getFirst() > .2).isTrue();
+        assertThat(support(raft).stream()
+                        .anyMatch(s -> s.z1() < raft.modelLayers().getFirst()))
+                .isTrue();
     }
 
     @Test
@@ -251,7 +260,7 @@ class SlicerAcceptanceTest {
                     .mapToDouble(b -> b.solid().volume())
                     .sum();
         }
-        assertEquals(6400, volume, .01);
+        assertThat(volume).isCloseTo(6400, org.assertj.core.data.Offset.offset(.01));
         var model = dev.voxelbrew.engine.printing.ManufacturingModels.evaluate(session.document(), MeshOptions.DEFAULT);
         Path roof = artifacts.resolve("handoff-model.stl"),
                 leg = artifacts.resolve("handoff-leg.stl"),
@@ -326,26 +335,29 @@ class SlicerAcceptanceTest {
                 new Cancellation(),
                 line -> {});
         var job = GcodeReader.read(jobFile);
-        assertEquals(60, job.modelLayers().size());
+        assertThat(job.modelLayers().size()).isEqualTo(60);
         var underRoof = job.segments().stream()
                 .filter(s -> s.deposits() && s.role().model() && s.z1() < 10 && inside(s, 34.9, 34.9, 39.1, 39.1))
                 .toList();
-        assertFalse(underRoof.isEmpty());
-        assertEquals(
-                9.8, underRoof.stream().mapToDouble(GcodeJob.Segment::z1).max().orElseThrow(), .001);
-        assertTrue(underRoof.stream().anyMatch(s -> Math.abs(s.z1() - 5) < 1e-6));
+        assertThat(underRoof.isEmpty()).isFalse();
+        assertThat(underRoof.stream().mapToDouble(GcodeJob.Segment::z1).max().orElseThrow())
+                .isCloseTo(9.8, org.assertj.core.data.Offset.offset(.001));
+        assertThat(underRoof.stream().anyMatch(s -> Math.abs(s.z1() - 5) < 1e-6))
+                .isTrue();
         for (var s : job.segments())
             if (s.deposits() && s.role().model()) {
-                assertTrue(s.x1() >= 19.999 && s.x1() <= 50.001, s.toString());
-                assertTrue(s.y1() >= 29.999 && s.y1() <= 70.001, s.toString());
+                assertThat(s.x1() >= 19.999 && s.x1() <= 50.001)
+                        .as(s.toString())
+                        .isTrue();
+                assertThat(s.y1() >= 29.999 && s.y1() <= 70.001)
+                        .as(s.toString())
+                        .isTrue();
             }
         try (var evaluation = session.evaluate()) {
-            assertEquals(
-                    volume,
-                    evaluation.bodies().stream()
+            assertThat(evaluation.bodies().stream()
                             .mapToDouble(b -> b.solid().volume())
-                            .sum(),
-                    .001);
+                            .sum())
+                    .isCloseTo(volume, org.assertj.core.data.Offset.offset(.001));
         }
     }
 
@@ -386,30 +398,30 @@ class SlicerAcceptanceTest {
                 new Cancellation(),
                 line -> {});
         var job = GcodeReader.read(output);
-        assertEquals(40, job.modelLayers().size());
+        assertThat(job.modelLayers().size()).isEqualTo(40);
         var layer = job.segments().stream()
                 .filter(s -> s.deposits() && s.role().model() && Math.abs(s.z1() - 4) < 1e-6)
                 .toList();
         for (int part = 0; part < 2; part++) {
             final boolean rotated = part == 1;
             var paths = layer.stream().filter(s -> (s.x1() > 100) == rotated).toList();
-            assertFalse(paths.isEmpty());
+            assertThat(paths.isEmpty()).isFalse();
             double minX = rotated ? 110 : 20, maxX = rotated ? 150 : 80, maxY = rotated ? 90 : 70;
-            assertEquals(
-                    minX, paths.stream().mapToDouble(GcodeJob.Segment::x1).min().orElseThrow(), .3);
-            assertEquals(
-                    maxX, paths.stream().mapToDouble(GcodeJob.Segment::x1).max().orElseThrow(), .3);
-            assertEquals(
-                    30, paths.stream().mapToDouble(GcodeJob.Segment::y1).min().orElseThrow(), .3);
-            assertEquals(
-                    maxY, paths.stream().mapToDouble(GcodeJob.Segment::y1).max().orElseThrow(), .3);
+            assertThat(paths.stream().mapToDouble(GcodeJob.Segment::x1).min().orElseThrow())
+                    .isCloseTo(minX, org.assertj.core.data.Offset.offset(.3));
+            assertThat(paths.stream().mapToDouble(GcodeJob.Segment::x1).max().orElseThrow())
+                    .isCloseTo(maxX, org.assertj.core.data.Offset.offset(.3));
+            assertThat(paths.stream().mapToDouble(GcodeJob.Segment::y1).min().orElseThrow())
+                    .isCloseTo(30, org.assertj.core.data.Offset.offset(.3));
+            assertThat(paths.stream().mapToDouble(GcodeJob.Segment::y1).max().orElseThrow())
+                    .isCloseTo(maxY, org.assertj.core.data.Offset.offset(.3));
             double holeX = rotated ? 140 : 30;
             for (var s : paths) {
                 double dx = s.x1() - s.x0(), dy = s.y1() - s.y0();
                 double t = Math.max(0, Math.min(1, ((holeX - s.x0()) * dx + (40 - s.y0()) * dy) / (dx * dx + dy * dy)));
-                assertTrue(
-                        Math.hypot(s.x0() + t * dx - holeX, s.y0() + t * dy - 40) - s.width() / 2 >= 1.95,
-                        "deposited bead enters transformed hole: " + s);
+                assertThat(Math.hypot(s.x0() + t * dx - holeX, s.y0() + t * dy - 40) - s.width() / 2 >= 1.95)
+                        .as("deposited bead enters transformed hole: " + s)
+                        .isTrue();
             }
         }
     }
@@ -418,7 +430,7 @@ class SlicerAcceptanceTest {
         var data = java.nio.ByteBuffer.wrap(Files.readAllBytes(file)).order(java.nio.ByteOrder.LITTLE_ENDIAN);
         data.position(80);
         int count = data.getInt();
-        assertEquals(84 + 50 * count, data.capacity());
+        assertThat(data.capacity()).isEqualTo(84 + 50 * count);
         double[] vertices = new double[9 * count];
         int[] triangles = new int[3 * count];
         for (int t = 0; t < count; t++) {

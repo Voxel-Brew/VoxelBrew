@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.util.i18n.Translations;
 import java.util.HashSet;
@@ -18,59 +18,59 @@ class KeyboardShortcutsTest {
                 .findFirst()
                 .orElseThrow();
         var letter = new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.K, false, false, false, false);
-        assertTrue(binding.matches(letter, false));
-        assertFalse(binding.matches(letter, true));
-        assertEquals("K", KeyboardShortcuts.letter("constraint-finish").orElseThrow());
+        assertThat(binding.matches(letter, false)).isTrue();
+        assertThat(binding.matches(letter, true)).isFalse();
+        assertThat(KeyboardShortcuts.letter("constraint-finish").orElseThrow()).isEqualTo("K");
         boolean mac = System.getProperty("os.name").startsWith("Mac");
         var enter = new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, !mac, false, mac);
-        assertTrue(binding.matches(enter, true));
-        assertFalse(
-                binding.matches(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.K, false, true, true, false), true));
+        assertThat(binding.matches(enter, true)).isTrue();
+        assertThat(binding.matches(
+                        new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.K, false, true, true, false), true))
+                .isFalse();
     }
 
     @Test
     void operationsMenuAllowsActionsWithoutKeyboardBindings() {
         for (var id : List.of("fillet", "chamfer", "shell")) {
-            assertTrue(KeyboardShortcuts.menuAccelerator(id).isEmpty(), id);
-            assertTrue(KeyboardShortcuts.menuAccelerator("menu-" + id).isEmpty(), id);
+            assertThat(KeyboardShortcuts.menuAccelerator(id).isEmpty()).as(id).isTrue();
+            assertThat(KeyboardShortcuts.menuAccelerator("menu-" + id).isEmpty())
+                    .as(id)
+                    .isTrue();
         }
         for (var id : List.of("extrude", "cut", "split-body")) {
-            assertEquals(
-                    KeyboardShortcuts.primary(id),
-                    KeyboardShortcuts.menuAccelerator(id).orElseThrow());
+            assertThat(KeyboardShortcuts.menuAccelerator(id).orElseThrow()).isEqualTo(KeyboardShortcuts.primary(id));
         }
     }
 
     @Test
     void menuAcceleratorsPreserveEveryRegisteredShortcutAndMirrorPrefix() {
         for (var binding : KeyboardShortcuts.BINDINGS) {
-            assertEquals(
-                    binding.keys().getFirst(),
-                    KeyboardShortcuts.menuAccelerator(binding.id()).orElseThrow());
-            assertEquals(
-                    binding.keys().getFirst(),
-                    KeyboardShortcuts.menuAccelerator("menu-" + binding.id()).orElseThrow());
+            assertThat(KeyboardShortcuts.menuAccelerator(binding.id()).orElseThrow())
+                    .isEqualTo(binding.keys().getFirst());
+            assertThat(KeyboardShortcuts.menuAccelerator("menu-" + binding.id()).orElseThrow())
+                    .isEqualTo(binding.keys().getFirst());
         }
     }
 
     @Test
     void futureMenuActionsCanOmitShortcutsWhileRequiredLookupsRemainStrict() {
-        assertTrue(KeyboardShortcuts.menuAccelerator("unbound-action").isEmpty());
-        assertThrows(RuntimeException.class, () -> KeyboardShortcuts.primary("unbound-action"));
+        assertThat(KeyboardShortcuts.menuAccelerator("unbound-action").isEmpty())
+                .isTrue();
+        assertThatThrownBy(() -> KeyboardShortcuts.primary("unbound-action")).isInstanceOf(RuntimeException.class);
     }
 
     @Test
     void modelingKeysRequireExactModifiersAndDoNotHijackCopyOrAltGr() {
-        assertEquals("constrained-sketch", match(KeyCode.K, false, false, false));
-        assertNull(match(KeyCode.R, false, false, false));
-        assertEquals("construction-menu", match(KeyCode.C, false, false, false));
-        assertEquals("operations-menu", match(KeyCode.O, false, false, false));
-        assertNull(match(KeyCode.O, false, true, false));
-        assertNull(match(KeyCode.C, false, true, false));
-        assertNull(match(KeyCode.C, false, true, true));
-        assertNull(match(KeyCode.C, true, false, false));
-        assertEquals("view-top", match(KeyCode.DIGIT1, false, false, false));
-        assertNull(match(KeyCode.DIGIT1, false, true, false));
+        assertThat(match(KeyCode.K, false, false, false)).isEqualTo("constrained-sketch");
+        assertThat(match(KeyCode.R, false, false, false)).isNull();
+        assertThat(match(KeyCode.C, false, false, false)).isEqualTo("construction-menu");
+        assertThat(match(KeyCode.O, false, false, false)).isEqualTo("operations-menu");
+        assertThat(match(KeyCode.O, false, true, false)).isNull();
+        assertThat(match(KeyCode.C, false, true, false)).isNull();
+        assertThat(match(KeyCode.C, false, true, true)).isNull();
+        assertThat(match(KeyCode.C, true, false, false)).isNull();
+        assertThat(match(KeyCode.DIGIT1, false, false, false)).isEqualTo("view-top");
+        assertThat(match(KeyCode.DIGIT1, false, true, false)).isNull();
     }
 
     @Test
@@ -78,7 +78,8 @@ class KeyboardShortcutsTest {
         boolean mac = System.getProperty("os.name").startsWith("Mac");
         for (var code : List.of(KeyCode.DIGIT1, KeyCode.DIGIT3, KeyCode.DIGIT4, KeyCode.DIGIT9)) {
             var event = new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, !mac, false, mac);
-            assertEquals("workspace-number", KeyboardShortcuts.match(KeyboardShortcuts.Scope.DOCUMENT, event, null));
+            assertThat(KeyboardShortcuts.match(KeyboardShortcuts.Scope.DOCUMENT, event, null))
+                    .isEqualTo("workspace-number");
         }
     }
 
@@ -86,12 +87,11 @@ class KeyboardShortcutsTest {
     void rectangleAndCircleShortcutsExistOnlyInsideTheSketchEditor() {
         for (var entry : java.util.Map.of(KeyCode.R, "sketch-tool-rectangle", KeyCode.C, "sketch-tool-circle")
                 .entrySet())
-            assertEquals(
-                    entry.getValue(),
-                    KeyboardShortcuts.match(
+            assertThat(KeyboardShortcuts.match(
                             KeyboardShortcuts.Scope.SKETCH,
                             new KeyEvent(KeyEvent.KEY_PRESSED, "", "", entry.getKey(), false, false, false, false),
-                            null));
+                            null))
+                    .isEqualTo(entry.getValue());
     }
 
     @Test
@@ -102,13 +102,16 @@ class KeyboardShortcutsTest {
                 if (binding.scope() != scope
                         && !(scope == KeyboardShortcuts.Scope.DESIGN
                                 && binding.scope() == KeyboardShortcuts.Scope.DOCUMENT)) continue;
-                for (var key : binding.keys()) assertTrue(combinations.add(key), binding.id());
+                for (var key : binding.keys())
+                    assertThat(combinations.add(key)).as(binding.id()).isTrue();
                 for (var language : List.of(Locale.ENGLISH, Locale.forLanguageTag("pl"))) {
                     var translations = new Translations(language);
-                    assertFalse(UiHelp.description(translations, binding.id()).isBlank());
-                    assertFalse(translations
-                            .text("shortcuts.section." + scope.name())
-                            .isBlank());
+                    assertThat(UiHelp.description(translations, binding.id()).isBlank())
+                            .isFalse();
+                    assertThat(translations
+                                    .text("shortcuts.section." + scope.name())
+                                    .isBlank())
+                            .isFalse();
                 }
             }
         }

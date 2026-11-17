@@ -1,6 +1,6 @@
 package dev.voxelbrew.slicer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.mesh.*;
 import dev.voxelbrew.engine.model.*;
@@ -45,13 +45,12 @@ class PrintingTest {
                 .withSupportsDisabled(true);
         session.setPrintSetup(setup);
         var model = ManufacturingModels.evaluate(session.document(), MeshOptions.DEFAULT);
-        assertTrue(model.setup().supports().isEmpty());
-        assertEquals("0", PrusaConfiguration.settings(model).get("support_material"));
-        assertEquals("0", PrusaConfiguration.settings(model).get("raft_layers"));
-        assertEquals(
-                1,
-                PrusaProjectExporter.volumes(model, model.instances().getFirst())
-                        .size());
+        assertThat(model.setup().supports().isEmpty()).isTrue();
+        assertThat(PrusaConfiguration.settings(model).get("support_material")).isEqualTo("0");
+        assertThat(PrusaConfiguration.settings(model).get("raft_layers")).isEqualTo("0");
+        assertThat(PrusaProjectExporter.volumes(model, model.instances().getFirst())
+                        .size())
+                .isEqualTo(1);
         var result = SliceService.slice(
                 new PrusaSlicerBackend(),
                 session.document(),
@@ -62,16 +61,19 @@ class PrintingTest {
                 new Cancellation(),
                 System.out::println,
                 dev.voxelbrew.slicer.api.Slicing.DIRECT);
-        assertFalse(result.job().segments().stream()
-                .anyMatch(segment -> segment.deposits()
-                        && (segment.role() == GcodeJob.Role.SUPPORT || segment.role() == GcodeJob.Role.INTERFACE)));
-        assertEquals(0.2, result.job().modelLayers().getFirst(), 1e-6);
-        assertEquals(2, session.document().printSetup().supports().size());
-        assertTrue(session.document()
-                .printSetup()
-                .withSupportsDisabled(false)
-                .process()
-                .automaticSupports());
+        assertThat(result.job().segments().stream()
+                        .anyMatch(segment -> segment.deposits()
+                                && (segment.role() == GcodeJob.Role.SUPPORT
+                                        || segment.role() == GcodeJob.Role.INTERFACE)))
+                .isFalse();
+        assertThat(result.job().modelLayers().getFirst()).isCloseTo(0.2, org.assertj.core.data.Offset.offset(1e-6));
+        assertThat(session.document().printSetup().supports().size()).isEqualTo(2);
+        assertThat(session.document()
+                        .printSetup()
+                        .withSupportsDisabled(false)
+                        .process()
+                        .automaticSupports())
+                .isTrue();
     }
 
     @Test
@@ -90,25 +92,31 @@ class PrintingTest {
                 System.out::println,
                 dev.voxelbrew.slicer.api.Slicing.DIRECT);
         var job = result.job();
-        assertEquals(40, job.modelLayers().size());
-        assertEquals(0.2, job.modelLayers().getFirst(), 1e-6);
-        assertEquals(8, job.modelLayers().getLast(), 1e-6);
-        assertEquals("PLA", job.report().get("material"));
-        assertEquals(model.revision(), job.report().get("revision"));
-        assertTrue(job.filamentMm().orElseThrow() > 0);
-        assertTrue(job.estimatedTime().isPresent());
+        assertThat(job.modelLayers().size()).isEqualTo(40);
+        assertThat(job.modelLayers().getFirst()).isCloseTo(0.2, org.assertj.core.data.Offset.offset(1e-6));
+        assertThat(job.modelLayers().getLast()).isCloseTo(8, org.assertj.core.data.Offset.offset(1e-6));
+        assertThat(job.report().get("material")).isEqualTo("PLA");
+        assertThat(job.report().get("revision")).isEqualTo(model.revision());
+        assertThat(job.filamentMm().orElseThrow() > 0).isTrue();
+        assertThat(job.estimatedTime().isPresent()).isTrue();
         var layer = job.segments().stream()
                 .filter(s -> s.deposits() && s.role().model() && Math.abs(s.z1() - 4) < 1e-6)
                 .toList();
-        assertFalse(layer.isEmpty());
+        assertThat(layer.isEmpty()).isFalse();
         for (var segment : layer) {
-            assertTrue(segment.x1() >= 19.999 && segment.x1() <= 80.001, segment.toString());
-            assertTrue(segment.y1() >= 29.999 && segment.y1() <= 70.001, segment.toString());
+            assertThat(segment.x1() >= 19.999 && segment.x1() <= 80.001)
+                    .as(segment.toString())
+                    .isTrue();
+            assertThat(segment.y1() >= 29.999 && segment.y1() <= 70.001)
+                    .as(segment.toString())
+                    .isTrue();
             double dx = segment.x1() - segment.x0(), dy = segment.y1() - segment.y0();
             double t = Math.max(
                     0, Math.min(1, ((30 - segment.x0()) * dx + (40 - segment.y0()) * dy) / (dx * dx + dy * dy)));
             double distance = Math.hypot(segment.x0() + t * dx - 30, segment.y0() + t * dy - 40);
-            assertTrue(distance - segment.width() / 2 >= 1.95, "deposited bead enters hole: " + segment);
+            assertThat(distance - segment.width() / 2 >= 1.95)
+                    .as("deposited bead enters hole: " + segment)
+                    .isTrue();
         }
     }
 
@@ -128,9 +136,9 @@ class PrintingTest {
                 new Cancellation(),
                 System.out::println,
                 dev.voxelbrew.slicer.api.Slicing.DIRECT);
-        assertEquals("0.6", result.job().report().get("nozzle_mm"));
-        assertFalse(result.job().modelLayers().isEmpty());
-        assertTrue(Files.size(output) > 0);
+        assertThat(result.job().report().get("nozzle_mm")).isEqualTo("0.6");
+        assertThat(result.job().modelLayers().isEmpty()).isFalse();
+        assertThat(Files.size(output) > 0).isTrue();
     }
 
     @Test
@@ -148,23 +156,23 @@ class PrintingTest {
         Path file = directory.resolve("placements.vxb");
         DocumentWriter.save(session.document(), file, false);
         var reopened = new ModelSession(DocumentReader.load(file));
-        assertEquals(session.document(), reopened.document());
+        assertThat(reopened.document()).isEqualTo(session.document());
         reopened.editDimension("thickness", "distance", 5);
-        assertEquals(setup, reopened.document().printSetup());
+        assertThat(reopened.document().printSetup()).isEqualTo(setup);
         try (var evaluation = reopened.evaluate()) {
             var bounds = evaluation.bodies().getFirst().solid().bounds();
-            assertEquals(0, bounds.minX(), 0.001);
-            assertEquals(60, bounds.maxX(), 0.001);
+            assertThat(bounds.minX()).isCloseTo(0, org.assertj.core.data.Offset.offset(0.001));
+            assertThat(bounds.maxX()).isCloseTo(60, org.assertj.core.data.Offset.offset(0.001));
         }
         var model =
                 dev.voxelbrew.engine.printing.ManufacturingModels.evaluate(reopened.document(), MeshOptions.DEFAULT);
-        assertTrue(
-                PrintValidation.validate(model).valid(),
-                PrintValidation.validate(model).toString());
+        assertThat(PrintValidation.validate(model).valid())
+                .as(PrintValidation.validate(model).toString())
+                .isTrue();
         var before = DocumentCodec.fingerprint(reopened.document());
         reopened.setPrintSetup(setup.withInstances(List.of(first)));
-        assertNotEquals(before, DocumentCodec.fingerprint(reopened.document()));
-        assertTrue(reopened.undo());
-        assertEquals(setup, reopened.document().printSetup());
+        assertThat(DocumentCodec.fingerprint(reopened.document())).isNotEqualTo(before);
+        assertThat(reopened.undo()).isTrue();
+        assertThat(reopened.document().printSetup()).isEqualTo(setup);
     }
 }

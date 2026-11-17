@@ -1,6 +1,6 @@
 package dev.voxelbrew.slicer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.engine.mesh.MeshOptions;
 import dev.voxelbrew.engine.printing.*;
@@ -14,6 +14,7 @@ import java.util.concurrent.CancellationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+@SuppressWarnings("deprecation")
 class SliceLifecycleTest {
     @TempDir
     Path directory;
@@ -26,9 +27,7 @@ class SliceLifecycleTest {
         Files.writeString(output, "original");
         var cancellation = new Cancellation();
         var log = new ArrayList<String>();
-        assertThrows(
-                CancellationException.class,
-                () -> SliceService.slice(
+        assertThatThrownBy(() -> SliceService.slice(
                         new PrusaSlicerBackend(),
                         session.document(),
                         model,
@@ -42,11 +41,12 @@ class SliceLifecycleTest {
                             }
                             if (line.contains("Processing triangulated mesh")) cancellation.cancel();
                         },
-                        dev.voxelbrew.slicer.api.Slicing.DIRECT));
-        assertEquals("original", Files.readString(output));
-        assertTrue(cancellation.cancelled());
+                        dev.voxelbrew.slicer.api.Slicing.DIRECT))
+                .isInstanceOf(CancellationException.class);
+        assertThat(Files.readString(output)).isEqualTo("original");
+        assertThat(cancellation.cancelled()).isTrue();
         try (var paths = Files.list(directory)) {
-            assertEquals(List.of(output), paths.toList());
+            assertThat(paths.toList()).isEqualTo(List.of(output));
         }
     }
 
@@ -70,8 +70,7 @@ class SliceLifecycleTest {
                 throw new IOException("forced backend failure");
             }
         };
-        var failure = assertThrows(
-                IOException.class,
+        var failure = org.assertj.core.api.Assertions.catchThrowableOfType(
                 () -> SliceService.slice(
                         backend,
                         session.document(),
@@ -81,9 +80,10 @@ class SliceLifecycleTest {
                         true,
                         new Cancellation(),
                         line -> {},
-                        dev.voxelbrew.slicer.api.Slicing.DIRECT));
-        assertTrue(failure.getMessage().contains("forced backend failure"));
-        assertEquals("original", Files.readString(output));
+                        dev.voxelbrew.slicer.api.Slicing.DIRECT),
+                IOException.class);
+        assertThat(failure.getMessage().contains("forced backend failure")).isTrue();
+        assertThat(Files.readString(output)).isEqualTo("original");
         var p = model.profile().printer();
         var wrong = new PrintProfile(
                 new PrintProfile.Printer(
@@ -97,9 +97,7 @@ class SliceLifecycleTest {
                         "bgcode"),
                 model.profile().material(),
                 model.profile().process());
-        assertThrows(
-                IOException.class,
-                () -> SliceService.slice(
+        assertThatThrownBy(() -> SliceService.slice(
                         backend,
                         session.document(),
                         new ManufacturingModel(
@@ -109,15 +107,17 @@ class SliceLifecycleTest {
                         true,
                         new Cancellation(),
                         line -> {},
-                        dev.voxelbrew.slicer.api.Slicing.DIRECT));
+                        dev.voxelbrew.slicer.api.Slicing.DIRECT))
+                .isInstanceOf(IOException.class);
         session.setPrintSetup(
                 session.document().printSetup().withProfile("prusa-slicer", "missing", "PLA", ProcessSettings.DEFAULT));
-        assertTrue(assertThrows(
-                        IllegalArgumentException.class,
-                        () -> dev.voxelbrew.engine.printing.ManufacturingModels.evaluate(
-                                session.document(), MeshOptions.DEFAULT))
-                .getMessage()
-                .contains("Missing printer profile"));
-        assertEquals("original", Files.readString(output));
+        assertThat(org.assertj.core.api.Assertions.catchThrowableOfType(
+                                () -> dev.voxelbrew.engine.printing.ManufacturingModels.evaluate(
+                                        session.document(), MeshOptions.DEFAULT),
+                                IllegalArgumentException.class)
+                        .getMessage()
+                        .contains("Missing printer profile"))
+                .isTrue();
+        assertThat(Files.readString(output)).isEqualTo("original");
     }
 }

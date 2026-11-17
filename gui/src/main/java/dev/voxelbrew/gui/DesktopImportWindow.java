@@ -2,10 +2,10 @@ package dev.voxelbrew.gui;
 
 import dev.voxelbrew.api.importer.ImportDialog;
 import dev.voxelbrew.api.importer.ImportWindow;
-import dev.voxelbrew.api.importer.component.FileSource;
-import dev.voxelbrew.api.importer.component.HorizontalLayout;
-import dev.voxelbrew.api.importer.component.ImportDialogComponent;
-import dev.voxelbrew.api.importer.component.VerticalLayout;
+import dev.voxelbrew.api.vui.Component;
+import dev.voxelbrew.api.vui.FileSource;
+import dev.voxelbrew.api.vui.HorizontalLayout;
+import dev.voxelbrew.api.vui.VerticalLayout;
 import dev.voxelbrew.util.i18n.Translations;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -132,7 +132,7 @@ public final class DesktopImportWindow implements ImportWindow {
         return Dialogs.show(dialog, owner, translations);
     }
 
-    private Node render(ImportDialogComponent component, Map<String, InputBinding> inputs, Runnable onChange) {
+    private Node render(Component component, Map<String, InputBinding> inputs, Runnable onChange) {
         if (component instanceof HorizontalLayout layout) {
             var row = new HBox(12);
             row.setAlignment(Pos.CENTER_LEFT);
@@ -148,8 +148,8 @@ public final class DesktopImportWindow implements ImportWindow {
             layout.children().forEach(child -> column.getChildren().add(render(child, inputs, onChange)));
             return column;
         }
-        if (component instanceof dev.voxelbrew.api.importer.component.Label label) return new Label(label.text());
-        if (component instanceof dev.voxelbrew.api.importer.component.Separator) return new Separator();
+        if (component instanceof dev.voxelbrew.api.vui.Label label) return new Label(label.text());
+        if (component instanceof dev.voxelbrew.api.vui.Separator) return new Separator();
         if (component instanceof FileSource source) {
             var path = new javafx.scene.control.TextField();
             path.setId("import-path");
@@ -183,7 +183,7 @@ public final class DesktopImportWindow implements ImportWindow {
                     path.textProperty(),
                     onChange);
         }
-        if (component instanceof dev.voxelbrew.api.importer.component.TextField field) {
+        if (component instanceof dev.voxelbrew.api.vui.TextField field) {
             var input = new javafx.scene.control.TextField(field.value());
             input.setId("import-" + field.id());
             input.setMaxWidth(Double.MAX_VALUE);
@@ -196,7 +196,7 @@ public final class DesktopImportWindow implements ImportWindow {
                     input.textProperty(),
                     onChange);
         }
-        if (component instanceof dev.voxelbrew.api.importer.component.TextArea area) {
+        if (component instanceof dev.voxelbrew.api.vui.TextArea area) {
             var input = new javafx.scene.control.TextArea(area.value());
             input.setId("import-" + area.id());
             input.setMaxWidth(Double.MAX_VALUE);
@@ -209,7 +209,7 @@ public final class DesktopImportWindow implements ImportWindow {
                     input.textProperty(),
                     onChange);
         }
-        if (component instanceof dev.voxelbrew.api.importer.component.CheckBox box) {
+        if (component instanceof dev.voxelbrew.api.vui.CheckBox box) {
             var input = new javafx.scene.control.CheckBox(box.label());
             input.setId("import-" + box.id());
             UiHelp.describe(input, translations.textOrDefault("help.import-" + box.id(), box.label()));
@@ -224,7 +224,7 @@ public final class DesktopImportWindow implements ImportWindow {
                     input.selectedProperty(),
                     onChange);
         }
-        if (component instanceof dev.voxelbrew.api.importer.component.ComboBox box) {
+        if (component instanceof dev.voxelbrew.api.vui.ComboBox box) {
             var input = new javafx.scene.control.ComboBox<String>();
             input.setId("import-" + box.id());
             input.getItems().setAll(box.choices());
@@ -239,7 +239,7 @@ public final class DesktopImportWindow implements ImportWindow {
                     input.valueProperty(),
                     onChange);
         }
-        if (component instanceof dev.voxelbrew.api.importer.component.RadioButtonGroup group) {
+        if (component instanceof dev.voxelbrew.api.vui.RadioButtonGroup group) {
             var buttons = new ToggleGroup();
             var container = new VBox(4, new Label(group.label()));
             for (String choice : group.choices()) {
@@ -261,7 +261,7 @@ public final class DesktopImportWindow implements ImportWindow {
                     buttons.selectedToggleProperty(),
                     onChange);
         }
-        if (component instanceof dev.voxelbrew.api.importer.component.Slider slider) {
+        if (component instanceof dev.voxelbrew.api.vui.Slider slider) {
             var input = new javafx.scene.control.Slider(slider.minimum(), slider.maximum(), slider.value());
             input.setId("import-" + slider.id());
             return bind(

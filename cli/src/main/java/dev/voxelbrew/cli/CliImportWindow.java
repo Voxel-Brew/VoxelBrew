@@ -2,7 +2,7 @@ package dev.voxelbrew.cli;
 
 import dev.voxelbrew.api.importer.ImportDialog;
 import dev.voxelbrew.api.importer.ImportWindow;
-import dev.voxelbrew.api.importer.component.*;
+import dev.voxelbrew.api.vui.*;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -20,7 +20,7 @@ final class CliImportWindow implements ImportWindow {
 
     @Override
     public <R> Optional<R> show(ImportDialog<R> dialog) {
-        var inputs = new LinkedHashMap<String, ImportDialogInput>();
+        var inputs = new LinkedHashMap<String, Input>();
         collect(dialog.layout(), inputs);
         var values = new LinkedHashMap<String, String>();
         for (var input : inputs.values()) {
@@ -42,8 +42,8 @@ final class CliImportWindow implements ImportWindow {
         return Optional.of(dialog.buildSettings(values));
     }
 
-    private static void collect(ImportDialogComponent component, Map<String, ImportDialogInput> inputs) {
-        if (component instanceof ImportDialogInput input) {
+    private static void collect(Component component, Map<String, Input> inputs) {
+        if (component instanceof Input input) {
             if (inputs.putIfAbsent(input.id(), input) != null)
                 throw new IllegalArgumentException("Duplicate import input: " + input.id());
         } else if (component instanceof HorizontalLayout layout) {

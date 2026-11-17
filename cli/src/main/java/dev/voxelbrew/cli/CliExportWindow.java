@@ -3,7 +3,7 @@ package dev.voxelbrew.cli;
 import dev.voxelbrew.api.exporter.ExportDialog;
 import dev.voxelbrew.api.exporter.ExportWindow;
 import dev.voxelbrew.api.exporter.FileExportDialog;
-import dev.voxelbrew.api.exporter.component.*;
+import dev.voxelbrew.api.vui.*;
 import dev.voxelbrew.util.config.PluginDirectorySource;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -66,7 +66,7 @@ final class CliExportWindow implements ExportWindow, PluginDirectorySource {
     public <R> Optional<R> show(ExportDialog<R> dialog) {
         if (meshFlagsProvided && dialog instanceof FileExportDialog)
             throw new IllegalArgumentException("This exporter requires the complete design without mesh options");
-        var inputs = new LinkedHashMap<String, ExportDialogInput>();
+        var inputs = new LinkedHashMap<String, Input>();
         collect(dialog.layout(), inputs);
         var resolved = new LinkedHashMap<>(supplied);
         var explicit = new HashSet<>(supplied.keySet());
@@ -116,7 +116,7 @@ final class CliExportWindow implements ExportWindow, PluginDirectorySource {
         return Optional.of(dialog.buildSettings(values));
     }
 
-    private <R> boolean prompt(ExportDialog<R> dialog, ExportDialogInput input, Map<String, String> resolved) {
+    private <R> boolean prompt(ExportDialog<R> dialog, Input input, Map<String, String> resolved) {
         String fallback = defaultValue(input);
         while (true) {
             out.print(label(input) + "[" + input.id() + "]: ");
@@ -137,10 +137,7 @@ final class CliExportWindow implements ExportWindow, PluginDirectorySource {
     }
 
     private static IllegalArgumentException validationFailure(
-            Map<String, ExportDialogInput> inputs,
-            Map<String, String> resolved,
-            Map<String, String> errors,
-            String prefix) {
+            Map<String, Input> inputs, Map<String, String> resolved, Map<String, String> errors, String prefix) {
         var messages = new ArrayList<String>();
         boolean invalid = false;
         for (var input : inputs.values()) {
@@ -163,8 +160,8 @@ final class CliExportWindow implements ExportWindow, PluginDirectorySource {
                 (invalid ? "Invalid export inputs: " : "Missing export inputs: ") + String.join(", ", messages));
     }
 
-    private static void collect(ExportDialogComponent component, Map<String, ExportDialogInput> inputs) {
-        if (component instanceof ExportDialogInput input) {
+    private static void collect(Component component, Map<String, Input> inputs) {
+        if (component instanceof Input input) {
             if (inputs.putIfAbsent(input.id(), input) != null)
                 throw new IllegalArgumentException("Duplicate export input: " + input.id());
         } else if (component instanceof HorizontalLayout horizontal) {
@@ -174,7 +171,7 @@ final class CliExportWindow implements ExportWindow, PluginDirectorySource {
         }
     }
 
-    private static String label(ExportDialogInput input) {
+    private static String label(Input input) {
         if (input instanceof TextField field) return field.label();
         if (input instanceof TextArea area) return area.label();
         if (input instanceof CheckBox box) return box.label();
@@ -184,7 +181,7 @@ final class CliExportWindow implements ExportWindow, PluginDirectorySource {
         return "Destination";
     }
 
-    private static String defaultValue(ExportDialogInput input) {
+    private static String defaultValue(Input input) {
         if (input instanceof TextField field) return field.value();
         if (input instanceof TextArea area) return area.value();
         if (input instanceof CheckBox box) return Boolean.toString(box.selected());

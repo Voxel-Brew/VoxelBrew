@@ -2,13 +2,13 @@ package dev.voxelbrew.exporter;
 
 import dev.voxelbrew.api.exporter.ExportDialog;
 import dev.voxelbrew.api.exporter.FileExportDialog;
-import dev.voxelbrew.api.exporter.component.CheckBox;
-import dev.voxelbrew.api.exporter.component.ComboBox;
-import dev.voxelbrew.api.exporter.component.ExportDialogComponent;
-import dev.voxelbrew.api.exporter.component.ExportDialogLayout;
-import dev.voxelbrew.api.exporter.component.FileDestination;
-import dev.voxelbrew.api.exporter.component.TextField;
-import dev.voxelbrew.api.exporter.component.VerticalLayout;
+import dev.voxelbrew.api.vui.CheckBox;
+import dev.voxelbrew.api.vui.ComboBox;
+import dev.voxelbrew.api.vui.Component;
+import dev.voxelbrew.api.vui.FileDestination;
+import dev.voxelbrew.api.vui.Layout;
+import dev.voxelbrew.api.vui.TextField;
+import dev.voxelbrew.api.vui.VerticalLayout;
 import dev.voxelbrew.engine.mesh.MeshOptions;
 import dev.voxelbrew.engine.printing.ManufacturingModel;
 import java.nio.file.Path;
@@ -28,8 +28,8 @@ public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Set
     }
 
     @Override
-    public ExportDialogLayout layout() {
-        var children = new ArrayList<ExportDialogComponent>();
+    public Layout layout() {
+        var children = new ArrayList<Component>();
         children.add(new FileDestination("destination", format.extensions().get(0)));
         children.add(new CheckBox("overwrite", "Overwrite", false));
         children.add(new ComboBox("space", "Space", List.of("DESIGN", "BUILD_PLATE"), "DESIGN"));

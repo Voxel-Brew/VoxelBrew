@@ -44,8 +44,8 @@ class InjectedDocumentIoTest {
                             }
 
                             @Override
-                            public dev.voxelbrew.api.importer.component.ImportDialogLayout layout() {
-                                return new dev.voxelbrew.api.importer.component.VerticalLayout();
+                            public dev.voxelbrew.api.vui.Layout layout() {
+                                return new dev.voxelbrew.api.vui.VerticalLayout();
                             }
 
                             @Override
@@ -133,8 +133,8 @@ class InjectedDocumentIoTest {
                                     }
 
                                     @Override
-                                    public dev.voxelbrew.api.exporter.component.ExportDialogLayout layout() {
-                                        return new dev.voxelbrew.api.exporter.component.VerticalLayout();
+                                    public dev.voxelbrew.api.vui.Layout layout() {
+                                        return new dev.voxelbrew.api.vui.VerticalLayout();
                                     }
 
                                     @Override

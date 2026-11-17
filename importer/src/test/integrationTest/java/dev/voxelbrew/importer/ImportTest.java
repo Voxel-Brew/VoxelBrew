@@ -30,11 +30,11 @@ class ImportTest {
         };
     }
 
-    private static void collect(dev.voxelbrew.api.importer.component.ImportDialogComponent component, Set<String> ids) {
-        if (component instanceof dev.voxelbrew.api.importer.component.ImportDialogInput input) ids.add(input.id());
-        else if (component instanceof dev.voxelbrew.api.importer.component.HorizontalLayout row)
+    private static void collect(dev.voxelbrew.api.vui.Component component, Set<String> ids) {
+        if (component instanceof dev.voxelbrew.api.vui.Input input) ids.add(input.id());
+        else if (component instanceof dev.voxelbrew.api.vui.HorizontalLayout row)
             row.children().forEach(child -> collect(child, ids));
-        else if (component instanceof dev.voxelbrew.api.importer.component.VerticalLayout column)
+        else if (component instanceof dev.voxelbrew.api.vui.VerticalLayout column)
             column.children().forEach(child -> collect(child, ids));
     }
 

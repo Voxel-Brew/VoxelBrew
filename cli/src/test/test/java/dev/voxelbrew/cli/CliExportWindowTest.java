@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.exporter.ExportDialog;
 import dev.voxelbrew.api.exporter.FileExportDialog;
-import dev.voxelbrew.api.exporter.component.ExportDialogLayout;
-import dev.voxelbrew.api.exporter.component.FileDestination;
-import dev.voxelbrew.api.exporter.component.VerticalLayout;
+import dev.voxelbrew.api.vui.FileDestination;
+import dev.voxelbrew.api.vui.Layout;
+import dev.voxelbrew.api.vui.VerticalLayout;
 import java.io.BufferedReader;
 import java.io.PrintWriter;
 import java.io.StringReader;
@@ -99,7 +99,7 @@ class CliExportWindowTest {
             }
 
             @Override
-            public ExportDialogLayout layout() {
+            public Layout layout() {
                 return new VerticalLayout(new FileDestination("model", "vxb"), new FileDestination("preview", "png"));
             }
 
@@ -143,7 +143,7 @@ class CliExportWindowTest {
             }
 
             @Override
-            public ExportDialogLayout layout() {
+            public Layout layout() {
                 return new VerticalLayout(new FileDestination("destination", "txt", Path.of("report.txt")));
             }
 

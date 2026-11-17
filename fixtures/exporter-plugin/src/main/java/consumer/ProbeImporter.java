@@ -1,7 +1,7 @@
 package consumer;
 
 import dev.voxelbrew.api.importer.*;
-import dev.voxelbrew.api.importer.component.*;
+import dev.voxelbrew.api.vui.*;
 import dev.voxelbrew.engine.model.*;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -38,7 +38,7 @@ public class ProbeImporter implements ImporterProvider {
         }
 
         @Override
-        public ImportDialogLayout layout() {
+        public Layout layout() {
             return new VerticalLayout(source, scale);
         }
 

@@ -1,8 +1,8 @@
 package dev.voxelbrew.exporter;
 
 import dev.voxelbrew.api.exporter.*;
-import dev.voxelbrew.engine.mesh.MeshOptions;
-import dev.voxelbrew.engine.mesh.MeshValidation;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
+import dev.voxelbrew.api.model.mesh.MeshValidation;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.List;

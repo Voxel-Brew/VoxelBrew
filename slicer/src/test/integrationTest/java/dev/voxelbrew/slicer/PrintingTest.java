@@ -2,7 +2,9 @@ package dev.voxelbrew.slicer;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.mesh.*;
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.mesh.*;
+import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import dev.voxelbrew.engine.printing.*;
@@ -60,7 +62,7 @@ class PrintingTest {
                 false,
                 new Cancellation(),
                 System.out::println,
-                dev.voxelbrew.slicer.api.Slicing.DIRECT);
+                dev.voxelbrew.api.slicer.Slicing.DIRECT);
         assertThat(result.job().segments().stream()
                         .anyMatch(segment -> segment.deposits()
                                 && (segment.role() == GcodeJob.Role.SUPPORT
@@ -90,7 +92,7 @@ class PrintingTest {
                 false,
                 new Cancellation(),
                 System.out::println,
-                dev.voxelbrew.slicer.api.Slicing.DIRECT);
+                dev.voxelbrew.api.slicer.Slicing.DIRECT);
         var job = result.job();
         assertThat(job.modelLayers().size()).isEqualTo(40);
         assertThat(job.modelLayers().getFirst()).isCloseTo(0.2, org.assertj.core.data.Offset.offset(1e-6));
@@ -135,7 +137,7 @@ class PrintingTest {
                 false,
                 new Cancellation(),
                 System.out::println,
-                dev.voxelbrew.slicer.api.Slicing.DIRECT);
+                dev.voxelbrew.api.slicer.Slicing.DIRECT);
         assertThat(result.job().report().get("nozzle_mm")).isEqualTo("0.6");
         assertThat(result.job().modelLayers().isEmpty()).isFalse();
         assertThat(Files.size(output) > 0).isTrue();

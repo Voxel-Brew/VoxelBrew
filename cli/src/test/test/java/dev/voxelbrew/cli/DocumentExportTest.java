@@ -2,7 +2,7 @@ package dev.voxelbrew.cli;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.model.CadDocument;
+import dev.voxelbrew.api.model.CadDocument;
 import dev.voxelbrew.exporter.DocumentWriter;
 import dev.voxelbrew.importer.DocumentReader;
 import java.io.PrintWriter;

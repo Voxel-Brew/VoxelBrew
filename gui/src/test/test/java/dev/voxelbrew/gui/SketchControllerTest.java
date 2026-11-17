@@ -1,8 +1,9 @@
 package dev.voxelbrew.gui;
 
-import static dev.voxelbrew.engine.sketch.SketchGeometry.*;
+import static dev.voxelbrew.api.model.sketch.SketchGeometry.*;
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.sketch.*;
 import dev.voxelbrew.engine.sketch.*;
 import java.util.List;
 import java.util.concurrent.*;
@@ -15,16 +16,16 @@ class SketchControllerTest {
         var queue = new ConcurrentLinkedQueue<Runnable>();
         var text = SketchText.create("text", "Width: 5", "SansSerif", 0, 0, 0, 5, 0, 0, "", false);
         var geometry = new SketchGeometry(List.of(text), List.of(), List.of("text"));
-        var parameters = dev.voxelbrew.engine.parameters.ParameterSet.empty()
-                .put("width", dev.voxelbrew.engine.parameters.ParameterUnit.MM, "5", "")
+        var parameters = dev.voxelbrew.api.model.parameters.ParameterSet.empty()
+                .put("width", dev.voxelbrew.api.model.parameters.ParameterUnit.MM, "5", "")
                 .bind(
-                        new dev.voxelbrew.engine.parameters.ParameterSet.Target("sketch", "text:text:content"),
+                        new dev.voxelbrew.api.model.parameters.ParameterSet.Target("sketch", "text:text:content"),
                         "=\"Width: \"+$width");
         try (var controller = new SketchController(geometry, parameters, "sketch", queue::add)) {
             await(controller, queue);
             controller.edit(
                     controller.definition(),
-                    parameters.put("width", dev.voxelbrew.engine.parameters.ParameterUnit.MM, "8", ""));
+                    parameters.put("width", dev.voxelbrew.api.model.parameters.ParameterUnit.MM, "8", ""));
             await(controller, queue);
             assertThat(controller.canFinish()).isTrue();
             assertThat(controller.definition().entity("text").text().content()).isEqualTo("Width: 8");
@@ -56,15 +57,17 @@ class SketchControllerTest {
     @Test
     void parameterChangesAndBindingsShareLocalHistoryAndSolveOnTheWorker() throws Exception {
         var queue = new ConcurrentLinkedQueue<Runnable>();
-        var p = dev.voxelbrew.engine.parameters.ParameterSet.empty()
-                .put("width", dev.voxelbrew.engine.parameters.ParameterUnit.MM, "60", "")
-                .bind(new dev.voxelbrew.engine.parameters.ParameterSet.Target("sketch", "constraint:width"), "width");
+        var p = dev.voxelbrew.api.model.parameters.ParameterSet.empty()
+                .put("width", dev.voxelbrew.api.model.parameters.ParameterUnit.MM, "60", "")
+                .bind(
+                        new dev.voxelbrew.api.model.parameters.ParameterSet.Target("sketch", "constraint:width"),
+                        "width");
         try (var controller =
                 new SketchController(Sketches.rectangle("r", 0, 0, 60, 40, true), p, "sketch", queue::add)) {
             await(controller, queue);
             controller.edit(
                     controller.definition(),
-                    p.put("width", dev.voxelbrew.engine.parameters.ParameterUnit.MM, "80", ""));
+                    p.put("width", dev.voxelbrew.api.model.parameters.ParameterUnit.MM, "80", ""));
             await(controller, queue);
             assertThat(controller.canFinish()).isTrue();
             assertThat(controller
@@ -83,7 +86,7 @@ class SketchControllerTest {
                     controller.definition(),
                     controller
                             .parameters()
-                            .put("width", dev.voxelbrew.engine.parameters.ParameterUnit.MM, "missing", ""));
+                            .put("width", dev.voxelbrew.api.model.parameters.ParameterUnit.MM, "missing", ""));
             await(controller, queue);
             assertThat(controller.canFinish()).isFalse();
             controller.undo();

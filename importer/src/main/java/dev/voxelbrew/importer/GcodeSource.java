@@ -1,6 +1,6 @@
 package dev.voxelbrew.importer;
 
-import dev.voxelbrew.engine.printing.GcodeJob;
+import dev.voxelbrew.api.model.printing.GcodeJob;
 import java.io.IOException;
 import java.nio.file.Path;
 

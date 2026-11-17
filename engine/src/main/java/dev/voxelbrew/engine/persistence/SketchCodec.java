@@ -1,8 +1,8 @@
 package dev.voxelbrew.engine.persistence;
 
+import dev.voxelbrew.api.model.sketch.SketchGeometry;
+import dev.voxelbrew.api.model.sketch.SketchText;
 import dev.voxelbrew.engine.persistence.proto.DocumentProto;
-import dev.voxelbrew.engine.sketch.SketchGeometry;
-import dev.voxelbrew.engine.sketch.SketchText;
 
 /** Protobuf remains an implementation detail; enum names are the compatibility contract. */
 @lombok.experimental.UtilityClass

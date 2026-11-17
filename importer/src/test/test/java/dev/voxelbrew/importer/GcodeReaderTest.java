@@ -2,7 +2,7 @@ package dev.voxelbrew.importer;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.printing.GcodeJob;
+import dev.voxelbrew.api.model.printing.GcodeJob;
 import java.nio.file.*;
 import java.util.List;
 import org.junit.jupiter.api.Test;

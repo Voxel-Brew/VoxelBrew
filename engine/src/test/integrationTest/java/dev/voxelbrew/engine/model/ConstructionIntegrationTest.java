@@ -1,9 +1,13 @@
 package dev.voxelbrew.engine.model;
 
-import static dev.voxelbrew.engine.construction.ConstructionGeometry.*;
-import static dev.voxelbrew.engine.construction.ConstructionTools.Tool.*;
+import static dev.voxelbrew.api.model.construction.ConstructionGeometry.*;
+import static dev.voxelbrew.api.model.construction.ConstructionTools.Tool.*;
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.CadDocument;
+import dev.voxelbrew.api.model.ConstructionFeature;
+import dev.voxelbrew.api.model.Feature;
+import dev.voxelbrew.api.model.Transform;
 import dev.voxelbrew.engine.geometry.Solid;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import java.util.List;

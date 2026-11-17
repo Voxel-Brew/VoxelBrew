@@ -1,8 +1,11 @@
 package dev.voxelbrew.engine.parameters;
 
-import dev.voxelbrew.engine.model.Feature;
-import dev.voxelbrew.engine.sketch.SketchGeometry;
-import dev.voxelbrew.engine.sketch.SketchText;
+import dev.voxelbrew.api.model.Feature;
+import dev.voxelbrew.api.model.parameters.BuiltinParameters;
+import dev.voxelbrew.api.model.parameters.Expressions;
+import dev.voxelbrew.api.model.parameters.ParameterSet;
+import dev.voxelbrew.api.model.sketch.SketchGeometry;
+import dev.voxelbrew.api.model.sketch.SketchText;
 import java.util.*;
 import javax.measure.Quantity;
 

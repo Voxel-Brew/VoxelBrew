@@ -1,7 +1,10 @@
 package dev.voxelbrew.engine.geometry;
 
-import static dev.voxelbrew.engine.units.Measurements.*;
+import static dev.voxelbrew.api.model.units.Measurements.*;
 
+import dev.voxelbrew.api.model.geometry.Bounds;
+import dev.voxelbrew.api.model.geometry.PlanarFace;
+import dev.voxelbrew.api.model.geometry.PlanarProfile;
 import javax.measure.Quantity;
 import javax.measure.quantity.Length;
 import javax.measure.quantity.Volume;
@@ -176,7 +179,7 @@ public final class Solid implements AutoCloseable {
     }
 
     /** Independently owned rigid copy; the source geometry is never changed. */
-    public synchronized Solid transformed(dev.voxelbrew.engine.model.Transform placement) {
+    public synchronized Solid transformed(dev.voxelbrew.api.model.Transform placement) {
         requireOpen();
         return new Solid(NativeKernel.transform(token, placement.matrix()));
     }
@@ -221,7 +224,8 @@ public final class Solid implements AutoCloseable {
     /**
      * Detached mesh; face IDs are local to this tessellation, never persistent feature references.
      */
-    public synchronized dev.voxelbrew.engine.mesh.MeshData tessellate(dev.voxelbrew.engine.mesh.MeshOptions options) {
+    public synchronized dev.voxelbrew.api.model.mesh.MeshData tessellate(
+            dev.voxelbrew.api.model.mesh.MeshOptions options) {
         requireOpen();
         return TessellationCleanup.removeCollapsedTriangles(
                 NativeKernel.tessellate(token, options.chordToleranceMm(), value(options.angularTolerance(), RADIAN)));

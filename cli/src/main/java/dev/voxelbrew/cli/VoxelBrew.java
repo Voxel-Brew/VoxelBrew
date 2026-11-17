@@ -1,5 +1,6 @@
 package dev.voxelbrew.cli;
 
+import dev.voxelbrew.api.model.*;
 import dev.voxelbrew.engine.geometry.Solid;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.importer.DocumentSource;
@@ -513,7 +514,9 @@ public final class VoxelBrew implements Runnable {
             session.add(new Feature.Extrude(
                     id,
                     region == null ? profile : new Feature.ProfileRef(sketch, region),
-                    session.document().parameters().value(distance, dev.voxelbrew.engine.parameters.ParameterUnit.MM)));
+                    session.document()
+                            .parameters()
+                            .value(distance, dev.voxelbrew.api.model.parameters.ParameterUnit.MM)));
             session.bindExpression(id, "distance", distance);
             return save(session);
         }

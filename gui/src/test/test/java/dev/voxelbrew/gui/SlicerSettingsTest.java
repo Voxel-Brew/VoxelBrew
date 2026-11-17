@@ -2,7 +2,7 @@ package dev.voxelbrew.gui;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.slicer.api.SlicerRuntime;
+import dev.voxelbrew.api.slicer.SlicerRuntime;
 import dev.voxelbrew.util.config.UserConfiguration;
 import java.nio.file.Path;
 import java.util.Map;

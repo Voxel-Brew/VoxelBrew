@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.exporter.*;
 import dev.voxelbrew.api.importer.ServiceLoaderImporterProviderRegistry;
-import dev.voxelbrew.engine.mesh.*;
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.mesh.*;
+import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.persistence.proto.DocumentProto;
 import dev.voxelbrew.engine.printing.*;

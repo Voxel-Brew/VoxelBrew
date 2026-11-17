@@ -2,7 +2,8 @@ package dev.voxelbrew.slicer;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.mesh.MeshOptions;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
+import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.slicer.orca.OrcaSlicerBackend;
@@ -45,7 +46,7 @@ class OrcaSlicerIntegrationTest {
                 false,
                 new Cancellation(),
                 System.out::println,
-                dev.voxelbrew.slicer.api.Slicing.DIRECT);
+                dev.voxelbrew.api.slicer.Slicing.DIRECT);
         assertThat(result.artifact()).isNotNull();
         assertThat(result.job().modelLayers().isEmpty()).isFalse();
         assertThat(result.artifact().metadata().get("model")).isEqualTo("Bambu Lab A1");

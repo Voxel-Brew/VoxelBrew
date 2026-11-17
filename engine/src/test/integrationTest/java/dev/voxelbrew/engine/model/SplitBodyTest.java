@@ -2,6 +2,7 @@ package dev.voxelbrew.engine.model;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.Feature;
 import dev.voxelbrew.exporter.DocumentWriter;
 import dev.voxelbrew.importer.DocumentReader;
 import java.nio.file.Path;

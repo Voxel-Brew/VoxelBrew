@@ -1,7 +1,8 @@
 package dev.voxelbrew.exporter;
 
 import dev.voxelbrew.api.exporter.*;
-import dev.voxelbrew.engine.mesh.MeshOptions;
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import dev.voxelbrew.util.config.PluginDirectorySource;
@@ -91,13 +92,13 @@ public abstract class MeshExporter implements Exporter<MeshExportDialog.Settings
             MeshOptions mesh,
             Map<String, String> options,
             OutputStream output,
-            dev.voxelbrew.engine.printing.PrintSetup setup)
+            dev.voxelbrew.api.model.printing.PrintSetup setup)
             throws IOException {
         write(view, mesh, options, output);
     }
 
     private void writeFile(
-            ModelView view, MeshExportDialog.Settings settings, dev.voxelbrew.engine.printing.PrintSetup setup)
+            ModelView view, MeshExportDialog.Settings settings, dev.voxelbrew.api.model.printing.PrintSetup setup)
             throws IOException {
         if (view.instances().isEmpty()) throw new IllegalArgumentException("Nothing to export");
         if (!format().multipleInstances() && view.instances().size() != 1)

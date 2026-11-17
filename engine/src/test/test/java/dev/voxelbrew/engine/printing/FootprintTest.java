@@ -2,8 +2,9 @@ package dev.voxelbrew.engine.printing;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.mesh.MeshData;
-import dev.voxelbrew.engine.model.Transform;
+import dev.voxelbrew.api.model.Transform;
+import dev.voxelbrew.api.model.mesh.MeshData;
+import dev.voxelbrew.api.model.printing.MeshGeometry;
 import java.awt.geom.*;
 import java.util.*;
 import org.junit.jupiter.api.Test;

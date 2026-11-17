@@ -1,6 +1,7 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.engine.model.Feature;
+import dev.voxelbrew.api.model.Feature;
+import dev.voxelbrew.api.model.parameters.*;
 import dev.voxelbrew.engine.parameters.*;
 import java.util.*;
 import java.util.function.Function;
@@ -352,11 +353,11 @@ final class ParameterDialog {
                 button(translations.text("gui.bind_dimension"), "parameter-bind", () -> {
                     var chosen = dimensions.getSelectionModel().getSelectedItem();
                     if (chosen == null) throw new IllegalArgumentException(translations.text("gui.select_a_dimension"));
-                    var doc = new dev.voxelbrew.engine.model.CadDocument(
+                    var doc = new dev.voxelbrew.api.model.CadDocument(
                             "parameter-editor",
                             features,
                             features.size(),
-                            dev.voxelbrew.engine.printing.PrintSetup.empty(),
+                            dev.voxelbrew.api.model.printing.PrintSetup.empty(),
                             draft);
                     update(FeatureDimensions.bind(doc, chosen.target(), binding.getText()));
                 }));

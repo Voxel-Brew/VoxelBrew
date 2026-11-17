@@ -2,6 +2,7 @@ package dev.voxelbrew.cli;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import dev.voxelbrew.exporter.DocumentWriter;
@@ -200,8 +201,8 @@ class WorkspaceIntegrationTest {
         var document = DocumentReader.load(file);
         assertThat(document.gcode().isEmpty()).isTrue();
         var model = dev.voxelbrew.engine.printing.ManufacturingModels.evaluate(
-                document, dev.voxelbrew.engine.mesh.MeshOptions.DEFAULT);
-        var bounds = dev.voxelbrew.engine.printing.MeshGeometry.bounds(
+                document, dev.voxelbrew.api.model.mesh.MeshOptions.DEFAULT);
+        var bounds = dev.voxelbrew.api.model.printing.MeshGeometry.bounds(
                 model.placedMesh(model.instances().getFirst()));
         assertThat(bounds.minZ()).isCloseTo(5, org.assertj.core.data.Offset.offset(0.001));
         assertThat(bounds.maxZ() - bounds.minZ()).isCloseTo(40, org.assertj.core.data.Offset.offset(0.001));

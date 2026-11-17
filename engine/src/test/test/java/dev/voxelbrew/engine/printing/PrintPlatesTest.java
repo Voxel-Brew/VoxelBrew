@@ -2,6 +2,13 @@ package dev.voxelbrew.engine.printing;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.printing.ManufacturingModel;
+import dev.voxelbrew.api.model.printing.PrintProfile;
+import dev.voxelbrew.api.model.printing.PrintSetup;
+import dev.voxelbrew.api.model.printing.PrintTarget;
+import dev.voxelbrew.api.model.printing.ProcessSettings;
+import dev.voxelbrew.api.model.printing.SupportVolume;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import java.util.List;

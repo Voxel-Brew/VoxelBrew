@@ -2,8 +2,8 @@ package dev.voxelbrew.cli;
 
 import static dev.voxelbrew.cli.WorkspaceEdits.*;
 
+import dev.voxelbrew.api.printer.*;
 import dev.voxelbrew.importer.DocumentSource;
-import dev.voxelbrew.printer.api.*;
 import dev.voxelbrew.util.config.ApplicationPaths;
 import java.nio.file.*;
 import java.util.*;
@@ -17,7 +17,7 @@ final class DeviceCommands {
     private final PrinterRuntime runtime;
     private final DocumentSource documents;
     private final DocumentSave writer;
-    private final dev.voxelbrew.slicer.api.PrinterProfileCatalog printers;
+    private final dev.voxelbrew.api.slicer.PrinterProfileCatalog printers;
 
     private Path directory() {
         return ApplicationPaths.configuration().resolveSibling("devices");
@@ -31,7 +31,7 @@ final class DeviceCommands {
                 var setup = document.printSetup();
                 if (action.equals("show")) {
                     String id = setup.workspaceSettings()
-                            .getOrDefault(dev.voxelbrew.engine.printing.PrintTarget.PRINTER_ID, "");
+                            .getOrDefault(dev.voxelbrew.api.model.printing.PrintTarget.PRINTER_ID, "");
                     String name = runtime.devices(directory()).stream()
                             .filter(p -> p.id().equals(id))
                             .map(Printer::name)

@@ -2,6 +2,11 @@ package dev.voxelbrew.engine.model;
 
 import static dev.voxelbrew.engine.model.Evaluation.State.*;
 
+import dev.voxelbrew.api.model.CadDocument;
+import dev.voxelbrew.api.model.ConstructionFeature;
+import dev.voxelbrew.api.model.Feature;
+import dev.voxelbrew.api.model.ModelException;
+import dev.voxelbrew.api.model.Transform;
 import dev.voxelbrew.engine.feature.FeatureRegistry;
 import dev.voxelbrew.engine.geometry.Solid;
 import java.io.IOException;
@@ -54,7 +59,8 @@ public final class Evaluator {
         Map<Feature.BodyRef, Evaluation.Body> outputs = new LinkedHashMap<>();
         Map<String, Evaluation.Body> active = new LinkedHashMap<>();
         Map<String, Evaluation.State> states = new LinkedHashMap<>();
-        Map<String, dev.voxelbrew.engine.construction.ConstructionGeometry.Datum> construction = new LinkedHashMap<>();
+        Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction =
+                new LinkedHashMap<>();
         var resolved = new ArrayList<>(document.features());
         Map<String, javax.measure.Quantity<?>> parameterValues;
         try {
@@ -103,7 +109,8 @@ public final class Evaluator {
                     } else if (feature instanceof Feature.Sketch s) {
                         if (!s.plane().constructionSupport().isEmpty()) {
                             var datum = construction.get(s.plane().constructionSupport());
-                            if (!(datum instanceof dev.voxelbrew.engine.construction.ConstructionGeometry.Plane plane))
+                            if (!(datum
+                                    instanceof dev.voxelbrew.api.model.construction.ConstructionGeometry.Plane plane))
                                 throw new ModelException(s.id(), "Supporting construction output is not a plane");
                             s = new Feature.Sketch(
                                     s.id(),

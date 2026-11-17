@@ -1,6 +1,6 @@
 package consumer;
 
-import static dev.voxelbrew.engine.units.Measurements.*;
+import static dev.voxelbrew.api.model.units.Measurements.*;
 
 import dev.voxelbrew.engine.feature.*;
 import dev.voxelbrew.engine.geometry.Solid;

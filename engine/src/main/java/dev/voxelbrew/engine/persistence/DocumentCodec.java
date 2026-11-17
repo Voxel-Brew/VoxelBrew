@@ -1,10 +1,11 @@
 package dev.voxelbrew.engine.persistence;
 
 import com.google.protobuf.Message;
-import dev.voxelbrew.engine.model.BodyInstance;
-import dev.voxelbrew.engine.model.CadDocument;
-import dev.voxelbrew.engine.model.Feature;
-import dev.voxelbrew.engine.model.Transform;
+import dev.voxelbrew.api.model.BodyInstance;
+import dev.voxelbrew.api.model.CadDocument;
+import dev.voxelbrew.api.model.Feature;
+import dev.voxelbrew.api.model.Transform;
+import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.engine.persistence.proto.DocumentProto;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.util.Version;
@@ -80,15 +81,14 @@ public final class DocumentCodec {
                     message.hasPrintSetup() ? fromProto(message.getPrintSetup()) : PrintSetup.empty(),
                     message.hasParameters()
                             ? ParameterCodec.fromProto(message.getParameters())
+                                    .withUuidGenerator(new dev.voxelbrew.api.model.UuidGenerator(message.getNextUuid()))
+                            : dev.voxelbrew.api.model.parameters.ParameterSet.empty()
                                     .withUuidGenerator(
-                                            new dev.voxelbrew.engine.model.UuidGenerator(message.getNextUuid()))
-                            : dev.voxelbrew.engine.parameters.ParameterSet.empty()
-                                    .withUuidGenerator(
-                                            new dev.voxelbrew.engine.model.UuidGenerator(message.getNextUuid())),
+                                            new dev.voxelbrew.api.model.UuidGenerator(message.getNextUuid())),
                     message.getBodyStylesMap().entrySet().stream()
                             .collect(java.util.stream.Collectors.toMap(
                                     java.util.Map.Entry::getKey,
-                                    e -> new dev.voxelbrew.engine.model.BodyStyle(
+                                    e -> new dev.voxelbrew.api.model.BodyStyle(
                                             e.getValue().getMaterial(),
                                             e.getValue().getColor()))),
                     message.getBodyNamesMap(),
@@ -100,7 +100,7 @@ public final class DocumentCodec {
             document = document.withPrintArtifacts(message.getPrintArtifactsMap().entrySet().stream()
                     .collect(java.util.stream.Collectors.toMap(
                             java.util.Map.Entry::getKey,
-                            e -> new dev.voxelbrew.engine.printing.PrintArtifact(
+                            e -> new dev.voxelbrew.api.model.printing.PrintArtifact(
                                     e.getValue().getFormat(),
                                             java.util.Base64.getEncoder()
                                                     .encodeToString(e.getValue()
@@ -262,17 +262,16 @@ public final class DocumentCodec {
             }
             case CONSTRUCTION -> {
                 var value = feature.getConstruction();
-                yield new dev.voxelbrew.engine.model.ConstructionFeature(
+                yield new dev.voxelbrew.api.model.ConstructionFeature(
                         feature.getId(),
-                        dev.voxelbrew.engine.construction.ConstructionTools.Tool.valueOf(value.getTool()),
+                        dev.voxelbrew.api.model.construction.ConstructionTools.Tool.valueOf(value.getTool()),
                         value.getInputsList().stream()
-                                .map(i -> new dev.voxelbrew.engine.model.ConstructionFeature.Input(
-                                        dev.voxelbrew.engine.model.ConstructionFeature.Selection.valueOf(
-                                                i.getSelection()),
+                                .map(i -> new dev.voxelbrew.api.model.ConstructionFeature.Input(
+                                        dev.voxelbrew.api.model.ConstructionFeature.Selection.valueOf(i.getSelection()),
                                         i.getSource(),
                                         i.getOutput(),
                                         i.getIndex(),
-                                        new dev.voxelbrew.engine.construction.ConstructionGeometry.Vector(
+                                        new dev.voxelbrew.api.model.construction.ConstructionGeometry.Vector(
                                                 i.getX(), i.getY(), i.getZ())))
                                 .toList(),
                         value.getValue(),
@@ -551,7 +550,7 @@ public final class DocumentCodec {
 
     private static DocumentProto.Feature toProto(Feature feature) {
         var out = DocumentProto.Feature.newBuilder().setId(feature.id());
-        if (feature instanceof dev.voxelbrew.engine.model.ConstructionFeature c) {
+        if (feature instanceof dev.voxelbrew.api.model.ConstructionFeature c) {
             var definition = DocumentProto.Construction.newBuilder()
                     .setTool(c.tool().name())
                     .setValue(c.value())
@@ -638,14 +637,14 @@ public final class DocumentCodec {
 
     private static Feature.Plane plane(DocumentProto.Plane value) {
         var frame = value.getFrameCount() == 0
-                ? dev.voxelbrew.engine.model.Transform.IDENTITY
-                : new dev.voxelbrew.engine.model.Transform(value.getFrameList().stream()
+                ? dev.voxelbrew.api.model.Transform.IDENTITY
+                : new dev.voxelbrew.api.model.Transform(value.getFrameList().stream()
                         .mapToDouble(Double::doubleValue)
                         .toArray());
-        dev.voxelbrew.engine.model.FaceSupport support = null;
+        dev.voxelbrew.api.model.FaceSupport support = null;
         if (value.hasSupport()) {
             var s = value.getSupport();
-            support = new dev.voxelbrew.engine.model.FaceSupport(
+            support = new dev.voxelbrew.api.model.FaceSupport(
                     new Feature.BodyRef(s.getBody().getFeatureId(), s.getBody().getOutputName()),
                     s.getNormalX(),
                     s.getNormalY(),

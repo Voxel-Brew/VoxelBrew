@@ -2,10 +2,12 @@ package dev.voxelbrew.cli;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.printing.*;
+import dev.voxelbrew.api.printer.*;
+import dev.voxelbrew.api.slicer.PrinterProfileCatalog;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.printing.*;
-import dev.voxelbrew.printer.api.*;
-import dev.voxelbrew.slicer.api.PrinterProfileCatalog;
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;

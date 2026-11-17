@@ -9,7 +9,7 @@ public final class VoxelBrewImporter extends FileImporter {
     }
 
     @Override
-    protected dev.voxelbrew.engine.model.CadDocument read(InputStream input) throws IOException {
+    protected dev.voxelbrew.api.model.CadDocument read(InputStream input) throws IOException {
         return dev.voxelbrew.engine.persistence.DocumentCodec.decode(
                 input.readNBytes(dev.voxelbrew.engine.persistence.DocumentCodec.MAX_ENCODED_BYTES + 1));
     }

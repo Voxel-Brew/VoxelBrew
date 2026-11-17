@@ -1,7 +1,7 @@
 package dev.voxelbrew.exporter;
 
-import dev.voxelbrew.engine.mesh.MeshOptions;
-import dev.voxelbrew.engine.mesh.MeshValidation;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
+import dev.voxelbrew.api.model.mesh.MeshValidation;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;

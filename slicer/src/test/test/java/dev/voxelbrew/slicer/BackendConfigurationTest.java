@@ -2,6 +2,7 @@ package dev.voxelbrew.slicer;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.engine.printing.*;
 import java.nio.file.*;
 import java.util.*;

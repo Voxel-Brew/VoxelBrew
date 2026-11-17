@@ -1,13 +1,14 @@
 package dev.voxelbrew.slicer;
 
 import dev.voxelbrew.api.exporter.*;
-import dev.voxelbrew.engine.mesh.MeshOptions;
-import dev.voxelbrew.engine.model.CadDocument;
+import dev.voxelbrew.api.model.CadDocument;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
+import dev.voxelbrew.api.model.printing.*;
+import dev.voxelbrew.api.slicer.SlicerBackend;
+import dev.voxelbrew.api.slicer.Slicing.*;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.exporter.*;
 import dev.voxelbrew.importer.GcodeReader;
-import dev.voxelbrew.slicer.api.SlicerBackend;
-import dev.voxelbrew.slicer.api.Slicing.*;
 import java.io.*;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;

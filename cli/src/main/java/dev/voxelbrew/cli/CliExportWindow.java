@@ -3,7 +3,7 @@ package dev.voxelbrew.cli;
 import dev.voxelbrew.api.exporter.ExportDialog;
 import dev.voxelbrew.api.exporter.ExportWindow;
 import dev.voxelbrew.api.exporter.FileExportDialog;
-import dev.voxelbrew.api.vui.*;
+import dev.voxelbrew.api.model.vui.*;
 import dev.voxelbrew.util.config.PluginDirectorySource;
 import java.io.BufferedReader;
 import java.io.IOException;

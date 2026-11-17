@@ -841,7 +841,7 @@ JNIEXPORT jobject JNICALL Java_dev_voxelbrew_engine_geometry_NativeKernel_tessel
         env->SetDoubleArrayRegion(points, 0, static_cast<jsize>(vertices.size()), vertices.data());
         env->SetIntArrayRegion(triangles, 0, static_cast<jsize>(indices.size()), indices.data());
         env->SetIntArrayRegion(faceIds, 0, static_cast<jsize>(faces.size()), faces.data());
-        auto type = env->FindClass("dev/voxelbrew/engine/mesh/MeshData");
+        auto type = env->FindClass("dev/voxelbrew/api/model/mesh/MeshData");
         if (!type || env->ExceptionCheck()) return nullptr;
         auto constructor = env->GetMethodID(type, "<init>", "([D[I[I)V");
         return constructor ? env->NewObject(type, constructor, points, triangles, faceIds)

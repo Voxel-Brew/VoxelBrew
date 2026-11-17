@@ -1,5 +1,6 @@
 package dev.voxelbrew.engine.persistence;
 
+import dev.voxelbrew.api.model.parameters.*;
 import dev.voxelbrew.engine.parameters.*;
 import dev.voxelbrew.engine.persistence.proto.DocumentProto;
 

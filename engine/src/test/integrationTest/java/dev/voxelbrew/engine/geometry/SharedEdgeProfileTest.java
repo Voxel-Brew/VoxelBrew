@@ -1,8 +1,9 @@
 package dev.voxelbrew.engine.geometry;
 
-import static dev.voxelbrew.engine.sketch.SketchGeometry.*;
+import static dev.voxelbrew.api.model.sketch.SketchGeometry.*;
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.sketch.*;
 import dev.voxelbrew.engine.sketch.*;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -33,18 +34,17 @@ class SharedEdgeProfileTest {
             if (seed % 2 == 0)
                 entities.replaceAll(
                         e -> Sketches.entity(e.id(), Kind.LINE, false, e.value(2), e.value(3), e.value(0), e.value(1)));
-            var sketch = new dev.voxelbrew.engine.model.Feature.Sketch(
+            var sketch = new dev.voxelbrew.api.model.Feature.Sketch(
                     "sketch",
                     "profile",
-                    new dev.voxelbrew.engine.model.Feature.Plane("origin-xy", 0),
-                    new dev.voxelbrew.engine.model.Feature.Constrained(geometry(entities)));
+                    new dev.voxelbrew.api.model.Feature.Plane("origin-xy", 0),
+                    new dev.voxelbrew.api.model.Feature.Constrained(geometry(entities)));
             for (int i = 0; i < original.size(); i++) {
-                var reference = new dev.voxelbrew.engine.model.Feature.ProfileRef(
+                var reference = new dev.voxelbrew.api.model.Feature.ProfileRef(
                         "sketch", SketchProfiles.regionProfileId("profile", original.get(i)));
-                var session =
-                        new dev.voxelbrew.engine.model.ModelSession(dev.voxelbrew.engine.model.CadDocument.empty());
+                var session = new dev.voxelbrew.engine.model.ModelSession(dev.voxelbrew.api.model.CadDocument.empty());
                 session.add(sketch);
-                session.add(new dev.voxelbrew.engine.model.Feature.Extrude("extrude", reference, 5));
+                session.add(new dev.voxelbrew.api.model.Feature.Extrude("extrude", reference, 5));
                 var reopened = dev.voxelbrew.engine.persistence.DocumentCodec.decode(
                         dev.voxelbrew.engine.persistence.DocumentCodec.encode(session.document()));
                 try (var evaluation = new dev.voxelbrew.engine.model.ModelSession(reopened).evaluate()) {
@@ -72,11 +72,11 @@ class SharedEdgeProfileTest {
             assertThat(solid.contains(10, 5, 2)).isFalse();
             assertThat(solid.contains(10, 15, 2)).isFalse();
         }
-        var sketch = new dev.voxelbrew.engine.model.Feature.Sketch(
+        var sketch = new dev.voxelbrew.api.model.Feature.Sketch(
                 "s",
                 "p",
-                new dev.voxelbrew.engine.model.Feature.Plane("origin-xy", 0),
-                new dev.voxelbrew.engine.model.Feature.Constrained(g));
+                new dev.voxelbrew.api.model.Feature.Plane("origin-xy", 0),
+                new dev.voxelbrew.api.model.Feature.Constrained(g));
         assertThatThrownBy(() -> SketchProfiles.referencedRegions(sketch, "p/region/missing"))
                 .isInstanceOf(IllegalArgumentException.class);
     }

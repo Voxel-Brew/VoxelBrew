@@ -2,9 +2,11 @@ package dev.voxelbrew.gui;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.printing.*;
+import dev.voxelbrew.api.slicer.SlicerBackend;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.printing.*;
-import dev.voxelbrew.slicer.api.SlicerBackend;
 import dev.voxelbrew.slicer.prusa.PrusaSlicerBackend;
 import java.io.IOException;
 import java.nio.file.*;

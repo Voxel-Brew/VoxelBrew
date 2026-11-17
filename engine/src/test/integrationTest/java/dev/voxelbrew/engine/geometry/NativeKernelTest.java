@@ -2,6 +2,7 @@ package dev.voxelbrew.engine.geometry;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.geometry.Bounds;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -20,8 +21,8 @@ class NativeKernelTest {
                 Solid cut4 = cut3.cutThroughCircle(9, 43, 6);
                 Solid bored = cut4.cutThroughCircle(38, 26, 20)) {
             for (var solid : java.util.List.of(rounded, cut1, cut2, cut3, cut4, bored)) {
-                var mesh = solid.tessellate(dev.voxelbrew.engine.mesh.MeshOptions.DEFAULT);
-                var report = dev.voxelbrew.engine.mesh.MeshValidation.inspect(mesh);
+                var mesh = solid.tessellate(dev.voxelbrew.api.model.mesh.MeshOptions.DEFAULT);
+                var report = dev.voxelbrew.api.model.mesh.MeshValidation.inspect(mesh);
                 assertThat(report.closed()).as(report.toString()).isTrue();
                 for (int t = 0; t < mesh.triangleCount(); t++) {
                     assertThat(mesh.faceIndex(t) >= 0).isTrue();

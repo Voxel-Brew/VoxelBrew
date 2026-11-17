@@ -1,7 +1,8 @@
 package dev.voxelbrew.slicer.cura;
 
+import dev.voxelbrew.api.model.printing.*;
+import dev.voxelbrew.api.slicer.SlicerBackend;
 import dev.voxelbrew.engine.printing.*;
-import dev.voxelbrew.slicer.api.SlicerBackend;
 import dev.voxelbrew.slicer.internal.ProcessRunner;
 import java.io.IOException;
 import java.nio.file.*;

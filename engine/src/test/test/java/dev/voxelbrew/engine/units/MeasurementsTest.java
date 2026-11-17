@@ -1,9 +1,11 @@
 package dev.voxelbrew.engine.units;
 
-import static dev.voxelbrew.engine.units.Measurements.*;
+import static dev.voxelbrew.api.model.units.Measurements.*;
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.mesh.MeshOptions;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
+import dev.voxelbrew.api.model.parameters.*;
+import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.engine.parameters.*;
 import dev.voxelbrew.engine.printing.*;
 import java.util.Map;

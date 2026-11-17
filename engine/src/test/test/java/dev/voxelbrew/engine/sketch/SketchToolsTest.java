@@ -1,9 +1,11 @@
 package dev.voxelbrew.engine.sketch;
 
-import static dev.voxelbrew.engine.sketch.SketchGeometry.*;
+import static dev.voxelbrew.api.model.sketch.SketchGeometry.*;
 import static dev.voxelbrew.engine.sketch.SketchTools.Tool.*;
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.sketch.SketchGeometry;
+import dev.voxelbrew.api.model.sketch.SketchText;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 

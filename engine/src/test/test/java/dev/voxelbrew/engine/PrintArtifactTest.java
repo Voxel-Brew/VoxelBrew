@@ -2,9 +2,10 @@ package dev.voxelbrew.engine;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.printing.PrintArtifact;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
-import dev.voxelbrew.engine.printing.PrintArtifact;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 

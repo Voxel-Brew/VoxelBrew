@@ -2,7 +2,7 @@ package dev.voxelbrew.gui;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.model.CadDocument;
+import dev.voxelbrew.api.model.CadDocument;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
@@ -44,8 +44,8 @@ class InjectedDocumentIoTest {
                             }
 
                             @Override
-                            public dev.voxelbrew.api.vui.Layout layout() {
-                                return new dev.voxelbrew.api.vui.VerticalLayout();
+                            public dev.voxelbrew.api.model.vui.Layout layout() {
+                                return new dev.voxelbrew.api.model.vui.VerticalLayout();
                             }
 
                             @Override
@@ -133,8 +133,8 @@ class InjectedDocumentIoTest {
                                     }
 
                                     @Override
-                                    public dev.voxelbrew.api.vui.Layout layout() {
-                                        return new dev.voxelbrew.api.vui.VerticalLayout();
+                                    public dev.voxelbrew.api.model.vui.Layout layout() {
+                                        return new dev.voxelbrew.api.model.vui.VerticalLayout();
                                     }
 
                                     @Override

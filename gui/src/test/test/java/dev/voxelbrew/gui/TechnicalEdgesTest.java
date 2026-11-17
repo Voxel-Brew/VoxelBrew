@@ -2,7 +2,7 @@ package dev.voxelbrew.gui;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.mesh.MeshData;
+import dev.voxelbrew.api.model.mesh.MeshData;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 

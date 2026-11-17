@@ -1,10 +1,10 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.engine.construction.ConstructionGeometry.Vector;
-import dev.voxelbrew.engine.construction.ConstructionTools.Tool;
-import dev.voxelbrew.engine.model.ConstructionFeature;
-import dev.voxelbrew.engine.model.ConstructionFeature.Input;
-import dev.voxelbrew.engine.model.ConstructionFeature.Selection;
+import dev.voxelbrew.api.model.ConstructionFeature;
+import dev.voxelbrew.api.model.ConstructionFeature.Input;
+import dev.voxelbrew.api.model.ConstructionFeature.Selection;
+import dev.voxelbrew.api.model.construction.ConstructionGeometry.Vector;
+import dev.voxelbrew.api.model.construction.ConstructionTools.Tool;
 import dev.voxelbrew.util.i18n.Translations;
 import java.util.ArrayList;
 import java.util.List;
@@ -63,7 +63,7 @@ final class ConstructionEditor extends VBox {
             if (feature.id().equals(id)) break;
             if (controller.build().construction().containsKey(feature.id())) {
                 int parts = controller.build().construction().get(feature.id())
-                                instanceof dev.voxelbrew.engine.construction.ConstructionGeometry.CoordinateSystem
+                                instanceof dev.voxelbrew.api.model.construction.ConstructionGeometry.CoordinateSystem
                         ? 7
                         : 1;
                 for (int part = 0; part < parts; part++)
@@ -163,7 +163,8 @@ final class ConstructionEditor extends VBox {
         if (input.selection() == Selection.DATUM)
             return controller.snapshot().document().featureName(input.source(), input.source())
                     + (controller.build().construction().get(input.source())
-                                    instanceof dev.voxelbrew.engine.construction.ConstructionGeometry.CoordinateSystem
+                                    instanceof
+                                    dev.voxelbrew.api.model.construction.ConstructionGeometry.CoordinateSystem
                             ? " · " + new String[] {"O", "X", "Y", "Z", "YZ", "XZ", "XY"}[input.index()]
                             : "");
         String name = translations.text("construction.selection." + input.selection());

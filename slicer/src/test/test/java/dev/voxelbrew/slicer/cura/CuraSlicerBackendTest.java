@@ -2,6 +2,7 @@ package dev.voxelbrew.slicer.cura;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.engine.printing.*;
 import java.nio.file.*;
 import java.util.*;
@@ -25,7 +26,7 @@ class CuraSlicerBackendTest {
         assertThat(settings.get("support_enable")).isEqualTo("false");
         assertThat(settings.get("center_object")).isEqualTo("false");
         assertThatThrownBy(() -> settings.put("layer_height", "1")).isInstanceOf(UnsupportedOperationException.class);
-        assertThatThrownBy(() -> backend.slice(new dev.voxelbrew.slicer.api.SlicerBackend.Request(
+        assertThatThrownBy(() -> backend.slice(new dev.voxelbrew.api.slicer.SlicerBackend.Request(
                         model,
                         file,
                         Path.of("unused"),

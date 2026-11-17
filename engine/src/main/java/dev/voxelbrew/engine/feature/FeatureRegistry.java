@@ -1,8 +1,8 @@
 package dev.voxelbrew.engine.feature;
 
+import dev.voxelbrew.api.model.Feature;
+import dev.voxelbrew.api.model.ModelException;
 import dev.voxelbrew.engine.geometry.Solid;
-import dev.voxelbrew.engine.model.Feature;
-import dev.voxelbrew.engine.model.ModelException;
 import java.io.IOException;
 import java.net.*;
 import java.nio.file.*;

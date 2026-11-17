@@ -3,10 +3,10 @@ package dev.voxelbrew.exporter;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.exporter.FileExportDialog;
-import dev.voxelbrew.engine.mesh.MeshData;
-import dev.voxelbrew.engine.mesh.MeshOptions;
-import dev.voxelbrew.engine.model.BodyInstance;
-import dev.voxelbrew.engine.model.Transform;
+import dev.voxelbrew.api.model.BodyInstance;
+import dev.voxelbrew.api.model.Transform;
+import dev.voxelbrew.api.model.mesh.MeshData;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;

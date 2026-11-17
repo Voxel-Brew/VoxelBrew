@@ -2,7 +2,7 @@ package dev.voxelbrew.cli;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.model.CadDocument;
+import dev.voxelbrew.api.model.CadDocument;
 import dev.voxelbrew.util.config.UserConfiguration;
 import dev.voxelbrew.util.di.ApplicationModule;
 import java.io.*;
@@ -19,11 +19,19 @@ class WorkspaceCommandsTest {
 
     @Test
     void disablingSupportsRetainsDefinitionsAndMovingAnInstanceMovesItsAttachments() {
-        var owner = new dev.voxelbrew.engine.model.BodyInstance(
-                "first", "body", dev.voxelbrew.engine.model.Transform.IDENTITY);
-        var support = new dev.voxelbrew.engine.printing.SupportVolume(
-                "support", "first", dev.voxelbrew.engine.printing.SupportVolume.Role.SOLID_SUPPORT, 0, 0, 0, 5, 5, 5);
-        var setup = dev.voxelbrew.engine.printing.PrintSetup.empty()
+        var owner =
+                new dev.voxelbrew.api.model.BodyInstance("first", "body", dev.voxelbrew.api.model.Transform.IDENTITY);
+        var support = new dev.voxelbrew.api.model.printing.SupportVolume(
+                "support",
+                "first",
+                dev.voxelbrew.api.model.printing.SupportVolume.Role.SOLID_SUPPORT,
+                0,
+                0,
+                0,
+                5,
+                5,
+                5);
+        var setup = dev.voxelbrew.api.model.printing.PrintSetup.empty()
                 .withInstances(List.of(owner))
                 .withSupports(List.of(support));
         var document = new AtomicReference<>(
@@ -102,11 +110,11 @@ class WorkspaceCommandsTest {
     @Test
     void cursorChangesAreNotUndoEntriesAndUndoNeverRewindsIdsOrRestoresStaleJobs() throws Exception {
         var model = new dev.voxelbrew.engine.model.ModelSession(CadDocument.empty());
-        model.add(new dev.voxelbrew.engine.model.Feature.Sketch(
+        model.add(new dev.voxelbrew.api.model.Feature.Sketch(
                 "outline",
                 "profile",
-                dev.voxelbrew.engine.model.Feature.Plane.origin("XY"),
-                new dev.voxelbrew.engine.model.Feature.Rectangle(0, 0, 10, 10)));
+                dev.voxelbrew.api.model.Feature.Plane.origin("XY"),
+                new dev.voxelbrew.api.model.Feature.Rectangle(0, 0, 10, 10)));
         var initial = model.document().withGcode(Map.of("plate-1", List.of("G1 X1")));
         long ids = initial.uuidGenerator().nextValue();
         var document = new AtomicReference<>(initial);

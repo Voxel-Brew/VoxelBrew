@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.engine.model.Feature;
+import dev.voxelbrew.api.model.Feature;
 import dev.voxelbrew.util.i18n.Translations;
 import dev.voxelbrew.util.update.ApplicationImage;
 import dev.voxelbrew.util.update.UpdateCancellation;

@@ -4,12 +4,12 @@ import dagger.Module;
 import dagger.Provides;
 import dev.voxelbrew.api.exporter.*;
 import dev.voxelbrew.api.importer.*;
+import dev.voxelbrew.api.slicer.SlicerCatalog;
+import dev.voxelbrew.api.slicer.SlicerRuntime;
+import dev.voxelbrew.api.slicer.Slicing;
 import dev.voxelbrew.importer.DocumentSource;
 import dev.voxelbrew.importer.GcodeSource;
 import dev.voxelbrew.importer.ImportRuntime;
-import dev.voxelbrew.slicer.api.SlicerCatalog;
-import dev.voxelbrew.slicer.api.SlicerRuntime;
-import dev.voxelbrew.slicer.api.Slicing;
 import javax.inject.Singleton;
 
 @Module
@@ -80,7 +80,7 @@ public final class FileIoModule {
     }
 
     @Provides
-    dev.voxelbrew.slicer.api.PrinterProfileCatalog printers() {
+    dev.voxelbrew.api.slicer.PrinterProfileCatalog printers() {
         return slicerRuntime.printers(dev.voxelbrew.util.config.ApplicationPaths.printers());
     }
 

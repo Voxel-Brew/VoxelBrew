@@ -1,10 +1,13 @@
 package dev.voxelbrew.engine.model;
 
-import static dev.voxelbrew.engine.units.Measurements.*;
+import static dev.voxelbrew.api.model.units.Measurements.*;
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.CadDocument;
+import dev.voxelbrew.api.model.Feature;
+import dev.voxelbrew.api.model.Transform;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
 import dev.voxelbrew.engine.geometry.Solid;
-import dev.voxelbrew.engine.mesh.MeshOptions;
 import dev.voxelbrew.engine.persistence.proto.DocumentProto;
 import dev.voxelbrew.exporter.DocumentWriter;
 import dev.voxelbrew.importer.DocumentReader;

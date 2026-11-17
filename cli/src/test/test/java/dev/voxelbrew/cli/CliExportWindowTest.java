@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.exporter.ExportDialog;
 import dev.voxelbrew.api.exporter.FileExportDialog;
-import dev.voxelbrew.api.vui.FileDestination;
-import dev.voxelbrew.api.vui.Layout;
-import dev.voxelbrew.api.vui.VerticalLayout;
+import dev.voxelbrew.api.model.vui.FileDestination;
+import dev.voxelbrew.api.model.vui.Layout;
+import dev.voxelbrew.api.model.vui.VerticalLayout;
 import java.io.BufferedReader;
 import java.io.PrintWriter;
 import java.io.StringReader;

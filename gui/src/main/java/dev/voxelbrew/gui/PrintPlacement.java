@@ -1,7 +1,7 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.engine.model.BodyInstance;
-import dev.voxelbrew.engine.model.Transform;
+import dev.voxelbrew.api.model.BodyInstance;
+import dev.voxelbrew.api.model.Transform;
 
 /** Screen projection and hit testing for transient plate placement. */
 final class PrintPlacement {
@@ -18,8 +18,8 @@ final class PrintPlacement {
                 source.id(), source.bodyId(), Transform.translation(x, y, 0).compose(source.transform()));
     }
 
-    static dev.voxelbrew.engine.printing.PrintSetup reorder(
-            dev.voxelbrew.engine.printing.PrintSetup setup, String source, String target) {
+    static dev.voxelbrew.api.model.printing.PrintSetup reorder(
+            dev.voxelbrew.api.model.printing.PrintSetup setup, String source, String target) {
         var plates = new java.util.ArrayList<>(setup.plates());
         var moving =
                 plates.stream().filter(p -> p.id().equals(source)).findFirst().orElseThrow();
@@ -29,7 +29,7 @@ final class PrintPlacement {
                 .orElseThrow();
         plates.remove(moving);
         plates.add(destination, moving);
-        return new dev.voxelbrew.engine.printing.PrintSetup(
+        return new dev.voxelbrew.api.model.printing.PrintSetup(
                 setup.id(),
                 setup.version(),
                 setup.backendId(),
@@ -43,7 +43,7 @@ final class PrintPlacement {
                 setup.supportsDisabled());
     }
 
-    static Transform autoOrient(dev.voxelbrew.engine.mesh.MeshData mesh, Transform current) {
+    static Transform autoOrient(dev.voxelbrew.api.model.mesh.MeshData mesh, Transform current) {
         return dev.voxelbrew.engine.printing.PrintOrientation.autoOrient(mesh, current);
     }
 

@@ -1,7 +1,7 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.engine.mesh.MeshData;
-import dev.voxelbrew.engine.model.Feature;
+import dev.voxelbrew.api.model.Feature;
+import dev.voxelbrew.api.model.mesh.MeshData;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -311,12 +311,12 @@ public final class Viewport extends StackPane {
     private final ConstructionView construction = new ConstructionView(), constructionPreview = new ConstructionView();
 
     public void showConstruction(
-            java.util.Map<String, dev.voxelbrew.engine.construction.ConstructionGeometry.Datum> values,
+            java.util.Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> values,
             Consumer<String> selected) {
         construction.show(values, selected);
     }
 
-    public void previewConstruction(dev.voxelbrew.engine.construction.ConstructionGeometry.Datum value) {
+    public void previewConstruction(dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum value) {
         constructionPreview.preview(value);
     }
 
@@ -330,7 +330,7 @@ public final class Viewport extends StackPane {
     }
 
     /** Convert a CAD placement to FX axes without changing handedness or millimeter scale. */
-    static Affine viewTransform(dev.voxelbrew.engine.model.Transform frame) {
+    static Affine viewTransform(dev.voxelbrew.api.model.Transform frame) {
         var m = frame.matrix();
         return new Affine(m[0], -m[2], m[1], m[3], -m[8], m[10], -m[9], -m[11], m[4], -m[6], m[5], m[7]);
     }
@@ -458,7 +458,7 @@ public final class Viewport extends StackPane {
 
     public Point3D pointOnPlane(double x, double y, double z) {
         double scale = 2
-                * Math.tan(dev.voxelbrew.engine.units.Measurements.radians(camera.getFieldOfView() / 2))
+                * Math.tan(dev.voxelbrew.api.model.units.Measurements.radians(camera.getFieldOfView() / 2))
                 / scene.getHeight();
         Point3D a = toModel(world.parentToLocal(new Point3D(0, 0, -distance)));
         Point3D b = toModel(world.parentToLocal(
@@ -561,11 +561,11 @@ public final class Viewport extends StackPane {
     }
 
     private void showConstrainedSketch(
-            Feature.Sketch sketch, dev.voxelbrew.engine.sketch.SketchGeometry geometry, boolean chosen) {
+            Feature.Sketch sketch, dev.voxelbrew.api.model.sketch.SketchGeometry geometry, boolean chosen) {
         var group = new Group();
         group.getTransforms().add(viewTransform(sketch.plane().frame()));
         for (var entity : geometry.entities()) {
-            java.util.List<dev.voxelbrew.engine.sketch.SketchGeometry.Entity> curves;
+            java.util.List<dev.voxelbrew.api.model.sketch.SketchGeometry.Entity> curves;
             try {
                 curves = geometry.curves(entity);
             } catch (IllegalArgumentException invalid) {
@@ -605,7 +605,7 @@ public final class Viewport extends StackPane {
         sketches.getChildren().add(group);
     }
 
-    private static Point3D sketchPoint(Feature.Plane plane, dev.voxelbrew.engine.sketch.SketchGeometry.Vec point) {
+    private static Point3D sketchPoint(Feature.Plane plane, dev.voxelbrew.api.model.sketch.SketchGeometry.Vec point) {
         var model = plane.frame().apply(point.x(), point.y(), plane.offsetZ() + .04);
         return new Point3D(model[0], model[1], model[2]);
     }
@@ -657,11 +657,11 @@ public final class Viewport extends StackPane {
                     .flatMap(e -> e.sample().stream())
                     .toList();
             x = points.stream()
-                    .mapToDouble(dev.voxelbrew.engine.sketch.SketchGeometry.Vec::x)
+                    .mapToDouble(dev.voxelbrew.api.model.sketch.SketchGeometry.Vec::x)
                     .average()
                     .orElse(0);
             y = points.stream()
-                    .mapToDouble(dev.voxelbrew.engine.sketch.SketchGeometry.Vec::y)
+                    .mapToDouble(dev.voxelbrew.api.model.sketch.SketchGeometry.Vec::y)
                     .average()
                     .orElse(0);
         }
@@ -882,7 +882,7 @@ public final class Viewport extends StackPane {
         selected = id;
         bodyViews.forEach((key, view) -> {
             var base = Color.web(bodyStyles
-                    .getOrDefault(key, dev.voxelbrew.engine.model.BodyStyle.DEFAULT)
+                    .getOrDefault(key, dev.voxelbrew.api.model.BodyStyle.DEFAULT)
                     .color());
             var material = new PhongMaterial(key.equals(id) ? base.interpolate(Color.web("#edae49"), 0.3) : base);
             material.setSpecularColor(key.equals(id) ? Color.web("#fff1ba") : Color.WHITE);
@@ -897,9 +897,9 @@ public final class Viewport extends StackPane {
                 view.setMaterial(new PhongMaterial(key.equals(id) ? Color.web("#a86600") : Color.web("#202124"))));
     }
 
-    private Map<String, dev.voxelbrew.engine.model.BodyStyle> bodyStyles = Map.of();
+    private Map<String, dev.voxelbrew.api.model.BodyStyle> bodyStyles = Map.of();
 
-    public void setBodyStyles(Map<String, dev.voxelbrew.engine.model.BodyStyle> styles) {
+    public void setBodyStyles(Map<String, dev.voxelbrew.api.model.BodyStyle> styles) {
         if (bodyStyles.equals(styles)) return;
         bodyStyles = Map.copyOf(styles);
         select(selected);

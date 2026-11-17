@@ -2,7 +2,7 @@ package dev.voxelbrew.exporter;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.model.CadDocument;
+import dev.voxelbrew.api.model.CadDocument;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import dev.voxelbrew.engine.persistence.DocumentFormatException;
 import dev.voxelbrew.engine.persistence.proto.DocumentProto;
@@ -69,7 +69,7 @@ class DocumentWriterTest {
             if (feature.hasSketch())
                 feature.getSketchBuilder()
                         .getPlaneBuilder()
-                        .addAllFrame(Arrays.stream(dev.voxelbrew.engine.model.Transform.IDENTITY.matrix())
+                        .addAllFrame(Arrays.stream(dev.voxelbrew.api.model.Transform.IDENTITY.matrix())
                                 .boxed()
                                 .toList());
         assertThat(DocumentCodec.fingerprint(document))

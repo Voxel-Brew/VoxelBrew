@@ -1,7 +1,7 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.slicer.api.SlicerBackend;
-import dev.voxelbrew.slicer.api.SlicerCatalog;
+import dev.voxelbrew.api.slicer.SlicerBackend;
+import dev.voxelbrew.api.slicer.SlicerCatalog;
 import dev.voxelbrew.util.config.UserConfiguration;
 import java.io.IOException;
 import java.util.Map;

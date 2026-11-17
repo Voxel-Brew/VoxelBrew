@@ -2,7 +2,7 @@ package dev.voxelbrew.cli;
 
 import dev.voxelbrew.api.importer.ImportDialog;
 import dev.voxelbrew.api.importer.ImportWindow;
-import dev.voxelbrew.api.vui.*;
+import dev.voxelbrew.api.model.vui.*;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;

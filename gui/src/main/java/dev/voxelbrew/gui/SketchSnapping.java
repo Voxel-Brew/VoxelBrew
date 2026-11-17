@@ -1,8 +1,8 @@
 package dev.voxelbrew.gui;
 
-import static dev.voxelbrew.engine.sketch.SketchGeometry.*;
+import static dev.voxelbrew.api.model.sketch.SketchGeometry.*;
 
-import dev.voxelbrew.engine.sketch.SketchGeometry;
+import dev.voxelbrew.api.model.sketch.SketchGeometry;
 
 /** Screen-sized drawing snaps, evaluated on the actual curves rather than display chords. */
 final class SketchSnapping {

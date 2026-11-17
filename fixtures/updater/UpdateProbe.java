@@ -70,7 +70,7 @@ public final class UpdateProbe {
     private static void verifyDocumentVersion(String expectedVersion, Path path) throws Exception {
         if (!expectedVersion.equals(dev.voxelbrew.util.Version.version()))
             throw new IllegalStateException("Packaged Version does not match the installed release");
-        var document = dev.voxelbrew.engine.model.CadDocument.empty();
+        var document = dev.voxelbrew.api.model.CadDocument.empty();
         dev.voxelbrew.exporter.DocumentWriter.save(document, path, false);
         byte[] bytes = Files.readAllBytes(path);
         var message = dev.voxelbrew.engine.persistence.proto.DocumentProto.Document.parseFrom(

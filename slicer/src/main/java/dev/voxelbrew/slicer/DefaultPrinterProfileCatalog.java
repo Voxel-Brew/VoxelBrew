@@ -1,8 +1,9 @@
 package dev.voxelbrew.slicer;
 
 import com.google.gson.*;
+import dev.voxelbrew.api.model.printing.*;
+import dev.voxelbrew.api.slicer.PrinterProfileCatalog;
 import dev.voxelbrew.engine.printing.*;
-import dev.voxelbrew.slicer.api.PrinterProfileCatalog;
 import java.util.*;
 
 /** Validated, reloadable catalog. Saved documents never depend on this service. */

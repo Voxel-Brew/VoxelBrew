@@ -1,7 +1,7 @@
 package dev.voxelbrew.gui;
 
 import com.google.gson.Gson;
-import dev.voxelbrew.engine.model.Feature;
+import dev.voxelbrew.api.model.Feature;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;

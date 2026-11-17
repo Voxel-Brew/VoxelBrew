@@ -1,7 +1,8 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.model.parameters.*;
+import dev.voxelbrew.api.model.units.Measurements;
 import dev.voxelbrew.engine.parameters.*;
-import dev.voxelbrew.engine.units.Measurements;
 import java.util.Objects;
 import java.util.function.Supplier;
 import javafx.beans.binding.Bindings;

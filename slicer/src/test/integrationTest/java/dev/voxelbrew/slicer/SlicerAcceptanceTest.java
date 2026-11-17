@@ -2,7 +2,9 @@ package dev.voxelbrew.slicer;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.mesh.*;
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.mesh.*;
+import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.exporter.DocumentWriter;
@@ -86,7 +88,7 @@ class SlicerAcceptanceTest {
                 true,
                 new Cancellation(),
                 messages::add,
-                dev.voxelbrew.slicer.api.Slicing.DIRECT);
+                dev.voxelbrew.api.slicer.Slicing.DIRECT);
         Files.write(artifacts.resolve(name + ".log"), messages);
         System.out.println(name
                 + ": model layers="

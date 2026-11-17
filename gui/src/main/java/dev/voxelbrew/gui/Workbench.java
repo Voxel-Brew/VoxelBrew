@@ -1,8 +1,10 @@
 package dev.voxelbrew.gui;
 
 import dev.voxelbrew.api.exporter.ExporterProviderRegistry;
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.mesh.MeshData;
+import dev.voxelbrew.api.model.parameters.*;
 import dev.voxelbrew.engine.feature.FeatureRegistry;
-import dev.voxelbrew.engine.mesh.MeshData;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.parameters.*;
 import dev.voxelbrew.util.i18n.Translations;
@@ -305,8 +307,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     private final Button customFeature;
     private final Button parameters;
     private final ComboBox<String> configuration = new ComboBox<>();
-    private dev.voxelbrew.engine.parameters.ParameterSet lastParameters =
-            dev.voxelbrew.engine.parameters.ParameterSet.empty();
+    private dev.voxelbrew.api.model.parameters.ParameterSet lastParameters =
+            dev.voxelbrew.api.model.parameters.ParameterSet.empty();
     private final Button constrainedSketch;
     private final Button extrude;
     private final Button cut;
@@ -724,12 +726,12 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         var constructionMenu = new MenuButton(translations.text("construction.menu"));
         constructionMenu.setId("construction-menu");
         constructionMenu.setGraphic(
-                ConstructionIcons.icon(dev.voxelbrew.engine.construction.ConstructionTools.Tool.OFFSET_PLANE));
+                ConstructionIcons.icon(dev.voxelbrew.api.model.construction.ConstructionTools.Tool.OFFSET_PLANE));
         UiHelp.menu(constructionMenu, translations);
-        for (var command : dev.voxelbrew.engine.construction.ConstructionTools.Tool.values()) {
-            if (command == dev.voxelbrew.engine.construction.ConstructionTools.Tool.OFFSET_PLANE
-                    || command == dev.voxelbrew.engine.construction.ConstructionTools.Tool.AXIS_SURFACE
-                    || command == dev.voxelbrew.engine.construction.ConstructionTools.Tool.POINT_VERTEX)
+        for (var command : dev.voxelbrew.api.model.construction.ConstructionTools.Tool.values()) {
+            if (command == dev.voxelbrew.api.model.construction.ConstructionTools.Tool.OFFSET_PLANE
+                    || command == dev.voxelbrew.api.model.construction.ConstructionTools.Tool.AXIS_SURFACE
+                    || command == dev.voxelbrew.api.model.construction.ConstructionTools.Tool.POINT_VERTEX)
                 constructionMenu.getItems().add(new SeparatorMenuItem());
             var item = new MenuItem(translations.text("construction." + command.name()));
             item.setGraphic(ConstructionIcons.icon(command));
@@ -1607,7 +1609,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 .snapshot()
                 .document()
                 .parameters()
-                .binding(new dev.voxelbrew.engine.parameters.ParameterSet.Target(feature.id(), name));
+                .binding(new dev.voxelbrew.api.model.parameters.ParameterSet.Target(feature.id(), name));
         if (!expression.isEmpty()) field.setText(expression);
         var apply = button(translations.text("gui.apply"), "apply-" + name, () -> {
             String text = field.getText().strip();
@@ -1778,7 +1780,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                             () -> choosePlane(Feature.Plane.origin(name))));
         form.getChildren().add(origins);
         controller.build().construction().forEach((id, datum) -> {
-            if (datum instanceof dev.voxelbrew.engine.construction.ConstructionGeometry.Plane plane) {
+            if (datum instanceof dev.voxelbrew.api.model.construction.ConstructionGeometry.Plane plane) {
                 var choose = new Button(controller.snapshot().document().featureName(id, featureBaseName(id)));
                 choose.setId("choose-construction-" + id);
                 choose.setOnAction(
@@ -1949,7 +1951,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                         .snapshot()
                         .document()
                         .parameters()
-                        .value(distance.getText(), dev.voxelbrew.engine.parameters.ParameterUnit.MM);
+                        .value(distance.getText(), dev.voxelbrew.api.model.parameters.ParameterUnit.MM);
                 controller.previewExtrusion(
                         sketch,
                         profileIds.get(region.getSelectionModel().getSelectedIndex()),
@@ -2213,7 +2215,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     }
 
     private void beginConstruction(
-            dev.voxelbrew.engine.construction.ConstructionTools.Tool command, ConstructionFeature original) {
+            dev.voxelbrew.api.model.construction.ConstructionTools.Tool command, ConstructionFeature original) {
         if (controller.rebuilding()
                 || controller.ioBusy()
                 || (original == null && !controller.build().valid())) return;
@@ -2276,7 +2278,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         if (!controller.dirty()
                 && document.features().isEmpty()
                 && document.gcode().isEmpty()
-                && document.parameters().equals(dev.voxelbrew.engine.parameters.ParameterSet.empty())) {
+                && document.parameters().equals(dev.voxelbrew.api.model.parameters.ParameterSet.empty())) {
             requestChange(currentWindow);
             return;
         }

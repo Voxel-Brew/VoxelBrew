@@ -2,7 +2,7 @@ package dev.voxelbrew.exporter;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.model.CadDocument;
+import dev.voxelbrew.api.model.CadDocument;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.jar.*;

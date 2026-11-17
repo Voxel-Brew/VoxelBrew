@@ -1,8 +1,9 @@
 package dev.voxelbrew.slicer.prusa;
 
+import dev.voxelbrew.api.model.printing.*;
+import dev.voxelbrew.api.slicer.SlicerBackend;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.exporter.printing.PrusaConfiguration;
-import dev.voxelbrew.slicer.api.SlicerBackend;
 import dev.voxelbrew.slicer.internal.ProcessRunner;
 import java.io.*;
 import java.nio.charset.StandardCharsets;

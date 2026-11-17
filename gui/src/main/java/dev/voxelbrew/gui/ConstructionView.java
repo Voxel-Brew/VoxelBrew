@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.engine.construction.ConstructionGeometry.*;
+import dev.voxelbrew.api.model.construction.ConstructionGeometry.*;
 import java.util.Map;
 import java.util.function.Consumer;
 import javafx.geometry.Point3D;

@@ -2,20 +2,29 @@ package dev.voxelbrew.gui;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.*;
 import dev.voxelbrew.engine.model.*;
 import org.junit.jupiter.api.Test;
 
 class PrintPlacementTest {
     @Test
     void automaticOrientationUsesBroadBedFaceAndPreservesCenter() {
-        var mesh = dev.voxelbrew.engine.printing.MeshGeometry.box(new dev.voxelbrew.engine.printing.SupportVolume(
-                "support", "part", dev.voxelbrew.engine.printing.SupportVolume.Role.SOLID_SUPPORT, 0, 0, 0, 60, 40, 5));
+        var mesh = dev.voxelbrew.api.model.printing.MeshGeometry.box(new dev.voxelbrew.api.model.printing.SupportVolume(
+                "support",
+                "part",
+                dev.voxelbrew.api.model.printing.SupportVolume.Role.SOLID_SUPPORT,
+                0,
+                0,
+                0,
+                60,
+                40,
+                5));
         var current = Transform.translation(80, 90, 20).compose(Transform.rotation(90, 0, 30));
-        var before = dev.voxelbrew.engine.printing.MeshGeometry.bounds(
-                dev.voxelbrew.engine.printing.MeshGeometry.transform(mesh, current));
+        var before = dev.voxelbrew.api.model.printing.MeshGeometry.bounds(
+                dev.voxelbrew.api.model.printing.MeshGeometry.transform(mesh, current));
         var oriented = PrintPlacement.autoOrient(mesh, current);
-        var after = dev.voxelbrew.engine.printing.MeshGeometry.bounds(
-                dev.voxelbrew.engine.printing.MeshGeometry.transform(mesh, oriented));
+        var after = dev.voxelbrew.api.model.printing.MeshGeometry.bounds(
+                dev.voxelbrew.api.model.printing.MeshGeometry.transform(mesh, oriented));
         assertThat(after.minZ()).isCloseTo(0, org.assertj.core.data.Offset.offset(1e-6));
         assertThat(after.maxZ()).isCloseTo(5, org.assertj.core.data.Offset.offset(1e-6));
         assertThat(after.minX() + after.maxX())
@@ -26,13 +35,13 @@ class PrintPlacementTest {
 
     @Test
     void plateReorderPreservesSelectionContentsAndPreferences() {
-        var setup = dev.voxelbrew.engine.printing.PrintSetup.empty()
+        var setup = dev.voxelbrew.api.model.printing.PrintSetup.empty()
                 .addPlate("second")
                 .addPlate("third")
                 .withWorkspaceSettings(java.util.Map.of("print-overwrite", "true"));
         var reordered = PrintPlacement.reorder(setup, "plate-1", "third");
         assertThat(reordered.plates().stream()
-                        .map(dev.voxelbrew.engine.printing.PrintPlate::id)
+                        .map(dev.voxelbrew.api.model.printing.PrintPlate::id)
                         .toList())
                 .isEqualTo(java.util.List.of("second", "third", "plate-1"));
         assertThat(reordered.activePlateId()).isEqualTo(setup.activePlateId());

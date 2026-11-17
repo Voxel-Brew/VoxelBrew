@@ -2,7 +2,9 @@ package dev.voxelbrew.engine.geometry;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.mesh.*;
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.mesh.*;
+import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.performance.ComputeBenchmark;
 import dev.voxelbrew.engine.printing.*;

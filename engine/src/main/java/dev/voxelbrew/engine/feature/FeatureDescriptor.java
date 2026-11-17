@@ -1,6 +1,6 @@
 package dev.voxelbrew.engine.feature;
 
-import dev.voxelbrew.engine.model.CadDocument;
+import dev.voxelbrew.api.model.CadDocument;
 import java.util.*;
 import lombok.NonNull;
 

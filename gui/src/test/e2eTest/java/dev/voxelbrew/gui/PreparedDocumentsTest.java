@@ -2,8 +2,8 @@ package dev.voxelbrew.gui;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.Feature;
 import dev.voxelbrew.engine.model.Evaluator;
-import dev.voxelbrew.engine.model.Feature;
 import dev.voxelbrew.importer.DocumentReader;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;

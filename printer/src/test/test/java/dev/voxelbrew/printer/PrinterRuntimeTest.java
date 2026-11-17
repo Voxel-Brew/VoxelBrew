@@ -2,7 +2,7 @@ package dev.voxelbrew.printer;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.printer.api.*;
+import dev.voxelbrew.api.printer.*;
 import java.nio.file.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

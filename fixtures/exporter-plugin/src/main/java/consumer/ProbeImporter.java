@@ -1,8 +1,8 @@
 package consumer;
 
 import dev.voxelbrew.api.importer.*;
-import dev.voxelbrew.api.vui.*;
-import dev.voxelbrew.engine.model.*;
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.vui.*;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;

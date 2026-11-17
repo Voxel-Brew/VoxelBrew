@@ -1,7 +1,7 @@
 package dev.voxelbrew.printer;
 
 import com.google.gson.*;
-import dev.voxelbrew.printer.api.*;
+import dev.voxelbrew.api.printer.*;
 import java.io.*;
 import java.net.*;
 import java.net.http.*;

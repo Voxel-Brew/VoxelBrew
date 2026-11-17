@@ -1,8 +1,10 @@
 package dev.voxelbrew.engine.geometry;
 
-import static dev.voxelbrew.engine.sketch.SketchGeometry.*;
+import static dev.voxelbrew.api.model.sketch.SketchGeometry.*;
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.sketch.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.sketch.*;
 import dev.voxelbrew.exporter.DocumentWriter;

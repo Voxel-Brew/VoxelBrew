@@ -1,6 +1,7 @@
 package dev.voxelbrew.gui;
 
 import dev.voxelbrew.api.importer.*;
+import dev.voxelbrew.api.model.parameters.*;
 import dev.voxelbrew.engine.parameters.*;
 import dev.voxelbrew.util.i18n.Translations;
 import java.nio.file.*;

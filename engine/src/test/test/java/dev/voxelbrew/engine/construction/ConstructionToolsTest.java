@@ -1,7 +1,7 @@
 package dev.voxelbrew.engine.construction;
 
-import static dev.voxelbrew.engine.construction.ConstructionGeometry.*;
-import static dev.voxelbrew.engine.construction.ConstructionTools.*;
+import static dev.voxelbrew.api.model.construction.ConstructionGeometry.*;
+import static dev.voxelbrew.api.model.construction.ConstructionTools.*;
 import static org.assertj.core.api.Assertions.*;
 
 import org.junit.jupiter.api.Test;

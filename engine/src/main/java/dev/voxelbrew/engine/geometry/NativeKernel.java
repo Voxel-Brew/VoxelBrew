@@ -107,5 +107,5 @@ final class NativeKernel {
 
     static native int liveHandles();
 
-    static native dev.voxelbrew.engine.mesh.MeshData tessellate(long body, double chord, double angleRadians);
+    static native dev.voxelbrew.api.model.mesh.MeshData tessellate(long body, double chord, double angleRadians);
 }

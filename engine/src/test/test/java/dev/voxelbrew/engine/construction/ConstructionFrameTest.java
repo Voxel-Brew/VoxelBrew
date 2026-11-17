@@ -1,11 +1,12 @@
 package dev.voxelbrew.engine.construction;
 
-import static dev.voxelbrew.engine.construction.ConstructionGeometry.*;
+import static dev.voxelbrew.api.model.construction.ConstructionGeometry.*;
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.model.ConstructionFeature;
-import dev.voxelbrew.engine.model.Feature;
-import dev.voxelbrew.engine.model.Transform;
+import dev.voxelbrew.api.model.ConstructionFeature;
+import dev.voxelbrew.api.model.Feature;
+import dev.voxelbrew.api.model.Transform;
+import dev.voxelbrew.api.model.construction.ConstructionTools;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;

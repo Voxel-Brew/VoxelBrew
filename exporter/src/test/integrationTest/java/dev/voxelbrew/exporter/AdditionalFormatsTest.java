@@ -2,8 +2,9 @@ package dev.voxelbrew.exporter;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.mesh.*;
 import dev.voxelbrew.engine.geometry.Solid;
-import dev.voxelbrew.engine.mesh.*;
 import dev.voxelbrew.engine.model.*;
 import java.nio.file.*;
 import java.util.*;

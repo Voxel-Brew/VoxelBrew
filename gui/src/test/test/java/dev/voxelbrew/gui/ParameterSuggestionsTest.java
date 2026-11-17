@@ -2,8 +2,8 @@ package dev.voxelbrew.gui;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.engine.parameters.ParameterSet;
-import dev.voxelbrew.engine.parameters.ParameterUnit;
+import dev.voxelbrew.api.model.parameters.ParameterSet;
+import dev.voxelbrew.api.model.parameters.ParameterUnit;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

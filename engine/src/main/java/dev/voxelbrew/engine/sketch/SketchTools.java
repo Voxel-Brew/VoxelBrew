@@ -1,7 +1,10 @@
 package dev.voxelbrew.engine.sketch;
 
-import static dev.voxelbrew.engine.sketch.SketchGeometry.*;
+import static dev.voxelbrew.api.model.sketch.SketchGeometry.*;
 
+import dev.voxelbrew.api.model.sketch.SketchCurves;
+import dev.voxelbrew.api.model.sketch.SketchGeometry;
+import dev.voxelbrew.api.model.sketch.SketchText;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.math3.linear.*;

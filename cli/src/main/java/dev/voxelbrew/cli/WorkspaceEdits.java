@@ -1,7 +1,8 @@
 package dev.voxelbrew.cli;
 
-import dev.voxelbrew.engine.construction.ConstructionGeometry.Vector;
-import dev.voxelbrew.engine.construction.ConstructionTools;
+import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.construction.ConstructionGeometry.Vector;
+import dev.voxelbrew.api.model.construction.ConstructionTools;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.importer.DocumentSource;
 import java.nio.file.Path;
@@ -41,10 +42,10 @@ final class WorkspaceEdits {
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Unknown instance " + instanceId));
             var model = dev.voxelbrew.engine.printing.ManufacturingModels.evaluate(
-                    session.document(), dev.voxelbrew.engine.mesh.MeshOptions.DEFAULT, value(s, "--plugin-dir"));
+                    session.document(), dev.voxelbrew.api.model.mesh.MeshOptions.DEFAULT, value(s, "--plugin-dir"));
             double angle = session.document()
                     .parameters()
-                    .value(value(s, "--angle"), dev.voxelbrew.engine.parameters.ParameterUnit.DEG);
+                    .value(value(s, "--angle"), dev.voxelbrew.api.model.parameters.ParameterUnit.DEG);
             var changed = dev.voxelbrew.engine.printing.PrintOrientation.rotate(
                     instance,
                     model.meshes().get(instance.bodyId()),
@@ -182,7 +183,7 @@ final class WorkspaceEdits {
             var spec = edit(root, "slicer placement " + operation, s -> {
                 var session = session(s);
                 var model = dev.voxelbrew.engine.printing.ManufacturingModels.evaluate(
-                        session.document(), dev.voxelbrew.engine.mesh.MeshOptions.DEFAULT, value(s, "--plugin-dir"));
+                        session.document(), dev.voxelbrew.api.model.mesh.MeshOptions.DEFAULT, value(s, "--plugin-dir"));
                 var setup = session.document().printSetup();
                 if (operation.equals("arrange"))
                     setup = setup.withInstances(dev.voxelbrew.engine.printing.PrintArrangement.arrange(
@@ -220,8 +221,8 @@ final class WorkspaceEdits {
                 var setup = session.document().printSetup();
                 var printer = setup.printerSnapshot();
                 if (printer == null)
-                    printer = new dev.voxelbrew.engine.printing.PrinterProfile(
-                            dev.voxelbrew.engine.printing.PrintProfile.resolve(setup)
+                    printer = new dev.voxelbrew.api.model.printing.PrinterProfile(
+                            dev.voxelbrew.api.model.printing.PrintProfile.resolve(setup)
                                     .printer(),
                             "Custom",
                             1.75,
@@ -232,7 +233,7 @@ final class WorkspaceEdits {
                     s.commandLine().getOut().println(printer);
                     return 0;
                 }
-                if (setup.workspaceSettings().containsKey(dev.voxelbrew.engine.printing.PrintTarget.PRINTER_ID))
+                if (setup.workspaceSettings().containsKey(dev.voxelbrew.api.model.printing.PrintTarget.PRINTER_ID))
                     throw new IllegalArgumentException("Clear the physical device target before editing the bed");
                 session.setPrintSetup(setup.withPrinter(
                         printer.rectangular(number(s, "--width"), number(s, "--depth"), number(s, "--height"))));
@@ -317,7 +318,7 @@ final class WorkspaceEdits {
                 String expression = value(s, "--size");
                 double amount = session.document()
                         .parameters()
-                        .value(expression, dev.voxelbrew.engine.parameters.ParameterUnit.MM);
+                        .value(expression, dev.voxelbrew.api.model.parameters.ParameterUnit.MM);
                 var body = new Feature.BodyRef(value(s, "--body-feature"), value(s, "--body-output"));
                 var selectedEdges = new TreeSet<Integer>();
                 if (!kind.equals("shell")) {

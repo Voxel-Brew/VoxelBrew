@@ -219,7 +219,7 @@ final class WorkspaceEdits {
                 var setup = session.document().printSetup();
                 var printer = setup.printerSnapshot();
                 if (printer == null)
-                    printer = new dev.voxelbrew.api.model.printing.PrinterProfile(
+                    printer = new dev.voxelbrew.api.model.printing.HardwareSettings(
                             dev.voxelbrew.api.model.printing.PrintProfile.resolve(setup)
                                     .printer(),
                             "Custom",

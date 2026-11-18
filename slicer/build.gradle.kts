@@ -9,6 +9,8 @@ dependencies {
     api("dev.voxelbrew.api:slicer")
     implementation("com.google.code.gson:gson")
     testImplementation("com.google.protobuf:protobuf-java")
+    testImplementation(project(":printer-impl"))
+    runtimeOnly(project(":printer-impl"))
     implementation(project(":engine"))
     implementation(project(":exporter-impl"))
     implementation(project(":importer-impl"))

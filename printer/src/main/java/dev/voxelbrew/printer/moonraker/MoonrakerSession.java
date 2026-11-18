@@ -1,7 +1,8 @@
-package dev.voxelbrew.printer;
+package dev.voxelbrew.printer.moonraker;
 
 import com.google.gson.*;
-import dev.voxelbrew.api.printer.*;
+import dev.voxelbrew.api.printer.driver.*;
+import dev.voxelbrew.printer.internal.*;
 import java.io.*;
 import java.net.*;
 import java.net.http.*;
@@ -11,17 +12,13 @@ import java.time.Duration;
 import java.util.*;
 import java.util.function.DoubleConsumer;
 
-final class MoonrakerSession implements PrinterSession {
-    private final Printer device;
+final class MoonrakerSession implements DeviceTransport {
+    private final Connection device;
     private final HttpClient client =
             HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     private final String base;
-    private final JsonObject observed = new JsonObject();
-    private volatile WebSocket socket;
-    private volatile long observedAt;
-    private boolean subscribing;
 
-    MoonrakerSession(Printer device) {
+    MoonrakerSession(Connection device) {
         this.device = device;
         base = device.address().replaceAll("/+$", "");
     }
@@ -37,9 +34,11 @@ final class MoonrakerSession implements PrinterSession {
     private JsonObject send(HttpRequest request) throws IOException {
         try {
             var response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (response.statusCode() / 100 == 4)
+                throw new JobRejectedException("Moonraker rejected the request (HTTP " + response.statusCode() + ")");
             if (response.statusCode() / 100 != 2) throw new IOException("Moonraker HTTP " + response.statusCode());
             var json = JsonParser.parseString(response.body()).getAsJsonObject();
-            if (json.has("error")) throw new IOException("Moonraker rejected the request");
+            if (json.has("error")) throw new JobRejectedException("Moonraker rejected the request");
             return json;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -50,32 +49,23 @@ final class MoonrakerSession implements PrinterSession {
     }
 
     @Override
-    public PrinterStatus status() throws IOException {
-        subscribe();
-        JsonObject root;
-        synchronized (observed) {
-            root = observedAt != 0
-                            && System.nanoTime() - observedAt
-                                    < Duration.ofSeconds(10).toNanos()
-                    ? observed.deepCopy()
-                    : null;
-        }
-        if (root == null)
-            root = request("/printer/objects/query?print_stats&virtual_sdcard&extruder&heater_bed", null)
-                    .getAsJsonObject("result")
-                    .getAsJsonObject("status");
+    public DriverStatus status() throws IOException {
+
+        JsonObject root = request("/printer/objects/query?print_stats&virtual_sdcard&extruder&heater_bed", null)
+                .getAsJsonObject("result")
+                .getAsJsonObject("status");
         if (root == null || !root.has("print_stats")) throw new IOException("Moonraker did not report printer state");
         var print = root.getAsJsonObject("print_stats");
         String state = print.has("state") ? print.get("state").getAsString() : "unknown";
         var mapped = switch (state) {
-            case "standby" -> PrinterStatus.State.IDLE;
-            case "printing" -> PrinterStatus.State.PRINTING;
-            case "paused" -> PrinterStatus.State.PAUSED;
-            case "complete", "cancelled" -> PrinterStatus.State.COMPLETE;
-            case "error" -> PrinterStatus.State.ERROR;
-            default -> PrinterStatus.State.UNKNOWN;
+            case "standby" -> DriverStatus.State.IDLE;
+            case "printing" -> DriverStatus.State.PRINTING;
+            case "paused" -> DriverStatus.State.PAUSED;
+            case "complete", "cancelled" -> DriverStatus.State.COMPLETE;
+            case "error" -> DriverStatus.State.ERROR;
+            default -> DriverStatus.State.UNKNOWN;
         };
-        return new PrinterStatus(
+        return new DriverStatus(
                 mapped,
                 print.has("filename") ? print.get("filename").getAsString() : "",
                 number(root.getAsJsonObject("virtual_sdcard"), "progress"),
@@ -124,91 +114,7 @@ final class MoonrakerSession implements PrinterSession {
     }
 
     @Override
-    public void command(Command command) throws IOException {
-        request("/printer/print/" + command.name().toLowerCase(Locale.ROOT), HttpRequest.BodyPublishers.noBody());
-    }
-
-    private synchronized void subscribe() {
-        if (subscribing) return;
-        subscribing = true;
-        var builder = client.newWebSocketBuilder().connectTimeout(Duration.ofSeconds(10));
-        if (!device.secret().isEmpty()) builder.header("X-Api-Key", device.secret());
-        builder.buildAsync(URI.create(base.replaceFirst("^http", "ws") + "/websocket"), new WebSocket.Listener() {
-                    private final StringBuilder frame = new StringBuilder();
-
-                    @Override
-                    public void onOpen(WebSocket webSocket) {
-                        socket = webSocket;
-                        webSocket.sendText(
-                                "{\"jsonrpc\":\"2.0\",\"method\":\"printer.objects.subscribe\",\"params\":{\"objects\":{\"print_stats\":null,\"virtual_sdcard\":null,\"extruder\":null,\"heater_bed\":null}},\"id\":1}",
-                                true);
-                        webSocket.request(1);
-                    }
-
-                    @Override
-                    public java.util.concurrent.CompletionStage<?> onText(
-                            WebSocket webSocket, CharSequence data, boolean last) {
-                        frame.append(data);
-                        if (frame.length() > 1024 * 1024) {
-                            frame.setLength(0);
-                            webSocket.abort();
-                            return null;
-                        }
-                        if (last) {
-                            try {
-                                var message =
-                                        JsonParser.parseString(frame.toString()).getAsJsonObject();
-                                JsonObject update = null;
-                                if (message.has("result"))
-                                    update = message.getAsJsonObject("result").getAsJsonObject("status");
-                                else if (message.has("method")
-                                        && "notify_status_update"
-                                                .equals(message.get("method").getAsString()))
-                                    update = message.getAsJsonArray("params")
-                                            .get(0)
-                                            .getAsJsonObject();
-                                if (update != null)
-                                    synchronized (observed) {
-                                        for (var entry : update.entrySet()) {
-                                            if (!entry.getValue().isJsonObject()) continue;
-                                            if (!observed.has(entry.getKey()))
-                                                observed.add(entry.getKey(), new JsonObject());
-                                            var target = observed.getAsJsonObject(entry.getKey());
-                                            entry.getValue()
-                                                    .getAsJsonObject()
-                                                    .entrySet()
-                                                    .forEach(field -> target.add(field.getKey(), field.getValue()));
-                                        }
-                                        observedAt = System.nanoTime();
-                                    }
-                            } catch (RuntimeException ignored) {
-                                observedAt = 0;
-                            }
-                            frame.setLength(0);
-                        }
-                        webSocket.request(1);
-                        return null;
-                    }
-
-                    @Override
-                    public void onError(WebSocket webSocket, Throwable error) {
-                        observedAt = 0;
-                    }
-
-                    @Override
-                    public java.util.concurrent.CompletionStage<?> onClose(
-                            WebSocket webSocket, int statusCode, String reason) {
-                        observedAt = 0;
-                        return null;
-                    }
-                })
-                .exceptionally(failure -> null);
-    }
-
-    @Override
     public void close() {
-        var connected = socket;
-        if (connected != null) connected.abort();
         client.shutdownNow();
     }
 

@@ -6,6 +6,8 @@ import dev.voxelbrew.api.model.mesh.MeshOptions;
 import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import dev.voxelbrew.engine.printing.*;
+import dev.voxelbrew.printer.DefaultPrinterProfileCatalog;
+import dev.voxelbrew.printer.ProfileHardware;
 import dev.voxelbrew.slicer.orca.OrcaSlicerBackend;
 import java.nio.file.*;
 import java.util.*;
@@ -33,8 +35,9 @@ class OrcaSlicerIntegrationTest {
                         "filament",
                         fixtures.resolve("filament.json").toString()));
         var session = PrintingTest.reference();
-        var catalog = new DefaultPrinterProfileCatalog(new PrinterResources(directory.resolve("printers"))).load();
-        var setup = session.document().printSetup().withPrinter(catalog.require("bambu-lab-a1"));
+        var catalog = new DefaultPrinterProfileCatalog(directory.resolve("profiles")).load();
+        var setup =
+                session.document().printSetup().withPrinter(ProfileHardware.resolve(catalog.require("bambu-lab-a1")));
         session.setPrintSetup(setup.withProfile("orca", setup.printerId(), setup.materialId(), setup.process()));
         var model = ManufacturingModels.evaluate(session.document(), MeshOptions.DEFAULT);
         var result = SliceService.slice(

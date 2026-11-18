@@ -1,14 +1,14 @@
-package dev.voxelbrew.printer;
+package dev.voxelbrew.printer.internal;
 
 import java.io.*;
 import java.nio.file.*;
 import java.security.*;
 import java.util.HexFormat;
 
-final class ArtifactChecks {
-    private ArtifactChecks() {}
+@lombok.experimental.UtilityClass
+public class ArtifactChecks {
 
-    static String sha256(Path file) throws IOException {
+    public static String sha256(Path file) throws IOException {
         try {
             var digest = MessageDigest.getInstance("SHA-256");
             try (var stream = Files.newInputStream(file)) {

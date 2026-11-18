@@ -32,6 +32,7 @@ final class FeatureCommands {
         @Spec
         CommandLine.Model.CommandSpec spec;
 
+        @Override
         public Integer call() throws Exception {
             try (var registry = features.open(plugins)) {
                 for (var d : registry.descriptors())
@@ -73,6 +74,7 @@ final class FeatureCommands {
                 description = "Numeric KEY=VALUE; repeatable. Omitted fields use provider defaults.")
         Map<String, Double> parameters = new LinkedHashMap<>();
 
+        @Override
         public Integer call() throws Exception {
             var session = session();
             try (var registry = features.open(pluginDirectory)) {

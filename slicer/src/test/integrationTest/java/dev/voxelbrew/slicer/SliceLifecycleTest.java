@@ -58,14 +58,17 @@ class SliceLifecycleTest {
         Path output = directory.resolve("failed.gcode");
         Files.writeString(output, "original");
         var backend = new SlicerBackend() {
+            @Override
             public Descriptor descriptor() {
                 return new PrusaSlicerBackend().descriptor();
             }
 
+            @Override
             public Probe probe(Path exe, Cancellation cancellation) {
                 return new Probe("failure-fixture", Set.of());
             }
 
+            @Override
             public RunResult slice(Request request) throws IOException {
                 Files.writeString(request.output(), "partial");
                 throw new IOException("forced backend failure");

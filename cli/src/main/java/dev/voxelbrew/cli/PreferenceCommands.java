@@ -2,6 +2,7 @@ package dev.voxelbrew.cli;
 
 import static dev.voxelbrew.cli.WorkspaceEdits.*;
 
+import dev.voxelbrew.api.printer.PrinterProfileCatalog;
 import dev.voxelbrew.api.slicer.*;
 import dev.voxelbrew.util.config.*;
 import java.nio.file.Path;

@@ -17,7 +17,7 @@ dependencies {
     implementation(project(":importer-impl"))
     implementation(project(":exporter-impl"))
     runtimeOnly(project(":slicer-impl"))
-    runtimeOnly(project(":printer-impl"))
+    implementation(project(":printer-impl"))
     testImplementation(project(":exporter-impl"))
     testImplementation(project(":slicer-impl"))
     implementation(project(":util"))

@@ -9,10 +9,49 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class PrinterPaneTest {
+    private static dev.voxelbrew.api.printer.Profile profile() {
+        var p = dev.voxelbrew.api.model.printing.PrintProfile.resolve(
+                        dev.voxelbrew.api.model.printing.PrintSetup.empty())
+                .printer();
+        return new dev.voxelbrew.api.printer.Profile(
+                p.id(),
+                p.name(),
+                "Generic",
+                p.bed(),
+                p.excludedZones(),
+                p.usableHeight(),
+                p.nozzleMm(),
+                1.75,
+                1,
+                p.firmware(),
+                p.outputFormat(),
+                true,
+                null);
+    }
+
+    @Test
+    void artifactSavingPreservesNativeBytes(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory)
+            throws Exception {
+        var artifact = PrintArtifact.of("gcode.3mf", new byte[] {0, 1, 2, 3}, Map.of("target_kind", "profile"));
+        var path = directory.resolve("job.gcode.3mf");
+        PrinterPane.saveArtifact(path, artifact, List.of("preview only"));
+        assertThat(java.nio.file.Files.readAllBytes(path)).isEqualTo(artifact.bytes());
+    }
+
     @Test
     void slicedJobDeterminesTheOnlyPrinterDevice() {
-        var other = new Printer("other", "Other", Printer.Kind.MOONRAKER, "profile", "http://other", "", "", "");
-        var target = new Printer("target", "Target", Printer.Kind.MOONRAKER, "profile", "http://target", "", "", "");
+        var other = new Printer(
+                "other",
+                "Other",
+                "custom",
+                new dev.voxelbrew.api.printer.driver.DriverConfiguration(Map.of()),
+                profile());
+        var target = new Printer(
+                "target",
+                "Target",
+                "custom",
+                new dev.voxelbrew.api.printer.driver.DriverConfiguration(Map.of()),
+                profile());
         var devices = List.of(other, target);
         var sliced =
                 PrintArtifact.of("gcode", new byte[] {1}, Map.of("target_kind", "printer", "target_id", target.id()));

@@ -7,6 +7,7 @@ import dev.voxelbrew.api.model.parameters.*;
 import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.api.model.sketch.SketchGeometry;
 import dev.voxelbrew.api.printer.Printer;
+import dev.voxelbrew.api.printer.driver.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.parameters.*;
 import dev.voxelbrew.engine.persistence.proto.DocumentProto;
@@ -16,6 +17,10 @@ import dev.voxelbrew.engine.sketch.Sketches;
 import dev.voxelbrew.exporter.DocumentWriter;
 import dev.voxelbrew.importer.DocumentReader;
 import dev.voxelbrew.importer.GcodeReader;
+import dev.voxelbrew.printer.DefaultPrinterProfileCatalog;
+import dev.voxelbrew.printer.FilePrinterStore;
+import dev.voxelbrew.printer.ProfileHardware;
+import dev.voxelbrew.printer.moonraker.MoonrakerDriverGui;
 import dev.voxelbrew.slicer.prusa.PrusaSlicerBackend;
 import dev.voxelbrew.util.Version;
 import java.nio.ByteBuffer;
@@ -23,6 +28,9 @@ import java.nio.file.*;
 import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import javafx.application.*;
 import javafx.event.EventHandler;
 import javafx.geometry.Point2D;
@@ -30,7 +38,6 @@ import javafx.geometry.Point3D;
 import javafx.scene.*;
 import javafx.scene.control.*;
 import javafx.scene.input.*;
-import javafx.scene.layout.VBox;
 import javafx.scene.robot.Robot;
 import javafx.scene.shape.Polygon;
 import javafx.stage.*;
@@ -190,8 +197,20 @@ class WorkbenchUiTest {
         assertThat(selectedWorkspace()).isEqualTo("workspace-printer");
         openQuickMenu("printer-heading");
         assertThat(fx(() -> node("#quick-printer-configure"))).isNotNull();
-        assertThat(fx(() -> node("#quick-printer-print").isDisabled()))
-                .isEqualTo(fx(() -> node("#printer-print").isDisabled()));
+        fx(() -> {
+            var menu = node("#quick-menu");
+            assertThat(menu.lookup("#quick-printer-print"))
+                    .as("Profile-only jobs must not expose physical-printer submission")
+                    .isNull();
+            assertThat(stage.getScene().lookup("#printer-print").isVisible()).isFalse();
+            assertThat(node("#quick-printer-exportGcode").isDisabled()).isFalse();
+            assertThat(node("#quick-printer-exportGcode").isDisabled())
+                    .isEqualTo(node("#printer-exportGcode").isDisabled());
+            Screenshot.save(
+                    menu.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "quick-menu-printer-profile-only.png"));
+            return null;
+        });
         key(KeyCode.ESCAPE);
         assertThat(fx(() -> Window.getWindows().stream()
                         .anyMatch(w -> w.isShowing()
@@ -284,217 +303,175 @@ class WorkbenchUiTest {
         var prepared = PreparedDocuments.copy("plate-5mm.vxb", directory);
         fx(() -> workbench.controller().open(prepared)).get(20, TimeUnit.SECONDS);
         ready();
-        var activeProfile = document().printSetup().printerId();
         fx(() -> {
             ((TabPane) node("#workspaces")).getSelectionModel().select(1);
-            var target = (ComboBox<?>) node("#print-target");
-            assertThat(target.getButtonCell().getText()).isEqualTo("No device — G-code only");
-            var configure = (Button) node("#print-configure-devices");
-            assertThat(configure.getText()).isEqualTo("Configure devices…");
-            assertThat(configure.getParent()).isSameAs(target.getParent());
-            assertThat(stage.getScene().lookup("#print-reload-printers")).isNull();
-            var printersMenu = ((MenuBar) node("#main-menu"))
-                    .getMenus().stream()
-                            .filter(menu -> "menu-printers".equals(menu.getId()))
-                            .findFirst()
-                            .orElseThrow();
-            assertThat(printersMenu.getItems().stream()
-                            .filter(item -> "printers-reload".equals(item.getId()))
-                            .findFirst()
-                            .orElseThrow()
-                            .getText())
-                    .isEqualTo("Reload printers profiles");
             return null;
         });
         Platform.runLater(() -> ((Button) node("#print-configure-devices")).fire());
+        awaitPrinterControl("#device-config-driver");
         fx(() -> {
-            var kind = (ComboBox<?>) node("#device-config-kind");
-            var dialog = (VBox) node("#device-config-content");
-            assertThat(kind.getValue()).isEqualTo(Printer.Kind.MOONRAKER);
-            assertThat(selectedText(kind)).isEqualTo("Klipper / Moonraker");
-            assertThat(dialog.lookup("#device-config-serial")).isNull();
-            assertThat(dialog.lookupAll(".label").stream()
-                            .filter(Label.class::isInstance)
-                            .map(Label.class::cast)
-                            .noneMatch(label -> label.getText().contains("Nozzle")))
-                    .isTrue();
-            assertThat(((Label) node("#device-config-address-label")).getText()).isEqualTo("Moonraker server URL");
-            ((TextField) node("#device-config-address")).setText("moonraker.local");
-            assertThat(((Label) node("#device-config-address-error")).getText().contains("Moonraker"))
-                    .isTrue();
-            ((TextField) node("#device-config-address")).setText("http://moonraker.local");
-            assertThat(((Label) dialog.lookup("#device-config-address-error")).getText())
-                    .isEqualTo("");
-            assertThat(((Label) node("#device-config-model-label")).getText()).isEqualTo("Slicer preset ID (optional)");
-            assertThat(((Label) node("#device-config-secret-label")).getText()).isEqualTo("API key (optional)");
-            Screenshot.save(
-                    dialog.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "device-moonraker.png"));
-            ((TextField) node("#device-config-address")).setText("http://moonraker.local");
-            ((TextField) node("#device-config-model")).setText("klipper-preset");
-            ((TextField) node("#device-config-secret")).setText("moon-key");
-            return null;
-        });
-        fx(() -> {
-            var kind = (ComboBox<?>) node("#device-config-kind");
-            kind.getSelectionModel().select(kind.getItems().indexOf(Printer.Kind.BAMBU));
-            return null;
-        });
-        fx(() -> {
-            var kind = (ComboBox<?>) node("#device-config-kind");
-            var dialog = (VBox) node("#device-config-content");
-            assertThat(selectedText(kind)).isEqualTo("Bambu Lab");
-            assertThat(dialog.lookup("#device-config-serial")).isNotNull();
-            assertThat(((Label) node("#device-config-address-label")).getText()).isEqualTo("Printer IP / host");
-            ((TextField) node("#device-config-address")).setText("256.0.0.1");
-            assertThat(((Label) node("#device-config-address-error")).getText().contains("printer IP"))
-                    .isTrue();
-            ((TextField) node("#device-config-address")).clear();
-            assertThat(((Label) node("#device-config-model-label")).getText()).isEqualTo("Printer model");
-            assertThat(((Label) node("#device-config-secret-label")).getText()).isEqualTo("Access code");
-            assertThat(((TextField) node("#device-config-address")).getText()).isEqualTo("");
-            assertThat(((TextField) node("#device-config-secret")).getText()).isEqualTo("");
-            Screenshot.save(
-                    dialog.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "device-bambu.png"));
-            ((TextField) node("#device-config-address")).setText("192.0.2.2");
-            ((TextField) node("#device-config-serial")).setText("BAMBU123");
-            ((TextField) node("#device-config-model")).setText("Bambu Lab A1");
-            ((TextField) node("#device-config-secret")).setText("bambu-code");
-            return null;
-        });
-        fx(() -> {
-            var kind = (ComboBox<?>) node("#device-config-kind");
-            kind.getSelectionModel().select(kind.getItems().indexOf(Printer.Kind.MOONRAKER));
-            return null;
-        });
-        fx(() -> {
-            var kind = (ComboBox<?>) node("#device-config-kind");
-            var dialog = (VBox) node("#device-config-content");
-            assertThat(dialog.lookup("#device-config-serial")).isNull();
-            assertThat(((Label) node("#device-config-address-label")).getText()).isEqualTo("Moonraker server URL");
-            assertThat(((TextField) node("#device-config-address")).getText()).isEqualTo("http://moonraker.local");
-            assertThat(((TextField) node("#device-config-model")).getText()).isEqualTo("klipper-preset");
-            assertThat(((TextField) node("#device-config-secret")).getText()).isEqualTo("moon-key");
-            kind.getSelectionModel().select(kind.getItems().indexOf(Printer.Kind.BAMBU));
-            assertThat(((TextField) node("#device-config-address")).getText()).isEqualTo("192.0.2.2");
-            assertThat(((TextField) node("#device-config-serial")).getText()).isEqualTo("BAMBU123");
-            assertThat(((TextField) node("#device-config-model")).getText()).isEqualTo("Bambu Lab A1");
-            assertThat(((TextField) node("#device-config-secret")).getText()).isEqualTo("bambu-code");
+            var drivers = (ComboBox<?>) node("#device-config-driver");
+            assertThat(drivers.getValue()).isNull();
+            assertThat(((Button) node("#device-config-save")).isDisabled()).isTrue();
+            assertThat(((javafx.scene.layout.VBox) node("#device-config-fields")).getChildren())
+                    .isEmpty();
             ((Button) node("#device-config-cancel")).fire();
             return null;
         });
-        Platform.runLater(() -> ((MenuBar) node("#main-menu"))
-                .getMenus().stream()
-                        .filter(menu -> "menu-printers".equals(menu.getId()))
-                        .findFirst()
-                        .orElseThrow()
-                        .getItems()
-                        .stream()
-                        .filter(item -> "printers-configure-devices".equals(item.getId()))
-                        .findFirst()
-                        .orElseThrow()
-                        .fire());
+        assertThat(Files.exists(directory.resolve("printers"))).isFalse();
+        Platform.runLater(() -> ((Button) node("#print-configure-devices")).fire());
+        awaitPrinterControl("#device-config-driver");
         fx(() -> {
             ((TextField) node("#device-config-name")).setText("Lab Klipper");
-            ((TextField) node("#device-config-address")).setText("http://moonraker.local");
-            var profile = (ComboBox<?>) node("#device-config-profile");
-            var matchingProfile = java.util.stream.IntStream.range(
-                            0, profile.getItems().size())
-                    .filter(index -> profile.getItems().get(index)
-                                    instanceof dev.voxelbrew.api.slicer.PrinterProfileCatalog.Entry entry
-                            && !entry.definition().printer().id().equals(activeProfile))
+            var drivers = (ComboBox<?>) node("#device-config-driver");
+            int index = java.util.stream.IntStream.range(0, drivers.getItems().size())
+                    .filter(i -> ((dev.voxelbrew.api.printer.driver.Driver)
+                                    drivers.getItems().get(i))
+                            .id()
+                            .equals("moonraker"))
                     .findFirst()
                     .orElseThrow();
-            profile.getSelectionModel().select(matchingProfile);
+            drivers.getSelectionModel().select(index);
+            stage.getScene().getRoot().applyCss();
+            stage.getScene().getRoot().layout();
+            assertThat(node("#device-config-moonraker-apiKey")).isInstanceOf(PasswordField.class);
+            ((TextField) node("#device-config-moonraker-url")).setText("http://localhost:1");
+            ((TextField) node("#device-config-moonraker-serial")).setText("KLIPPER-123");
+            ((TextField) node("#device-config-moonraker-apiKey")).setText("private-key");
+            return null;
+        });
+        Platform.runLater(() -> ((Button) node("#device-profile-new")).fire());
+        awaitPrinterControl("#profile-name");
+        fx(() -> {
+            ((TextField) node("#profile-name")).setText("Custom fixture");
+            ((TextField) node("#profile-id")).setText("custom-fixture");
+            return null;
+        });
+        fx(() -> {
+            Screenshot.save(
+                    node("#profile-name").getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "printer-profile-editor.png"));
+            ((Button) node("#profile-save")).fire();
+            return null;
+        });
+        fx(() -> {
+            assertThat(((ComboBox<?>) node("#device-config-profile")).getValue())
+                    .isInstanceOf(dev.voxelbrew.api.printer.Profile.class);
+            assertThat(((Button) node("#device-config-save")).isDisabled()).isFalse();
+            Screenshot.save(
+                    node("#device-config-driver").getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "printer-driver-inline.png"));
             ((Button) node("#device-config-save")).fire();
             return null;
         });
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-        var devices = directory.resolve("devices");
-        while (System.nanoTime() < deadline && !Files.isDirectory(devices)) Thread.sleep(25);
-        assertThat(Files.isDirectory(devices))
-                .as("Saving should create the device directory")
-                .isTrue();
-        while (System.nanoTime() < deadline) {
-            try (var files = Files.list(devices)) {
-                if (files.anyMatch(path -> path.toString().endsWith(".properties"))) break;
-            }
-            Thread.sleep(25);
-        }
-        String deviceProfile;
-        try (var files = Files.list(devices)) {
-            var saved = files.filter(path -> path.toString().endsWith(".properties"))
-                    .findFirst()
-                    .orElseThrow();
-            var properties = new Properties();
-            try (var input = Files.newInputStream(saved)) {
-                properties.load(input);
-            }
-            assertThat(properties.getProperty("name")).isEqualTo("Lab Klipper");
-            deviceProfile = properties.getProperty("profile_id");
-            assertThat(deviceProfile).isNotEqualTo(activeProfile);
-        }
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline && !Files.exists(directory.resolve("printers"))) Thread.sleep(25);
+        var store = new dev.voxelbrew.printer.FilePrinterStore(directory.resolve("printers"));
+        while (System.nanoTime() < deadline && store.load().devices().isEmpty()) Thread.sleep(25);
+        var saved = store.load().devices().getFirst();
+        assertThat(saved.name()).isEqualTo("Lab Klipper");
+        assertThat(saved.profile().id()).isEqualTo("custom-fixture");
+        assertThat(saved.driverConfiguration().requireStringProperty(MoonrakerDriverGui.MOONRAKER_SERIAL_ID))
+                .isEqualTo("KLIPPER-123");
         deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         while (fx(() -> stage.getScene().getRoot().lookup("#device-config-content")) != null
                 && System.nanoTime() < deadline) Thread.sleep(25);
         assertThat(fx(() -> stage.getScene().getRoot().lookup("#device-config-content")))
                 .as("The save completion callback should close the device dialog")
                 .isNull();
-        var selectedDevice = fx(() -> {
+        ready();
+        Thread.sleep(200);
+        fx(() -> {
             var target = (ComboBox<?>) node("#print-target");
-            assertThat(target.getItems().size()).isEqualTo(2);
             target.getSelectionModel().select(1);
             assertThat(target.getButtonCell().getText()).isEqualTo("Lab Klipper");
-            return (String) target.getValue();
-        });
-        ready();
-        assertThat(document().printSetup().printerId()).isEqualTo(deviceProfile);
-        assertThat(document().printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID))
-                .isEqualTo(selectedDevice);
-        assertThat(fx(() -> ((ComboBox<?>) node("#print-target")).getValue())).isEqualTo(selectedDevice);
-        assertThat(fx(() ->
-                        ((ComboBox<?>) node("#print-target")).getButtonCell().getText()))
-                .isEqualTo("Lab Klipper");
-        fx(() -> {
-            assertThat(((Button) node("#print-printer")).isDisabled()).isTrue();
-            ((TabPane) node("#print-controls")).getSelectionModel().select(1);
-            var nozzle = (FormulaField) node("#print-nozzle");
-            assertThat(nozzle.isDisabled()).isFalse();
-            assertThat(((ScrollPane) ((TabPane) node("#print-controls"))
-                                    .getTabs()
-                                    .get(1)
-                                    .getContent())
-                            .getContent()
-                            .lookup("#print-nozzle"))
-                    .isNotNull();
-            assertThat(((Label) node("#print-plate-size")).isDisabled()).isTrue();
-            assertThat(((Label) node("#print-printer-profile-label")).getText())
-                    .isEqualTo("Printer profile (set by device)");
-            Screenshot.save(
-                    stage.getScene(),
-                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "slicer-device-profile.png"));
-            nozzle.setText("0.6");
-            nozzle.fireEvent(new javafx.event.ActionEvent());
             return null;
         });
         ready();
-        assertThat(document().printSetup().printerId()).isEqualTo(deviceProfile);
+        assertThat(document().printSetup().printerSnapshot()).isEqualTo(ProfileHardware.resolve(saved.profile()));
         assertThat(document().printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID))
-                .isEqualTo(selectedDevice);
-        assertThat(document().printSetup().printerSnapshot().printer().nozzleMm())
-                .isCloseTo(0.6, org.assertj.core.data.Offset.offset(0.0001));
+                .isEqualTo(saved.id());
+        var catalog = new dev.voxelbrew.printer.DefaultPrinterProfileCatalog(
+                dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
+                        .profiles());
+        var original = saved.profile();
+        catalog.save(
+                new dev.voxelbrew.api.printer.Profile(
+                        original.id(),
+                        original.name(),
+                        original.manufacturer(),
+                        original.bed(),
+                        original.excludedZones(),
+                        300,
+                        original.nozzleDiameter(),
+                        original.filamentDiameter(),
+                        original.toolCount(),
+                        original.firmware(),
+                        original.outputFormat(),
+                        original.genericGcode(),
+                        original.imageReference()),
+                null);
+        assertThat(store.load().devices().getFirst().profile().usableHeight()).isEqualTo(200);
+        Platform.runLater(() -> ((Button) node("#print-configure-devices")).fire());
+        awaitPrinterControl("#device-config-driver");
         fx(() -> {
-            ((ComboBox<?>) node("#print-target")).getSelectionModel().selectFirst();
+            var list = (ComboBox<?>) node("#device-config-content").lookup(".combo-box");
+            list.getSelectionModel().selectFirst();
+            assertThat(((TextField) node("#device-config-name")).getText()).isEqualTo("Lab Klipper");
+            assertThat(((TextField) node("#device-config-moonraker-serial")).getText())
+                    .isEqualTo("KLIPPER-123");
+            assertThat(((TextField) node("#device-config-moonraker-apiKey")).getText())
+                    .isEqualTo("private-key");
+            var profile = (ComboBox<?>) node("#device-config-profile");
+            assertThat(profile.getItems().stream()
+                            .filter(p ->
+                                    ((dev.voxelbrew.api.printer.Profile) p).id().equals(original.id()))
+                            .count())
+                    .isEqualTo(2);
+            assertThat(((dev.voxelbrew.api.printer.Profile) profile.getValue()).usableHeight())
+                    .isEqualTo(200);
+            ((TextField) node("#device-config-name")).setText("Cancelled edit");
+            ((TextField) node("#device-config-moonraker-serial")).setText("CANCELLED-SERIAL");
+            ((Button) node("#device-config-cancel")).fire();
             return null;
         });
+        assertThat(store.load().devices().getFirst().name()).isEqualTo("Lab Klipper");
+        assertThat(store.load()
+                        .devices()
+                        .getFirst()
+                        .driverConfiguration()
+                        .requireStringProperty(MoonrakerDriverGui.MOONRAKER_SERIAL_ID))
+                .isEqualTo("KLIPPER-123");
+        assertThat(store.load().devices().getFirst().profile().usableHeight()).isEqualTo(200);
+        Platform.runLater(() -> ((Button) node("#print-configure-devices")).fire());
+        awaitPrinterControl("#device-config-driver");
+        fx(() -> {
+            ((ComboBox<?>) node("#device-config-content").lookup(".combo-box"))
+                    .getSelectionModel()
+                    .selectFirst();
+            var profile = (ComboBox<?>) node("#device-config-profile");
+            int updated = java.util.stream.IntStream.range(0, profile.getItems().size())
+                    .filter(i -> ((dev.voxelbrew.api.printer.Profile)
+                                            profile.getItems().get(i))
+                                    .id()
+                                    .equals(original.id())
+                            && ((dev.voxelbrew.api.printer.Profile)
+                                                    profile.getItems().get(i))
+                                            .usableHeight()
+                                    == 300)
+                    .findFirst()
+                    .orElseThrow();
+            profile.getSelectionModel().select(updated);
+            ((Button) node("#device-config-save")).fire();
+            return null;
+        });
+        deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline
+                && store.load().devices().getFirst().profile().usableHeight() != 300) Thread.sleep(25);
         ready();
-        assertThat(document().printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID))
-                .isNull();
-        fx(() -> {
-            assertThat(((Button) node("#print-printer")).isDisabled()).isFalse();
-            assertThat(((FormulaField) node("#print-nozzle")).isDisabled()).isFalse();
-            assertThat(((Label) node("#print-plate-size")).isDisabled()).isFalse();
-            return null;
-        });
+        assertThat(store.load().devices().getFirst().profile().usableHeight()).isEqualTo(300);
+        assertThat(document().printSetup().printerSnapshot().printer().usableHeight())
+                .isEqualTo(300);
     }
 
     @Test
@@ -595,6 +572,148 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void printerSubmissionRunsOnWorkerAndLeavesJavaFxResponsive() throws Exception {
+        ready();
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var submissionThread = new AtomicReference<Thread>();
+        var transportOnFx = new AtomicBoolean();
+        var submissions = new AtomicInteger();
+        var driver = new Driver() {
+            @Override
+            public String id() {
+                return "thread-fixture";
+            }
+
+            @Override
+            public String name() {
+                return "Thread fixture";
+            }
+
+            @Override
+            public DriverGui gui() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public PrintResult print(DriverConfiguration configuration, PrintArtifact artifact) throws Exception {
+                transportOnFx.compareAndSet(false, Platform.isFxApplicationThread());
+                submissionThread.set(Thread.currentThread());
+                submissions.incrementAndGet();
+                entered.countDown();
+                if (!release.await(10, TimeUnit.SECONDS)) throw new AssertionError("Submission was not released");
+                return PrintResult.Success.SUCCESS;
+            }
+
+            @Override
+            public DriverStatus readPrinterStatus(DriverConfiguration configuration) {
+                transportOnFx.compareAndSet(false, Platform.isFxApplicationThread());
+                return new DriverStatus(
+                        DriverStatus.State.IDLE,
+                        "",
+                        OptionalDouble.empty(),
+                        OptionalDouble.empty(),
+                        OptionalDouble.empty(),
+                        OptionalDouble.empty(),
+                        "");
+            }
+        };
+        var catalog = new DefaultPrinterProfileCatalog(directory.resolve("thread-profiles"));
+        var printer = new Printer(
+                "thread-printer",
+                "Thread printer",
+                driver.id(),
+                new DriverConfiguration(Map.of()),
+                catalog.load().require("generic-marlin-200-0.4"));
+        var store = new FilePrinterStore(directory.resolve("thread-printers"));
+        store.save(printer);
+        var document = new CadDocument("thread-job", List.of(), 0);
+        String plate = document.printSetup().activePlateId();
+        var job = document.withGcode(Map.of(plate, List.of("G28")))
+                .withPrintArtifacts(Map.of(
+                        plate,
+                        PrintArtifact.of(
+                                "gcode",
+                                new byte[] {71, 50, 56, 10},
+                                Map.of(
+                                        "target_kind",
+                                        "printer",
+                                        "target_id",
+                                        printer.id(),
+                                        "target_profile",
+                                        printer.profile().id()))));
+        try (var registry = new DriverRegistry() {
+                    @Override
+                    public DriverRegistry withDirectory(Path plugins) {
+                        return this;
+                    }
+
+                    @Override
+                    @lombok.NonNull
+                    public List<Driver> drivers() {
+                        return List.of(driver);
+                    }
+
+                    @Override
+                    @lombok.NonNull
+                    public Optional<Driver> find(@lombok.NonNull String id) {
+                        return id.equals(driver.id()) ? Optional.of(driver) : Optional.empty();
+                    }
+
+                    @Override
+                    public void close() {}
+                };
+                var worker = WindowResources.worker("printer")) {
+            var pane = fx(() -> {
+                var created = new PrinterPane(
+                        store,
+                        registry,
+                        catalog,
+                        new PrinterVisibility(configuration),
+                        new dev.voxelbrew.util.i18n.Translations(Locale.ENGLISH),
+                        worker);
+                new Scene(created, 820, 650);
+                created.applyCss();
+                created.layout();
+                created.documentChanged(job);
+                return created;
+            });
+            try {
+                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+                while (fx(() -> pane.lookup("#printer-print").isDisabled()) && System.nanoTime() < deadline)
+                    Thread.sleep(25);
+                fx(() -> {
+                    var button = (Button) pane.lookup("#printer-print");
+                    assertThat(button.isDisabled()).isFalse();
+                    button.fire();
+                    return null;
+                });
+                assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
+                var responsive = new FutureTask<>(Platform::isFxApplicationThread);
+                Platform.runLater(responsive);
+                assertThat(responsive.get(2, TimeUnit.SECONDS))
+                        .as("JavaFX must process events while G-code submission is blocked")
+                        .isTrue();
+                assertThat(submissionThread.get().getName()).isEqualTo("voxelbrew-printer");
+                assertThat(transportOnFx.get())
+                        .as("Submission and monitoring must stay off JavaFX")
+                        .isFalse();
+                assertThat(submissions.get()).isEqualTo(1);
+                assertThat(fx(() -> pane.lookup("#printer-print").isDisabled())).isTrue();
+                assertThat(release.getCount())
+                        .as("Driver remains blocked during the responsiveness check")
+                        .isEqualTo(1);
+            } finally {
+                release.countDown();
+                fx(() -> {
+                    pane.close();
+                    return null;
+                });
+            }
+        }
+    }
+
+    @Test
     void printerWorkspaceFollowsStoredPlateJobs() throws Exception {
         ready();
         openPrepared("plate-5mm.vxb");
@@ -608,7 +727,8 @@ class WorkbenchUiTest {
             assertThat(tabs.getTabs().get(2).isDisable()).isFalse();
             tabs.getSelectionModel().select(2);
             assertThat(((ComboBox<?>) node("#printer-plate")).getItems().size()).isEqualTo(1);
-            assertThat(((Button) node("#printer-print")).isDisable()).isTrue();
+            assertThat(stage.getScene().lookup("#printer-print").isVisible()).isFalse();
+            assertThat(((Button) node("#printer-exportGcode")).isDisable()).isFalse();
             workbench.applyCss();
             workbench.layout();
             var selector = (ComboBox<?>) node("#printer-plate");
@@ -626,8 +746,7 @@ class WorkbenchUiTest {
         ready();
         fx(() -> {
             var selectedPlate = (ComboBox<?>) node("#printer-plate");
-            assertThat(selectedPlate.getButtonCell().getText())
-                    .isEqualTo(selectedPlate.getValue().toString());
+            assertThat(selectedPlate.getButtonCell().getText()).isEqualTo(selectedText(selectedPlate));
             assertThat(selectedPlate.getButtonCell().getText().isBlank())
                     .as("Selected plate needs a readable name")
                     .isFalse();
@@ -4209,6 +4328,19 @@ class WorkbenchUiTest {
             }
             return null;
         });
+    }
+
+    private void awaitPrinterControl(String selector) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline) {
+            if (fx(() -> {
+                stage.getScene().getRoot().applyCss();
+                stage.getScene().getRoot().layout();
+                return stage.getScene().getRoot().lookup(selector) != null;
+            })) return;
+            Thread.sleep(25);
+        }
+        throw new AssertionError("Missing printer control " + selector);
     }
 
     private static <T> String selectedText(ComboBox<T> choice) {

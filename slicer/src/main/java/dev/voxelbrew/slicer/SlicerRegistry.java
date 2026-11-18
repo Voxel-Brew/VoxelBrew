@@ -78,14 +78,17 @@ public final class SlicerRegistry implements dev.voxelbrew.api.slicer.SlicerCata
         diagnostics.forEach(message -> log.warn("Slicer discovery: {}", message));
     }
 
+    @Override
     public List<SlicerBackend.Descriptor> descriptors() {
         return providers.values().stream().map(Entry::descriptor).toList();
     }
 
+    @Override
     public List<String> diagnostics() {
         return List.copyOf(diagnostics);
     }
 
+    @Override
     public SlicerBackend require(String id) {
         var backend = providers.get(id);
         if (backend == null) throw new IllegalArgumentException("Slicer backend unavailable: " + id);

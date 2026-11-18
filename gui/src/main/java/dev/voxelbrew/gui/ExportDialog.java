@@ -43,11 +43,13 @@ final class ExportDialog {
         button.setId("export-confirm");
         String appVersion = dev.voxelbrew.util.update.BuildVersion.current();
         format.setConverter(new StringConverter<>() {
+            @Override
             public String toString(ExporterDescriptor value) {
                 if (value == null) return "";
                 return value.name() + (value.version().equals(appVersion) ? "" : " (" + value.version() + ")");
             }
 
+            @Override
             public ExporterDescriptor fromString(String value) {
                 throw new UnsupportedOperationException();
             }

@@ -32,6 +32,7 @@ final class ParameterCommands {
         @Spec
         CommandLine.Model.CommandSpec spec;
 
+        @java.lang.Override
         public void run() {
             spec.commandLine().usage(spec.commandLine().getOut());
         }
@@ -56,6 +57,7 @@ final class ParameterCommands {
         @Spec
         CommandLine.Model.CommandSpec spec;
 
+        @java.lang.Override
         public void run() {
             spec.commandLine().usage(spec.commandLine().getOut());
         }
@@ -71,6 +73,7 @@ final class ParameterCommands {
         @Option(names = "--configuration")
         String configuration;
 
+        @java.lang.Override
         public Integer call() throws Exception {
             var doc = session().document();
             var p = doc.parameters();
@@ -119,6 +122,7 @@ final class ParameterCommands {
         @Option(names = "--comment", defaultValue = "")
         String comment;
 
+        @java.lang.Override
         public Integer call() throws Exception {
             var s = session();
             s.setParameters(s.document().parameters().put(name, ParameterUnit.parse(unit), expression, comment));
@@ -139,6 +143,7 @@ final class ParameterCommands {
         @Option(names = "--to", required = true)
         String next;
 
+        @java.lang.Override
         public Integer call() throws Exception {
             var s = session();
             s.setParameters(s.document().parameters().rename(name, next));
@@ -159,6 +164,7 @@ final class ParameterCommands {
         @Option(names = "--name", required = true)
         String name;
 
+        @java.lang.Override
         public Integer call() throws Exception {
             var s = session();
             s.setParameters(s.document().parameters().remove(name));
@@ -186,6 +192,7 @@ final class ParameterCommands {
         @Option(names = "--expression", required = true)
         String expression;
 
+        @java.lang.Override
         public Integer call() throws Exception {
             var s = session();
             s.bindExpression(feature, field, expression);
@@ -200,6 +207,7 @@ final class ParameterCommands {
             super(documents, documentWriter);
         }
 
+        @java.lang.Override
         public Integer call() throws Exception {
             var p = session().document().parameters();
             var out = spec.commandLine().getOut();
@@ -230,6 +238,7 @@ final class ParameterCommands {
         @Option(names = "--copy-active", description = "Snapshot current expressions; otherwise inherit Default")
         boolean copy;
 
+        @java.lang.Override
         public Integer call() throws Exception {
             var s = session();
             s.setParameters(s.document().parameters().addConfiguration(name, copy));
@@ -256,6 +265,7 @@ final class ParameterCommands {
         @Option(names = "--expression", required = true)
         String expression;
 
+        @java.lang.Override
         public Integer call() throws Exception {
             var s = session();
             s.setParameters(s.document().parameters().override(parameter, name, expression));
@@ -273,6 +283,7 @@ final class ParameterCommands {
         @Option(names = "--name", required = true)
         String name;
 
+        @java.lang.Override
         public Integer call() throws Exception {
             var s = session();
             s.selectConfiguration(name);
@@ -293,6 +304,7 @@ final class ParameterCommands {
         @Option(names = "--to", required = true)
         String next;
 
+        @java.lang.Override
         public Integer call() throws Exception {
             var s = session();
             s.setParameters(s.document().parameters().renameConfiguration(name, next));
@@ -310,6 +322,7 @@ final class ParameterCommands {
         @Option(names = "--name", required = true)
         String name;
 
+        @java.lang.Override
         public Integer call() throws Exception {
             var s = session();
             s.setParameters(s.document().parameters().removeConfiguration(name));

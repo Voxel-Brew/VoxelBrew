@@ -1,10 +1,11 @@
 package dev.voxelbrew.cli;
 
-import dev.voxelbrew.api.printer.PrinterRuntime;
+import dev.voxelbrew.api.printer.PrinterProfileCatalog;
+import dev.voxelbrew.api.printer.PrinterStore;
+import dev.voxelbrew.api.printer.driver.DriverRegistry;
 import dev.voxelbrew.engine.feature.FeatureRegistry;
 import dev.voxelbrew.util.di.ApplicationModule;
 import dev.voxelbrew.util.i18n.Translations;
-import dev.voxelbrew.util.services.Services;
 import java.util.HashMap;
 import java.util.function.Supplier;
 
@@ -22,6 +23,8 @@ public final class DefaultCliFactory implements CliComponent.Factory {
         private final FileIoModule files;
         private final Translations translations;
         private final CommandFactory commands;
+        private final PrinterStore printerStore;
+        private final PrinterProfileCatalog profiles;
 
         public CommandFactory commands() {
             return commands;
@@ -34,6 +37,9 @@ public final class DefaultCliFactory implements CliComponent.Factory {
         Scope(ApplicationModule application, FileIoModule files) {
             this.application = application;
             this.files = files;
+            this.printerStore = new dev.voxelbrew.printer.FilePrinterStore(application.configuration());
+            this.profiles = new dev.voxelbrew.printer.DefaultPrinterProfileCatalog(
+                    application.paths().profiles());
             this.translations = new Translations(application.configuration(), application.paths());
             var commands = new HashMap<Class<?>, Supplier<Object>>();
             commands.put(ReportBugCommand.class, () -> reportBugCommand());
@@ -111,12 +117,19 @@ public final class DefaultCliFactory implements CliComponent.Factory {
         }
 
         private PreferenceCommands preferenceCommands() {
-            return new PreferenceCommands(application.configuration(), files.printers(), files.slicers());
+            return new PreferenceCommands(application.configuration(), profiles, files.slicers());
         }
 
         private DeviceCommands deviceCommands() {
             return new DeviceCommands(
-                    Services.load(PrinterRuntime.class), files.source(), files.sink(), files.printers());
+                    printerStore,
+                    () -> java.util.ServiceLoader.load(DriverRegistry.class)
+                            .findFirst()
+                            .orElseThrow(() ->
+                                    new IllegalStateException("No DriverRegistry service found; install printer-impl")),
+                    files.source(),
+                    files.sink(),
+                    profiles);
         }
 
         private SessionCommand sessionCommand() {
@@ -128,7 +141,7 @@ public final class DefaultCliFactory implements CliComponent.Factory {
         }
 
         private PrintingCommands.Printers printingCommandsPrinters() {
-            return new PrintingCommands.Printers(files.printers());
+            return new PrintingCommands.Printers(profiles);
         }
 
         private BodyStyleCommand bodyStyleCommand() {
@@ -216,7 +229,7 @@ public final class DefaultCliFactory implements CliComponent.Factory {
         }
 
         private PrintingCommands.Settings printingCommandsSettings() {
-            return new PrintingCommands.Settings(files.source(), files.sink(), files.printers());
+            return new PrintingCommands.Settings(files.source(), files.sink(), profiles);
         }
 
         private PrintingCommands.Support printingCommandsSupport() {
@@ -248,6 +261,7 @@ public final class DefaultCliFactory implements CliComponent.Factory {
                     files.source(),
                     files.sink(),
                     files.slicers(),
+                    printerStore,
                     files.exporters(),
                     files.slicing(),
                     files.slicerExecutable());

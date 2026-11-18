@@ -339,8 +339,8 @@ public final class DocumentCodec {
         return message.build();
     }
 
-    private static PrinterProfile fromProto(DocumentProto.PrinterSnapshot p) {
-        return new PrinterProfile(
+    private static HardwareSettings fromProto(DocumentProto.PrinterSnapshot p) {
+        return new HardwareSettings(
                 new PrintProfile.Printer(
                         p.getId(),
                         p.getName(),
@@ -367,7 +367,7 @@ public final class DocumentCodec {
         return DocumentProto.PrinterPoint.newBuilder().setX(p.x()).setY(p.y()).build();
     }
 
-    private static DocumentProto.PrinterSnapshot toProto(PrinterProfile definition) {
+    private static DocumentProto.PrinterSnapshot toProto(HardwareSettings definition) {
         var p = definition.printer();
         var out = DocumentProto.PrinterSnapshot.newBuilder()
                 .setId(p.id())

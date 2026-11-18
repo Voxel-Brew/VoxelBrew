@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 final class WindowResources implements AutoCloseable {
     final ExporterProviderRegistry exporters;
+    final dev.voxelbrew.api.printer.driver.DriverRegistry printers;
     final SlicerCatalog slicers;
     final ExecutorService rebuild, files, slicing, validation, appearance, printer;
     private boolean closed;
@@ -23,11 +24,31 @@ final class WindowResources implements AutoCloseable {
             java.util.function.Supplier<ExporterProviderRegistry> exporterSupplier,
             SlicerCatalog.Factory slicerFactory) {
         ExporterProviderRegistry opened = null;
+        SlicerCatalog openedSlicers = null;
+        dev.voxelbrew.api.printer.driver.DriverRegistry openedPrinters = null;
         try {
             opened = exporterSupplier.get().withDirectory(plugins);
-            slicers = slicerFactory.open(plugins);
+            openedSlicers = slicerFactory.open(plugins);
+            slicers = openedSlicers;
             exporters = opened;
+            openedPrinters = java.util.ServiceLoader.load(dev.voxelbrew.api.printer.driver.DriverRegistry.class)
+                    .findFirst()
+                    .orElseThrow(
+                            () -> new IllegalStateException("No DriverRegistry service found; install printer-impl"));
+            printers = openedPrinters.withDirectory(plugins);
         } catch (IOException | RuntimeException | Error failure) {
+            if (openedPrinters != null)
+                try {
+                    openedPrinters.close();
+                } catch (IOException close) {
+                    failure.addSuppressed(close);
+                }
+            if (openedSlicers != null)
+                try {
+                    openedSlicers.close();
+                } catch (IOException close) {
+                    failure.addSuppressed(close);
+                }
             if (opened != null)
                 try {
                     opened.close();
@@ -89,6 +110,12 @@ final class WindowResources implements AutoCloseable {
         }
         try {
             slicers.close();
+        } catch (IOException failure) {
+            if (failed == null) failed = failure;
+            else failed.addSuppressed(failure);
+        }
+        try {
+            printers.close();
         } catch (IOException failure) {
             if (failed == null) failed = failure;
             else failed.addSuppressed(failure);

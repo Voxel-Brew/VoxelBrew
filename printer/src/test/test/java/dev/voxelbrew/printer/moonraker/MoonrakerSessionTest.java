@@ -1,4 +1,4 @@
-package dev.voxelbrew.printer;
+package dev.voxelbrew.printer.moonraker;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -14,6 +14,37 @@ import org.junit.jupiter.api.io.TempDir;
 class MoonrakerSessionTest {
     @TempDir
     Path directory;
+
+    @Test
+    void definiteHttpRejectionAndMonitoringFailureAreCheckedWithoutRetry() throws Exception {
+        var starts = new java.util.concurrent.atomic.AtomicInteger();
+        var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> {
+            String path = exchange.getRequestURI().getPath();
+            boolean start = path.endsWith("start");
+            if (start) starts.incrementAndGet();
+            String body = path.endsWith("query")
+                    ? "{\"result\":{\"status\":{\"print_stats\":{\"state\":\"standby\"}}}}"
+                    : "{}";
+            byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(start ? 409 : 200, bytes.length);
+            try (var output = exchange.getResponseBody()) {
+                output.write(bytes);
+            }
+        });
+        server.start();
+        try (var session = new MoonrakerSession(
+                new Connection("http://127.0.0.1:" + server.getAddress().getPort(), "", ""))) {
+            assertThatThrownBy(() -> session.start(
+                            new dev.voxelbrew.printer.internal.DeviceTransport.Upload("fixture.gcode", "hash")))
+                    .isInstanceOf(dev.voxelbrew.printer.internal.JobRejectedException.class);
+            assertThat(starts.get()).isEqualTo(1);
+            server.stop(0);
+            assertThatThrownBy(session::status).isInstanceOf(java.io.IOException.class);
+        } finally {
+            server.stop(0);
+        }
+    }
 
     @Test
     void uploadDoesNotStartUntilExplicitRequestAndBusyPrinterRejectsStart() throws Exception {
@@ -45,15 +76,8 @@ class MoonrakerSessionTest {
             }
         });
         server.start();
-        try (var session = new MoonrakerSession(new Printer(
-                "local",
-                "Local",
-                Printer.Kind.MOONRAKER,
-                "generic-marlin-200-0.4",
-                "http://127.0.0.1:" + server.getAddress().getPort(),
-                "",
-                "",
-                "key"))) {
+        try (var session = new MoonrakerSession(
+                new Connection("http://127.0.0.1:" + server.getAddress().getPort(), "", "key"))) {
             Path file = directory.resolve("job.gcode");
             Files.writeString(file, "G1 X10\n");
             var receipt = session.upload(file, fraction -> {});
@@ -62,8 +86,6 @@ class MoonrakerSessionTest {
             assertThat(calls.contains("/printer/print/start")).isTrue();
             state.set("printing");
             assertThatThrownBy(() -> session.start(receipt)).isInstanceOf(java.io.IOException.class);
-            session.command(PrinterSession.Command.PAUSE);
-            assertThat(calls.getLast()).isEqualTo("/printer/print/pause");
             assertThat(session.status().progress().orElseThrow()).isEqualTo(0.25);
         } finally {
             server.stop(0);

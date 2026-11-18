@@ -2152,10 +2152,12 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         body.setId("split-input");
         body.getItems().setAll(controller.build().bodies());
         body.setConverter(new javafx.util.StringConverter<>() {
+            @Override
             public String toString(DocumentController.Body value) {
                 return value == null ? "" : value.id();
             }
 
+            @Override
             public DocumentController.Body fromString(String value) {
                 throw new UnsupportedOperationException();
             }

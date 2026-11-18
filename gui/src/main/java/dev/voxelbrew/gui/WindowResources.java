@@ -7,11 +7,9 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.*;
-import javax.inject.*;
 import lombok.extern.slf4j.Slf4j;
 
-/** Window-owned resources. Dagger scopes instances; the window explicitly closes them. */
-@Singleton
+/** Window-owned resources. The window scope constructs and explicitly closes them. */
 @Slf4j
 final class WindowResources implements AutoCloseable {
     final ExporterProviderRegistry exporters;
@@ -20,9 +18,8 @@ final class WindowResources implements AutoCloseable {
     private boolean closed;
     private final CompletableFuture<Void> disposal = new CompletableFuture<>();
 
-    @Inject
     WindowResources(
-            @Named("plugins") Path plugins,
+            Path plugins,
             java.util.function.Supplier<ExporterProviderRegistry> exporterSupplier,
             SlicerCatalog.Factory slicerFactory) {
         ExporterProviderRegistry opened = null;

@@ -23,7 +23,11 @@ public final class Translations {
     private final Map<String, String> languages;
 
     public Translations(@NonNull Locale locale) {
-        this(locale, ApplicationPaths.home().resolve("i18n"));
+        this(
+                locale,
+                dev.voxelbrew.util.services.Services.load(ApplicationPaths.class)
+                        .home()
+                        .resolve("i18n"));
     }
 
     Translations(@NonNull Locale locale, Path directory) {
@@ -123,37 +127,56 @@ public final class Translations {
         return messages.containsKey(key) ? text(key) : fallback;
     }
 
-    public static Translations configured(UserConfiguration configuration) {
+    public Translations() {
+        this(
+                dev.voxelbrew.util.services.Services.load(UserConfiguration.class),
+                dev.voxelbrew.util.services.Services.load(ApplicationPaths.class));
+    }
+
+    public Translations(@NonNull UserConfiguration configuration, @NonNull ApplicationPaths paths) {
+        this(language(configuration), paths.home().resolve("i18n"));
+    }
+
+    private record Language(Locale locale, String source) {}
+
+    private Translations(Language language, Path directory) {
+        this(language.locale(), directory);
+        if (language.source() == null) return;
+        if (language.locale().getLanguage().equals(locale().getLanguage()))
+            log.info(
+                    "Selected application language {} from {} ({})",
+                    locale().toLanguageTag(),
+                    language.source(),
+                    language.locale().toLanguageTag());
+        else
+            log.info(
+                    "Selected application language en: English fallback for unset or unsupported {} ({})",
+                    language.source(),
+                    language.locale().toLanguageTag());
+    }
+
+    private static Language language(UserConfiguration configuration) {
         try {
             String language = configuration.get("language", "system").strip();
             boolean system = language.isEmpty() || language.equalsIgnoreCase("system");
             Locale selected = system
                     ? Locale.getDefault(Locale.Category.DISPLAY)
                     : new Locale.Builder().setLanguageTag(language).build();
-            var translations = new Translations(selected);
-            String source = system ? "system display locale" : "saved language preference";
-            if (selected.getLanguage().equals(translations.locale().getLanguage()))
-                log.info(
-                        "Selected application language {} from {} ({})",
-                        translations.locale().toLanguageTag(),
-                        source,
-                        selected.toLanguageTag());
-            else
-                log.info(
-                        "Selected application language en: English fallback for unset or unsupported {} ({})",
-                        source,
-                        selected.toLanguageTag());
-            return translations;
+            return new Language(selected, system ? "system display locale" : "saved language preference");
         } catch (IOException | IllformedLocaleException failure) {
             log.warn("Cannot read language preference; using English", failure);
             log.info(
                     "Selected application language en: English fallback for unreadable or invalid language preference");
-            return new Translations(Locale.ENGLISH);
+            return new Language(Locale.ENGLISH, null);
         }
     }
 
+    public static Translations configured(UserConfiguration configuration) {
+        return new Translations(configuration, dev.voxelbrew.util.services.Services.load(ApplicationPaths.class));
+    }
+
     private static final class Current {
-        static final Translations INSTANCE = configured(UserConfiguration.user());
+        static final Translations INSTANCE = dev.voxelbrew.util.services.Services.load(Translations.class);
     }
 
     /** Reads the language preference once per application process; restart after changing it. */

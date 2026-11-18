@@ -2,7 +2,6 @@ package dev.voxelbrew.util.i18n;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.util.config.UserConfiguration;
 import java.nio.file.*;
 import java.util.*;
 import java.util.logging.*;
@@ -45,7 +44,7 @@ class TranslationsTest {
 
     @Test
     void firstLaunchUsesDisplayLanguageWithoutCreatingOrChangingPreferences() throws Exception {
-        var config = new UserConfiguration(directory.resolve("config.properties"));
+        var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
         Locale.setDefault(Locale.ENGLISH);
         Locale.setDefault(Locale.Category.DISPLAY, Locale.forLanguageTag("pl-PL"));
         assertThat(Translations.configured(config).text("action.save")).isEqualTo("Zapisz");
@@ -66,7 +65,7 @@ class TranslationsTest {
 
     @Test
     void missingUnsupportedAndInvalidLanguagesFallBackWhileSavedChoicesOverrideSystem() throws Exception {
-        var config = new UserConfiguration(directory.resolve("config.properties"));
+        var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
         Locale.setDefault(Locale.forLanguageTag("pl-PL"));
         for (var unsupported : List.of(Locale.ROOT, Locale.GERMAN, Locale.JAPANESE)) {
             Locale.setDefault(Locale.Category.DISPLAY, unsupported);
@@ -108,7 +107,7 @@ class TranslationsTest {
         logger.setUseParentHandlers(false);
         logger.addHandler(capture);
         try {
-            var config = new UserConfiguration(directory.resolve("config.properties"));
+            var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
             Locale.setDefault(Locale.Category.DISPLAY, Locale.forLanguageTag("pl-PL"));
             Translations.configured(config);
             config.set("language", "en");
@@ -164,7 +163,7 @@ class TranslationsTest {
 
     @Test
     void configurationSelectsLanguageAndEveryCatalogHasTheSameKeysAndValidFormats() throws Exception {
-        var config = new UserConfiguration(directory.resolve("config.properties"));
+        var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
         config.set("language", "en");
         assertThat(Translations.configured(config).text("action.save")).isEqualTo("Save");
         config.set("language", "pl");
@@ -202,7 +201,7 @@ class TranslationsTest {
 
     @Test
     void configuredCatalogsAreIndependentAndOnlyNewInstancesReadPreferenceChanges() throws Exception {
-        var config = new UserConfiguration(directory.resolve("config.properties"));
+        var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
         config.set("language", "en");
         var english = Translations.configured(config);
         config.set("language", "pl-PL");

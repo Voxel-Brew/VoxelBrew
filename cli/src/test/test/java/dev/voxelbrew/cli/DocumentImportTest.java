@@ -16,7 +16,7 @@ class DocumentImportTest {
     Path directory;
 
     @Test
-    void daggerImportsVxbAndJsonAndProtectsSourcesAndExistingOutputs() throws Exception {
+    void serviceImportsVxbAndJsonAndProtectsSourcesAndExistingOutputs() throws Exception {
         var expected = CadDocument.empty();
         for (var format : List.of("vxb", "json")) {
             Path source = directory.resolve("source." + format);

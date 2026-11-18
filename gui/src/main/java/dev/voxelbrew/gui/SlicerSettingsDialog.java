@@ -21,13 +21,12 @@ final class SlicerSettingsDialog {
     private final Translations translations;
     private final ExecutorService worker;
 
-    @javax.inject.Inject
     SlicerSettingsDialog(
             SlicerCatalog catalog,
             SlicerSettings settings,
             SlicerAvailability availability,
             Translations translations,
-            @javax.inject.Named("appearance") ExecutorService worker) {
+            ExecutorService worker) {
         this.catalog = catalog;
         this.settings = settings;
         this.availability = availability;

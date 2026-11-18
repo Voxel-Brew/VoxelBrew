@@ -23,7 +23,8 @@ public final class FeatureRegistry implements AutoCloseable {
     private final URLClassLoader loader;
 
     public static Path defaultDirectory() {
-        return dev.voxelbrew.util.config.ApplicationPaths.plugins();
+        return dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
+                .plugins();
     }
 
     public FeatureRegistry(Path directory) throws IOException {

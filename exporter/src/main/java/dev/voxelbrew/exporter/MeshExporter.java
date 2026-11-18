@@ -16,7 +16,8 @@ public abstract class MeshExporter implements Exporter<MeshExportDialog.Settings
     private final Path plugins;
 
     protected MeshExporter() {
-        this(dev.voxelbrew.util.config.ApplicationPaths.plugins());
+        this(dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
+                .plugins());
     }
 
     protected MeshExporter(@NonNull Path plugins) {

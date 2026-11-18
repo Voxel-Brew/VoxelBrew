@@ -10,7 +10,6 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableMap;
 
 /** Window-owned runtime checks shared by settings and print actions. */
-@javax.inject.Singleton
 final class SlicerAvailability {
     record Status(boolean working, String detail) {}
 
@@ -21,12 +20,8 @@ final class SlicerAvailability {
     private long generation;
     final ObservableMap<String, Status> statuses = FXCollections.observableHashMap();
 
-    @javax.inject.Inject
     SlicerAvailability(
-            SlicerCatalog catalog,
-            SlicerSettings settings,
-            @javax.inject.Named("appearance") ExecutorService worker,
-            Translations translations) {
+            SlicerCatalog catalog, SlicerSettings settings, ExecutorService worker, Translations translations) {
         this.catalog = catalog;
         this.settings = settings;
         this.worker = worker;

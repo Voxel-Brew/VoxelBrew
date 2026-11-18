@@ -9,8 +9,7 @@ import java.util.Set;
 import java.util.TreeMap;
 
 /** Persistent provider settings; each invocation receives a new configured backend. */
-@javax.inject.Singleton
-@lombok.RequiredArgsConstructor(onConstructor_ = @javax.inject.Inject)
+@lombok.RequiredArgsConstructor
 final class SlicerSettings {
     private final SlicerCatalog catalog;
     private final UserConfiguration configuration;

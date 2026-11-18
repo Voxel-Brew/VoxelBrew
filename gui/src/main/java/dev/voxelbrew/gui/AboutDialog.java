@@ -12,7 +12,6 @@ import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.stage.Window;
-import javax.inject.*;
 import lombok.extern.slf4j.Slf4j;
 
 /** An explicit, window-local release lookup. Closing it cancels work and rejects late results. */
@@ -30,11 +29,7 @@ final class AboutDialog {
     private final Button close;
     private boolean closed, openUpdates;
 
-    @Inject
-    AboutDialog(
-            UpdateServiceFactory factory,
-            Translations translations,
-            @Named("updateWorkers") Supplier<ExecutorService> workers) {
+    AboutDialog(UpdateServiceFactory factory, Translations translations, Supplier<ExecutorService> workers) {
         this.factory = factory;
         this.translations = translations;
         dialog.setTitle(translations.text("about.title"));

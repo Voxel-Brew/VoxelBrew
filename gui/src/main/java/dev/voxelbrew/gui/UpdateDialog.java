@@ -15,7 +15,6 @@ import javafx.stage.Window;
 /** Explicit updater. All network, archive and helper work stays off the JavaFX thread. */
 @lombok.extern.slf4j.Slf4j
 final class UpdateDialog {
-    @dagger.assisted.AssistedFactory
     interface Factory {
         UpdateDialog create(Consumer<Runnable> beforeInstall);
     }
@@ -38,12 +37,11 @@ final class UpdateDialog {
     private UpdateService.Prepared prepared;
     private boolean busy, closed, scheduled;
 
-    @dagger.assisted.AssistedInject
     UpdateDialog(
             UpdateServiceFactory factory,
             Translations translations,
-            @javax.inject.Named("updateWorkers") java.util.function.Supplier<ExecutorService> workers,
-            @dagger.assisted.Assisted Consumer<Runnable> beforeInstall) {
+            java.util.function.Supplier<ExecutorService> workers,
+            Consumer<Runnable> beforeInstall) {
         this.factory = factory;
         this.translations = translations;
         this.beforeInstall = beforeInstall;

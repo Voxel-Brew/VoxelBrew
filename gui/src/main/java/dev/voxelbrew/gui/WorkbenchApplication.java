@@ -24,7 +24,11 @@ public final class WorkbenchApplication extends Application {
             throw new IllegalStateException(
                     dev.voxelbrew.util.i18n.Translations.current().text("graphics.unavailable"));
         var args = getParameters().getRaw();
-        Path plugins = dev.voxelbrew.util.config.ApplicationPaths.plugins(), open = null;
+        Path
+                plugins =
+                        dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
+                                .plugins(),
+                open = null;
         Path smokeOutput = Path.of(System.getProperty("voxelbrew.smoke.output", "build/gui-smoke.png"));
         for (int i = 0; i < args.size(); i++) {
             if (args.get(i).equals("--plugin-dir") && i + 1 < args.size()) plugins = Path.of(args.get(++i));

@@ -30,7 +30,6 @@ import lombok.Getter;
 import lombok.experimental.Accessors;
 
 /** CAD workbench: model state stays in engine; scene graph and tool previews stay here. */
-@javax.inject.Singleton
 @lombok.extern.slf4j.Slf4j
 public final class Workbench extends BorderPane implements AutoCloseable {
     private static final String EXPORT_NOTIFICATION_DURATION_KEY = "export.notification.duration-ms";
@@ -354,7 +353,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     private Button finish;
     private final List<QuickMenu> quickMenus = new ArrayList<>();
     private final UpdateDialog.Factory updates;
-    private final javax.inject.Provider<AboutDialog> about;
+    private final java.util.function.Supplier<AboutDialog> about;
 
     public static Workbench create(Stage stage, Path plugins) throws IOException {
         return create(
@@ -381,7 +380,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             dev.voxelbrew.util.di.ApplicationModule application,
             dev.voxelbrew.gui.FileIoModule files)
             throws IOException {
-        var graph = DaggerGuiComponent.factory().create(stage, plugins, application, files);
+        var graph = GuiComponent.factory().create(stage, plugins, application, files);
         WindowResources resources;
         try {
             resources = graph.resources();
@@ -396,10 +395,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         }
     }
 
-    @javax.inject.Inject
     Workbench(
             Stage stage,
-            @javax.inject.Named("plugins") Path pluginDirectory,
+            Path pluginDirectory,
             DocumentController controller,
             McpServerHost mcpServer,
             ExporterProviderRegistry registry,
@@ -409,12 +407,12 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             SlicerSettingsDialog slicerSettings,
             Appearance appearance,
             Rendering rendering,
-            @javax.inject.Named("appearance") ExecutorService preferencesWorker,
+            ExecutorService preferencesWorker,
             Translations translations,
             dev.voxelbrew.util.config.UserConfiguration configurationStore,
             RecentFiles recentFiles,
             UpdateDialog.Factory updates,
-            javax.inject.Provider<AboutDialog> about,
+            java.util.function.Supplier<AboutDialog> about,
             WindowResources resources,
             FeatureRegistry.Factory featureProviders,
             SketchController.Factory sketches) {
@@ -599,7 +597,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         {
             try {
                 mcpServer.credentials(
-                        dev.voxelbrew.util.config.ApplicationPaths.home().resolve("mcp-token"));
+                        dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
+                                .home()
+                                .resolve("mcp-token"));
             } catch (java.io.IOException failure) {
                 log.warn("Could not load persistent MCP credentials; using a window-only token", failure);
             }

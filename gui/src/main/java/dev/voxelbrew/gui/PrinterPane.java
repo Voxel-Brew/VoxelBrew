@@ -18,7 +18,6 @@ import javafx.stage.FileChooser;
 import javafx.util.Duration;
 
 /** Device workspace. All transport work is serialized away from JavaFX. */
-@javax.inject.Singleton
 final class PrinterPane extends VBox implements AutoCloseable {
     private record Plate(String id, String name) {
         @Override
@@ -58,14 +57,13 @@ final class PrinterPane extends VBox implements AutoCloseable {
     private boolean startPending;
     private volatile long jobGeneration;
 
-    @javax.inject.Inject
     PrinterPane(
             PrinterRuntime runtime,
             dev.voxelbrew.api.slicer.PrinterProfileCatalog profiles,
             PrinterVisibility printerVisibility,
             UserConfiguration configuration,
             Translations text,
-            @javax.inject.Named("printer") ExecutorService worker) {
+            ExecutorService worker) {
         this.runtime = runtime;
         this.profiles = profiles;
         this.printerVisibility = printerVisibility;

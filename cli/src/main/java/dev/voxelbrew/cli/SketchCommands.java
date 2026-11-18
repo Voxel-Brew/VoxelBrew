@@ -33,7 +33,6 @@ import picocli.CommandLine.*;
         })
 final class SketchCommands implements Runnable {
 
-    @javax.inject.Inject
     SketchCommands() {}
 
     @Spec
@@ -53,7 +52,6 @@ final class SketchCommands implements Runnable {
             description = "Create a sketch type/variant; use --help for tools and numeric options")
     static final class Draw extends EditSketch {
 
-        @javax.inject.Inject
         Draw(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -141,7 +139,6 @@ final class SketchCommands implements Runnable {
             description = "Change persisted sketch text while preserving its identity and dimensions")
     static final class EditText extends EditSketch {
 
-        @javax.inject.Inject
         EditText(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -231,7 +228,6 @@ final class SketchCommands implements Runnable {
     @Command(name = "new", mixinStandardHelpOptions = true, description = "Add an empty constrained sketch")
     static final class Create extends VoxelBrew.AddSketch {
 
-        @javax.inject.Inject
         Create(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -247,7 +243,6 @@ final class SketchCommands implements Runnable {
             description = "Convert a rectangle/circle without changing its feature or profile IDs")
     static final class Convert extends EditSketch {
 
-        @javax.inject.Inject
         Convert(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -265,7 +260,6 @@ final class SketchCommands implements Runnable {
                     "Add POINT x,y; LINE x1,y1,x2,y2; CIRCLE cx,cy,r; ARC cx,cy,r,start,sweep; ELLIPSE cx,cy,r1,r2,angle; CONIC startX,startY,vertexX,vertexY,endX,endY,rho; SPLINE four x,y pairs; FIT_SPLINE / CONTROL_SPLINE variable x,y pairs. Angles are radians. Use sketch draw for text.")
     static final class PutEntity extends EditSketch {
 
-        @javax.inject.Inject
         PutEntity(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -332,7 +326,6 @@ final class SketchCommands implements Runnable {
                     "Add a geometric constraint or driving dimension; refs use entity.start/end/center/control1/control2 or origin.point")
     static final class Constrain extends EditSketch {
 
-        @javax.inject.Inject
         Constrain(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -381,7 +374,6 @@ final class SketchCommands implements Runnable {
             description = "Remove a constraint or unfix geometry by constraint ID")
     static final class RemoveConstraint extends EditSketch {
 
-        @javax.inject.Inject
         RemoveConstraint(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -408,7 +400,6 @@ final class SketchCommands implements Runnable {
             description = "Remove an entity and its dependent constraints")
     static final class RemoveEntity extends EditSketch {
 
-        @javax.inject.Inject
         RemoveEntity(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -428,7 +419,6 @@ final class SketchCommands implements Runnable {
             description = "Select one closed exterior and optional interior holes for extrusion/cutting")
     static final class Profile extends EditSketch {
 
-        @javax.inject.Inject
         Profile(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -450,7 +440,6 @@ final class SketchCommands implements Runnable {
             description = "Solve and save a repairable sketch; conflicts leave the file unchanged")
     static final class Solve extends EditSketch {
 
-        @javax.inject.Inject
         Solve(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -467,7 +456,6 @@ final class SketchCommands implements Runnable {
             description = "List entity IDs, constraints, profile selection, degrees of freedom and conflicts")
     static final class Listing extends EditSketch {
 
-        @javax.inject.Inject
         Listing(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -501,7 +489,6 @@ final class SketchCommands implements Runnable {
             description = "Move a point while satisfying its constraints")
     static final class Move extends EditSketch {
 
-        @javax.inject.Inject
         Move(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -530,7 +517,6 @@ final class SketchCommands implements Runnable {
             description = "Add a regular polygon with its persistent polygon constraint")
     static final class Polygon extends EditSketch {
 
-        @javax.inject.Inject
         Polygon(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }

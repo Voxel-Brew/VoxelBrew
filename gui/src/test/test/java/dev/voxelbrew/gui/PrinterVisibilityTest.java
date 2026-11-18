@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.slicer.PrinterProfileCatalog;
 import dev.voxelbrew.api.slicer.SlicerRuntime;
-import dev.voxelbrew.util.config.UserConfiguration;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -17,7 +16,7 @@ class PrinterVisibilityTest {
 
     @Test
     void visibilityPersistsCanBeRestoredAndPreservesOtherPreferences() throws Exception {
-        var configuration = new UserConfiguration(directory.resolve("config.properties"));
+        var configuration = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
         configuration.set("language", "pl");
         var visibility = new PrinterVisibility(configuration);
         var catalog = SlicerRuntime.load().printers(directory.resolve("printers"));
@@ -30,7 +29,7 @@ class PrinterVisibilityTest {
                 .collect(Collectors.toSet());
         visible.remove("bambu-lab-a1-mini");
         visibility.saveVisible(entries, visible);
-        var reopened = new PrinterVisibility(new UserConfiguration(configuration.path()));
+        var reopened = new PrinterVisibility(new dev.voxelbrew.util.config.FileUserConfiguration(configuration.path()));
         assertThat(reopened.hidden()).isEqualTo(Set.of("bambu-lab-a1-mini"));
         assertThat(configuration.get("language", "")).isEqualTo("pl");
         assertThat(catalog.load().require("bambu-lab-a1-mini")).isNotNull();

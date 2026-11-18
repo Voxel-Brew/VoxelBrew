@@ -6,11 +6,9 @@ import dev.voxelbrew.api.slicer.*;
 import dev.voxelbrew.util.config.*;
 import java.nio.file.Path;
 import java.util.*;
-import javax.inject.Inject;
-import lombok.RequiredArgsConstructor;
 import picocli.CommandLine;
 
-@RequiredArgsConstructor(onConstructor_ = @Inject)
+@lombok.RequiredArgsConstructor
 final class PreferenceCommands {
     private final UserConfiguration configuration;
     private final PrinterProfileCatalog printers;
@@ -152,7 +150,9 @@ final class PreferenceCommands {
                     "--plugin-dir",
                     Path.class,
                     false,
-                    ApplicationPaths.plugins().toString(),
+                    dev.voxelbrew.util.services.Services.load(ApplicationPaths.class)
+                            .plugins()
+                            .toString(),
                     "Trusted plugins directory");
             if (action.equals("configure"))
                 option(spec, "--option", String[].class, true, null, "Repeat provider key=value");

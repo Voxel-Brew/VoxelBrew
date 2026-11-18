@@ -7,8 +7,6 @@ tasks.named<Test>("test") {
     systemProperty("voxelbrew.test.plugin", fixture.absolutePath)
 }
 
-apply(from = rootProject.file("gradle/di.gradle.kts"))
-
 apply(from = rootProject.file("gradle/packaging.gradle.kts"))
 
 dependencies {

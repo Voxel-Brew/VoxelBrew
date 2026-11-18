@@ -25,7 +25,6 @@ final class McpServerHost implements AutoCloseable {
     private int historyLimit = 100;
     private final Deque<Map<String, Object>> activity = new ArrayDeque<>();
 
-    @javax.inject.Inject
     McpServerHost(McpAutomation automation) {
         this.automation = automation;
     }

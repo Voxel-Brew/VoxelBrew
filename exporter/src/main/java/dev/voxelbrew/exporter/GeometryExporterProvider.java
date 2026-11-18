@@ -24,6 +24,7 @@ public class GeometryExporterProvider implements ExporterProvider<MeshExportDial
 
     @Override
     public Exporter<MeshExportDialog.Settings> create() {
-        return factory.apply(dev.voxelbrew.util.config.ApplicationPaths.plugins());
+        return factory.apply(dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
+                .plugins());
     }
 }

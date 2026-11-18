@@ -3,7 +3,6 @@ package dev.voxelbrew.cli;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.model.CadDocument;
-import dev.voxelbrew.util.config.UserConfiguration;
 import dev.voxelbrew.util.di.ApplicationModule;
 import java.io.*;
 import java.nio.file.*;
@@ -165,11 +164,14 @@ class WorkspaceCommandsTest {
                 path -> {
                     throw new IOException("No job");
                 });
-        return DaggerCliComponent.factory()
+        return CliComponent.factory()
                 .create(
-                        new ApplicationModule(new UserConfiguration(directory.resolve("config.properties")), () -> {
-                            throw new AssertionError("No update lookup");
-                        }),
+                        new ApplicationModule(
+                                new dev.voxelbrew.util.config.FileUserConfiguration(
+                                        directory.resolve("config.properties")),
+                                () -> {
+                                    throw new AssertionError("No update lookup");
+                                }),
                         files)
                 .commandLine()
                 .setOut(new PrintWriter(new StringWriter()))

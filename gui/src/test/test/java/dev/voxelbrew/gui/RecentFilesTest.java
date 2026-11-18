@@ -2,7 +2,6 @@ package dev.voxelbrew.gui;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.util.config.UserConfiguration;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
@@ -14,7 +13,7 @@ class RecentFilesTest {
 
     @Test
     void persistsMostRecentTenNormalizesAndMovesDuplicatesToFront() throws Exception {
-        var configuration = new UserConfiguration(directory.resolve("config.properties"));
+        var configuration = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
         configuration.set("unrelated", "preserved");
         var recent = new RecentFiles(configuration);
         assertThat(recent.paths().isEmpty()).isTrue();
@@ -36,7 +35,7 @@ class RecentFilesTest {
 
     @Test
     void loadingSkipsDeletedFilesAndDirectories() throws Exception {
-        var configuration = new UserConfiguration(directory.resolve("config.properties"));
+        var configuration = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
         Path existing = Files.createFile(directory.resolve("existing.vxb"));
         Path deleted = Files.createFile(directory.resolve("deleted.vxb"));
         Path folder = Files.createDirectory(directory.resolve("folder"));

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-if command -v prusa-slicer >/dev/null && prusa-slicer --help | sed -n '1p' | grep -q 'PrusaSlicer-2.7.2'; then
+if [[ "$#" -eq 0 ]] && command -v prusa-slicer >/dev/null && prusa-slicer --help | sed -n '1p' | grep -q 'PrusaSlicer-2.7.2'; then
     exit 0
 fi
 # Qualified Ubuntu 24.04 package, upstream 2.7.2. Other distributions need their own qualification.
@@ -10,5 +10,5 @@ if [[ "$ID" != ubuntu || "$VERSION_ID" != 24.04 ]]; then
     exit 1
 fi
 sudo apt-get update
-sudo apt-get install -y prusa-slicer=2.7.2+dfsg-1build2
+sudo apt-get install -y prusa-slicer=2.7.2+dfsg-1build2 "$@"
 prusa-slicer --help | sed -n '1p'

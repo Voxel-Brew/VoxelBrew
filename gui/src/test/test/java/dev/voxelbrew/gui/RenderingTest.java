@@ -2,7 +2,6 @@ package dev.voxelbrew.gui;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.util.config.UserConfiguration;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -13,7 +12,7 @@ class RenderingTest {
 
     @Test
     void remembersStyleWithoutChangingOtherPreferencesAndRecoversFromUnknownValues() throws Exception {
-        var configuration = new UserConfiguration(directory.resolve("config.properties"));
+        var configuration = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
         configuration.set("language", "pl");
         var rendering = new Rendering(configuration);
         assertThat(rendering.load()).isEqualTo(Rendering.Style.SHADED);

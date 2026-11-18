@@ -18,7 +18,6 @@ import lombok.Setter;
 import lombok.experimental.Accessors;
 
 /** Owner-thread state with cancellable worker execution and revision-guarded publication. */
-@javax.inject.Singleton
 @lombok.extern.slf4j.Slf4j
 public final class PrintController implements AutoCloseable {
     public enum State {
@@ -97,10 +96,10 @@ public final class PrintController implements AutoCloseable {
     }
 
     PrintController(
-            @NonNull @javax.inject.Named("ui") Consumer<Runnable> dispatch,
+            @NonNull Consumer<Runnable> dispatch,
             @NonNull Supplier<CadDocument> current,
-            @NonNull @javax.inject.Named("plugins") Path pluginDirectory,
-            @NonNull @javax.inject.Named("slicing") ExecutorService worker,
+            @NonNull Path pluginDirectory,
+            @NonNull ExecutorService worker,
             java.util.function.Supplier<dev.voxelbrew.api.exporter.ExporterProviderRegistry> exporters,
             Slicing slicing) {
         this(
@@ -113,12 +112,11 @@ public final class PrintController implements AutoCloseable {
                 dev.voxelbrew.importer.ImportRuntime.load().gcode());
     }
 
-    @javax.inject.Inject
     PrintController(
-            @javax.inject.Named("ui") Consumer<Runnable> dispatch,
+            Consumer<Runnable> dispatch,
             Supplier<CadDocument> current,
-            @javax.inject.Named("plugins") Path pluginDirectory,
-            @javax.inject.Named("slicing") ExecutorService worker,
+            Path pluginDirectory,
+            ExecutorService worker,
             java.util.function.Supplier<dev.voxelbrew.api.exporter.ExporterProviderRegistry> exporters,
             Slicing slicing,
             dev.voxelbrew.importer.GcodeSource gcodeReader) {

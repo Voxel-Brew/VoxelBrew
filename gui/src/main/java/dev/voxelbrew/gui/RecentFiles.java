@@ -8,7 +8,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 
 /** Window-local recent documents, persisted separately from document contents. */
@@ -19,7 +18,6 @@ final class RecentFiles {
     private final UserConfiguration configuration;
     private final List<Path> paths = new ArrayList<>();
 
-    @Inject
     RecentFiles(UserConfiguration configuration) {
         this.configuration = configuration;
         try {

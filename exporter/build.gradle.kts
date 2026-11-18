@@ -3,8 +3,6 @@ plugins {
     `maven-publish`
 }
 
-apply(from = rootProject.file("gradle/di.gradle.kts"))
-
 base { archivesName.set("exporter-impl") }
 
 dependencies {

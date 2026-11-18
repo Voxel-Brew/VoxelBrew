@@ -4,8 +4,6 @@ plugins {
     `maven-publish`
 }
 
-apply(from = rootProject.file("gradle/di.gradle.kts"))
-
 dependencies {
     implementation("org.apache.commons:commons-compress")
     implementation("com.google.code.gson:gson")

@@ -11,11 +11,12 @@ import org.junit.jupiter.api.io.TempDir;
 class ConfigurationSectionTest {
     @Test
     void migratesPreviousFileWithDestinationTakingPrecedence() throws Exception {
-        var main = new UserConfiguration(directory.resolve("config.properties"));
+        var main = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
         main.set("slicer.cura.executable", "oldest");
-        var previous = new UserConfiguration(directory.resolve("config-slicer-cura.properties"));
+        var previous =
+                new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config-slicer-cura.properties"));
         previous.update(Map.of("executable", "previous", "definition", "machine.json"), java.util.Set.of());
-        var target = new UserConfiguration(directory.resolve("slicers/cura.properties"));
+        var target = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("slicers/cura.properties"));
         target.set("executable", "current");
         assertThat(main.section("slicer", "cura").read())
                 .isEqualTo(Map.of("executable", "current", "definition", "machine.json"));
@@ -26,8 +27,9 @@ class ConfigurationSectionTest {
 
     @Test
     void failedFileMigrationKeepsPreviousFile() throws Exception {
-        var main = new UserConfiguration(directory.resolve("config.properties"));
-        var previous = new UserConfiguration(directory.resolve("config-slicer-cura.properties"));
+        var main = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
+        var previous =
+                new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config-slicer-cura.properties"));
         previous.set("executable", "kept");
         Files.createDirectories(directory.resolve("slicers/cura.properties"));
         assertThatThrownBy(() -> main.section("slicer", "cura")).isInstanceOf(IOException.class);
@@ -39,7 +41,7 @@ class ConfigurationSectionTest {
 
     @Test
     void migratesOnlyThisProviderAndKeepsDestinationValuesAndUnknownKeys() throws Exception {
-        var main = new UserConfiguration(directory.resolve("custom.properties"));
+        var main = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("custom.properties"));
         main.update(
                 Map.of(
                         "slicer.prusa-slicer.executable",
@@ -51,7 +53,8 @@ class ConfigurationSectionTest {
                         "appearance",
                         "dark"),
                 java.util.Set.of());
-        var separate = new UserConfiguration(directory.resolve("slicers/prusa-slicer.properties"));
+        var separate = new dev.voxelbrew.util.config.FileUserConfiguration(
+                directory.resolve("slicers/prusa-slicer.properties"));
         separate.set("executable", "new");
         assertThat(main.section("slicer", "prusa-slicer").read())
                 .isEqualTo(Map.of("executable", "new", "custom", "kept"));
@@ -61,7 +64,7 @@ class ConfigurationSectionTest {
 
     @Test
     void failedMigrationPreservesLegacyValues() throws Exception {
-        var main = new UserConfiguration(directory.resolve("config.properties"));
+        var main = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
         main.set("slicer.cura.executable", "kept");
         Files.createDirectories(directory.resolve("slicers/cura.properties"));
         assertThatThrownBy(() -> main.section("slicer", "cura")).isInstanceOf(IOException.class);
@@ -70,7 +73,7 @@ class ConfigurationSectionTest {
 
     @Test
     void rejectsTraversalAndDoesNotCreateUnusedFiles() throws Exception {
-        var main = new UserConfiguration(directory.resolve("config.properties"));
+        var main = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
         assertThatThrownBy(() -> main.section("slicer", "../outside")).isInstanceOf(IllegalArgumentException.class);
         assertThat(main.section("slicer", "cura").read().isEmpty()).isTrue();
         assertThat(Files.exists(directory.resolve("slicers/cura.properties"))).isFalse();

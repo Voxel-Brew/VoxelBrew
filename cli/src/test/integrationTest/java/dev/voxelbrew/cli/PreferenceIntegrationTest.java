@@ -3,7 +3,6 @@ package dev.voxelbrew.cli;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.slicer.*;
-import dev.voxelbrew.util.config.UserConfiguration;
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
@@ -22,7 +21,7 @@ class PreferenceIntegrationTest {
         var runtime = SlicerRuntime.load();
         var root = new CommandLine(CommandLine.Model.CommandSpec.create().name("test"));
         new PreferenceCommands(
-                        new UserConfiguration(directory.resolve("config.properties")),
+                        new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties")),
                         runtime.printers(directory.resolve("printers")),
                         runtime.slicers())
                 .install(root);
@@ -44,7 +43,7 @@ class PreferenceIntegrationTest {
         assertThat(run("settings", "set", "--key", "appearance", "--value", "dark"))
                 .isEqualTo(0);
         assertThat(run("settings", "reset", "--key", "language")).isEqualTo(0);
-        var saved = new UserConfiguration(directory.resolve("config.properties")).read();
+        var saved = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties")).read();
         assertThat(saved.containsKey("language")).isFalse();
         assertThat(saved.get("appearance")).isEqualTo("dark");
         assertThat(run("settings", "show")).isEqualTo(0);
@@ -53,7 +52,7 @@ class PreferenceIntegrationTest {
 
     @Test
     void visibilityOperationsApplyToAllDefaultsAndRejectCustomOrUnknownIdsWithoutWriting() throws Exception {
-        var config = new UserConfiguration(directory.resolve("config.properties"));
+        var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
         var catalog =
                 SlicerRuntime.load().printers(directory.resolve("printers")).load();
         var ids = catalog.entries().stream()
@@ -98,7 +97,8 @@ class PreferenceIntegrationTest {
                         "executable=" + executable))
                 .as(output)
                 .isEqualTo(0);
-        var section = new UserConfiguration(directory.resolve("config.properties")).section("slicer", "prusa-slicer");
+        var section = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"))
+                .section("slicer", "prusa-slicer");
         assertThat(section.get("executable", "")).isEqualTo(executable);
         byte[] before = Files.readAllBytes(section.path());
         assertThat(run("slicer", "backend", "configure", "--id", "prusa-slicer", "--option", "not-an-option=value"))

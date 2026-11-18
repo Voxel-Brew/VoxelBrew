@@ -205,12 +205,7 @@ configure(libraryProjects) {
         auxClassPaths.from(sources.getByName("main").runtimeClasspath)
         classes =
             sources.getByName("main").output.classesDirs.asFileTree.matching {
-                exclude(
-                    "**/persistence/proto/**",
-                    "**/Dagger*",
-                    "**/*_Factory*",
-                    "**/*_MembersInjector*",
-                )
+                exclude("**/persistence/proto/**")
             }
     }
     sources.named("test") {
@@ -264,6 +259,11 @@ configure(libraryProjects) {
             }
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
+        if (name != "test") {
+            outputs.doNotCacheIf("Platform tests qualify the current runner and installed tools") {
+                true
+            }
+        }
         // Parallelize projects, not suite JVMs: homes and evidence are shared within a suite.
         maxParallelForks = 1
         val temporaryDirectory = layout.buildDirectory.dir("test-tmp/$name")

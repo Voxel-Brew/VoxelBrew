@@ -64,7 +64,6 @@ final class UpdateCommands {
                     "Download and install a verified public application update after exit (no GitHub login required)")
     static final class Update extends Options {
 
-        @javax.inject.Inject
         Update(UpdateServiceFactory updates) {
             super(updates);
         }
@@ -78,7 +77,6 @@ final class UpdateCommands {
     @Command(name = "check", description = "Check releases without downloading or replacing files")
     static final class Check extends Options {
 
-        @javax.inject.Inject
         Check(UpdateServiceFactory updates) {
             super(updates);
         }

@@ -28,7 +28,8 @@ class WindowResourcesTest {
             java.nio.file.Files.copy(
                     Path.of(System.getProperty("voxelbrew.test.plugin")), plugins.resolve("provider.jar"));
             var resources = new WindowResources(
-                    dev.voxelbrew.util.config.ApplicationPaths.plugins(),
+                    dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
+                            .plugins(),
                     () -> java.util.ServiceLoader.load(ExporterProviderRegistry.class)
                             .findFirst()
                             .orElseThrow(),

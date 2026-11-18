@@ -123,7 +123,7 @@ class DocumentExportTest {
     }
 
     @Test
-    void daggerRegistryDiscoversAndInvokesAnIndependentDocumentProvider() throws Exception {
+    void serviceRegistryDiscoversAndInvokesAnIndependentDocumentProvider() throws Exception {
         Path plugins = Files.createDirectory(directory.resolve("plugins"));
         Files.copy(Path.of(System.getProperty("voxelbrew.test.plugin")), plugins.resolve("provider.jar"));
         Path source = directory.resolve("source.vxb");

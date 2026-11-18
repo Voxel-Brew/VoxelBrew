@@ -8,8 +8,6 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.Callable;
-import javax.inject.Inject;
-import lombok.RequiredArgsConstructor;
 import picocli.CommandLine;
 import picocli.CommandLine.*;
 
@@ -18,7 +16,7 @@ import picocli.CommandLine.*;
         name = "session",
         mixinStandardHelpOptions = true,
         description = "Edit in memory; JSON scripts contain arrays of command argument arrays. Save explicitly.")
-@RequiredArgsConstructor(onConstructor_ = @Inject)
+@lombok.RequiredArgsConstructor
 final class SessionCommand implements Callable<Integer> {
     private final DocumentSource source;
     private final DocumentSave sink;
@@ -198,7 +196,7 @@ final class SessionCommand implements Callable<Integer> {
                         else sink.save(next, requested, overwrite);
                     },
                     gcode);
-            var parser = DaggerCliComponent.factory()
+            var parser = CliComponent.factory()
                     .create(
                             dev.voxelbrew.util.di.ApplicationModule.system(
                                     dev.voxelbrew.util.update.ApplicationImage.Component.CLI),

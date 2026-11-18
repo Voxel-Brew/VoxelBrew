@@ -3,7 +3,6 @@ package dev.voxelbrew.exporter;
 import dev.voxelbrew.api.exporter.*;
 
 public final class StepExporterProvider implements ExporterProvider<FileExportDialog.Destination> {
-    @javax.inject.Inject
     public StepExporterProvider() {}
 
     @Override

@@ -17,7 +17,6 @@ import lombok.Setter;
 import lombok.experimental.Accessors;
 
 /** UI-neutral document controller. UI dispatch confines all state changes to its owner thread. */
-@javax.inject.Singleton
 @lombok.extern.slf4j.Slf4j
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public final class DocumentController implements AutoCloseable {
@@ -194,12 +193,11 @@ public final class DocumentController implements AutoCloseable {
                 dev.voxelbrew.exporter.DocumentWriter::save);
     }
 
-    @javax.inject.Inject
     DocumentController(
-            @javax.inject.Named("ui") Consumer<Runnable> dispatch,
-            @javax.inject.Named("plugins") Path pluginDirectory,
-            @javax.inject.Named("rebuild") ExecutorService worker,
-            @javax.inject.Named("files") ExecutorService io,
+            Consumer<Runnable> dispatch,
+            Path pluginDirectory,
+            ExecutorService worker,
+            ExecutorService io,
             dev.voxelbrew.importer.DocumentSource documents,
             DocumentSave documentWriter) {
         this(

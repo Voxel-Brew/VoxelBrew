@@ -433,7 +433,11 @@ class WorkbenchUiTest {
             deviceProfile = properties.getProperty("profile_id");
             assertThat(deviceProfile).isNotEqualTo(activeProfile);
         }
+        deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (fx(() -> stage.getScene().getRoot().lookup("#device-config-content")) != null
+                && System.nanoTime() < deadline) Thread.sleep(25);
         assertThat(fx(() -> stage.getScene().getRoot().lookup("#device-config-content")))
+                .as("The save completion callback should close the device dialog")
                 .isNull();
         var selectedDevice = fx(() -> {
             var target = (ComboBox<?>) node("#print-target");
@@ -1102,6 +1106,12 @@ class WorkbenchUiTest {
         String second = document().printSetup().activePlateId();
         var from = fx(() -> node("#print-plate-plate-1").localToScreen(20, 15));
         var to = fx(() -> node("#print-plate-" + second).localToScreen(20, 15));
+        var dragOver = new CountDownLatch(1);
+        fx(() -> {
+            node("#print-plate-" + second)
+                    .addEventFilter(javafx.scene.input.DragEvent.DRAG_OVER, event -> dragOver.countDown());
+            return null;
+        });
         // Windows native drag-and-drop blocks the JavaFX Robot call until release.
         // Drive this gesture from the test thread so release can reach the OS loop.
         var dragRobot = new java.awt.Robot();
@@ -1112,8 +1122,16 @@ class WorkbenchUiTest {
             Thread.sleep(150);
             dragRobot.mouseMove((int) from.getX() + 12, (int) from.getY());
             Thread.sleep(200);
-            dragRobot.mouseMove((int) to.getX(), (int) to.getY());
-            Thread.sleep(250);
+            for (int step = 1; step <= 20; step++) {
+                double fraction = step / 20.0;
+                dragRobot.mouseMove((int) (from.getX() + 12 + (to.getX() - from.getX() - 12) * fraction), (int)
+                        (from.getY() + (to.getY() - from.getY()) * fraction));
+                Thread.sleep(40);
+            }
+            assertThat(dragOver.await(5, TimeUnit.SECONDS))
+                    .as("The target plate must receive the native drag before release")
+                    .isTrue();
+            fx(() -> null);
         } finally {
             dragRobot.mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK);
         }
@@ -3178,7 +3196,8 @@ class WorkbenchUiTest {
     @BeforeEach
     void window(TestInfo info) throws Exception {
         updates = new UpdateFixture(directory.resolve("update fixture"));
-        configuration = new dev.voxelbrew.util.config.UserConfiguration(directory.resolve("preferences.properties"));
+        configuration =
+                new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("preferences.properties"));
         String testName = info.getTestMethod().orElseThrow().getName();
         boolean firstLaunch = testName.startsWith("firstLaunch");
         if (!firstLaunch) configuration.set("language", testName.startsWith("polish") ? "pl" : "en");
@@ -3966,13 +3985,13 @@ class WorkbenchUiTest {
     }
 
     @Test
-    void daggerGraphsIsolateWindowsPreferencesAndWorkerLifetimes() throws Exception {
+    void serviceScopesIsolateWindowsPreferencesAndWorkerLifetimes() throws Exception {
         fx(() -> {
-            var config = new dev.voxelbrew.util.config.UserConfiguration(directory.resolve("isolated.properties"));
+            var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("isolated.properties"));
             config.set("language", "pl");
             config.set("appearance", "DARK");
             var secondStage = new Stage();
-            var graph = DaggerGuiComponent.factory()
+            var graph = GuiComponent.factory()
                     .create(
                             secondStage,
                             directory.resolve("isolated plugins"),

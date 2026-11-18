@@ -2,7 +2,6 @@ package dev.voxelbrew.gui;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.util.config.UserConfiguration;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -13,13 +12,13 @@ class AppearanceTest {
 
     @Test
     void migratesExistingPreferenceOnceAndPreservesUnrelatedConfiguration() throws Exception {
-        var config = new UserConfiguration(directory.resolve("config.properties"));
+        var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
         config.set("language", "pl");
         var appearance = new Appearance(config, () -> "DARK");
         assertThat(appearance.load()).isEqualTo(Appearance.Choice.DARK);
         assertThat(config.get("appearance", "")).isEqualTo("DARK");
         appearance.save(Appearance.Choice.LIGHT);
-        var reopened = new Appearance(new UserConfiguration(config.path()), () -> {
+        var reopened = new Appearance(new dev.voxelbrew.util.config.FileUserConfiguration(config.path()), () -> {
             fail("Legacy preference should not be consulted again");
             return null;
         });
@@ -29,7 +28,7 @@ class AppearanceTest {
 
     @Test
     void missingOrInvalidPreferenceUsesSystemAndAllowsRepair() throws Exception {
-        var config = new UserConfiguration(directory.resolve("config.properties"));
+        var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
         var appearance = new Appearance(config, () -> null);
         assertThat(appearance.load()).isEqualTo(Appearance.Choice.SYSTEM);
         config.set("appearance", "UNKNOWN");

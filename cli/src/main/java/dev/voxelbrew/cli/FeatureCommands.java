@@ -22,7 +22,7 @@ final class FeatureCommands {
             name = "feature-types",
             mixinStandardHelpOptions = true,
             description = "List trusted persistent feature types and numeric parameters")
-    @RequiredArgsConstructor(access = AccessLevel.PACKAGE, onConstructor_ = @javax.inject.Inject)
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     static final class Types implements Callable<Integer> {
         private final FeatureRegistry.Factory features;
 
@@ -57,7 +57,6 @@ final class FeatureCommands {
     static final class Custom extends VoxelBrew.AddFeature {
         private final FeatureRegistry.Factory features;
 
-        @javax.inject.Inject
         Custom(DocumentSource documents, DocumentSave documentWriter, FeatureRegistry.Factory features) {
             super(documents, documentWriter);
             this.features = features;

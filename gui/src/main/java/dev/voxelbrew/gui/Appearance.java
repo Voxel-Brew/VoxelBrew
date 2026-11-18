@@ -31,7 +31,6 @@ final class Appearance {
                 () -> Preferences.userNodeForPackage(Appearance.class).get("appearance", null));
     }
 
-    @javax.inject.Inject
     Appearance(UserConfiguration configuration) {
         this(
                 configuration,

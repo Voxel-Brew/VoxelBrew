@@ -15,9 +15,9 @@ class BackendConfigurationTest {
 
     @Test
     void registryReadsSeparateFilesAndMigratesLegacySettings() throws Exception {
-        var configuration = new dev.voxelbrew.util.config.UserConfiguration(directory.resolve("config.properties"));
+        var configuration = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
         configuration.set("slicer.prusa-slicer.executable", "legacy-prusa");
-        var cura = new dev.voxelbrew.util.config.UserConfiguration(directory.resolve("slicers/cura.properties"));
+        var cura = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("slicers/cura.properties"));
         cura.set("executable", "separate-cura");
         try (var registry = new SlicerRegistry(directory, configuration)) {
             assertThat(registry.require("prusa-slicer").executable()).isEqualTo(Path.of("legacy-prusa"));

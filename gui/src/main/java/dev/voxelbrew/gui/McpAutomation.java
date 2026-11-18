@@ -15,9 +15,7 @@ final class McpAutomation {
     private final Gson json = new Gson();
     private final java.util.function.Consumer<Runnable> dispatch;
 
-    @javax.inject.Inject
-    McpAutomation(
-            DocumentController document, @javax.inject.Named("ui") java.util.function.Consumer<Runnable> dispatch) {
+    McpAutomation(DocumentController document, java.util.function.Consumer<Runnable> dispatch) {
         this(document, () -> true, dispatch);
     }
 

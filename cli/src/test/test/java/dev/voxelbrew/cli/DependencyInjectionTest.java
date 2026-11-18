@@ -3,7 +3,6 @@ package dev.voxelbrew.cli;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.model.CadDocument;
-import dev.voxelbrew.util.config.UserConfiguration;
 import dev.voxelbrew.util.di.ApplicationModule;
 import dev.voxelbrew.util.update.UpdateServiceFactory;
 import java.io.*;
@@ -129,9 +128,9 @@ class DependencyInjectionTest {
     }
 
     private CliComponent graph(String language, FileIoModule files, UpdateServiceFactory updates) throws IOException {
-        var config = new UserConfiguration(directory.resolve(language + ".properties"));
+        var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve(language + ".properties"));
         config.set("language", language);
-        return DaggerCliComponent.factory().create(new ApplicationModule(config, updates), files);
+        return CliComponent.factory().create(new ApplicationModule(config, updates), files);
     }
 
     private static CommandLine quiet(CommandLine command) {

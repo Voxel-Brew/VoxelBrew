@@ -1,0 +1,212 @@
+package dev.voxelbrew.gui;
+
+import dev.voxelbrew.api.printer.PrinterRuntime;
+import dev.voxelbrew.engine.feature.FeatureRegistry;
+import dev.voxelbrew.util.di.ApplicationModule;
+import dev.voxelbrew.util.i18n.Translations;
+import dev.voxelbrew.util.services.Services;
+import java.nio.file.Path;
+import javafx.application.Platform;
+import javafx.stage.Stage;
+
+/** Service-discovered factory; each invocation owns an independent constructor graph. */
+public final class DefaultGuiFactory implements GuiComponent.Factory {
+    public DefaultGuiFactory() {}
+
+    @Override
+    public GuiComponent create(Stage stage, Path plugins, ApplicationModule application, FileIoModule files) {
+        return new Scope(stage, plugins, application, files);
+    }
+
+    private static final class Scope implements GuiComponent {
+        private PrinterRuntime printerRuntime;
+
+        private PrinterRuntime printerRuntime() {
+            if (printerRuntime == null) printerRuntime = Services.load(PrinterRuntime.class);
+            return printerRuntime;
+        }
+
+        private final ApplicationModule application;
+        private final FileIoModule files;
+        private final Translations translations;
+        private final Stage stage;
+        private final Path plugins;
+        private DocumentController documentController;
+        private WindowResources windowResources;
+        private McpAutomation mcpAutomation;
+        private McpServerHost mcpServerHost;
+        private PrinterVisibility printerVisibility;
+        private PrintController printController;
+        private SlicerSettings slicerSettings;
+        private SlicerAvailability slicerAvailability;
+        private PrintingPane printingPane;
+        private PrinterPane printerPane;
+        private SlicerSettingsDialog slicerSettingsDialog;
+        private Appearance appearance;
+        private Rendering rendering;
+        private RecentFiles recentFiles;
+
+        private Workbench workbench;
+
+        Scope(Stage stage, Path plugins, ApplicationModule application, FileIoModule files) {
+            this.application = application;
+            this.files = files;
+            this.translations = new Translations(application.configuration(), application.paths());
+            this.stage = stage;
+            this.plugins = plugins;
+        }
+
+        private DocumentController documentController() {
+            if (documentController == null)
+                documentController = new DocumentController(
+                        Platform::runLater,
+                        plugins,
+                        resources().rebuild,
+                        resources().files,
+                        files.source(),
+                        files.sink());
+            return documentController;
+        }
+
+        private WindowResources windowResources() {
+            if (windowResources == null)
+                windowResources = new WindowResources(plugins, files.exporters(), files.slicers());
+            return windowResources;
+        }
+
+        public WindowResources resources() {
+            return windowResources();
+        }
+
+        private McpAutomation mcpAutomation() {
+            if (mcpAutomation == null) mcpAutomation = new McpAutomation(documentController(), Platform::runLater);
+            return mcpAutomation;
+        }
+
+        private McpServerHost mcpServerHost() {
+            if (mcpServerHost == null) mcpServerHost = new McpServerHost(mcpAutomation());
+            return mcpServerHost;
+        }
+
+        private PrinterVisibility printerVisibility() {
+            if (printerVisibility == null) printerVisibility = new PrinterVisibility(application.configuration());
+            return printerVisibility;
+        }
+
+        private PrintController printController() {
+            if (printController == null)
+                printController = new PrintController(
+                        Platform::runLater,
+                        () -> documentController().snapshot().document(),
+                        plugins,
+                        resources().slicing,
+                        files.exporters(),
+                        files.slicing(),
+                        files.gcode());
+            return printController;
+        }
+
+        private SlicerSettings slicerSettings() {
+            if (slicerSettings == null)
+                slicerSettings = new SlicerSettings(resources().slicers, application.configuration());
+            return slicerSettings;
+        }
+
+        private SlicerAvailability slicerAvailability() {
+            if (slicerAvailability == null)
+                slicerAvailability = new SlicerAvailability(
+                        resources().slicers, slicerSettings(), resources().appearance, translations);
+            return slicerAvailability;
+        }
+
+        private PrintingPane printingPane() {
+            if (printingPane == null)
+                printingPane = new PrintingPane(
+                        files.printers(),
+                        printerRuntime(),
+                        printerVisibility(),
+                        documentController(),
+                        printController(),
+                        resources().slicers,
+                        slicerSettings(),
+                        slicerAvailability(),
+                        resources().exporters,
+                        stage,
+                        resources().validation,
+                        translations,
+                        application.configuration(),
+                        files.slicerExecutable());
+            return printingPane;
+        }
+
+        private PrinterPane printerPane() {
+            if (printerPane == null)
+                printerPane = new PrinterPane(
+                        printerRuntime(),
+                        files.printers(),
+                        printerVisibility(),
+                        application.configuration(),
+                        translations,
+                        resources().printer);
+            return printerPane;
+        }
+
+        private SlicerSettingsDialog slicerSettingsDialog() {
+            if (slicerSettingsDialog == null)
+                slicerSettingsDialog = new SlicerSettingsDialog(
+                        resources().slicers,
+                        slicerSettings(),
+                        slicerAvailability(),
+                        translations,
+                        resources().appearance);
+            return slicerSettingsDialog;
+        }
+
+        private Appearance appearance() {
+            if (appearance == null) appearance = new Appearance(application.configuration());
+            return appearance;
+        }
+
+        private Rendering rendering() {
+            if (rendering == null) rendering = new Rendering(application.configuration());
+            return rendering;
+        }
+
+        private RecentFiles recentFiles() {
+            if (recentFiles == null) recentFiles = new RecentFiles(application.configuration());
+            return recentFiles;
+        }
+
+        private AboutDialog aboutDialog() {
+            return new AboutDialog(application.updates(), translations, () -> WindowResources.worker("update"));
+        }
+
+        public Workbench workbench() {
+            if (workbench == null)
+                workbench = new Workbench(
+                        stage,
+                        plugins,
+                        documentController(),
+                        mcpServerHost(),
+                        resources().exporters,
+                        files.importers(),
+                        printingPane(),
+                        printerPane(),
+                        slicerSettingsDialog(),
+                        appearance(),
+                        rendering(),
+                        resources().appearance,
+                        translations,
+                        application.configuration(),
+                        recentFiles(),
+                        before -> new UpdateDialog(
+                                application.updates(), translations, () -> WindowResources.worker("update"), before),
+                        () -> aboutDialog(),
+                        resources(),
+                        FeatureRegistry::new,
+                        (geometry, parameters, id) ->
+                                new SketchController(geometry, parameters, id, Platform::runLater));
+            return workbench;
+        }
+    }
+}

@@ -19,7 +19,7 @@ dependencies {
     }
 }
 
-// Cooperating Lombok/Dagger processors intentionally leave other annotations unclaimed.
+// Lombok processors intentionally leave other annotations unclaimed.
 tasks.withType<JavaCompile>().configureEach {
     inputs.file(rootProject.file("lombok.config")).withPathSensitivity(PathSensitivity.RELATIVE)
     options.compilerArgs.add("-Xlint:-processing")

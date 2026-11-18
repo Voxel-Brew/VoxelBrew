@@ -3,32 +3,20 @@ package dev.voxelbrew.util.config;
 import java.nio.file.Path;
 
 /** User-local application files, independent of documents and installation directories. */
-@lombok.experimental.UtilityClass
-public class ApplicationPaths {
+public interface ApplicationPaths {
+    Path home();
 
-    public static Path home() {
-        String override = System.getProperty("voxelbrew.home");
-        return (override == null ? Path.of(System.getProperty("user.home"), ".voxelbrew") : Path.of(override))
-                .toAbsolutePath()
-                .normalize();
-    }
+    Path configuration();
 
-    public static Path configuration() {
-        String override = System.getProperty("voxelbrew.config");
-        return override == null
-                ? home().resolve("config.properties")
-                : Path.of(override).toAbsolutePath().normalize();
-    }
-
-    public static Path plugins() {
+    default Path plugins() {
         return home().resolve("plugins");
     }
 
-    public static Path printers() {
+    default Path printers() {
         return home().resolve("printers");
     }
 
-    public static Path logs() {
+    default Path logs() {
         return home().resolve("log");
     }
 }

@@ -33,7 +33,7 @@ jobs:
   native:
     name: ${{ inputs.suite }} (${{ inputs.os }})
     runs-on: ${{ inputs.os }}
-    timeout-minutes: 75
+    timeout-minutes: 20
     env:
       ORG_GRADLE_PROJECT_uiTestShard: ${{ inputs.ui-shard }}
       ORG_GRADLE_PROJECT_uiTestShardCount: ${{ inputs.ui-shard-count }}
@@ -98,8 +98,17 @@ jobs:
           bash scripts/bootstrap-native.sh
           bash scripts/bootstrap-slicer-macos.sh
           echo "VOXELBREW_SLICER=$GITHUB_WORKSPACE/.tools/PrusaSlicer-2.7.2/PrusaSlicer.app/Contents/MacOS/PrusaSlicer" >> "$GITHUB_ENV"
-      - name: Install pinned slicer (Ubuntu)
+      - name: Cache Ubuntu package downloads
+        id: ubuntu-packages
         if: runner.os == 'Linux'
+        uses: actions/cache/restore@v4
+        with:
+          path: .tools/apt-archives/*.deb
+          key: apt-v1-${{ inputs.os }}-${{ runner.arch }}-${{ inputs.suite == 'integrationTest' && 'headless' || 'desktop' }}-${{ hashFiles('scripts/bootstrap-slicer.sh', '.github/workflows/native-check.yml') }}
+      - name: Install Ubuntu test dependencies
+        if: runner.os == 'Linux'
+        env:
+          GRADLE_SUITE: ${{ inputs.suite }}
         run: |
           # The runner's Azure mirror can stall individual package downloads for minutes.
           # Use Ubuntu's main mirror and bound stalled requests without changing packages.
@@ -110,33 +119,42 @@ jobs:
             fi
           done
           printf 'Acquire::http::Timeout "20";\nAcquire::https::Timeout "20";\nAcquire::Retries "3";\n' | sudo tee /etc/apt/apt.conf.d/80voxelbrew-downloads
-          bash scripts/bootstrap-slicer.sh
+          mkdir -p "$GITHUB_WORKSPACE/.tools/apt-archives"
+          printf 'Dir::Cache::archives "%s";\n' "$GITHUB_WORKSPACE/.tools/apt-archives" | sudo tee /etc/apt/apt.conf.d/81voxelbrew-archives
+          if [[ "$GRADLE_SUITE" == integrationTest ]]; then
+            bash scripts/bootstrap-slicer.sh
+          else
+            bash scripts/bootstrap-slicer.sh xvfb xauth openbox libgtk-3-0t64 libgl1-mesa-dri
+          fi
+      - name: Save Ubuntu package downloads
+        if: runner.os == 'Linux' && steps.ubuntu-packages.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .tools/apt-archives/*.deb
+          key: ${{ steps.ubuntu-packages.outputs.cache-primary-key }}
       - name: Install pinned slicer (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./scripts/bootstrap-slicer.ps1
       - name: Integration tests (headless Ubuntu)
         if: inputs.suite == 'integrationTest'
-        run: ./gradlew --refresh-dependencies integrationTest
+        run: ./gradlew --build-cache integrationTest
       - name: Platform checks (Ubuntu)
         if: (inputs.suite == 'platformCheck' || inputs.suite == 'check' || inputs.suite == ':gui:e2eTest') && runner.os == 'Linux'
         env:
           GRADLE_SUITE: ${{ inputs.suite }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb xauth openbox libgtk-3-0t64 libgl1-mesa-dri
-          bash scripts/with-virtual-desktop.sh ./gradlew --refresh-dependencies "$GRADLE_SUITE"
+        run: bash scripts/with-virtual-desktop.sh ./gradlew --build-cache "$GRADLE_SUITE"
       - name: Platform checks (Windows, v142 toolchain)
         if: (inputs.suite == 'platformCheck' || inputs.suite == 'check' || inputs.suite == ':gui:e2eTest') && runner.os == 'Windows'
         env:
           GRADLE_SUITE: ${{ inputs.suite }}
         shell: pwsh
-        run: ./gradlew.bat --refresh-dependencies $env:GRADLE_SUITE '-PvsGenerator=Visual Studio 17 2022'
+        run: ./gradlew.bat --build-cache $env:GRADLE_SUITE '-PvsGenerator=Visual Studio 17 2022'
       - name: Headless platform checks (macOS; GUI qualification deferred)
         if: (inputs.suite == 'headlessPlatformCheck' || inputs.suite == 'headlessWorkflowCheck' || inputs.suite == 'headlessPackageCheck') && runner.os == 'macOS'
         env:
           GRADLE_SUITE: ${{ inputs.suite }}
-        run: ./gradlew --refresh-dependencies "$GRADLE_SUITE"
+        run: ./gradlew --build-cache "$GRADLE_SUITE"
       - name: Archive app images
         if: inputs.archive
         shell: bash

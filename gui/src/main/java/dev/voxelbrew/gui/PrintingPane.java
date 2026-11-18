@@ -30,7 +30,6 @@ import javafx.scene.paint.Stop;
 import javafx.util.StringConverter;
 
 /** Build placement and actual toolpath preview, sharing all validation and slicing with CLI. */
-@javax.inject.Singleton
 final class PrintingPane extends BorderPane implements AutoCloseable {
     private final SlicerWorkspace workspace = new SlicerWorkspace();
     private final Map<String, ButtonBase> quickActions = new LinkedHashMap<>();
@@ -178,7 +177,6 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     private List<Double> previewLayers = List.of();
     private Slicing.Result displayed;
 
-    @javax.inject.Inject
     PrintingPane(
             PrinterProfileCatalog printers,
             dev.voxelbrew.api.printer.PrinterRuntime printerRuntime,
@@ -190,10 +188,10 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
             SlicerAvailability availability,
             ExporterProviderRegistry exporters,
             javafx.stage.Stage owner,
-            @javax.inject.Named("validation") ExecutorService validator,
+            ExecutorService validator,
             dev.voxelbrew.util.i18n.Translations translations,
             dev.voxelbrew.util.config.UserConfiguration configuration,
-            @javax.inject.Named("slicerExecutable") java.nio.file.Path defaultExecutable) {
+            java.nio.file.Path defaultExecutable) {
         this.translations = translations;
         this.printers = printers;
         this.printerRuntime = printerRuntime;

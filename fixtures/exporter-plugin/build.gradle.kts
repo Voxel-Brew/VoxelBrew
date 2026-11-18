@@ -8,6 +8,11 @@ repositories { maven { url = uri("../../engine/build/repository") } }
 
 apply(from = "../../gradle/repositories.gradle.kts")
 
+configurations.configureEach {
+    // The host rebuilds the fixture against its freshly published engine snapshot.
+    resolutionStrategy.cacheChangingModulesFor(0, "seconds")
+}
+
 java { toolchain.languageVersion.set(JavaLanguageVersion.of(21)) }
 
 val bomVersion = providers.gradleProperty("bomVersion").orElse("0.1.0-SNAPSHOT").get()

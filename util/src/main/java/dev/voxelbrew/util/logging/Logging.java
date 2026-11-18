@@ -22,7 +22,11 @@ public final class Logging {
     public static synchronized void initialize(String component) {
         if (initialized) return;
         try {
-            configure(UserConfiguration.user(), ApplicationPaths.logs(), component);
+            configure(
+                    UserConfiguration.user(),
+                    dev.voxelbrew.util.services.Services.load(ApplicationPaths.class)
+                            .logs(),
+                    component);
         } catch (IOException | IllegalArgumentException failure) {
             install(Level.WARNING, console(Level.WARNING));
             log.warn("Cannot configure file logging; using console diagnostics", failure);

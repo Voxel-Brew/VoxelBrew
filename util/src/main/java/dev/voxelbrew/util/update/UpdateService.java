@@ -49,7 +49,7 @@ public final class UpdateService {
                 component,
                 ReleaseVersion.parse(BuildVersion.current()),
                 ApplicationImage.currentPlatform(),
-                new GitHubReleaseSource(),
+                dev.voxelbrew.util.services.Services.load(ReleaseSource.class),
                 ApplicationImage.detect(component));
     }
 

@@ -3,7 +3,6 @@ package dev.voxelbrew.gui;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.slicer.SlicerRuntime;
-import dev.voxelbrew.util.config.UserConfiguration;
 import java.nio.file.Path;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -15,7 +14,8 @@ class SlicerSettingsTest {
 
     @Test
     void savesProvidersSeparatelyAndAppliesUpdatesWithoutChangingCapturedBackend() throws Exception {
-        var configuration = new UserConfiguration(directory.resolve("settings.properties"));
+        var configuration =
+                new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("settings.properties"));
         configuration.set("external.setting", "preserved");
         try (var catalog = SlicerRuntime.load().slicers().open(directory)) {
             var settings = new SlicerSettings(catalog, configuration);
@@ -38,10 +38,12 @@ class SlicerSettingsTest {
             assertThat(settings.options("cura").get("definition")).isEqualTo("machine.json");
             assertThat(configuration.get("external.setting", "")).isEqualTo("preserved");
             assertThat(configuration.read()).isEqualTo(Map.of("external.setting", "preserved"));
-            assertThat(new UserConfiguration(directory.resolve("slicers/prusa-slicer.properties"))
+            assertThat(new dev.voxelbrew.util.config.FileUserConfiguration(
+                                    directory.resolve("slicers/prusa-slicer.properties"))
                             .get("executable", ""))
                     .isEqualTo("second-prusa");
-            assertThat(new UserConfiguration(directory.resolve("slicers/cura.properties")).get("executable", ""))
+            assertThat(new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("slicers/cura.properties"))
+                            .get("executable", ""))
                     .isEqualTo("cura-engine");
             assertThat(new SlicerSettings(catalog, configuration).options("cura"))
                     .isEqualTo(settings.options("cura"));

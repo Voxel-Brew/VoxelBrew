@@ -6,7 +6,6 @@ import dev.voxelbrew.api.exporter.ExporterProvider;
 import dev.voxelbrew.api.exporter.FileExportDialog;
 
 public final class JsonExporterProvider implements ExporterProvider<FileExportDialog.Destination> {
-    @javax.inject.Inject
     public JsonExporterProvider() {}
 
     @Override

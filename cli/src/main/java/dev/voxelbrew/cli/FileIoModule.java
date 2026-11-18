@@ -1,7 +1,5 @@
 package dev.voxelbrew.cli;
 
-import dagger.Module;
-import dagger.Provides;
 import dev.voxelbrew.api.exporter.*;
 import dev.voxelbrew.api.importer.*;
 import dev.voxelbrew.api.slicer.SlicerCatalog;
@@ -10,9 +8,7 @@ import dev.voxelbrew.api.slicer.Slicing;
 import dev.voxelbrew.importer.DocumentSource;
 import dev.voxelbrew.importer.GcodeSource;
 import dev.voxelbrew.importer.ImportRuntime;
-import javax.inject.Singleton;
 
-@Module
 @lombok.RequiredArgsConstructor(access = lombok.AccessLevel.PRIVATE)
 public final class FileIoModule {
     @lombok.NonNull
@@ -31,7 +27,10 @@ public final class FileIoModule {
     private final SlicerRuntime slicerRuntime;
 
     public FileIoModule() {
-        this(ImportRuntime.load(), dev.voxelbrew.exporter.DocumentWriter::save, SlicerRuntime.load());
+        this(
+                dev.voxelbrew.util.services.Services.load(ImportRuntime.class),
+                dev.voxelbrew.exporter.DocumentWriter::save,
+                dev.voxelbrew.util.services.Services.load(SlicerRuntime.class));
     }
 
     private FileIoModule(ImportRuntime imports, DocumentSave sink, SlicerRuntime slicerRuntime) {
@@ -39,58 +38,48 @@ public final class FileIoModule {
     }
 
     public FileIoModule(DocumentSource source, DocumentSave sink, GcodeSource gcode) {
-        this(source, sink, gcode, ImportRuntime.load(), SlicerRuntime.load());
+        this(
+                source,
+                sink,
+                gcode,
+                dev.voxelbrew.util.services.Services.load(ImportRuntime.class),
+                dev.voxelbrew.util.services.Services.load(SlicerRuntime.class));
     }
 
-    @Provides
-    @Singleton
     DocumentSource source() {
         return source;
     }
 
-    @Provides
-    @Singleton
     DocumentSave sink() {
         return sink;
     }
 
-    @Provides
-    @Singleton
     GcodeSource gcode() {
         return gcode;
     }
 
-    @Provides
     java.util.function.Supplier<ExporterProviderRegistry> exporters() {
-        return () -> java.util.ServiceLoader.load(ExporterProviderRegistry.class)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("No ExporterProviderRegistry service found"));
+        return () -> dev.voxelbrew.util.services.Services.load(ExporterProviderRegistry.class);
     }
 
-    @Provides
     java.util.function.Supplier<ImporterProviderRegistry> importers() {
-        return () -> java.util.ServiceLoader.load(ImporterProviderRegistry.class)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("No ImporterProviderRegistry service found"));
+        return () -> dev.voxelbrew.util.services.Services.load(ImporterProviderRegistry.class);
     }
 
-    @Provides
     SlicerCatalog.Factory slicers() {
         return slicerRuntime.slicers();
     }
 
-    @Provides
     dev.voxelbrew.api.slicer.PrinterProfileCatalog printers() {
-        return slicerRuntime.printers(dev.voxelbrew.util.config.ApplicationPaths.printers());
+        return slicerRuntime.printers(
+                dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
+                        .printers());
     }
 
-    @Provides
     Slicing slicing() {
         return slicerRuntime.slicing();
     }
 
-    @Provides
-    @javax.inject.Named("slicerExecutable")
     java.nio.file.Path slicerExecutable() {
         return slicerRuntime.defaultSlicerExecutable();
     }

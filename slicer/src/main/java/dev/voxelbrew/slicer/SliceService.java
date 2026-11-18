@@ -32,7 +32,9 @@ public final class SliceService {
             Consumer<String> diagnostics,
             PublicationGuard guard)
             throws IOException {
-        var pluginDirectory = dev.voxelbrew.util.config.ApplicationPaths.plugins();
+        var pluginDirectory = dev.voxelbrew.util.services.Services.load(
+                        dev.voxelbrew.util.config.ApplicationPaths.class)
+                .plugins();
         try (var exporters = ServiceLoader.load(ExporterProviderRegistry.class)
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("No ExporterProviderRegistry service found"))

@@ -2,7 +2,6 @@ package dev.voxelbrew.util.logging;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.util.config.UserConfiguration;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -18,7 +17,7 @@ class LoggingProcessTest {
     @Timeout(60)
     void liveApplicationsShareTheActiveFileAcrossStartupAndSizeRotation() throws Exception {
         Path home = directory.resolve("user home with % spaces");
-        new UserConfiguration(home.resolve("config.properties"))
+        new dev.voxelbrew.util.config.FileUserConfiguration(home.resolve("config.properties"))
                 .update(
                         Map.of(
                                 "logging.level",
@@ -159,7 +158,10 @@ class LoggingProcessTest {
             Logging.initialize(args[0]);
             try {
                 Files.writeString(
-                        dev.voxelbrew.util.config.ApplicationPaths.home().resolve(args[0] + ".ready"), "ready");
+                        dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
+                                .home()
+                                .resolve(args[0] + ".ready"),
+                        "ready");
                 if (System.in.read() < 0) throw new IllegalStateException("Missing start signal");
                 for (int i = 0; i < 100; i++) log.debug("event-{}-{}; Zażółć ☕", args[0], i);
                 var failed = Thread.ofPlatform().start(() -> {

@@ -17,7 +17,6 @@ import lombok.experimental.Accessors;
 /** One isolated sketch-edit transaction. Solves are coalesced and never run on the FX thread. */
 @lombok.extern.slf4j.Slf4j
 final class SketchController implements AutoCloseable {
-    @dagger.assisted.AssistedFactory
     interface Factory {
         SketchController create(SketchGeometry geometry, ParameterSet parameters, String featureId);
     }
@@ -83,14 +82,13 @@ final class SketchController implements AutoCloseable {
         this(geometry, parameters, featureId, dispatch, SketchSolver::solve, WindowResources.worker("sketch-solver"));
     }
 
-    @dagger.assisted.AssistedInject
     SketchController(
-            @dagger.assisted.Assisted SketchGeometry geometry,
-            @dagger.assisted.Assisted ParameterSet parameters,
-            @dagger.assisted.Assisted String featureId,
-            @javax.inject.Named("ui") Consumer<Runnable> dispatch,
+            SketchGeometry geometry,
+            ParameterSet parameters,
+            String featureId,
+            Consumer<Runnable> dispatch,
             Function<SketchGeometry, SketchSolver.Result> solver,
-            @javax.inject.Named("sketchWorkers") java.util.function.Supplier<ExecutorService> workers) {
+            java.util.function.Supplier<ExecutorService> workers) {
         this(geometry, parameters, featureId, dispatch, solver, workers.get());
     }
 

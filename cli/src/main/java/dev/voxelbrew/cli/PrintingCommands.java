@@ -43,7 +43,6 @@ final class PrintingCommands {
             description = "Split an earlier body with a plane; outputs are negative and positive.")
     static final class Split extends VoxelBrew.AddFeature {
 
-        @javax.inject.Inject
         Split(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -85,7 +84,6 @@ final class PrintingCommands {
                     "Add or replace a build instance; rigid placement is separate from design coordinates. Units: mm/degrees.")
     static final class Place extends VoxelBrew.FileCommand {
 
-        @javax.inject.Inject
         Place(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -133,7 +131,6 @@ final class PrintingCommands {
             description = "Duplicate a build instance and its attached support instructions.")
     static final class Duplicate extends VoxelBrew.FileCommand {
 
-        @javax.inject.Inject
         Duplicate(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -185,7 +182,6 @@ final class PrintingCommands {
             description = "Lay an evaluated planar face on bed Z=0. Face IDs belong only to the current revision.")
     static final class LayOnFace extends VoxelBrew.FileCommand {
 
-        @javax.inject.Inject
         LayOnFace(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -217,7 +213,6 @@ final class PrintingCommands {
             description = "Edit the persisted printer, material and process. Unspecified values are retained.")
     static final class Settings extends VoxelBrew.FileCommand {
 
-        @javax.inject.Inject
         Settings(DocumentSource documents, DocumentSave documentWriter, PrinterProfileCatalog printers) {
             super(documents, documentWriter);
             this.printers = printers;
@@ -304,7 +299,6 @@ final class PrintingCommands {
                     "Add or replace a body-coordinate blocker, enforcer or explicit support pillar attached to a build instance.")
     static final class Support extends VoxelBrew.FileCommand {
 
-        @javax.inject.Inject
         Support(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -354,7 +348,6 @@ final class PrintingCommands {
             description = "Remove a build instance; keep attached instructions available for repair.")
     static final class RemoveInstance extends VoxelBrew.FileCommand {
 
-        @javax.inject.Inject
         RemoveInstance(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -379,7 +372,6 @@ final class PrintingCommands {
             description = "Remove a support instruction or explicit pillar.")
     static final class RemoveSupport extends VoxelBrew.FileCommand {
 
-        @javax.inject.Inject
         RemoveSupport(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -405,7 +397,6 @@ final class PrintingCommands {
             description = "List persisted build placements, profiles and support instructions.")
     static final class Setup extends VoxelBrew.FileCommand {
 
-        @javax.inject.Inject
         Setup(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -433,7 +424,6 @@ final class PrintingCommands {
             description = "Validate build-space meshes, bed polygon, overlap, height and support attachments.")
     static final class Validate extends VoxelBrew.FileCommand {
 
-        @javax.inject.Inject
         Validate(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -453,7 +443,7 @@ final class PrintingCommands {
             name = "printer-profiles",
             mixinStandardHelpOptions = true,
             description = "List bundled and custom printer hardware presets.")
-    @RequiredArgsConstructor(access = AccessLevel.PACKAGE, onConstructor_ = @javax.inject.Inject)
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     static final class Printers implements Callable<Integer> {
         private final PrinterProfileCatalog printers;
 
@@ -486,12 +476,13 @@ final class PrintingCommands {
             name = "slicers",
             mixinStandardHelpOptions = true,
             description = "List versioned backend capabilities; unsupported features are not silently substituted.")
-    @RequiredArgsConstructor(access = AccessLevel.PACKAGE, onConstructor_ = @javax.inject.Inject)
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     static final class Slicers implements Callable<Integer> {
         private final SlicerCatalog.Factory slicers;
 
         @Option(names = "--plugin-dir")
-        Path plugins = dev.voxelbrew.util.config.ApplicationPaths.plugins();
+        Path plugins = dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
+                .plugins();
 
         @Spec
         CommandLine.Model.CommandSpec spec;
@@ -515,14 +506,13 @@ final class PrintingCommands {
         private final SlicerCatalog.Factory slicers;
         private final java.util.function.Supplier<dev.voxelbrew.api.exporter.ExporterProviderRegistry> exporters;
 
-        @javax.inject.Inject
         Slice(
                 DocumentSource documents,
                 DocumentSave documentWriter,
                 SlicerCatalog.Factory slicers,
                 java.util.function.Supplier<dev.voxelbrew.api.exporter.ExporterProviderRegistry> exporters,
                 Slicing slicing,
-                @javax.inject.Named("slicerExecutable") Path defaultExecutable) {
+                Path defaultExecutable) {
             super(documents, documentWriter);
             this.slicers = slicers;
             this.exporters = exporters;
@@ -625,7 +615,9 @@ final class PrintingCommands {
                         document.printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID);
                 if (printerConnection != null) {
                     var connections = dev.voxelbrew.api.printer.PrinterRuntime.load()
-                            .devices(dev.voxelbrew.util.config.ApplicationPaths.configuration()
+                            .devices(dev.voxelbrew.util.services.Services.load(
+                                            dev.voxelbrew.util.config.ApplicationPaths.class)
+                                    .configuration()
                                     .resolveSibling("devices"));
                     var connection = connections.stream()
                             .filter(p -> p.name().equalsIgnoreCase(printerConnection.strip()))
@@ -685,7 +677,7 @@ final class PrintingCommands {
             name = "inspect-job",
             mixinStandardHelpOptions = true,
             description = "Independently inspect actual G-code deposition layers, roles, estimates and job provenance.")
-    @RequiredArgsConstructor(access = AccessLevel.PACKAGE, onConstructor_ = @javax.inject.Inject)
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     static final class InspectJob implements Callable<Integer> {
         private final dev.voxelbrew.importer.GcodeSource gcode;
         private final DocumentSource documents;

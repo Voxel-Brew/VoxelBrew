@@ -10,7 +10,6 @@ final class PrinterVisibility {
     private static final String KEY = "printers.hiddenDefaults";
     private final UserConfiguration configuration;
 
-    @javax.inject.Inject
     PrinterVisibility(UserConfiguration configuration) {
         this.configuration = configuration;
     }

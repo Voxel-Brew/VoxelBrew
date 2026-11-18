@@ -7,12 +7,10 @@ import dev.voxelbrew.importer.DocumentSource;
 import dev.voxelbrew.util.config.ApplicationPaths;
 import java.nio.file.*;
 import java.util.*;
-import javax.inject.Inject;
-import lombok.RequiredArgsConstructor;
 import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
 
-@RequiredArgsConstructor(onConstructor_ = @Inject)
+@lombok.RequiredArgsConstructor
 final class DeviceCommands {
     private final PrinterRuntime runtime;
     private final DocumentSource documents;
@@ -20,7 +18,9 @@ final class DeviceCommands {
     private final dev.voxelbrew.api.slicer.PrinterProfileCatalog printers;
 
     private Path directory() {
-        return ApplicationPaths.configuration().resolveSibling("devices");
+        return dev.voxelbrew.util.services.Services.load(ApplicationPaths.class)
+                .configuration()
+                .resolveSibling("devices");
     }
 
     void install(CommandLine root) {

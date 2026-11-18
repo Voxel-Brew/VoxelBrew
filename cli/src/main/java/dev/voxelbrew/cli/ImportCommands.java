@@ -18,12 +18,13 @@ final class ImportCommands {
     }
 
     @Command(name = "importers", mixinStandardHelpOptions = true, description = "List built-in and external importers")
-    @RequiredArgsConstructor(access = AccessLevel.PACKAGE, onConstructor_ = @javax.inject.Inject)
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     static final class Importers implements Callable<Integer> {
         private final java.util.function.Supplier<ImporterProviderRegistry> importers;
 
         @Option(names = "--plugin-dir")
-        Path plugins = dev.voxelbrew.util.config.ApplicationPaths.plugins();
+        Path plugins = dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
+                .plugins();
 
         @Spec
         CommandLine.Model.CommandSpec spec;
@@ -42,7 +43,7 @@ final class ImportCommands {
     }
 
     @Command(name = "import", mixinStandardHelpOptions = true, description = "Import a document to .vxb")
-    @RequiredArgsConstructor(access = AccessLevel.PACKAGE, onConstructor_ = @javax.inject.Inject)
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     static final class ImportFile implements Callable<Integer> {
         private final java.util.function.Supplier<ImporterProviderRegistry> importers;
         private final DocumentSave documents;
@@ -60,7 +61,8 @@ final class ImportCommands {
         Map<String, String> options = new LinkedHashMap<>();
 
         @Option(names = "--plugin-dir")
-        Path plugins = dev.voxelbrew.util.config.ApplicationPaths.plugins();
+        Path plugins = dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
+                .plugins();
 
         @Option(names = "--overwrite")
         boolean overwrite;

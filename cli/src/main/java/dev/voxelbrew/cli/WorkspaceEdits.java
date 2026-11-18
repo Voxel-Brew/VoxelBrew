@@ -8,13 +8,11 @@ import dev.voxelbrew.importer.DocumentSource;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.Callable;
-import javax.inject.Inject;
-import lombok.RequiredArgsConstructor;
 import picocli.CommandLine;
 import picocli.CommandLine.Model.*;
 
 /** Headless edits missing from the original flat command surface. */
-@RequiredArgsConstructor(onConstructor_ = @Inject)
+@lombok.RequiredArgsConstructor
 final class WorkspaceEdits {
     private final DocumentSource documents;
     private final DocumentSave writer;
@@ -515,7 +513,9 @@ final class WorkspaceEdits {
                     "--plugin-dir",
                     Path.class,
                     false,
-                    dev.voxelbrew.util.config.ApplicationPaths.plugins().toString(),
+                    dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
+                            .plugins()
+                            .toString(),
                     "Trusted plugins directory");
             option(
                     spec,

@@ -15,7 +15,7 @@ class ConfigurationProcessTest {
     @Test
     void independentApplicationsMergeEditsInTheSameConfiguration() throws Exception {
         Path file = directory.resolve("shared settings/config.properties");
-        var config = new UserConfiguration(file);
+        var config = new dev.voxelbrew.util.config.FileUserConfiguration(file);
         config.set("unrelated", "preserved");
         String classpath = Path.of(UserConfiguration.class
                         .getProtectionDomain()
@@ -77,7 +77,7 @@ class ConfigurationProcessTest {
 
     public static final class Writer {
         public static void main(String[] args) throws Exception {
-            var config = new UserConfiguration(Path.of(args[0]));
+            var config = new dev.voxelbrew.util.config.FileUserConfiguration(Path.of(args[0]));
             for (int index = 0; index < 20; index++) config.set(args[1] + "." + index, "value." + index);
         }
     }

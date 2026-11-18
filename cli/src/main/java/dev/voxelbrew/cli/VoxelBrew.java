@@ -40,7 +40,6 @@ import picocli.CommandLine.Spec;
 @lombok.extern.slf4j.Slf4j
 public final class VoxelBrew implements Runnable {
 
-    @javax.inject.Inject
     VoxelBrew() {}
 
     @Spec
@@ -70,7 +69,7 @@ public final class VoxelBrew implements Runnable {
     }
 
     public static CommandLine commandLine() {
-        return DaggerCliComponent.factory()
+        return CliComponent.factory()
                 .create(
                         dev.voxelbrew.util.di.ApplicationModule.system(
                                 dev.voxelbrew.util.update.ApplicationImage.Component.CLI),
@@ -108,12 +107,14 @@ public final class VoxelBrew implements Runnable {
     }
 
     @Command(name = "exporters", mixinStandardHelpOptions = true, description = "List built-in and external exporters")
-    @RequiredArgsConstructor(access = AccessLevel.PACKAGE, onConstructor_ = @javax.inject.Inject)
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     static final class Exporters implements Callable<Integer> {
         private final java.util.function.Supplier<dev.voxelbrew.api.exporter.ExporterProviderRegistry> exporters;
 
         @Option(names = "--plugin-dir")
-        Path pluginDirectory = dev.voxelbrew.util.config.ApplicationPaths.plugins();
+        Path pluginDirectory = dev.voxelbrew.util.services.Services.load(
+                        dev.voxelbrew.util.config.ApplicationPaths.class)
+                .plugins();
 
         @Spec
         CommandSpec spec;
@@ -138,7 +139,7 @@ public final class VoxelBrew implements Runnable {
             name = "export",
             mixinStandardHelpOptions = true,
             description = "Export a complete document using a registered provider")
-    @RequiredArgsConstructor(access = AccessLevel.PACKAGE, onConstructor_ = @javax.inject.Inject)
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     static final class Export implements Callable<Integer> {
         private final DocumentSource documents;
         private final java.util.function.Supplier<dev.voxelbrew.api.exporter.ExporterProviderRegistry> exporters;
@@ -174,7 +175,9 @@ public final class VoxelBrew implements Runnable {
         String contents;
 
         @Option(names = "--plugin-dir")
-        Path pluginDirectory = dev.voxelbrew.util.config.ApplicationPaths.plugins();
+        Path pluginDirectory = dev.voxelbrew.util.services.Services.load(
+                        dev.voxelbrew.util.config.ApplicationPaths.class)
+                .plugins();
 
         @Option(names = "--chord-tolerance", defaultValue = "0.02", description = "Absolute chordal tolerance (mm)")
         double chord;
@@ -297,7 +300,9 @@ public final class VoxelBrew implements Runnable {
         String expectedRevision;
 
         @Option(names = "--plugin-dir", description = "Trusted feature and service JAR directory")
-        Path pluginDirectory = dev.voxelbrew.util.config.ApplicationPaths.plugins();
+        Path pluginDirectory = dev.voxelbrew.util.services.Services.load(
+                        dev.voxelbrew.util.config.ApplicationPaths.class)
+                .plugins();
 
         @Spec
         CommandSpec spec;
@@ -420,7 +425,6 @@ public final class VoxelBrew implements Runnable {
     @Command(name = "new", description = "Create an empty editable document.", mixinStandardHelpOptions = true)
     static final class Create extends FileCommand {
 
-        @javax.inject.Inject
         Create(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -441,7 +445,6 @@ public final class VoxelBrew implements Runnable {
             mixinStandardHelpOptions = true)
     static final class Rectangle extends AddSketch {
 
-        @javax.inject.Inject
         Rectangle(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -467,7 +470,6 @@ public final class VoxelBrew implements Runnable {
     @Command(name = "circle", description = "Add a circle by center and diameter, mm.", mixinStandardHelpOptions = true)
     static final class Circle extends AddSketch {
 
-        @javax.inject.Inject
         Circle(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -493,7 +495,6 @@ public final class VoxelBrew implements Runnable {
             mixinStandardHelpOptions = true)
     static final class Extrude extends AddFeature {
 
-        @javax.inject.Inject
         Extrude(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -528,7 +529,6 @@ public final class VoxelBrew implements Runnable {
             mixinStandardHelpOptions = true)
     static final class Cut extends AddFeature {
 
-        @javax.inject.Inject
         Cut(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -559,7 +559,6 @@ public final class VoxelBrew implements Runnable {
             mixinStandardHelpOptions = true)
     static final class Edit extends FileCommand {
 
-        @javax.inject.Inject
         Edit(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -596,7 +595,6 @@ public final class VoxelBrew implements Runnable {
             mixinStandardHelpOptions = true)
     static final class Cursor extends FileCommand {
 
-        @javax.inject.Inject
         Cursor(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -621,7 +619,6 @@ public final class VoxelBrew implements Runnable {
             mixinStandardHelpOptions = true)
     static final class Repair extends FileCommand {
 
-        @javax.inject.Inject
         Repair(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -675,7 +672,6 @@ public final class VoxelBrew implements Runnable {
             mixinStandardHelpOptions = true)
     static final class History extends FileCommand {
 
-        @javax.inject.Inject
         History(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -713,7 +709,6 @@ public final class VoxelBrew implements Runnable {
             mixinStandardHelpOptions = true)
     static final class Inspect extends FileCommand {
 
-        @javax.inject.Inject
         Inspect(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -776,7 +771,6 @@ public final class VoxelBrew implements Runnable {
             mixinStandardHelpOptions = true)
     static final class NativeDemo implements Callable<Integer> {
 
-        @javax.inject.Inject
         NativeDemo() {}
 
         @Override

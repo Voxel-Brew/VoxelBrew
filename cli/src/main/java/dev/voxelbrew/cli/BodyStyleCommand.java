@@ -10,7 +10,6 @@ import picocli.CommandLine.Option;
         mixinStandardHelpOptions = true,
         description = "List or assign CAD body material and color; independent of slicer settings.")
 final class BodyStyleCommand extends VoxelBrew.FileCommand {
-    @javax.inject.Inject
     BodyStyleCommand(DocumentSource documents, DocumentSave documentWriter) {
         super(documents, documentWriter);
     }

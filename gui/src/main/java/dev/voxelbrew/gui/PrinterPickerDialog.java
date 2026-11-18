@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.api.slicer.PrinterProfileCatalog;
+import dev.voxelbrew.api.printer.PrinterProfileCatalog;
 import dev.voxelbrew.util.i18n.Translations;
 import java.util.*;
 import javafx.application.Platform;
@@ -29,7 +29,7 @@ final class PrinterPickerDialog {
                 setText(
                         empty || item == null
                                 ? null
-                                : item
+                                : item.name()
                                         + (item.bundled()
                                                 ? " (" + translations.text("print.builtInPrinter") + ")"
                                                 : ""));
@@ -47,7 +47,7 @@ final class PrinterPickerDialog {
             results.getItems()
                     .setAll(entries.stream()
                             .filter(entry ->
-                                    entry.toString().toLowerCase(Locale.ROOT).contains(filter))
+                                    entry.name().toLowerCase(Locale.ROOT).contains(filter))
                             .toList());
             results.getSelectionModel().selectFirst();
             results.scrollTo(0);

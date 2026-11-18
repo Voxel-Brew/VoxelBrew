@@ -129,18 +129,22 @@ class SlicerExportPipelineTest {
 
     private static SlicerBackend backend(String format, Run run) {
         return new SlicerBackend() {
+            @Override
             public Descriptor descriptor() {
                 return new PrusaSlicerBackend().descriptor();
             }
 
+            @Override
             public Probe probe(Path executable, Cancellation cancellation) {
                 return new Probe("fixture", descriptor().capabilities());
             }
 
+            @Override
             public InputFormat inputFormat() {
                 return new InputFormat(format, format.equals("stl") ? "stl" : "3mf");
             }
 
+            @Override
             public RunResult slice(Request request) throws IOException {
                 return run.run(request);
             }

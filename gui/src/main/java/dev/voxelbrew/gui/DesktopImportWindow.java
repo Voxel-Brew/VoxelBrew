@@ -183,6 +183,19 @@ public final class DesktopImportWindow implements ImportWindow {
                     path.textProperty(),
                     onChange);
         }
+        if (component instanceof dev.voxelbrew.api.model.vui.PasswordField field) {
+            var input = new javafx.scene.control.PasswordField();
+            input.setText(field.value());
+            input.setId("import-" + field.id());
+            return bind(
+                    inputs,
+                    field.id(),
+                    input::getText,
+                    input,
+                    field(field.label(), input),
+                    input.textProperty(),
+                    onChange);
+        }
         if (component instanceof dev.voxelbrew.api.model.vui.TextField field) {
             var input = new javafx.scene.control.TextField(field.value());
             input.setId("import-" + field.id());

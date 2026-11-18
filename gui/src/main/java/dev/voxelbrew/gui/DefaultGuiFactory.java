@@ -1,10 +1,10 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.api.printer.PrinterRuntime;
+import dev.voxelbrew.api.printer.PrinterProfileCatalog;
+import dev.voxelbrew.api.printer.PrinterStore;
 import dev.voxelbrew.engine.feature.FeatureRegistry;
 import dev.voxelbrew.util.di.ApplicationModule;
 import dev.voxelbrew.util.i18n.Translations;
-import dev.voxelbrew.util.services.Services;
 import java.nio.file.Path;
 import javafx.application.Platform;
 import javafx.stage.Stage;
@@ -19,11 +19,20 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
     }
 
     private static final class Scope implements GuiComponent {
-        private PrinterRuntime printerRuntime;
+        private PrinterStore printerRuntime;
+        private PrinterProfileCatalog profiles;
 
-        private PrinterRuntime printerRuntime() {
-            if (printerRuntime == null) printerRuntime = Services.load(PrinterRuntime.class);
+        private PrinterStore printerRuntime() {
+            if (printerRuntime == null)
+                printerRuntime = new dev.voxelbrew.printer.FilePrinterStore(application.configuration());
             return printerRuntime;
+        }
+
+        private PrinterProfileCatalog profiles() {
+            if (profiles == null)
+                profiles = new dev.voxelbrew.printer.DefaultPrinterProfileCatalog(
+                        application.paths().profiles());
+            return profiles;
         }
 
         private final ApplicationModule application;
@@ -122,7 +131,7 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
         private PrintingPane printingPane() {
             if (printingPane == null)
                 printingPane = new PrintingPane(
-                        files.printers(),
+                        profiles(),
                         printerRuntime(),
                         printerVisibility(),
                         documentController(),
@@ -134,7 +143,6 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
                         stage,
                         resources().validation,
                         translations,
-                        application.configuration(),
                         files.slicerExecutable());
             return printingPane;
         }
@@ -143,9 +151,9 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
             if (printerPane == null)
                 printerPane = new PrinterPane(
                         printerRuntime(),
-                        files.printers(),
+                        resources().printers,
+                        profiles(),
                         printerVisibility(),
-                        application.configuration(),
                         translations,
                         resources().printer);
             return printerPane;

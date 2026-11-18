@@ -364,7 +364,7 @@ tasks.wrapper {
     distributionSha256Sum = "a17ddd85a26b6a7f5ddb71ff8b05fc5104c0202c6e64782429790c933686c806"
 }
 
-// Frontends compile against API modules; implementations are runtime-only.
+// Frontends use APIs for operations. Composition roots construct the printer store directly.
 for (module in listOf(":cli", ":gui")) {
     project(module) {
         val verifyFrontendIoDependencies by
@@ -394,7 +394,8 @@ for (module in listOf(":cli", ":gui")) {
                     check(compile.containsAll(apis)) {
                         "$module is missing public API dependencies"
                     }
-                    check(compile.intersect(implementations.toSet()).isEmpty()) {
+                    val runtimeOnlyImplementations = implementations - "dev.voxelbrew:printer-impl"
+                    check(compile.intersect(runtimeOnlyImplementations.toSet()).isEmpty()) {
                         "$module compiles against implementations"
                     }
                     check(runtime.containsAll(apis + implementations)) {

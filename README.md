@@ -1,4 +1,4 @@
-﻿# VoxelBrew CAD
+# VoxelBrew CAD
 
 [![Build on master](https://github.com/Voxel-Brew/VoxelBrew/actions/workflows/check.yml/badge.svg?branch=master)](https://github.com/Voxel-Brew/VoxelBrew/actions/workflows/check.yml?query=branch%3Amaster)
 [![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
@@ -60,7 +60,7 @@ Choose a sketch plane, then draw your profile with precise dimensions.
 **Printer** — select a sliced plate and export its G-code or send it to a
 configured printer. This example uses a profile-only job with no device connected.
 
-![Printer workspace in the light theme](docs/screenshots/printer-light.png)
+![Printer workspace in the light theme](docs/screenshots/printer-profile-only.png)
 
 ## Bug reports and contributions
 
@@ -100,3 +100,11 @@ The five public API repositories listed above are separately licensed under the
 MIT license; each repository includes its own license file. This does not change
 the application's AGPL license. See the
 [third-party notices](THIRD_PARTY_NOTICES.md) for dependency licensing details.
+
+## Configuring printers
+
+Configure named physical printers with an embedded hardware profile and an installed driver. Driver Virtual UI forms collect and validate settings inline. Versioned JSON files in `~/.voxelbrew/printers` contain credentials with owner-only permissions. Documents contain only resolved hardware and target IDs. Custom profiles and copied pictures live in `~/.voxelbrew/profiles`; bundled definitions are read-only.
+
+Choose a saved printer by name when slicing, or select a standalone profile for artifact export. Missing devices or drivers require explicit reconfiguration. Submission success means acceptance; uncertain submissions are never retried automatically.
+
+See [driver and profile development](docs/DEV_README.md) for architecture, plugins, storage, and CLI examples.

@@ -26,6 +26,7 @@ final class BodyStyleCommand extends VoxelBrew.FileCommand {
     @Option(names = "--reset", description = "Remove the override and inherit the source/default style")
     boolean reset;
 
+    @Override
     public Integer call() throws Exception {
         boolean editing = reset || material != null || color != null;
         if (editing && body == null) throw new IllegalArgumentException("Assignments require --body");

@@ -38,6 +38,7 @@ final class SketchCommands implements Runnable {
     @Spec
     CommandLine.Model.CommandSpec spec;
 
+    @Override
     public void run() {
         spec.commandLine().usage(spec.commandLine().getOut());
     }
@@ -104,6 +105,7 @@ final class SketchCommands implements Runnable {
         @Option(names = "--spacing", defaultValue = "0", description = "Extra text character spacing in em")
         double spacing;
 
+        @Override
         public Integer call() throws Exception {
             if (points.size() % 2 != 0) throw new IllegalArgumentException("Points must be x,y pairs");
             var positions = new ArrayList<Vec>();
@@ -155,6 +157,7 @@ final class SketchCommands implements Runnable {
         @Option(names = "--path", description = "Replacement text path ID; an empty value detaches it")
         String path;
 
+        @Override
         public Integer call() throws Exception {
             var session = session();
             var g = geometry(session);
@@ -232,6 +235,7 @@ final class SketchCommands implements Runnable {
             super(documents, documentWriter);
         }
 
+        @Override
         public Integer call() throws Exception {
             return sketch(new Feature.Constrained(SketchGeometry.empty()));
         }
@@ -247,6 +251,7 @@ final class SketchCommands implements Runnable {
             super(documents, documentWriter);
         }
 
+        @Override
         public Integer call() throws Exception {
             var session = session();
             return publish(session, geometry(session));
@@ -287,6 +292,7 @@ final class SketchCommands implements Runnable {
                 description = "Replace an existing entity; reject edits that conflict with constraints")
         boolean replace;
 
+        @Override
         public Integer call() throws Exception {
             var session = session();
             var g = geometry(session);
@@ -350,6 +356,7 @@ final class SketchCommands implements Runnable {
         @Option(names = "--tangency", description = "Optional circle/circle tangency branch")
         Tangency tangency;
 
+        @Override
         public Integer call() throws Exception {
             var session = session();
             var g = geometry(session);
@@ -381,6 +388,7 @@ final class SketchCommands implements Runnable {
         @Option(names = "--id", required = true)
         String id;
 
+        @Override
         public Integer call() throws Exception {
             var session = session();
             var g = geometry(session);
@@ -407,6 +415,7 @@ final class SketchCommands implements Runnable {
         @Option(names = "--id", required = true)
         String id;
 
+        @Override
         public Integer call() throws Exception {
             var session = session();
             return publish(session, Sketches.removeEntity(geometry(session), id));
@@ -426,6 +435,7 @@ final class SketchCommands implements Runnable {
         @Option(names = "--entities", required = true, split = ",")
         List<String> entities;
 
+        @Override
         public Integer call() throws Exception {
             var session = session();
             var g = geometry(session).withBoundary(entities);
@@ -444,6 +454,7 @@ final class SketchCommands implements Runnable {
             super(documents, documentWriter);
         }
 
+        @Override
         public Integer call() throws Exception {
             var session = session();
             return publish(session, geometry(session));
@@ -460,6 +471,7 @@ final class SketchCommands implements Runnable {
             super(documents, documentWriter);
         }
 
+        @Override
         public Integer call() throws Exception {
             var g = geometry(session());
             var output = spec.commandLine().getOut();
@@ -502,6 +514,7 @@ final class SketchCommands implements Runnable {
         @Option(names = "--y", required = true)
         double y;
 
+        @Override
         public Integer call() throws Exception {
             var session = session();
             return publish(
@@ -536,6 +549,7 @@ final class SketchCommands implements Runnable {
         @Option(names = "--sides", defaultValue = "6")
         int sides;
 
+        @Override
         public Integer call() throws Exception {
             var session = session();
             var g = geometry(session);

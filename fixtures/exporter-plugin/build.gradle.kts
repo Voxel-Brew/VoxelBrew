@@ -55,7 +55,7 @@ tasks.named("jar") {
                 .filter { it.group.startsWith("dev.voxelbrew") }
                 .map { it.name }
                 .toSet()
-        check(hostModules == setOf("model", "import", "export", "slicer")) {
+        check(hostModules == setOf("model", "import", "export", "printer", "slicer")) {
             "The external consumer must compile with API/domain artifacts only: $hostModules"
         }
     }

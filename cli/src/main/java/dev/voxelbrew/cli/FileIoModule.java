@@ -70,12 +70,6 @@ public final class FileIoModule {
         return slicerRuntime.slicers();
     }
 
-    dev.voxelbrew.api.slicer.PrinterProfileCatalog printers() {
-        return slicerRuntime.printers(
-                dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
-                        .printers());
-    }
-
     Slicing slicing() {
         return slicerRuntime.slicing();
     }

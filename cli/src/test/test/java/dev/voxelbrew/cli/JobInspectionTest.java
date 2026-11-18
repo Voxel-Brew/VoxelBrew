@@ -33,11 +33,13 @@ class JobInspectionTest {
                 Optional.of("1 minute"),
                 Map.of("backend", "fixture"));
         var reader = new GcodeSource() {
+            @Override
             public GcodeJob read(Path path) {
                 reads.add("file:" + path);
                 return job;
             }
 
+            @Override
             public GcodeJob readLines(List<String> lines) {
                 reads.addAll(lines);
                 return job;

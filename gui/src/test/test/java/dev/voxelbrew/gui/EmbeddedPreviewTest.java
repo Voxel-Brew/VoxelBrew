@@ -18,24 +18,30 @@ class EmbeddedPreviewTest {
             new AtomicReference<>(CadDocument.empty().withGcode(Map.of("plate-1", List.of("G90"))));
     private boolean failRead;
     private final ExecutorService worker = new AbstractExecutorService() {
+        @Override
         public void execute(Runnable task) {
             work.add(task);
         }
 
+        @Override
         public void shutdown() {}
 
+        @Override
         public List<Runnable> shutdownNow() {
             return List.of();
         }
 
+        @Override
         public boolean isShutdown() {
             return false;
         }
 
+        @Override
         public boolean isTerminated() {
             return false;
         }
 
+        @Override
         public boolean awaitTermination(long timeout, TimeUnit unit) {
             return true;
         }
@@ -43,10 +49,12 @@ class EmbeddedPreviewTest {
 
     private PrintController controller() {
         return new PrintController(ui::add, current::get, Path.of("."), worker, null, null, new GcodeSource() {
+            @Override
             public GcodeJob read(Path path) {
                 throw new AssertionError("Embedded jobs require no files");
             }
 
+            @Override
             public GcodeJob readLines(List<String> lines) throws IOException {
                 if (failRead) throw new IOException("broken job");
                 return new GcodeJob(List.of(), List.of(), OptionalDouble.empty(), Optional.empty(), Map.of(), lines);

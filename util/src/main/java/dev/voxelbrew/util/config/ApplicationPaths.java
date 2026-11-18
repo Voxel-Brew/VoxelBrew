@@ -12,6 +12,10 @@ public interface ApplicationPaths {
         return home().resolve("plugins");
     }
 
+    default Path profiles() {
+        return home().resolve("profiles");
+    }
+
     default Path printers() {
         return home().resolve("printers");
     }

@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.api.slicer.PrinterProfileCatalog;
+import dev.voxelbrew.api.printer.PrinterProfileCatalog;
 import dev.voxelbrew.util.i18n.Translations;
 import java.util.*;
 import javafx.scene.control.*;
@@ -56,7 +56,7 @@ final class PrinterExportDialog {
         for (var entry : entries) {
             if (!entry.bundled()) continue;
             String id = entry.definition().printer().id();
-            var choice = new CheckBox(entry.toString());
+            var choice = new CheckBox(entry.name());
             choice.setId("printer-export-" + id);
             choice.setSelected(initial.contains(id));
             choice.setMaxWidth(Double.MAX_VALUE);

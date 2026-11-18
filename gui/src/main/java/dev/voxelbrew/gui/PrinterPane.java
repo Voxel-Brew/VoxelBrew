@@ -3,7 +3,7 @@ package dev.voxelbrew.gui;
 import dev.voxelbrew.api.model.CadDocument;
 import dev.voxelbrew.api.model.printing.PrintArtifact;
 import dev.voxelbrew.api.printer.*;
-import dev.voxelbrew.util.config.UserConfiguration;
+import dev.voxelbrew.api.printer.driver.*;
 import dev.voxelbrew.util.i18n.Translations;
 import java.nio.file.*;
 import java.util.*;
@@ -19,20 +19,44 @@ import javafx.util.Duration;
 
 /** Device workspace. All transport work is serialized away from JavaFX. */
 final class PrinterPane extends VBox implements AutoCloseable {
-    private record Plate(String id, String name) {
-        @Override
-        public String toString() {
-            return name;
+    private static final Object[] OPERATION_LOCKS = new Object[64];
+
+    static {
+        Arrays.setAll(OPERATION_LOCKS, index -> new Object());
+    }
+
+    private static Object operationLock(Printer printer) {
+        var endpoints = printer.driverConfiguration().properties().values().stream()
+                .filter(java.net.URI.class::isInstance)
+                .map(Object::toString)
+                .sorted()
+                .toList();
+        return OPERATION_LOCKS[
+                Math.floorMod(
+                        Objects.hash(printer.driverId(), endpoints.isEmpty() ? printer.id() : endpoints),
+                        OPERATION_LOCKS.length)];
+    }
+
+    static DriverStatus readStatus(Driver driver, Printer printer) throws Exception {
+        synchronized (operationLock(printer)) {
+            return driver.readPrinterStatus(printer.driverConfiguration());
         }
     }
 
-    private record ConnectionDraft(String address, String serial, String model, String secret) {}
+    static Driver.PrintResult submitArtifact(Driver driver, Printer printer, PrintArtifact artifact) throws Exception {
+        var errors = printer.validateArtifact(artifact);
+        if (!errors.isEmpty()) return new Driver.PrintResult.Failure(errors);
+        synchronized (operationLock(printer)) {
+            return driver.print(printer.driverConfiguration(), artifact);
+        }
+    }
 
-    private final PrinterRuntime runtime;
-    private final dev.voxelbrew.api.slicer.PrinterProfileCatalog profiles;
+    private record Plate(String id, String name) {}
+
+    private final PrinterStore runtime;
+    private final dev.voxelbrew.api.printer.PrinterProfileCatalog profiles;
     private final PrinterVisibility printerVisibility;
     private final Translations text;
-    private final Path directory;
     private final ExecutorService worker;
     private final ComboBox<Plate> plates = new ComboBox<>();
     private final Label deviceName = new Label();
@@ -46,11 +70,14 @@ final class PrinterPane extends VBox implements AutoCloseable {
             remainingValue = new Label();
     private final ProgressBar transfer = new ProgressBar(0);
     private final VBox monitor = new VBox(16);
-    private final Button upload, print, pause, resume, cancel, exportGcode;
+    private final Button print, exportGcode;
+    private final DriverRegistry providers;
     private final Timeline polling;
     private CadDocument document;
-    private PrinterSession session;
-    private PrinterStatus current = PrinterStatus.unknown("");
+    private Driver session;
+    // Accessed only by the serialized device worker, including final cleanup.
+
+    private DriverStatus current = DriverStatus.unknown("");
     private long generation;
     private boolean busy;
     private volatile boolean closed;
@@ -58,21 +85,32 @@ final class PrinterPane extends VBox implements AutoCloseable {
     private volatile long jobGeneration;
 
     PrinterPane(
-            PrinterRuntime runtime,
-            dev.voxelbrew.api.slicer.PrinterProfileCatalog profiles,
+            PrinterStore runtime,
+            DriverRegistry providers,
+            dev.voxelbrew.api.printer.PrinterProfileCatalog profiles,
             PrinterVisibility printerVisibility,
-            UserConfiguration configuration,
             Translations text,
             ExecutorService worker) {
         this.runtime = runtime;
+        this.providers = providers;
         this.profiles = profiles;
         this.printerVisibility = printerVisibility;
         this.text = text;
         this.worker = worker;
-        directory = configuration.path().resolveSibling("devices");
         setId("printer-workspace");
         getStyleClass().add("printer-workspace");
         plates.setId("printer-plate");
+        plates.setConverter(new javafx.util.StringConverter<>() {
+            @Override
+            public String toString(Plate plate) {
+                return plate == null ? "" : plate.name();
+            }
+
+            @Override
+            public Plate fromString(String value) {
+                return plates.getValue();
+            }
+        });
         deviceName.setId("printer-device");
         plates.setMaxWidth(Double.MAX_VALUE);
         deviceName.setMaxWidth(Double.MAX_VALUE);
@@ -90,14 +128,9 @@ final class PrinterPane extends VBox implements AutoCloseable {
         });
         var configure = button("configure", this::configure);
         configure.getStyleClass().add("printer-configure");
-        upload = button("upload", () -> submit(false));
         exportGcode = button("exportGcode", this::exportGcode);
-        print = button("print", () -> submit(true));
+        print = button("print", this::submit);
         print.getStyleClass().add("printer-primary");
-        pause = button("pause", () -> command(PrinterSession.Command.PAUSE));
-        resume = button("resume", () -> command(PrinterSession.Command.RESUME));
-        cancel = button("cancel", () -> command(PrinterSession.Command.CANCEL));
-        cancel.getStyleClass().add("printer-danger");
         status.setId("printer-status");
         details.setId("printer-details");
         message.setId("printer-message");
@@ -119,7 +152,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
         setup.getStyleClass().add("printer-card");
         var sendTitle = new Label(t("sendTitle"));
         sendTitle.getStyleClass().add("printer-section-title");
-        var actions = new HBox(10, exportGcode, upload, print);
+        var actions = new HBox(10, exportGcode, print);
         actions.setAlignment(Pos.CENTER_LEFT);
         var send = new VBox(12, sendTitle, details, actions, transfer, message);
         send.getStyleClass().add("printer-card");
@@ -137,8 +170,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
                 metric(t("bed"), bedValue),
                 metric(t("remaining"), remainingValue));
         metrics.getStyleClass().add("printer-metrics");
-        var controls = new HBox(10, pause, resume, cancel);
-        monitor.getChildren().addAll(statusRow, connectionDetail, metrics, controls);
+        monitor.getChildren().addAll(statusRow, connectionDetail, metrics);
         monitor.getStyleClass().add("printer-card");
         var content = new VBox(18, introduction, setup, send, monitor);
         content.getStyleClass().add("printer-content");
@@ -173,15 +205,11 @@ final class PrinterPane extends VBox implements AutoCloseable {
                 this,
                 theme,
                 text,
-                () -> new QuickMenu.Content(
-                        QuickMenu.controls(
-                                this,
-                                "printer-configure",
-                                "printer-upload",
-                                "printer-print",
-                                "printer-pause",
-                                "printer-resume"),
-                        QuickMenu.controls(this, "printer-cancel")),
+                () -> {
+                    var commands = QuickMenu.controls(this, "printer-configure", "printer-exportGcode");
+                    if (print.isVisible()) commands.addAll(QuickMenu.controls(this, "printer-print"));
+                    return new QuickMenu.Content(commands, List.of());
+                },
                 workspaces,
                 (dx, dy) -> {},
                 target -> {
@@ -291,17 +319,8 @@ final class PrinterPane extends VBox implements AutoCloseable {
     private void update() {
         exportGcode.setDisable(busy || plates.getValue() == null);
         boolean selected = plates.getValue() != null && selectedDevice != null;
-        var incompatible = selected && document != null
-                ? PrinterJobs.incompatibility(document, plates.getValue().id(), selectedDevice)
-                : Optional.<String>empty();
-        boolean compatible = selected && incompatible.isEmpty();
-        upload.setDisable(busy || !compatible || session == null);
-        print.setDisable(upload.isDisable() || !current.canStart() || startPending);
-        pause.setDisable(busy || session == null || current.state() != PrinterStatus.State.PRINTING);
-        resume.setDisable(busy || session == null || current.state() != PrinterStatus.State.PAUSED);
-        cancel.setDisable(busy
-                || session == null
-                || (current.state() != PrinterStatus.State.PRINTING && current.state() != PrinterStatus.State.PAUSED));
+        boolean compatible = selected;
+        print.setDisable(busy || !selected || session == null || !current.canStart() || startPending);
         plates.setDisable(busy);
         if (plates.getValue() == null) details.setText(t("choose"));
         else if (selectedDevice == null) {
@@ -310,7 +329,9 @@ final class PrinterPane extends VBox implements AutoCloseable {
                     artifact != null && "printer".equals(artifact.metadata().get("target_kind"))
                             ? t("missingDevice")
                             : t("profileOnly"));
-        } else details.setText(compatible ? t("ready") : incompatible.orElse(t("bambuPackage")));
+        } else details.setText(compatible ? t("ready") : t("choose"));
+        print.setVisible(selectedDevice != null);
+        print.setManaged(print.isVisible());
         monitor.setVisible(selectedDevice != null);
         monitor.setManaged(monitor.isVisible());
         status.setText(t("state." + current.state().name().toLowerCase(Locale.ROOT)));
@@ -330,10 +351,12 @@ final class PrinterPane extends VBox implements AutoCloseable {
     private void reload() {
         worker.submit(() -> {
             try {
-                var loaded = runtime.devices(directory);
+                var snapshot = runtime.load();
+                var loaded = snapshot.devices();
                 Platform.runLater(() -> {
                     if (closed) return;
                     availableDevices = List.copyOf(loaded);
+                    message.setText(String.join("\n", snapshot.diagnostics()));
                     syncDevice(true);
                 });
             } catch (Exception failure) {
@@ -347,38 +370,30 @@ final class PrinterPane extends VBox implements AutoCloseable {
         startPending = false;
         long token = ++generation;
         var device = selectedDevice;
-        var previous = session;
         session = null;
-        current = PrinterStatus.unknown(t("connecting"));
+        current = DriverStatus.unknown(t("connecting"));
         update();
+        if (device == null) return;
         worker.submit(() -> {
-            if (previous != null) previous.close();
-            if (device == null) return;
             try {
-                var connected = runtime.connect(device);
-                PrinterStatus initial;
-                try {
-                    initial = connected.status();
-                } catch (Exception failure) {
-                    connected.close();
-                    throw failure;
-                }
+                var driver = providers
+                        .find(device.driverId())
+                        .orElseThrow(() -> new IllegalStateException(
+                                "Printer '" + device.name() + "' uses missing driver '" + device.driverId()
+                                        + "'. Install its plugin or edit this printer configuration."));
+                var initial = readStatus(driver, device);
                 Platform.runLater(() -> {
-                    if (closed || token != generation) {
-                        Thread.ofVirtual().start(connected::close);
-                        return;
-                    }
-                    session = connected;
+                    if (closed || token != generation) return;
+                    session = driver;
                     current = initial;
                     update();
                 });
             } catch (Exception failure) {
                 Platform.runLater(() -> {
-                    if (!closed && token == generation) {
-                        current = PrinterStatus.unknown(t("offline"));
-                        message.setText(failure.getMessage());
-                        update();
-                    }
+                    if (closed || token != generation) return;
+                    current = DriverStatus.unknown(t("offline"));
+                    message.setText(failure.getMessage());
+                    update();
                 });
             }
         });
@@ -387,22 +402,24 @@ final class PrinterPane extends VBox implements AutoCloseable {
     private void poll() {
         if (closed || busy || session == null) return;
         var connected = session;
+        var configuredPrinter = selectedDevice;
         long token = generation;
         busy = true;
         worker.submit(() -> {
-            PrinterStatus next;
+            DriverStatus next;
             try {
-                next = connected.status();
+                next = readStatus(connected, configuredPrinter);
             } catch (Exception failure) {
-                next = PrinterStatus.unknown(t("offline"));
+                next = DriverStatus.unknown(t("offline"));
             }
             var result = next;
             Platform.runLater(() -> {
                 if (!closed && token == generation) {
                     busy = false;
                     current = result;
-                    if (current.state() == PrinterStatus.State.PRINTING
-                            || current.state() == PrinterStatus.State.PAUSED) startPending = false;
+                    if (current.state() == DriverStatus.State.PRINTING
+                            || current.state() == DriverStatus.State.PAUSED
+                            || current.state() == DriverStatus.State.COMPLETE) startPending = false;
                     update();
                 }
             });
@@ -413,10 +430,13 @@ final class PrinterPane extends VBox implements AutoCloseable {
         if (document == null || plates.getValue() == null) return;
         var lines = document.gcode().getOrDefault(plates.getValue().id(), List.of());
         if (lines.isEmpty()) return;
+        var artifact = document.printArtifacts().get(plates.getValue().id());
+        String format = artifact == null ? "gcode" : artifact.format();
         var chooser = new FileChooser();
         chooser.setTitle(t("exportGcode"));
-        chooser.setInitialFileName(plates.getValue().name() + ".gcode");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("G-code (*.gcode)", "*.gcode"));
+        chooser.setInitialFileName(plates.getValue().name() + "." + format);
+        chooser.getExtensionFilters()
+                .add(new FileChooser.ExtensionFilter("Print artifact (*." + format + ")", "*." + format));
         var chosen = chooser.showSaveDialog(getScene().getWindow());
         if (chosen == null) return;
         var path = chosen.toPath();
@@ -427,91 +447,58 @@ final class PrinterPane extends VBox implements AutoCloseable {
                 return;
         }
         try {
-            Files.writeString(path, String.join("\n", lines) + "\n");
+            saveArtifact(path, artifact, lines);
         } catch (java.io.IOException failure) {
             error(failure);
         }
     }
 
-    private void submit(boolean start) {
-        if (busy || session == null || document == null || plates.getValue() == null) return;
-        if (start && (startPending || !current.canStart())) return;
-        var lines = document.gcode().getOrDefault(plates.getValue().id(), List.of());
-        if (lines.isEmpty()) return;
-        if (selectedDevice == null
-                || PrinterJobs.incompatibility(document, plates.getValue().id(), selectedDevice)
-                        .isPresent()) return;
-        var artifact = document.printArtifacts().get(plates.getValue().id());
-        long revision = jobGeneration;
+    static void saveArtifact(Path path, PrintArtifact artifact, List<String> lines) throws java.io.IOException {
+        Files.write(
+                path,
+                artifact == null
+                        ? (String.join("\n", lines) + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8)
+                        : artifact.bytes());
+    }
+
+    private void submit() {
+        if (busy
+                || session == null
+                || document == null
+                || plates.getValue() == null
+                || startPending
+                || !current.canStart()) return;
+        var job = document;
+        var plate = plates.getValue().id();
         var connected = session;
+        var configuredPrinter = selectedDevice;
+        long token = generation;
         busy = true;
-        message.setText(t("uploading"));
-        transfer.setProgress(0);
+        startPending = true;
+        transfer.setProgress(-1);
         transfer.setVisible(true);
         update();
         worker.submit(() -> {
-            Path temporary = null;
             try {
-                temporary =
-                        Files.createTempFile("voxelbrew-print-", artifact == null ? ".gcode" : "." + artifact.format());
-                if (artifact == null) Files.writeString(temporary, String.join("\n", lines));
-                else Files.write(temporary, artifact.bytes());
-                var receipt = connected.upload(
-                        temporary,
-                        fraction -> Platform.runLater(() -> {
-                            if (!closed) transfer.setProgress(fraction);
-                        }));
-                if (revision != jobGeneration || closed)
-                    throw new java.io.IOException("Job changed during upload; print was not started");
-                if (start) {
-                    Platform.runLater(() -> {
-                        if (!closed) {
-                            startPending = true;
-                            update();
-                        }
-                    });
-                    connected.start(receipt);
-                }
+                var result = submitArtifact(
+                        connected, configuredPrinter, job.printArtifacts().get(plate));
                 Platform.runLater(() -> {
-                    if (!closed) message.setText(t(start ? "submitted" : "uploaded"));
+                    if (closed || token != generation) return;
+                    if (result instanceof Driver.PrintResult.Failure failure) {
+                        startPending = failure.submissionUncertain();
+                        message.setText(String.join("\n", failure.messages()));
+                    } else message.setText(t("submitted"));
                 });
             } catch (Exception failure) {
-                error(failure);
-            } finally {
-                if (temporary != null)
-                    try {
-                        Files.deleteIfExists(temporary);
-                    } catch (java.io.IOException ignored) {
-                    }
-                Platform.runLater(() -> {
-                    if (!closed) {
-                        busy = false;
-                        transfer.setVisible(false);
-                        update();
-                        poll();
-                    }
-                });
-            }
-        });
-    }
-
-    private void command(PrinterSession.Command command) {
-        if (busy || session == null) return;
-        var connected = session;
-        busy = true;
-        update();
-        worker.submit(() -> {
-            try {
-                connected.command(command);
-            } catch (Exception failure) {
+                // Submission may have reached the printer. Keep start disabled until status reconciles it.
                 error(failure);
             } finally {
                 Platform.runLater(() -> {
-                    if (!closed) {
-                        busy = false;
-                        update();
-                        poll();
-                    }
+                    if (closed || token != generation) return;
+                    busy = false;
+                    transfer.setVisible(false);
+                    update();
+                    poll();
                 });
             }
         });
@@ -526,235 +513,205 @@ final class PrinterPane extends VBox implements AutoCloseable {
     void configure() {
         var dialog = new Dialog<ButtonType>();
         dialog.setTitle(t("configure"));
-        if (getScene() != null) dialog.initOwner(getScene().getWindow());
+        dialog.getDialogPane().setId("device-config-dialog");
         var list = new ComboBox<Printer>();
+        list.setConverter(new javafx.util.StringConverter<>() {
+            @Override
+            public String toString(Printer printer) {
+                return printer == null ? "" : printer.name();
+            }
+
+            @Override
+            public Printer fromString(String value) {
+                return list.getValue();
+            }
+        });
         list.getItems().setAll(availableDevices);
         list.setPromptText(t("new"));
         var name = new TextField();
         name.setId("device-config-name");
-        var address = new TextField();
-        var serial = new TextField();
-        var model = new TextField();
-        var profile = new ComboBox<dev.voxelbrew.api.slicer.PrinterProfileCatalog.Entry>();
-        profile.setId("device-config-profile");
-        try {
-            var hidden = printerVisibility.hidden();
-            profile.getItems()
-                    .setAll(profiles.load().entries().stream()
-                            .filter(entry -> !entry.bundled()
-                                    || !hidden.contains(
-                                            entry.definition().printer().id()))
-                            .toList());
-        } catch (java.io.IOException ex) {
-            throw new IllegalStateException(ex);
-        }
-        profile.setMaxWidth(Double.MAX_VALUE);
-        var secret = new PasswordField();
-        var kind = new ComboBox<Printer.Kind>();
-        kind.setId("device-config-kind");
-        address.setId("device-config-address");
-        serial.setId("device-config-serial");
-        model.setId("device-config-model");
-        secret.setId("device-config-secret");
-        kind.getItems().setAll(Printer.Kind.values());
-        kind.setConverter(new javafx.util.StringConverter<>() {
+        var driver = new ComboBox<Driver>();
+        driver.setId("device-config-driver");
+        driver.getItems().setAll(providers.drivers());
+        driver.setPromptText("Choose a driver");
+        driver.setConverter(new javafx.util.StringConverter<>() {
             @Override
-            public String toString(Printer.Kind value) {
-                return value == null ? "" : t(value == Printer.Kind.BAMBU ? "kind.bambu" : "kind.moonraker");
+            public String toString(Driver d) {
+                return d == null ? "" : d.name();
             }
 
             @Override
-            public Printer.Kind fromString(String value) {
-                return kind.getValue();
+            public Driver fromString(String value) {
+                return driver.getValue();
             }
         });
-        kind.setValue(Printer.Kind.MOONRAKER);
-        var drafts = new EnumMap<Printer.Kind, ConnectionDraft>(Printer.Kind.class);
-        var loading = new boolean[1];
-        list.valueProperty().addListener((o, a, d) -> {
-            if (d != null) {
-                loading[0] = true;
-                try {
-                    drafts.clear();
-                    kind.setValue(d.kind());
-                    name.setText(d.name());
-                    address.setText(d.address());
-                    serial.setText(d.serial());
-                    model.setText(d.model());
-                    profile.getItems().stream()
-                            .filter(p -> p.definition().printer().id().equals(d.profileId()))
-                            .findFirst()
-                            .ifPresent(profile::setValue);
-                    secret.setText(d.secret());
-                } finally {
-                    loading[0] = false;
-                }
+        var profile = new ComboBox<Profile>();
+        profile.setId("device-config-profile");
+        profile.getItems()
+                .setAll(profiles.load().entries().stream()
+                        .map(PrinterProfileCatalog.Entry::definition)
+                        .toList());
+        profile.setConverter(new javafx.util.StringConverter<>() {
+            @Override
+            public String toString(Profile p) {
+                return p == null
+                        ? ""
+                        : p.manufacturer() + " " + p.name()
+                                + (list.getValue() != null
+                                                && p == list.getValue().profile()
+                                        ? " (saved snapshot)"
+                                        : "");
             }
+
+            @Override
+            public Profile fromString(String value) {
+                return profile.getValue();
+            }
+        });
+        var inline = new VBox();
+        inline.setId("device-config-fields");
+        var error = new Label();
+        error.setWrapText(true);
+        var form = new DesktopExportWindow.Embedded[1];
+        var save = new ButtonType(t("save"), ButtonBar.ButtonData.OK_DONE);
+        var remove = new ButtonType(t("remove"), ButtonBar.ButtonData.OTHER);
+        dialog.getDialogPane().getButtonTypes().addAll(remove, ButtonType.CANCEL, save);
+        var cancelButton = (Button) dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
+        var saveButton = (Button) dialog.getDialogPane().lookupButton(save);
+        saveButton.setId("device-config-save");
+        dialog.getDialogPane().lookupButton(ButtonType.CANCEL).setId("device-config-cancel");
+        Runnable validate = () -> {
+            boolean valid = driver.getValue() != null
+                    && profile.getValue() != null
+                    && !name.getText().isBlank()
+                    && form[0] != null;
+            var errors =
+                    valid ? driver.getValue().gui().validate(form[0].values().get()) : Map.<String, String>of();
+            saveButton.setDisable(!valid || !errors.isEmpty());
+            error.setText(String.join("; ", errors.values()));
+        };
+        driver.valueProperty().addListener((o, old, value) -> {
+            form[0] = null;
+            inline.getChildren().clear();
+            if (value != null) {
+                var existing = list.getValue();
+                var initial = existing != null && existing.driverId().equals(value.id())
+                        ? existing.driverConfiguration().toInput()
+                        : Map.<String, String>of();
+                form[0] = new DesktopExportWindow(getScene().getWindow(), null, text)
+                        .interaction(t("save"), "device-config-")
+                        .embed(value.gui(), initial, validate);
+                inline.getChildren().add(form[0].node());
+            }
+            validate.run();
+        });
+        name.textProperty().addListener((o, a, b) -> validate.run());
+        profile.valueProperty().addListener((o, a, b) -> validate.run());
+        list.valueProperty().addListener((o, a, value) -> {
+            if (value == null) return;
+            name.setText(value.name());
+            profile.getItems()
+                    .setAll(profiles.load().entries().stream()
+                            .map(PrinterProfileCatalog.Entry::definition)
+                            .toList());
+            if (!profile.getItems().contains(value.profile()))
+                profile.getItems().add(value.profile());
+            profile.setValue(value.profile());
+            driver.setValue(null);
+            driver.setValue(providers.find(value.driverId()).orElse(null));
+            if (driver.getValue() == null)
+                error.setText("Missing driver " + value.driverId() + ". Install its plugin or choose a replacement.");
         });
         var add = new Button(t("new"));
         add.setOnAction(e -> {
-            loading[0] = true;
-            try {
-                list.setValue(null);
-                drafts.clear();
-                kind.setValue(Printer.Kind.MOONRAKER);
-                name.clear();
-                address.clear();
-                serial.clear();
-                model.clear();
-                profile.setValue(null);
-                secret.clear();
-            } finally {
-                loading[0] = false;
-            }
+            list.setValue(null);
+            name.clear();
+            profile.setValue(null);
+            driver.setValue(null);
         });
-        var form = new VBox(14);
-        form.setId("device-config-form");
-        form.getStyleClass().add("device-config-form");
-        var selection = new HBox(10, list, add);
-        selection.getStyleClass().add("device-config-selection");
-        HBox.setHgrow(list, Priority.ALWAYS);
-        list.setMaxWidth(Double.MAX_VALUE);
-        var error = new Label();
-        error.setWrapText(true);
-        error.getStyleClass().add("device-config-message");
-        error.visibleProperty().bind(error.textProperty().isNotEmpty());
-        error.managedProperty().bind(error.visibleProperty());
-        var addressError = new Label();
-        addressError.setId("device-config-address-error");
-        addressError.setWrapText(true);
-        addressError.getStyleClass().add("device-config-message");
-        addressError.visibleProperty().bind(addressError.textProperty().isNotEmpty());
-        addressError.managedProperty().bind(addressError.visibleProperty());
-        var validateAddress = (Runnable) () -> {
-            try {
-                new Printer(
-                        "preview", "Preview", kind.getValue(), "preview", address.getText(), "serial", "model", "code");
-                addressError.setText("");
-            } catch (IllegalArgumentException failure) {
-                addressError.setText(failure.getMessage());
-            }
-        };
-        address.textProperty().addListener((o, previous, current) -> validateAddress.run());
-        var addressLabel = new Label();
-        addressLabel.setId("device-config-address-label");
-        var modelLabel = new Label();
-        modelLabel.setId("device-config-model-label");
-        var secretLabel = new Label();
-        secretLabel.setId("device-config-secret-label");
-        var fields = (java.util.function.Consumer<Printer.Kind>) selected -> {
-            boolean bambu = selected == Printer.Kind.BAMBU;
-            addressLabel.setText(t(bambu ? "bambuAddress" : "moonrakerAddress"));
-            modelLabel.setText(t(bambu ? "bambuModel" : "moonrakerModel"));
-            secretLabel.setText(t(bambu ? "bambuSecret" : "moonrakerSecret"));
-            var identity =
-                    new HBox(12, deviceField(new Label(t("name")), name), deviceField(new Label(t("type")), kind));
-            for (var field : identity.getChildren()) HBox.setHgrow(field, Priority.ALWAYS);
-            var details = new HBox(12);
-            if (bambu) details.getChildren().add(deviceField(new Label(t("serial")), serial));
-            details.getChildren().add(deviceField(modelLabel, model));
-            for (var field : details.getChildren()) HBox.setHgrow(field, Priority.ALWAYS);
-            form.getChildren()
-                    .setAll(
-                            identity,
-                            deviceField(new Label(t("profile")), profile),
-                            new VBox(6, deviceField(addressLabel, address), addressError),
-                            details,
-                            deviceField(secretLabel, secret),
-                            error);
-        };
-        kind.valueProperty().addListener((o, previous, selected) -> {
-            if (!loading[0] && previous != null) {
-                drafts.put(
-                        previous,
-                        new ConnectionDraft(address.getText(), serial.getText(), model.getText(), secret.getText()));
-                var draft = drafts.get(selected);
-                address.setText(draft == null ? "" : draft.address());
-                serial.setText(draft == null ? "" : draft.serial());
-                model.setText(draft == null ? "" : draft.model());
-                secret.setText(draft == null ? "" : draft.secret());
-            }
-            fields.accept(selected);
-            if (!loading[0]) validateAddress.run();
-        });
-        fields.accept(kind.getValue());
-        var save = new ButtonType(t("save"), ButtonBar.ButtonData.OK_DONE);
-        var remove = new ButtonType(t("remove"), ButtonBar.ButtonData.OTHER);
-        var test = new ButtonType(t("test"), ButtonBar.ButtonData.OTHER);
-        dialog.getDialogPane().getButtonTypes().addAll(remove, test, ButtonType.CANCEL, save);
-        dialog.getDialogPane().setId("device-config-dialog");
-        var content = new VBox(18, selection, new Separator(), form);
+        var newProfile = new Button("New profile");
+        newProfile.setId("device-profile-new");
+        newProfile.setOnAction(e -> ProfileEditor.show(getScene().getWindow(), text, profiles, null)
+                .ifPresent(p -> {
+                    profile.getItems().add(p);
+                    profile.setValue(p);
+                }));
+        var copyProfile = new Button("Copy / edit profile");
+        copyProfile.setId("device-profile-edit");
+        copyProfile.setOnAction(e -> ProfileEditor.show(getScene().getWindow(), text, profiles, profile.getValue())
+                .ifPresent(p -> {
+                    profile.getItems().removeIf(existing -> existing.id().equals(p.id()));
+                    profile.getItems().add(p);
+                    profile.setValue(p);
+                }));
+        var content = new VBox(
+                10,
+                new HBox(8, list, add),
+                deviceField(new Label(t("name")), name),
+                deviceField(new Label(t("profile")), profile),
+                new HBox(8, newProfile, copyProfile),
+                deviceField(new Label("Driver"), driver),
+                inline,
+                error);
         content.setId("device-config-content");
-        dialog.getDialogPane().setContent(content);
-        var saveButton = (Button) dialog.getDialogPane().lookupButton(save);
-        saveButton.setId("device-config-save");
-        var removeButton = (Button) dialog.getDialogPane().lookupButton(remove);
-        var testButton = (Button) dialog.getDialogPane().lookupButton(test);
-        var cancelButton = (Button) dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
-        cancelButton.setId("device-config-cancel");
-        saveButton.getStyleClass().add("printer-dialog-primary");
-        removeButton.getStyleClass().add("device-config-remove");
-        removeButton.setDisable(list.getValue() == null);
-        list.valueProperty().addListener((o, before, selected) -> removeButton.setDisable(selected == null));
-        var actions = List.of(saveButton, removeButton, testButton, cancelButton);
-        for (var action : List.of(save, remove, test))
-            dialog.getDialogPane().lookupButton(action).addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
-                e.consume();
+        var scroll = new ScrollPane(content);
+        scroll.setFitToWidth(true);
+        scroll.setPrefViewportHeight(580);
+        dialog.getDialogPane().setContent(scroll);
+        dialog.getDialogPane().setPrefWidth(600);
+        saveButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+            event.consume();
+            try {
+                var old = list.getValue();
+                var next = new Printer(
+                        old == null ? UUID.randomUUID().toString() : old.id(),
+                        name.getText(),
+                        driver.getValue().id(),
+                        driver.getValue()
+                                .gui()
+                                .buildConfiguration(form[0].values().get()),
+                        profile.getValue());
+                saveButton.setDisable(true);
+                content.setDisable(true);
+                cancelButton.setDisable(true);
+                worker.submit(() -> {
+                    try {
+                        runtime.save(next);
+                        Platform.runLater(() -> {
+                            reload();
+                            cancelButton.setDisable(false);
+                            cancelButton.fire();
+                        });
+                    } catch (Exception failure) {
+                        Platform.runLater(() -> {
+                            content.setDisable(false);
+                            cancelButton.setDisable(false);
+                            error.setText(failure.getMessage());
+                            validate.run();
+                        });
+                    }
+                });
+            } catch (RuntimeException failure) {
+                error.setText(failure.getMessage());
+            }
+        });
+        dialog.getDialogPane().lookupButton(remove).addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+            event.consume();
+            if (list.getValue() == null) return;
+            var selected = list.getValue();
+            worker.submit(() -> {
                 try {
-                    if (action == remove && list.getValue() == null) return;
-                    var value = action == remove
-                            ? list.getValue()
-                            : new Printer(
-                                    list.getValue() == null
-                                            ? UUID.randomUUID().toString()
-                                            : list.getValue().id(),
-                                    name.getText(),
-                                    kind.getValue(),
-                                    java.util.Objects.requireNonNull(profile.getValue(), "Choose a printer profile")
-                                            .definition()
-                                            .printer()
-                                            .id(),
-                                    address.getText(),
-                                    kind.getValue() == Printer.Kind.BAMBU ? serial.getText() : "",
-                                    model.getText(),
-                                    secret.getText());
-                    content.setDisable(true);
-                    actions.forEach(button -> button.setDisable(true));
-                    worker.submit(() -> {
-                        try {
-                            if (action == test) {
-                                try (var connection = runtime.connect(value)) {
-                                    connection.status();
-                                }
-                            } else if (action == remove) runtime.remove(directory, value.id());
-                            else runtime.save(directory, value);
-                            Platform.runLater(() -> {
-                                content.setDisable(false);
-                                actions.forEach(button -> button.setDisable(false));
-                                removeButton.setDisable(list.getValue() == null);
-                                if (action == test) {
-                                    error.getStyleClass().add("device-config-success");
-                                    error.setText(t("tested"));
-                                } else {
-                                    reload();
-                                    cancelButton.fire();
-                                }
-                            });
-                        } catch (Exception failure) {
-                            Platform.runLater(() -> {
-                                content.setDisable(false);
-                                actions.forEach(button -> button.setDisable(false));
-                                removeButton.setDisable(list.getValue() == null);
-                                error.getStyleClass().remove("device-config-success");
-                                error.setText(failure.getMessage());
-                            });
-                        }
+                    runtime.remove(selected.id());
+                    Platform.runLater(() -> {
+                        reload();
+                        cancelButton.fire();
                     });
-                } catch (IllegalArgumentException failure) {
-                    error.getStyleClass().remove("device-config-success");
-                    error.setText(failure.getMessage());
+                } catch (Exception failure) {
+                    error(failure);
                 }
             });
+        });
+        validate.run();
         Dialogs.show(dialog, getScene().getWindow(), text);
     }
 
@@ -773,9 +730,5 @@ final class PrinterPane extends VBox implements AutoCloseable {
         generation++;
         jobGeneration++;
         polling.stop();
-        var connected = session;
-        worker.submit(() -> {
-            if (connected != null) connected.close();
-        });
     }
 }

@@ -1,13 +1,13 @@
-package dev.voxelbrew.slicer;
+package dev.voxelbrew.printer;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 
-/** Bundled and custom printer resources owned by the slicer runtime. */
+/** Bundled and custom printer resources owned by the printer runtime. */
 public final class PrinterResources {
-    public static final String ROOT = "/dev/voxelbrew/slicer/printers/";
+    public static final String ROOT = "/dev/voxelbrew/printer/profiles/";
 
     public record Source(String name, String json, Path directory, boolean bundled) {}
 
@@ -73,6 +73,16 @@ public final class PrinterResources {
             if (name == null || !name.matches("[a-z0-9-]+\\.png")) return null;
             var url = PrinterResources.class.getResource(ROOT + name);
             return url == null ? null : url.toExternalForm();
+        }
+        if (name != null && name.matches("[a-zA-Z0-9.-]+")) {
+            var selected = source.directory().resolve(name).normalize();
+            try {
+                if (selected.toRealPath().startsWith(source.directory().toRealPath())
+                        && Files.isRegularFile(selected)
+                        && Files.size(selected) <= 5 * 1024 * 1024)
+                    return selected.toUri().toString();
+            } catch (IOException ignored) {
+            }
         }
         if (!source.name().endsWith(".json")) return null;
         String stem = source.name().substring(0, source.name().length() - ".json".length());

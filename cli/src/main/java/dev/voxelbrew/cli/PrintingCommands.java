@@ -3,12 +3,13 @@ package dev.voxelbrew.cli;
 import dev.voxelbrew.api.model.*;
 import dev.voxelbrew.api.model.mesh.MeshOptions;
 import dev.voxelbrew.api.model.printing.*;
-import dev.voxelbrew.api.slicer.PrinterProfileCatalog;
+import dev.voxelbrew.api.printer.PrinterProfileCatalog;
 import dev.voxelbrew.api.slicer.SlicerCatalog;
 import dev.voxelbrew.api.slicer.Slicing;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.importer.DocumentSource;
+import dev.voxelbrew.printer.ProfileHardware;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
@@ -286,7 +287,7 @@ final class PrintingCommands {
             if (printer != null && !printer.startsWith("generic-marlin-rect-"))
                 session.setPrintSetup(session.document()
                         .printSetup()
-                        .withPrinter(printers.load().require(printer)));
+                        .withPrinter(ProfileHardware.resolve(printers.load().require(printer))));
             PrintProfile.resolve(session.document().printSetup());
             return save(session);
         }
@@ -461,7 +462,7 @@ final class PrintingCommands {
                                 java.util.Locale.ROOT,
                                 "%s\t%s\t%.1f mm height\t%.2f mm nozzle\t%d tools\t%s%n",
                                 p.printer().id(),
-                                entry,
+                                entry.name(),
                                 p.printer().usableHeight(),
                                 p.printer().nozzleMm(),
                                 p.toolCount(),
@@ -504,17 +505,20 @@ final class PrintingCommands {
                     "Slice the complete persisted build setup with its explicit profiles; publish text G-code atomically.")
     static final class Slice extends VoxelBrew.FileCommand {
         private final SlicerCatalog.Factory slicers;
+        private final dev.voxelbrew.api.printer.PrinterStore printerStore;
         private final java.util.function.Supplier<dev.voxelbrew.api.exporter.ExporterProviderRegistry> exporters;
 
         Slice(
                 DocumentSource documents,
                 DocumentSave documentWriter,
                 SlicerCatalog.Factory slicers,
+                dev.voxelbrew.api.printer.PrinterStore printerStore,
                 java.util.function.Supplier<dev.voxelbrew.api.exporter.ExporterProviderRegistry> exporters,
                 Slicing slicing,
                 Path defaultExecutable) {
             super(documents, documentWriter);
             this.slicers = slicers;
+            this.printerStore = printerStore;
             this.exporters = exporters;
             this.slicing = slicing;
         }
@@ -614,17 +618,16 @@ final class PrintingCommands {
                 String selectedPrinterId =
                         document.printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID);
                 if (printerConnection != null) {
-                    var connections = dev.voxelbrew.api.printer.PrinterRuntime.load()
-                            .devices(dev.voxelbrew.util.services.Services.load(
-                                            dev.voxelbrew.util.config.ApplicationPaths.class)
-                                    .configuration()
-                                    .resolveSibling("devices"));
+                    var connections = printerStore.load().devices();
                     var connection = connections.stream()
                             .filter(p -> p.name().equalsIgnoreCase(printerConnection.strip()))
                             .findFirst()
                             .orElseThrow(() -> new IllegalArgumentException("Unknown printer: " + printerConnection));
-                    if (!connection.profileId().equals(document.printSetup().printerId()))
-                        throw new IllegalArgumentException("Printer connection references a different profile");
+                    var targetSession = new dev.voxelbrew.engine.model.ModelSession(document);
+                    targetSession.setPrintSetup(document.printSetup()
+                            .withPrinter(ProfileHardware.resolve(connection.profile()))
+                            .withPrintTarget(connection.id()));
+                    document = targetSession.document();
                     selectedPrinterId = connection.id();
                 }
                 var model = dev.voxelbrew.engine.printing.ManufacturingModels.evaluate(

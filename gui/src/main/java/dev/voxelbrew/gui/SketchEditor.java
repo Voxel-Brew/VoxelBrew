@@ -500,10 +500,12 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         references.setId("sketch-reference");
         references.setMaxWidth(Double.MAX_VALUE);
         references.setConverter(new javafx.util.StringConverter<>() {
+            @Override
             public String toString(Ref r) {
                 return r == null ? "" : r.toString();
             }
 
+            @Override
             public Ref fromString(String value) {
                 return Ref.parse(value);
             }

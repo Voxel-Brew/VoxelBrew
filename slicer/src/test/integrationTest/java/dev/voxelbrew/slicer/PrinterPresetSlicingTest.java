@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.model.mesh.MeshOptions;
 import dev.voxelbrew.api.model.printing.*;
-import dev.voxelbrew.api.slicer.SlicerRuntime;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.exporter.printing.PrusaConfiguration;
+import dev.voxelbrew.printer.ProfileHardware;
 import dev.voxelbrew.slicer.prusa.PrusaSlicerBackend;
 import java.nio.file.*;
 import org.junit.jupiter.api.Test;
@@ -18,11 +18,12 @@ class PrinterPresetSlicingTest {
 
     @Test
     void selectedHardwareControlsRealSliceIncludingVendorPresets() throws Exception {
-        var catalog = SlicerRuntime.load().printers(directory).load();
+        var catalog = new dev.voxelbrew.printer.DefaultPrinterProfileCatalog(directory).load();
         var session = SlicerAcceptanceTest.cube();
         session.setPrintSetup(session.document()
                 .printSetup()
-                .withPrinter(catalog.require("generic-marlin-200-0.4").rectangular(240, 230, 260)));
+                .withPrinter(ProfileHardware.resolve(catalog.require("generic-marlin-200-0.4"))
+                        .rectangular(240, 230, 260)));
         var model = ManufacturingModels.evaluate(session.document(), MeshOptions.DEFAULT);
         assertThat(PrusaConfiguration.settings(model).get("bed_shape"))
                 .isEqualTo("0.0x0.0,240.0x0.0,240.0x230.0,0.0x230.0");
@@ -40,7 +41,8 @@ class PrinterPresetSlicingTest {
                 dev.voxelbrew.api.slicer.Slicing.DIRECT);
         assertThat(result.job().modelLayers().isEmpty()).isFalse();
         for (String id : java.util.List.of("bambu-lab-a1-mini", "prusa-xl-5-tool")) {
-            session.setPrintSetup(session.document().printSetup().withPrinter(catalog.require(id)));
+            session.setPrintSetup(
+                    session.document().printSetup().withPrinter(ProfileHardware.resolve(catalog.require(id))));
             var vendorModel = ManufacturingModels.evaluate(session.document(), MeshOptions.DEFAULT);
             var settings = PrusaConfiguration.settings(vendorModel);
             assertThat(settings.get("gcode_flavor")).isEqualTo("marlin2");
@@ -61,7 +63,8 @@ class PrinterPresetSlicingTest {
         }
         session.setPrintSetup(session.document()
                 .printSetup()
-                .withPrinter(catalog.require("generic-marlin-200-0.4").rectangular(10, 10, 5)));
+                .withPrinter(ProfileHardware.resolve(catalog.require("generic-marlin-200-0.4"))
+                        .rectangular(10, 10, 5)));
         assertThat(PrintValidation.validate(ManufacturingModels.evaluate(session.document(), MeshOptions.DEFAULT))
                         .diagnostics()
                         .isEmpty())

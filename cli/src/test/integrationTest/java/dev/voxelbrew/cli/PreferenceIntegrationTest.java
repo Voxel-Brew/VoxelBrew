@@ -2,6 +2,7 @@ package dev.voxelbrew.cli;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.printer.PrinterProfileCatalog;
 import dev.voxelbrew.api.slicer.*;
 import java.io.*;
 import java.nio.file.*;
@@ -22,7 +23,7 @@ class PreferenceIntegrationTest {
         var root = new CommandLine(CommandLine.Model.CommandSpec.create().name("test"));
         new PreferenceCommands(
                         new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties")),
-                        runtime.printers(directory.resolve("printers")),
+                        new dev.voxelbrew.printer.DefaultPrinterProfileCatalog(directory.resolve("printers")),
                         runtime.slicers())
                 .install(root);
         var text = new StringWriter();
@@ -53,8 +54,7 @@ class PreferenceIntegrationTest {
     @Test
     void visibilityOperationsApplyToAllDefaultsAndRejectCustomOrUnknownIdsWithoutWriting() throws Exception {
         var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
-        var catalog =
-                SlicerRuntime.load().printers(directory.resolve("printers")).load();
+        var catalog = new dev.voxelbrew.printer.DefaultPrinterProfileCatalog(directory.resolve("printers")).load();
         var ids = catalog.entries().stream()
                 .filter(PrinterProfileCatalog.Entry::bundled)
                 .map(e -> e.definition().printer().id())
@@ -110,7 +110,7 @@ class PreferenceIntegrationTest {
 
     @Test
     void exportingDefaultProfilesPublishesConsumerReadableCopiesAndNeverOverwrites() throws Exception {
-        var catalog = SlicerRuntime.load().printers(directory.resolve("printers"));
+        var catalog = new dev.voxelbrew.printer.DefaultPrinterProfileCatalog(directory.resolve("printers"));
         String id = catalog.load().entries().stream()
                 .filter(PrinterProfileCatalog.Entry::bundled)
                 .findFirst()

@@ -52,6 +52,14 @@ public final class DesktopExportWindow implements ExportWindow {
     private final Translations translations;
     private Path suggestedDestination;
     private String exporterVersion;
+    private String confirmLabel;
+    private String inputPrefix = "export-";
+
+    public DesktopExportWindow interaction(String label, String prefix) {
+        confirmLabel = label;
+        inputPrefix = prefix;
+        return this;
+    }
 
     public DesktopExportWindow exporterVersion(String version) {
         exporterVersion =
@@ -64,6 +72,22 @@ public final class DesktopExportWindow implements ExportWindow {
     public DesktopExportWindow suggestDestination(Path destination) {
         suggestedDestination = destination;
         return this;
+    }
+
+    record Embedded(Node node, Supplier<Map<String, String>> values) {}
+
+    Embedded embed(dev.voxelbrew.api.printer.driver.DriverGui gui, Map<String, String> initial, Runnable changed) {
+        var inputs = new LinkedHashMap<String, InputBinding>();
+        var node = render(gui.layout(), inputs, changed);
+        initial.forEach((id, value) -> {
+            var binding = inputs.get(id);
+            if (binding == null) return;
+            if (binding.control() instanceof TextInputControl input) input.setText(value);
+            else if (binding.control() instanceof CheckBox input) input.setSelected(Boolean.parseBoolean(value));
+            else if (binding.control() instanceof ComboBox<?> input)
+                input.getSelectionModel().select(input.getItems().indexOf(value));
+        });
+        return new Embedded(node, () -> readValues(inputs));
     }
 
     @Override
@@ -100,7 +124,8 @@ public final class DesktopExportWindow implements ExportWindow {
         } else {
             dialog.getDialogPane().setContent(content);
         }
-        var confirm = new ButtonType(translations.text("gui.export"), ButtonBar.ButtonData.OK_DONE);
+        var confirm = new ButtonType(
+                confirmLabel == null ? translations.text("gui.export") : confirmLabel, ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(confirm, ButtonType.CANCEL);
         var button = dialog.getDialogPane().lookupButton(confirm);
         button.setId("export-confirm");
@@ -201,9 +226,22 @@ public final class DesktopExportWindow implements ExportWindow {
                     path.textProperty(),
                     onChange);
         }
+        if (component instanceof dev.voxelbrew.api.model.vui.PasswordField field) {
+            var input = new javafx.scene.control.PasswordField();
+            input.setText(field.value());
+            input.setId(inputPrefix + field.id().replace('.', '-'));
+            return bind(
+                    inputs,
+                    field.id(),
+                    input::getText,
+                    input,
+                    field(field.label(), input),
+                    input.textProperty(),
+                    onChange);
+        }
         if (component instanceof dev.voxelbrew.api.model.vui.TextField field) {
             var input = new javafx.scene.control.TextField(field.value());
-            input.setId("export-" + field.id());
+            input.setId(inputPrefix + field.id().replace('.', '-'));
             input.setMaxWidth(Double.MAX_VALUE);
             return bind(
                     inputs,
@@ -216,7 +254,7 @@ public final class DesktopExportWindow implements ExportWindow {
         }
         if (component instanceof dev.voxelbrew.api.model.vui.TextArea area) {
             var input = new javafx.scene.control.TextArea(area.value());
-            input.setId("export-" + area.id());
+            input.setId(inputPrefix + area.id());
             input.setMaxWidth(Double.MAX_VALUE);
             return bind(
                     inputs,
@@ -229,7 +267,7 @@ public final class DesktopExportWindow implements ExportWindow {
         }
         if (component instanceof dev.voxelbrew.api.model.vui.CheckBox box) {
             var input = new javafx.scene.control.CheckBox(box.label());
-            input.setId("export-" + box.id());
+            input.setId(inputPrefix + box.id());
             UiHelp.describe(input, translations.textOrDefault("help.export-" + box.id(), box.label()));
             input.setSelected(box.selected());
             input.getStyleClass().add("export-dialog-choice");
@@ -244,7 +282,7 @@ public final class DesktopExportWindow implements ExportWindow {
         }
         if (component instanceof dev.voxelbrew.api.model.vui.ComboBox box) {
             var input = new javafx.scene.control.ComboBox<String>();
-            input.setId("export-" + box.id());
+            input.setId(inputPrefix + box.id());
             input.getItems().setAll(box.choices());
             input.setValue(box.selected());
             input.setMaxWidth(Double.MAX_VALUE);
@@ -281,7 +319,7 @@ public final class DesktopExportWindow implements ExportWindow {
         }
         if (component instanceof dev.voxelbrew.api.model.vui.Slider slider) {
             var input = new javafx.scene.control.Slider(slider.minimum(), slider.maximum(), slider.value());
-            input.setId("export-" + slider.id());
+            input.setId(inputPrefix + slider.id());
             return bind(
                     inputs,
                     slider.id(),

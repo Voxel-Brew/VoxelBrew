@@ -26,20 +26,24 @@ class SlicerAvailabilityTest {
 
     private SlicerBackend backend(String version, boolean fails) {
         return new SlicerBackend() {
+            @Override
             public Descriptor descriptor() {
                 return new Descriptor("test", "Test", API_VERSION, "advertised", Set.of(), Set.of("gcode"));
             }
 
+            @Override
             public Path executable() {
                 return Path.of("configured-executable");
             }
 
+            @Override
             public Probe probe(Path executable, Cancellation cancellation) throws IOException {
                 assertThat(executable).isEqualTo(executable());
                 if (fails) throw new IOException("Executable is unavailable");
                 return new Probe(version, Set.of());
             }
 
+            @Override
             public RunResult slice(Request request) {
                 throw new AssertionError("Availability must not slice");
             }

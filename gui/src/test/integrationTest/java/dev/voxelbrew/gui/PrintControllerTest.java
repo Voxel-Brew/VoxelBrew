@@ -66,14 +66,17 @@ class PrintControllerTest {
     private static final class HeldBackend implements SlicerBackend {
         final CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
 
+        @Override
         public Descriptor descriptor() {
             return new PrusaSlicerBackend().descriptor();
         }
 
+        @Override
         public Probe probe(Path exe, Cancellation cancellation) {
             return new Probe("failure-lifecycle-fixture", Set.of());
         }
 
+        @Override
         public RunResult slice(Request request) throws IOException {
             request.diagnostics().accept("Fixture process entered");
             entered.countDown();
@@ -159,14 +162,17 @@ class PrintControllerTest {
         var backend = new SlicerBackend() {
             int calls;
 
+            @Override
             public Descriptor descriptor() {
                 return real.descriptor();
             }
 
+            @Override
             public Probe probe(Path path, Cancellation token) throws IOException {
                 return real.probe(path, token);
             }
 
+            @Override
             public RunResult slice(Request request) throws IOException {
                 return ++calls == 1 ? real.slice(request) : held.slice(request);
             }

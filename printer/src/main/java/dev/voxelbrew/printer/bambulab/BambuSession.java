@@ -1,7 +1,8 @@
-package dev.voxelbrew.printer;
+package dev.voxelbrew.printer.bambulab;
 
 import com.google.gson.*;
-import dev.voxelbrew.api.printer.*;
+import dev.voxelbrew.api.printer.driver.*;
+import dev.voxelbrew.printer.internal.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
@@ -10,25 +11,27 @@ import java.util.*;
 import java.util.function.DoubleConsumer;
 import java.util.zip.ZipFile;
 import org.apache.commons.net.ftp.*;
-import pl.grzeslowski.jbambuapi.mqtt.*;
 
 /** LAN device commands use JBambuAPI; file transfer is a separate FTPS operation. */
-final class BambuSession implements PrinterSession {
-    private final Printer device;
-    private final PrinterClient client;
-    private final PrinterClientConfig config;
+final class BambuSession implements DeviceTransport {
+    private final Connection device;
+    private final MqttPeer peer;
+    private final java.util.function.Supplier<FTPSClient> transfers;
     private final JsonObject report = new JsonObject();
     private volatile long lastReport;
     private volatile String commandFailure = "";
 
-    BambuSession(Printer device) throws IOException {
+    BambuSession(Connection device) throws IOException {
+        this(device, new LibraryMqttPeer(device), () -> new FTPSClient(true));
+    }
+
+    BambuSession(Connection device, MqttPeer peer, java.util.function.Supplier<FTPSClient> transfers)
+            throws IOException {
         this.device = device;
-        config = PrinterClientConfig.buildDefault(
-                device.address(), device.serial(), device.secret().toCharArray());
-        PrinterClient opened = null;
+        this.peer = peer;
+        this.transfers = transfers;
         try {
-            opened = new PrinterClient(config);
-            opened.subscribe((topic, bytes) -> {
+            peer.open(bytes -> {
                 try {
                     var message = JsonParser.parseString(new String(bytes, StandardCharsets.UTF_8))
                             .getAsJsonObject();
@@ -45,40 +48,49 @@ final class BambuSession implements PrinterSession {
                     /* Ignore non-status packets. */
                 }
             });
-            opened.connect();
-            client = opened;
-            client.getChannel().sendCommand(PrinterClient.Channel.PushingCommand.defaultPushingCommand());
-        } catch (Exception failure) {
-            if (opened != null) opened.close();
-            config.close();
-            throw new IOException("Cannot connect to Bambu device; check host, serial and LAN access code");
+        } catch (IOException | RuntimeException failure) {
+            try {
+                peer.close();
+            } catch (RuntimeException cleanupFailure) {
+                if (cleanupFailure != failure) failure.addSuppressed(cleanupFailure);
+            }
+            throw failure;
         }
     }
 
     @Override
-    public PrinterStatus status() throws IOException {
-        if (!client.isConnected()) throw new IOException("Bambu device disconnected");
+    public DriverStatus status() throws IOException {
+        long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+        while (lastReport == 0 && System.nanoTime() < deadline) {
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException failure) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Monitoring interrupted", failure);
+            }
+        }
+        if (!peer.connected()) throw new IOException("Bambu device disconnected");
         synchronized (report) {
             if (lastReport == 0
                     || System.nanoTime() - lastReport > Duration.ofSeconds(30).toNanos())
-                return PrinterStatus.unknown("Waiting for current printer status");
+                return DriverStatus.unknown("Waiting for current printer status");
             String state = string("gcode_state");
             var mapped = switch (state) {
-                case "IDLE" -> PrinterStatus.State.IDLE;
-                case "RUNNING", "PREPARE" -> PrinterStatus.State.PRINTING;
-                case "PAUSE" -> PrinterStatus.State.PAUSED;
-                case "FINISH" -> PrinterStatus.State.COMPLETE;
-                case "FAILED" -> PrinterStatus.State.ERROR;
-                default -> PrinterStatus.State.UNKNOWN;
+                case "IDLE" -> DriverStatus.State.IDLE;
+                case "RUNNING", "PREPARE" -> DriverStatus.State.PRINTING;
+                case "PAUSE" -> DriverStatus.State.PAUSED;
+                case "FINISH" -> DriverStatus.State.COMPLETE;
+                case "FAILED" -> DriverStatus.State.ERROR;
+                default -> DriverStatus.State.UNKNOWN;
             };
-            var percent = MoonrakerSession.number(report, "mc_percent");
-            var minutes = MoonrakerSession.number(report, "mc_remaining_time");
-            return new PrinterStatus(
+            var percent = dev.voxelbrew.printer.internal.TransportValues.number(report, "mc_percent");
+            var minutes = dev.voxelbrew.printer.internal.TransportValues.number(report, "mc_remaining_time");
+            return new DriverStatus(
                     mapped,
                     string("gcode_file"),
                     percent.isPresent() ? OptionalDouble.of(percent.getAsDouble() / 100) : percent,
-                    MoonrakerSession.number(report, "nozzle_temper"),
-                    MoonrakerSession.number(report, "bed_temper"),
+                    dev.voxelbrew.printer.internal.TransportValues.number(report, "nozzle_temper"),
+                    dev.voxelbrew.printer.internal.TransportValues.number(report, "bed_temper"),
                     minutes.isPresent() ? OptionalDouble.of(minutes.getAsDouble() * 60) : minutes,
                     commandFailure.isEmpty() ? state : commandFailure);
         }
@@ -98,7 +110,7 @@ final class BambuSession implements PrinterSession {
             if (zip.getEntry("Metadata/plate_1.gcode") == null)
                 throw new IOException("Package does not contain plate 1 G-code");
         }
-        var ftp = new FTPSClient(true);
+        var ftp = transfers.get();
         long size = Files.size(artifact);
         ftp.setCopyStreamListener(new org.apache.commons.net.io.CopyStreamAdapter() {
             @Override
@@ -132,51 +144,27 @@ final class BambuSession implements PrinterSession {
     public void start(Upload upload) throws IOException {
         if (!status().canStart()) throw new IOException("Printer is not idle");
         commandFailure = "";
-        client.getChannel().sendCommand(new PrinterClient.Channel.RawStringCommand() {
-            @Override
-            public String topic() {
-                return "device/" + device.serial() + "/request";
-            }
-
-            @Override
-            public String buildRawStringCommand(long sequenceId) {
-                var print = new JsonObject();
-                print.addProperty("sequence_id", Long.toString(sequenceId));
-                print.addProperty("command", "project_file");
-                print.addProperty("param", "Metadata/plate_1.gcode");
-                print.addProperty("url", "ftp:///" + upload.filename());
-                print.addProperty("subtask_name", upload.filename());
-                print.addProperty("use_ams", false);
-                print.addProperty("bed_leveling", true);
-                print.addProperty("flow_cali", false);
-                print.addProperty("vibration_cali", true);
-                print.addProperty("layer_inspect", false);
-                print.addProperty("timelapse", false);
-                print.addProperty("profile_id", "0");
-                print.addProperty("project_id", "0");
-                print.addProperty("task_id", "0");
-                print.addProperty("subtask_id", "0");
-                var root = new JsonObject();
-                root.add("print", print);
-                return root.toString();
-            }
-        });
-    }
-
-    @Override
-    public void command(Command command) {
-        client.getChannel()
-                .sendCommand(
-                        switch (command) {
-                            case PAUSE -> PrinterClient.Channel.PrintCommand.PAUSE;
-                            case RESUME -> PrinterClient.Channel.PrintCommand.RESUME;
-                            case CANCEL -> PrinterClient.Channel.PrintCommand.STOP;
-                        });
+        var print = new JsonObject();
+        print.addProperty("command", "project_file");
+        print.addProperty("param", "Metadata/plate_1.gcode");
+        print.addProperty("url", "ftp:///" + upload.filename());
+        print.addProperty("subtask_name", upload.filename());
+        print.addProperty("use_ams", false);
+        print.addProperty("bed_leveling", true);
+        print.addProperty("flow_cali", false);
+        print.addProperty("vibration_cali", true);
+        print.addProperty("layer_inspect", false);
+        print.addProperty("timelapse", false);
+        print.addProperty("profile_id", "0");
+        print.addProperty("project_id", "0");
+        print.addProperty("task_id", "0");
+        print.addProperty("subtask_id", "0");
+        peer.submit(print);
+        if (!commandFailure.isEmpty()) throw new JobRejectedException(commandFailure);
     }
 
     @Override
     public void close() {
-        client.close();
-        config.close();
+        peer.close();
     }
 }

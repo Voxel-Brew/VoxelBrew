@@ -20,10 +20,12 @@ class ConstructionToolsTest {
         var x = new Axis(O, X);
         var y = new Axis(O, Y);
         var path = new Path() {
+            @Override
             public Vector position(double t) {
                 return new Vector(10 * t, 0, 0);
             }
 
+            @Override
             public Vector tangent(double t) {
                 return X;
             }

@@ -324,10 +324,6 @@ public final class ModelSession {
         throw new ModelException(featureId, "feature does not exist");
     }
 
-    private void commit(List<Feature> next) {
-        commit(next, printSetup);
-    }
-
     public synchronized void setPrintSetup(dev.voxelbrew.api.model.printing.PrintSetup setup) {
         var retained = gcode;
         var retainedArtifacts = printArtifacts;

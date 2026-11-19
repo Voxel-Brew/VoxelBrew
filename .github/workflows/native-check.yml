@@ -52,6 +52,11 @@ jobs:
       - name: Check out the exact staged release commit
         if: inputs.release-candidate
         run: node .github/scripts/release.cjs checkout .tools/release-plan
+      - uses: actions/checkout@v4
+        with:
+          repository: Voxel-Brew/BOM
+          path: .tools/bom
+          persist-credentials: false
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

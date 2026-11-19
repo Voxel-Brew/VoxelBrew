@@ -22,6 +22,12 @@ testing launchers or distributions, then invoke the installed executable. Run ta
 `:cli:e2eTest --tests <ClassName>` checks for save/reopen/edit, native loading, or packaged-process
 changes; avoid the full E2E suite unless the change requires it.
 
+## Pre-commit SpotBugs
+
+Before committing a change to this module, run
+`./gradlew :cli:spotbugsMain` from the application root.
+Use `.\gradlew.bat` in place of `./gradlew` on Windows.
+
 ## Lombok in Java code
 
 Use Lombok where it removes routine Java boilerplate without obscuring a public contract. Apply these annotations in Java-bearing repositories and modules; the website has no Java production code.

@@ -21,6 +21,12 @@ Use local protocol fixtures and deterministic fakes for unit tests; tests must n
 devices by default. Run `./gradlew :printer-impl:test` for module changes. Record manual hardware
 qualification separately, including printer model, firmware, transport, and the operation tested.
 
+## Pre-commit SpotBugs
+
+Before committing a change to this module, run
+`./gradlew :printer-impl:spotbugsMain` from the application root.
+Use `.\gradlew.bat` in place of `./gradlew` on Windows.
+
 ## Lombok in Java code
 
 Use Lombok where it removes routine Java boilerplate without obscuring a public contract. Apply these annotations in Java-bearing repositories and modules; the website has no Java production code.

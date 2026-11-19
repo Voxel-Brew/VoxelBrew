@@ -21,6 +21,12 @@ Run `./gradlew :gui:test` for view-model and non-rendered behavior. Use targeted
 tests may require `scripts/with-virtual-desktop.sh`. Capture screenshots for visible changes and
 report manual gesture/render checks separately from headless test results.
 
+## Pre-commit SpotBugs
+
+Before committing a change to this module, run
+`./gradlew :gui:spotbugsMain` from the application root.
+Use `.\gradlew.bat` in place of `./gradlew` on Windows.
+
 ## Lombok in Java code
 
 Use Lombok where it removes routine Java boilerplate without obscuring a public contract. Apply these annotations in Java-bearing repositories and modules; the website has no Java production code.

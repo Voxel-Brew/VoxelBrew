@@ -20,6 +20,12 @@ Run `./gradlew :slicer-impl:test` for discovery, configuration, and process orch
 for failure handling, but qualification of a backend requires its real executable and representative
 models.
 
+## Pre-commit SpotBugs
+
+Before committing a change to this module, run
+`./gradlew :slicer-impl:spotbugsMain` from the application root.
+Use `.\gradlew.bat` in place of `./gradlew` on Windows.
+
 ## Lombok in Java code
 
 Use Lombok where it removes routine Java boilerplate without obscuring a public contract. Apply these annotations in Java-bearing repositories and modules; the website has no Java production code.

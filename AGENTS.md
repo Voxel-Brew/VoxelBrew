@@ -45,6 +45,13 @@ There is no numeric coverage quota, but every behavior change should include reg
 
 ## Pre-commit SpotBugs
 
+For a standalone checkout, set `VOXELBREW_BOM_DIR` to a VoxelBrew BOM checkout that
+contains `spotbugs-conventions`. The composite workspace and CI supply it automatically.
+
+HTML and XML reports are under each module?s `build/reports/spotbugs/`. Analysis uses
+the JavaFX dependencies from the normal classpaths. SpotBugs has limited coverage of
+JavaFX thread violations, binding lifecycle issues, and UI resource leaks.
+
 Before committing, run `./gradlew spotbugsMain` from the application root to analyze
 production code across the Java modules. For a change limited to one module, use
 its qualified task, for example `./gradlew :gui:spotbugsMain`.

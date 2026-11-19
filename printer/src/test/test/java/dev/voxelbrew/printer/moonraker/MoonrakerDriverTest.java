@@ -6,8 +6,12 @@ import dev.voxelbrew.api.model.printing.PrintArtifact;
 import dev.voxelbrew.api.printer.driver.*;
 import dev.voxelbrew.printer.internal.*;
 import java.io.IOException;
+import java.net.ConnectException;
+import java.net.NoRouteToHostException;
+import java.net.http.HttpConnectTimeoutException;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.logging.*;
 import org.junit.jupiter.api.Test;
 
 class MoonrakerDriverTest {
@@ -61,6 +65,50 @@ class MoonrakerDriverTest {
         assertThat(status.detail()).contains("Cannot read", "Monitoring unavailable");
         assertThat(status.canStart()).isFalse();
         assertThat(transport.calls).containsExactly("status", "close");
+    }
+
+    @Test
+    void unreachablePrinterStatusFailuresLogAtDebugLevel() {
+        var logger = Logger.getLogger(MoonrakerDriver.class.getName());
+        var previousLevel = logger.getLevel();
+        var records = new ArrayList<LogRecord>();
+        var capture = new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+                records.add(record);
+            }
+
+            @Override
+            public void flush() {}
+
+            @Override
+            public void close() {}
+        };
+        logger.setLevel(Level.FINE);
+        logger.addHandler(capture);
+        try {
+            for (var failure : List.of(
+                    new ConnectException(),
+                    new NoRouteToHostException(),
+                    new HttpConnectTimeoutException("Timed out"))) {
+                var driver = new MoonrakerDriver(configuration -> {
+                    throw failure;
+                });
+                var status = driver.readPrinterStatus(config());
+                assertThat(status.state()).isEqualTo(DriverStatus.State.ERROR);
+                assertThat(status.canStart()).isFalse();
+            }
+            var driver = new MoonrakerDriver(configuration -> {
+                throw new IOException("Invalid Moonraker response");
+            });
+            assertThat(driver.readPrinterStatus(config()).state()).isEqualTo(DriverStatus.State.ERROR);
+            assertThat(records)
+                    .extracting(LogRecord::getLevel)
+                    .containsExactly(Level.FINE, Level.FINE, Level.FINE, Level.WARNING);
+        } finally {
+            logger.removeHandler(capture);
+            logger.setLevel(previousLevel);
+        }
     }
 
     @Test

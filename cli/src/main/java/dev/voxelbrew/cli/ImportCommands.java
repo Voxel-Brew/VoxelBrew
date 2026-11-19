@@ -74,12 +74,10 @@ final class ImportCommands {
         public Integer call() throws Exception {
             try (var registry = importers.get().withDirectory(plugins)) {
                 if (output == null) throw new IllegalArgumentException("Document import requires --output");
-                if (output != null
-                        && (source.toAbsolutePath()
-                                        .normalize()
-                                        .equals(output.toAbsolutePath().normalize())
-                                || java.nio.file.Files.exists(output)
-                                        && java.nio.file.Files.isSameFile(source, output)))
+                if (source.toAbsolutePath()
+                                .normalize()
+                                .equals(output.toAbsolutePath().normalize())
+                        || java.nio.file.Files.exists(output) && java.nio.file.Files.isSameFile(source, output))
                     throw new IllegalArgumentException("Import destination must differ from its source");
                 var imported = registry.require(format).create().importFrom(new CliImportWindow(source, options));
                 if (imported.isPresent()) {

@@ -116,7 +116,7 @@ final class PreferenceCommands {
                 "show",
                 "show, hide, unhide, select-all, deselect-all, invert");
         option(visibility, "--id", String.class, false, null, "Bundled profile ID for hide/unhide");
-        for (String action : List.of("describe", "configure")) {
+        for (String action : List.of("describe", "configure", "discover")) {
             var spec = command(
                     root,
                     "slicer backend " + action,
@@ -125,6 +125,11 @@ final class PreferenceCommands {
                             catalog.withDirectory(value(s, "--plugin-dir"));
                             String id = value(s, "--id");
                             var backend = catalog.require(id);
+                            if (action.equals("discover")) {
+                                backend.discoverExecutables(new dev.voxelbrew.api.model.printing.Cancellation())
+                                        .forEach(s.commandLine().getOut()::println);
+                                return 0;
+                            }
                             var saved = configuration.section("slicer", id);
                             if (action.equals("configure")) {
                                 var overrides = new LinkedHashMap<String, String>();

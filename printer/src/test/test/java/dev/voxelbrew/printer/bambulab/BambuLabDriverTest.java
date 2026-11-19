@@ -6,8 +6,13 @@ import dev.voxelbrew.api.model.printing.PrintArtifact;
 import dev.voxelbrew.api.printer.driver.*;
 import dev.voxelbrew.printer.internal.*;
 import java.io.IOException;
+import java.net.ConnectException;
+import java.net.NoRouteToHostException;
+import java.net.SocketTimeoutException;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.logging.*;
+import javax.net.ssl.SSLHandshakeException;
 import org.junit.jupiter.api.Test;
 
 class BambuLabDriverTest {
@@ -67,6 +72,47 @@ class BambuLabDriverTest {
         assertThat(status.detail()).contains("Cannot read", "Monitoring unavailable");
         assertThat(status.canStart()).isFalse();
         assertThat(transport.calls).containsExactly("status", "close");
+    }
+
+    @Test
+    void wrappedNetworkFailuresLogAtDebugLevelAndTlsFailuresWarn() {
+        var logger = Logger.getLogger(BambuLabDriver.class.getName());
+        var previousLevel = logger.getLevel();
+        var records = new ArrayList<LogRecord>();
+        var capture = new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+                records.add(record);
+            }
+
+            @Override
+            public void flush() {}
+
+            @Override
+            public void close() {}
+        };
+        logger.setLevel(Level.FINE);
+        logger.addHandler(capture);
+        try {
+            for (var cause : List.of(
+                    new ConnectException(),
+                    new NoRouteToHostException(),
+                    new SocketTimeoutException(),
+                    new SSLHandshakeException("Certificate rejected"))) {
+                var driver = new BambuLabDriver(configuration -> {
+                    throw new IOException("Cannot connect to Bambu device", new IllegalStateException(cause));
+                });
+                var status = driver.readPrinterStatus(config());
+                assertThat(status.state()).isEqualTo(DriverStatus.State.ERROR);
+                assertThat(status.canStart()).isFalse();
+            }
+            assertThat(records)
+                    .extracting(LogRecord::getLevel)
+                    .containsExactly(Level.FINE, Level.FINE, Level.FINE, Level.WARNING);
+        } finally {
+            logger.removeHandler(capture);
+            logger.setLevel(previousLevel);
+        }
     }
 
     @Test

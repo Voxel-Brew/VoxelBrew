@@ -31,6 +31,8 @@ import lombok.RequiredArgsConstructor;
 /** Renders exporter-owned component trees on the JavaFX application thread. */
 @RequiredArgsConstructor
 public final class DesktopExportWindow implements ExportWindow {
+    private record PathAction(String inputId, String label, Supplier<Optional<Path>> selectPath) {}
+
     private record InputBinding(Supplier<String> value, Node control, Label caption, Label message) {
         void display(String error) {
             if (error == null) {
@@ -57,6 +59,7 @@ public final class DesktopExportWindow implements ExportWindow {
     private String confirmLabel;
     private String inputPrefix = "export-";
     private Function<String, String> sourceCaption;
+    private PathAction pathAction;
 
     public DesktopExportWindow interaction(String label, String prefix) {
         confirmLabel = label;
@@ -66,6 +69,11 @@ public final class DesktopExportWindow implements ExportWindow {
 
     DesktopExportWindow sourceCaption(Function<String, String> caption) {
         sourceCaption = caption;
+        return this;
+    }
+
+    DesktopExportWindow pathAction(String inputId, String label, Supplier<Optional<Path>> selectPath) {
+        pathAction = new PathAction(inputId, label, selectPath);
         return this;
     }
 
@@ -252,14 +260,9 @@ public final class DesktopExportWindow implements ExportWindow {
                 var chosen = chooser.showOpenDialog(owner);
                 if (chosen != null) path.setText(chosen.toString());
             });
-            return bind(
-                    inputs,
-                    source.id(),
-                    path::getText,
-                    path,
-                    field(caption, Dialogs.pathRow(path, browse)),
-                    path.textProperty(),
-                    onChange);
+            var row = Dialogs.pathRow(path, browse);
+            addPathAction(source.id(), path, row);
+            return bind(inputs, source.id(), path::getText, path, field(caption, row), path.textProperty(), onChange);
         }
         if (component instanceof FileDestination destination) {
             var path = new javafx.scene.control.TextField();
@@ -315,12 +318,19 @@ public final class DesktopExportWindow implements ExportWindow {
             var input = new javafx.scene.control.TextField(field.value());
             input.setId(inputPrefix + field.id().replace('.', '-'));
             input.setMaxWidth(Double.MAX_VALUE);
+            Node control = input;
+            if (pathAction != null && pathAction.inputId().equals(field.id())) {
+                var row = new HBox(8, input);
+                HBox.setHgrow(input, Priority.ALWAYS);
+                addPathAction(field.id(), input, row);
+                control = row;
+            }
             return bind(
                     inputs,
                     field.id(),
                     input::getText,
                     input,
-                    field(field.label(), input),
+                    field(field.label(), control),
                     input.textProperty(),
                     onChange);
         }
@@ -403,6 +413,15 @@ public final class DesktopExportWindow implements ExportWindow {
         }
         throw new UnsupportedOperationException(
                 "Unsupported export component: " + component.getClass().getName());
+    }
+
+    private void addPathAction(String id, TextField input, HBox row) {
+        if (pathAction == null || !pathAction.inputId().equals(id)) return;
+        var action = new Button(pathAction.label());
+        action.setId(inputPrefix + id + "-discover");
+        action.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
+        action.setOnAction(event -> pathAction.selectPath().get().ifPresent(path -> input.setText(path.toString())));
+        row.getChildren().add(action);
     }
 
     private static VBox field(String label, Node input) {

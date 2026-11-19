@@ -5,6 +5,9 @@ import dev.voxelbrew.api.printer.driver.*;
 import dev.voxelbrew.printer.internal.JobRejectedException;
 import dev.voxelbrew.printer.internal.TransportFactory;
 import java.io.IOException;
+import java.net.ConnectException;
+import java.net.NoRouteToHostException;
+import java.net.http.HttpConnectTimeoutException;
 import java.nio.file.*;
 import java.util.*;
 import lombok.extern.slf4j.Slf4j;
@@ -53,7 +56,13 @@ public final class MoonrakerDriver implements Driver {
         try (var session = transports.open(config)) {
             return session.status();
         } catch (IOException | RuntimeException failure) {
-            log.warn("Cannot read Moonraker printer status", failure);
+            if (failure instanceof ConnectException
+                    || failure instanceof NoRouteToHostException
+                    || failure instanceof HttpConnectTimeoutException) {
+                log.debug("Cannot connect to Moonraker for printer status", failure);
+            } else {
+                log.warn("Cannot read Moonraker printer status", failure);
+            }
             return new DriverStatus(
                     DriverStatus.State.ERROR,
                     "",

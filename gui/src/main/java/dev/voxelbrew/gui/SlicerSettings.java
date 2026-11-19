@@ -9,6 +9,7 @@ import dev.voxelbrew.util.config.UserConfiguration;
 import dev.voxelbrew.util.i18n.Translations;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutorService;
@@ -162,6 +163,7 @@ final class SlicerSettings {
         return new DesktopExportWindow(owner, null, text)
                 .interaction(text.text("slicer.installation.testSave"), "slicer-input-")
                 .sourceCaption(id -> text.textOrDefault("slicer.input." + id, text.text("import.source")))
+                .pathAction("executable", text.text("slicer.discovery.action"), () -> discover(provider, owner, text))
                 .show(
                         text.text("slicer.installation.configure", descriptor.name()),
                         layout,
@@ -178,6 +180,51 @@ final class SlicerSettings {
                         values -> saveCheckedInstallation(provider, existing, values, owner, text),
                         initial,
                         false);
+    }
+
+    private Optional<Path> discover(SlicerProvider provider, Window owner, Translations text) {
+        var dialog = new Dialog<Path>();
+        dialog.setTitle(
+                text.text("slicer.discovery.title", provider.descriptor().name()));
+        dialog.getDialogPane().setPrefWidth(640);
+        var use = new ButtonType(text.text("slicer.discovery.select"), ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(use, ButtonType.CANCEL);
+        var candidates = new ListView<Path>();
+        candidates.setId("slicer-discovered-executables");
+        candidates.setPrefHeight(175);
+        var status = new Label(text.text("slicer.discovery.searching"));
+        status.setWrapText(true);
+        candidates.setPlaceholder(status);
+        var choose = dialog.getDialogPane().lookupButton(use);
+        choose.setId("slicer-use-executable");
+        choose.disableProperty()
+                .bind(candidates.getSelectionModel().selectedItemProperty().isNull());
+        dialog.setResultConverter(
+                button -> button == use ? candidates.getSelectionModel().getSelectedItem() : null);
+        dialog.getDialogPane().setContent(candidates);
+        var cancellation = new Cancellation();
+        worker.execute(() -> {
+            try {
+                var found = List.copyOf(provider.discoverExecutables(cancellation));
+                Platform.runLater(() -> {
+                    if (cancellation.cancelled()) return;
+                    status.setText(text.text("slicer.discovery.empty"));
+                    candidates.getItems().setAll(found);
+                    candidates.getSelectionModel().selectFirst();
+                });
+            } catch (Exception | LinkageError failure) {
+                Platform.runLater(() -> {
+                    if (!cancellation.cancelled())
+                        status.setText(text.text(
+                                "slicer.discovery.failed", Objects.toString(failure.getMessage(), failure.toString())));
+                });
+            }
+        });
+        try {
+            return Dialogs.show(dialog, owner, text);
+        } finally {
+            cancellation.cancel();
+        }
     }
 
     private SlicerInstallation saveCheckedInstallation(

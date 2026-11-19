@@ -2244,7 +2244,19 @@ class WorkbenchUiTest {
         assertSlicerInstallationRejected("missing-voxelbrew-test-slicer.exe");
         assertThat(store.load()).allMatch(dev.voxelbrew.slicer.SlicerInstallation::bundled);
         String executable = PrusaSlicerBackend.defaultExecutable().toString();
-        text("slicer-input-executable", executable);
+        click("slicer-input-executable-discover");
+        long discoveryDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (fx(() -> node("#slicer-use-executable").isDisabled()) && System.nanoTime() < discoveryDeadline)
+            Thread.sleep(25);
+        assertThat(fx(() -> node("#slicer-use-executable").isDisabled())).isFalse();
+        String candidate = fx(() -> ((ListView<?>) node("#slicer-discovered-executables"))
+                .getSelectionModel()
+                .getSelectedItem()
+                .toString());
+        click("slicer-use-executable");
+        assertThat(fx(() -> ((TextField) node("#slicer-input-executable")).getText()))
+                .isEqualTo(candidate);
+        assertThat(store.load()).allMatch(dev.voxelbrew.slicer.SlicerInstallation::bundled);
         saveSlicerInstallation("Prusa first");
         assertThat(store.load())
                 .filteredOn(installation -> !installation.bundled())

@@ -106,6 +106,11 @@ custom installations alongside the bundled PrusaSlicer and OrcaSlicer entries.
 The bundled entries have stable IDs and read-only settings. The document remembers
 the selected installation ID.
 
+Use **Discover** beside the executable field to list candidates for the selected provider.
+Built-in providers search the command path and common installation locations on the current
+platform. Selecting a result fills the field. **Test and save** verifies the complete setup.
+Use `slicer backend discover --id prusa-slicer` to list candidates from the CLI.
+
 The CLI uses the named installation selected in the document. For documents with
 only a provider ID, use `slicer backend configure` to set provider defaults. A slice command can
 override input IDs with repeatable `--slicer-option key=value` values. `--slicer`

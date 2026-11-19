@@ -34,7 +34,7 @@ class PrinterPaneTest {
             throws Exception {
         var artifact = PrintArtifact.of("gcode.3mf", new byte[] {0, 1, 2, 3}, Map.of("target_kind", "profile"));
         var path = directory.resolve("job.gcode.3mf");
-        PrinterPane.saveArtifact(path, artifact, List.of("preview only"));
+        dev.voxelbrew.slicer.SliceService.save(artifact, path, false);
         assertThat(java.nio.file.Files.readAllBytes(path)).isEqualTo(artifact.bytes());
     }
 

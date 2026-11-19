@@ -1,16 +1,17 @@
 package dev.voxelbrew.slicer.prusa;
 
 import dev.voxelbrew.api.model.printing.*;
-import dev.voxelbrew.api.slicer.SlicerBackend;
+import dev.voxelbrew.api.slicer.SlicerException;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.exporter.printing.PrusaConfiguration;
 import dev.voxelbrew.slicer.internal.ProcessRunner;
+import dev.voxelbrew.slicer.internal.ProcessSlicer;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 
-public final class PrusaSlicerBackend implements SlicerBackend {
+public final class PrusaSlicerBackend implements ProcessSlicer {
     private final Map<String, String> configuration;
 
     public PrusaSlicerBackend() {
@@ -27,7 +28,7 @@ public final class PrusaSlicerBackend implements SlicerBackend {
     }
 
     @Override
-    public SlicerBackend configure(Map<String, String> options) {
+    public ProcessSlicer configure(Map<String, String> options) {
         if (!configurationOptions().keySet().containsAll(options.keySet()))
             throw new IllegalArgumentException("Unknown PrusaSlicer option");
         var merged = new TreeMap<>(configuration);
@@ -51,22 +52,23 @@ public final class PrusaSlicerBackend implements SlicerBackend {
 
     @Override
     public Descriptor descriptor() {
-        return new Descriptor("prusa-slicer", "PrusaSlicer", API_VERSION, VERSION, CAPABILITIES, Set.of("gcode"));
+        return new Descriptor("prusa-slicer", "PrusaSlicer", CAPABILITIES, Set.of("gcode"));
     }
 
     @Override
-    public Probe probe(Path executable, Cancellation cancellation) throws IOException {
+    public Probe probe(Path executable, Cancellation cancellation) throws IOException, SlicerException {
         String profile = configuration.getOrDefault("profile", "");
         if (!profile.isBlank() && !Files.isReadable(Path.of(profile)))
-            throw new IOException("Cannot read PrusaSlicer profile: " + profile);
+            throw new SlicerException.Configuration("Cannot read PrusaSlicer profile: " + profile);
         String help = ProcessRunner.run(List.of(executable.toString(), "--help"), null, cancellation, line -> {});
         if (!help.matches("(?s).*PrusaSlicer-2\\.7\\.2(?:\\+|\\s).*"))
-            throw new IOException("Expected PrusaSlicer "
+            throw new SlicerException.Configuration("Expected PrusaSlicer "
                     + VERSION
                     + "; executable reported: "
                     + help.lines().findFirst().orElse("no version"));
         for (var flag : List.of("--export-gcode", "--dont-arrange", "--no-ensure-on-bed", "--load"))
-            if (!help.contains(flag)) throw new IOException("Slicer is missing required capability " + flag);
+            if (!help.contains(flag))
+                throw new SlicerException.Configuration("Slicer is missing required capability " + flag);
         return new Probe(help.lines().findFirst().orElseThrow(), CAPABILITIES);
     }
 
@@ -76,15 +78,15 @@ public final class PrusaSlicerBackend implements SlicerBackend {
     }
 
     @Override
-    public RunResult slice(Request request) throws IOException {
+    public RunResult slice(Request request) throws IOException, SlicerException {
         var profile = request.model().profile();
         if (!Set.of("PLA", "PETG").contains(profile.material().id()))
-            throw new IOException(
+            throw new SlicerException.UnsupportedInput(
                     "Unsupported material profile: " + profile.material().id());
         if ((!profile.printer().firmware().equals("marlin2")
                         && !profile.printer().firmware().equals("vendor"))
                 || !profile.printer().outputFormat().equals("gcode"))
-            throw new IOException(
+            throw new SlicerException.UnsupportedInput(
                     "Unsupported printer/output pairing; this backend requires Marlin 2 or vendor hardware with generic text G-code");
         Path project = request.input(), config = request.workingDirectory().resolve("process.ini");
         Files.writeString(config, PrusaConfiguration.ini(request.model()), StandardCharsets.UTF_8);

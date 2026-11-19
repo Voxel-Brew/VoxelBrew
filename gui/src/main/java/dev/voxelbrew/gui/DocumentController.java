@@ -367,7 +367,10 @@ public final class DocumentController implements AutoCloseable {
         onChanged.run();
     }
 
-    void printArtifacts(java.util.Map<String, dev.voxelbrew.api.model.printing.PrintArtifact> artifacts) {
+    void attachPrintJobs(
+            java.util.Map<String, java.util.List<String>> jobs,
+            java.util.Map<String, dev.voxelbrew.api.model.printing.PrintArtifact> artifacts) {
+        session.setGcode(jobs);
         session.setPrintArtifacts(artifacts);
         onChanged.run();
     }

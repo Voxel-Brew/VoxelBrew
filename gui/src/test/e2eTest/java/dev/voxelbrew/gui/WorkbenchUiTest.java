@@ -2215,70 +2215,61 @@ class WorkbenchUiTest {
     }
 
     @Test
-    void slicerMenuPersistsSeparateProviderSettingsAndDiscardsUnsavedEdits() throws Exception {
+    void topMenuSavesProviderSettingsAndProcessSelectionSlicesWithoutPrompt() throws Exception {
         ready();
+        openPrepared("plate-5mm.vxb");
+        click("workspace-print");
+        ready();
+        click("print-add");
+        ready();
+        var saved = configuration.section("slicer", "prusa-slicer");
+        String executable = PrusaSlicerBackend.defaultExecutable().toString();
+        String input = "slicer-input-executable";
+
         click("menu-slicer");
-        click("slicer-settings");
         click("slicer-settings-prusa-slicer");
-        text("slicer-option-prusa-slicer-executable", "C:/Slicers/prusa.exe");
-        click("slicer-settings-cura");
-        text("slicer-option-cura-executable", "C:/Slicers/CuraEngine.exe");
-        text("slicer-option-cura-definition", "C:/Slicers/machine.json");
-        text("slicer-option-cura-settings", "C:/Slicers/process.properties");
-        click("slicer-settings-save");
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-        while (fx(() -> node("#slicer-settings-save").isDisabled()) && System.nanoTime() < deadline) Thread.sleep(25);
-        assertThat(fx(() -> ((Label) node("#slicer-settings-status")).getText().contains("saved")))
-                .isTrue();
-        long probeDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
-        while (fx(() -> ((Label) node("#slicer-status-cura")).getText().contains("Checking"))
-                && System.nanoTime() < probeDeadline) Thread.sleep(25);
-        assertThat(fx(() -> ((Label) node("#slicer-status-cura")).getText().contains("Not working")))
-                .isTrue();
-        fx(() -> {
-            var statusPanel = node("#slicer-status-cura").getParent();
-            assertThat(statusPanel.getStyleClass().contains("unavailable")).isTrue();
-            var saveButton = (Button) node("#slicer-settings-save");
-            var cancelButton = (Button) node("#slicer-settings-close");
-            assertThat(cancelButton.getParent()).isSameAs(saveButton.getParent());
-            assertThat(saveButton.isDefaultButton()).isTrue();
-            assertThat(cancelButton.getText()).isEqualTo("Cancel");
-            assertThat(cancelButton
-                            .localToScene(cancelButton.getBoundsInLocal())
-                            .getCenterY())
-                    .isCloseTo(
-                            saveButton
-                                    .localToScene(saveButton.getBoundsInLocal())
-                                    .getCenterY(),
-                            org.assertj.core.data.Offset.offset(1.0));
-            return null;
-        });
-        assertThat(fx(() -> workbench.lookup("#print-slice").isDisabled())).isTrue();
-        assertThat(fx(() -> workbench.lookup("#print-slice-all").isDisabled())).isTrue();
-        assertThat(configuration.section("slicer", "prusa-slicer").get("executable", ""))
-                .isEqualTo("C:/Slicers/prusa.exe");
-        assertThat(configuration.section("slicer", "cura").get("executable", ""))
-                .isEqualTo("C:/Slicers/CuraEngine.exe");
-        assertThat(configuration.section("slicer", "cura").get("definition", ""))
-                .isEqualTo("C:/Slicers/machine.json");
-        assertThat(configuration.section("slicer", "cura").get("settings", ""))
-                .isEqualTo("C:/Slicers/process.properties");
+        text(input, executable);
         fx(() -> {
             Screenshot.save(
-                    stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "slicer-settings.png"));
+                    node("#" + input).getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "slicer-provider-dialog.png"));
             return null;
         });
-        click("slicer-settings-close");
+        click("export-confirm");
+        assertThat(saved.path())
+                .isEqualTo(configuration.path().resolveSibling("slicers").resolve("prusa-slicer.properties"));
+        assertThat(saved.get("executable", "")).isEqualTo(executable);
+
         click("menu-slicer");
-        click("slicer-settings");
         click("slicer-settings-prusa-slicer");
-        assertThat(fx(() -> ((TextField) node("#slicer-option-prusa-slicer-executable")).getText()))
-                .isEqualTo("C:/Slicers/prusa.exe");
-        text("slicer-option-prusa-slicer-executable", "discarded");
+        click(input);
+        assertThat(fx(() -> ((TextField) node("#" + input)).getText())).isEqualTo(executable);
+        text(input, "discarded");
         key(KeyCode.ESCAPE);
-        assertThat(configuration.section("slicer", "prusa-slicer").get("executable", ""))
-                .isEqualTo("C:/Slicers/prusa.exe");
-        assertThat(fx(() -> workbench.controller().dirty())).isFalse();
+        assertThat(saved.get("executable", "")).isEqualTo(executable);
+
+        click("print-tab-process");
+        int prusa = fx(() -> {
+            var backend = (ComboBox<?>) node("#print-backend");
+            assertThat(backend.getItems()).hasSizeGreaterThan(1);
+            assertThat(((dev.voxelbrew.api.slicer.SlicerDescriptor) backend.getValue()).id())
+                    .isEqualTo("prusa-slicer");
+            return backend.getSelectionModel().getSelectedIndex();
+        });
+        choice("print-backend", prusa == 0 ? 1 : 0);
+        ready();
+        assertThat(document().printSetup().backendId()).isNotEqualTo("prusa-slicer");
+        choice("print-backend", prusa);
+        ready();
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+        while (fx(() -> node("#print-slice").isDisabled()) && System.nanoTime() < deadline) Thread.sleep(25);
+        click("print-slice");
+        deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().running()) && System.nanoTime() < deadline)
+            Thread.sleep(25);
+        assertThat(fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()))
+                .isEqualTo(PrintController.State.SUCCEEDED);
+        assertThat(document().printArtifacts().get("plate-1").metadata()).containsEntry("backend", "prusa-slicer");
     }
 
     @Test

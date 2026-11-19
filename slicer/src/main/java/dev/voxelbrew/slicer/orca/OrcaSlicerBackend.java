@@ -2,16 +2,17 @@ package dev.voxelbrew.slicer.orca;
 
 import com.google.gson.*;
 import dev.voxelbrew.api.model.printing.*;
-import dev.voxelbrew.api.slicer.SlicerBackend;
+import dev.voxelbrew.api.slicer.SlicerException;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.slicer.internal.ProcessRunner;
+import dev.voxelbrew.slicer.internal.ProcessSlicer;
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 import java.util.zip.ZipFile;
 
 /** Generates the actual Bambu package with Orca; never manufactures a ZIP around generic G-code. */
-public final class OrcaSlicerBackend implements SlicerBackend {
+public final class OrcaSlicerBackend implements ProcessSlicer {
     private static final Set<Capability> CAPABILITIES =
             Set.of(Capability.AUTOMATIC_SUPPORTS, Capability.BUILD_PLATE_SUPPORTS, Capability.BRIM, Capability.RAFT);
     private final Map<String, String> options;
@@ -26,7 +27,7 @@ public final class OrcaSlicerBackend implements SlicerBackend {
 
     @Override
     public Descriptor descriptor() {
-        return new Descriptor("orca", "OrcaSlicer (Bambu LAN)", API_VERSION, "2.x", CAPABILITIES, Set.of("gcode"));
+        return new Descriptor("orca", "OrcaSlicer (Bambu LAN)", CAPABILITIES, Set.of("gcode"));
     }
 
     @Override
@@ -35,7 +36,7 @@ public final class OrcaSlicerBackend implements SlicerBackend {
     }
 
     @Override
-    public SlicerBackend configure(Map<String, String> values) {
+    public ProcessSlicer configure(Map<String, String> values) {
         if (!configurationOptions().keySet().containsAll(values.keySet()))
             throw new IllegalArgumentException("Unknown OrcaSlicer option");
         var merged = new HashMap<>(options);
@@ -53,15 +54,15 @@ public final class OrcaSlicerBackend implements SlicerBackend {
         return new InputFormat("3mf", "3mf");
     }
 
-    private Path preset(String key) throws IOException {
+    private Path preset(String key) throws SlicerException.Configuration {
         String value = options.getOrDefault(key, "");
         if (value.isBlank() || !Files.isRegularFile(Path.of(value)))
-            throw new IOException("Configure OrcaSlicer " + key + " preset JSON");
+            throw new SlicerException.Configuration("Configure OrcaSlicer " + key + " preset JSON");
         return Path.of(value).toAbsolutePath();
     }
 
     @Override
-    public Probe probe(Path executable, Cancellation cancellation) throws IOException {
+    public Probe probe(Path executable, Cancellation cancellation) throws IOException, SlicerException {
         for (String key : List.of("machine", "process", "filament")) preset(key);
         Path directory = Files.createTempDirectory("voxelbrew-orca-probe-");
         Path settings = directory.resolve("settings.json");
@@ -72,14 +73,14 @@ public final class OrcaSlicerBackend implements SlicerBackend {
                     cancellation,
                     line -> {});
             if (!Files.isRegularFile(settings) || Files.size(settings) > 4 * 1024 * 1024)
-                throw new IOException("Orca CLI did not export settings");
+                throw new SlicerException.Execution("Orca CLI did not export settings");
             JsonObject exported;
             try (var reader = Files.newBufferedReader(settings)) {
                 exported = JsonParser.parseReader(reader).getAsJsonObject();
             }
             if (!exported.has("version")
                     || !"2.5.0".equals(exported.get("version").getAsString()))
-                throw new IOException("Expected qualified OrcaSlicer 2.5.0");
+                throw new SlicerException.Configuration("Expected qualified OrcaSlicer 2.5.0");
             return new Probe("OrcaSlicer 2.5.0", CAPABILITIES);
         } finally {
             List<Path> cleanup;
@@ -91,24 +92,28 @@ public final class OrcaSlicerBackend implements SlicerBackend {
     }
 
     @Override
-    public RunResult slice(Request request) throws IOException {
+    public RunResult slice(Request request) throws IOException, SlicerException {
         if (!request.model().setup().supports().isEmpty())
-            throw new IOException("Orca support volumes are not supported; remove explicit supports before slicing");
+            throw new SlicerException.UnsupportedInput(
+                    "Orca support volumes are not supported; remove explicit supports before slicing");
         JsonObject machine;
         try (var reader = Files.newBufferedReader(preset("machine"))) {
             machine = JsonParser.parseReader(reader).getAsJsonObject();
         }
         if (!machine.has("printer_model") || !machine.has("nozzle_diameter"))
-            throw new IOException("Export a complete Orca machine preset including printer_model and nozzle_diameter");
+            throw new SlicerException.Configuration(
+                    "Export a complete Orca machine preset including printer_model and nozzle_diameter");
         String model = machine.get("printer_model").getAsString();
-        if (!model.startsWith("Bambu Lab ")) throw new IOException("Select a Bambu Lab machine preset");
+        if (!model.startsWith("Bambu Lab "))
+            throw new SlicerException.Configuration("Select a Bambu Lab machine preset");
         var nozzles = machine.getAsJsonArray("nozzle_diameter");
         double nozzle = nozzles.get(0).getAsDouble();
         if (Math.abs(nozzle - request.model().profile().printer().nozzleMm()) > 0.0001)
-            throw new IOException("Orca machine nozzle differs from selected slicer printer");
+            throw new SlicerException.UnsupportedInput("Orca machine nozzle differs from selected slicer printer");
         String target = request.model().profile().printer().id();
         if (!normalize(model).equals(normalize(target)))
-            throw new IOException("Orca machine model differs from selected slicer printer: " + model);
+            throw new SlicerException.UnsupportedInput(
+                    "Orca machine model differs from selected slicer printer: " + model);
         var process = request.model().profile().process();
         var overrides = new LinkedHashMap<String, String>();
         overrides.put("layer-height", Double.toString(process.layerHeight()));
@@ -158,14 +163,15 @@ public final class OrcaSlicerBackend implements SlicerBackend {
         ProcessRunner.run(command, request.workingDirectory(), request.cancellation(), request.diagnostics());
         request.cancellation().check();
         if (!Files.isRegularFile(packageFile) || Files.size(packageFile) > 48L * 1024 * 1024)
-            throw new IOException("Missing or oversized Orca package");
+            throw new SlicerException.InvalidArtifact("Missing or oversized Orca package");
         try (var zip = new ZipFile(packageFile.toFile())) {
             var entry = zip.getEntry("Metadata/plate_1.gcode");
             if (entry == null || entry.getSize() < 1 || entry.getSize() > 64L * 1024 * 1024)
-                throw new IOException("Orca package lacks bounded plate 1 G-code");
+                throw new SlicerException.InvalidArtifact("Orca package lacks bounded plate 1 G-code");
             try (var input = zip.getInputStream(entry)) {
                 byte[] content = input.readNBytes(64 * 1024 * 1024 + 1);
-                if (content.length > 64 * 1024 * 1024) throw new IOException("Oversized packaged G-code");
+                if (content.length > 64 * 1024 * 1024)
+                    throw new SlicerException.InvalidArtifact("Oversized packaged G-code");
                 Files.write(request.output(), content);
             }
         }

@@ -13,7 +13,7 @@ import picocli.CommandLine;
 final class PreferenceCommands {
     private final UserConfiguration configuration;
     private final PrinterProfileCatalog printers;
-    private final SlicerCatalog.Factory slicers;
+    private final java.util.function.Supplier<SlicerProviderRegistry> slicers;
 
     void install(CommandLine root) {
         for (String action : List.of("show", "set", "reset")) {
@@ -121,26 +121,28 @@ final class PreferenceCommands {
                     root,
                     "slicer backend " + action,
                     s -> {
-                        try (var catalog = slicers.open(value(s, "--plugin-dir"))) {
+                        try (var catalog = slicers.get()) {
+                            catalog.withDirectory(value(s, "--plugin-dir"));
                             String id = value(s, "--id");
                             var backend = catalog.require(id);
-                            var options = new TreeMap<>(backend.configurationOptions());
                             var saved = configuration.section("slicer", id);
-                            var stored = saved.read();
-                            options.replaceAll((key, fallback) -> stored.getOrDefault(key, fallback));
                             if (action.equals("configure")) {
+                                var overrides = new LinkedHashMap<String, String>();
                                 for (String setting : (String[]) value(s, "--option")) {
                                     int equals = setting.indexOf('=');
-                                    if (equals < 1 || !options.containsKey(setting.substring(0, equals)))
+                                    if (equals < 1)
                                         throw new IllegalArgumentException("Unknown provider option: " + setting);
-                                    options.put(setting.substring(0, equals), setting.substring(equals + 1));
+                                    overrides.put(setting.substring(0, equals), setting.substring(equals + 1));
                                 }
-                                backend.configure(options);
-                                saved.update(options, Set.of());
+                                var dialog = backend.settingsDialog()
+                                        .orElseThrow(() -> new IllegalArgumentException(
+                                                "Slicer has no persistent settings: " + id));
+                                new CliSlicerWindow(configuration, id, overrides).show(dialog);
                             }
                             s.commandLine().getOut().println(backend.descriptor());
-                            options.forEach(
-                                    (key, val) -> s.commandLine().getOut().println(key + "=" + val));
+                            saved.read()
+                                    .forEach((key, val) ->
+                                            s.commandLine().getOut().println(key + "=" + val));
                         }
                         return 0;
                     },

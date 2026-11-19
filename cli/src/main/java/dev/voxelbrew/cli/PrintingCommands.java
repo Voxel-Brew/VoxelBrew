@@ -4,15 +4,17 @@ import dev.voxelbrew.api.model.*;
 import dev.voxelbrew.api.model.mesh.MeshOptions;
 import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.api.printer.PrinterProfileCatalog;
-import dev.voxelbrew.api.slicer.SlicerCatalog;
-import dev.voxelbrew.api.slicer.Slicing;
+import dev.voxelbrew.api.slicer.SlicerProviderRegistry;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.importer.DocumentSource;
 import dev.voxelbrew.printer.ProfileHardware;
+import dev.voxelbrew.slicer.SliceService;
+import dev.voxelbrew.util.config.UserConfiguration;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Supplier;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import picocli.CommandLine;
@@ -476,10 +478,10 @@ final class PrintingCommands {
     @Command(
             name = "slicers",
             mixinStandardHelpOptions = true,
-            description = "List versioned backend capabilities; unsupported features are not silently substituted.")
+            description = "List installed slicer providers and their implementation versions.")
     @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     static final class Slicers implements Callable<Integer> {
-        private final SlicerCatalog.Factory slicers;
+        private final Supplier<SlicerProviderRegistry> slicers;
 
         @Option(names = "--plugin-dir")
         Path plugins = dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
@@ -490,9 +492,9 @@ final class PrintingCommands {
 
         @Override
         public Integer call() throws Exception {
-            try (var registry = slicers.open(plugins)) {
+            try (var registry = slicers.get()) {
+                registry.withDirectory(plugins);
                 registry.descriptors().forEach(spec.commandLine().getOut()::println);
-                registry.diagnostics().forEach(spec.commandLine().getErr()::println);
             }
             return 0;
         }
@@ -504,23 +506,20 @@ final class PrintingCommands {
             description =
                     "Slice the complete persisted build setup with its explicit profiles; publish text G-code atomically.")
     static final class Slice extends VoxelBrew.FileCommand {
-        private final SlicerCatalog.Factory slicers;
+        private final Supplier<SlicerProviderRegistry> slicers;
         private final dev.voxelbrew.api.printer.PrinterStore printerStore;
-        private final java.util.function.Supplier<dev.voxelbrew.api.exporter.ExporterProviderRegistry> exporters;
+        private final UserConfiguration configuration;
 
         Slice(
                 DocumentSource documents,
                 DocumentSave documentWriter,
-                SlicerCatalog.Factory slicers,
+                Supplier<SlicerProviderRegistry> slicers,
                 dev.voxelbrew.api.printer.PrinterStore printerStore,
-                java.util.function.Supplier<dev.voxelbrew.api.exporter.ExporterProviderRegistry> exporters,
-                Slicing slicing,
-                Path defaultExecutable) {
+                UserConfiguration configuration) {
             super(documents, documentWriter);
             this.slicers = slicers;
             this.printerStore = printerStore;
-            this.exporters = exporters;
-            this.slicing = slicing;
+            this.configuration = configuration;
         }
 
         @Option(names = "--output", description = "Optional output file; directory with --all")
@@ -544,8 +543,6 @@ final class PrintingCommands {
         @Option(names = "--background", description = "Run in the background inside an editing session")
         boolean background;
 
-        private final Slicing slicing;
-
         @Option(names = "--overwrite")
         boolean overwrite;
 
@@ -561,45 +558,7 @@ final class PrintingCommands {
                             .toList()
                     : List.of(plate == null ? original.printSetup().activePlateId() : plate);
             if (ids.isEmpty()) throw new IllegalArgumentException("No nonempty plates to slice");
-            Path destination = output;
-            Path temporary = null;
-            if (destination == null) temporary = java.nio.file.Files.createTempDirectory("voxelbrew-slice-");
-            if (all && destination != null) java.nio.file.Files.createDirectories(destination);
-            try {
-                for (String id : ids) {
-                    var current = session().document();
-                    // Plate selection is a view of the same revision, not a manufacturing edit.
-                    var setup = current.printSetup().selectPlate(id);
-                    var document = new CadDocument(
-                            current.id(),
-                            current.features(),
-                            current.cursor(),
-                            setup,
-                            current.parameters(),
-                            current.bodyStyles(),
-                            current.bodyNames(),
-                            current.featureNames(),
-                            current.gcode(),
-                            current.printArtifacts());
-                    output = temporary != null
-                            ? temporary.resolve(id + ".gcode")
-                            : all ? destination.resolve(id + ".gcode") : destination;
-                    int result = sliceOne(document, original.printSetup().activePlateId());
-                    if (result != 0) return result;
-                }
-                return 0;
-            } finally {
-                output = destination;
-                if (temporary != null) {
-                    try (var files = java.nio.file.Files.list(temporary)) {
-                        for (var path : files.toList()) java.nio.file.Files.deleteIfExists(path);
-                    }
-                    java.nio.file.Files.deleteIfExists(temporary);
-                }
-            }
-        }
 
-        private Integer sliceOne(CadDocument document, String activePlateId) throws Exception {
             var cancellation = new Cancellation();
             var finished = new CountDownLatch(1);
             var shutdown = new Thread(
@@ -613,57 +572,95 @@ final class PrintingCommands {
                     },
                     "voxelbrew-slice-cancel");
             Runtime.getRuntime().addShutdownHook(shutdown);
-            try (var registry = slicers.open(pluginDirectory);
-                    var exportRegistry = exporters.get().withDirectory(pluginDirectory)) {
-                String selectedPrinterId =
-                        document.printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID);
+            try (var registry = slicers.get()) {
+                registry.withDirectory(pluginDirectory);
+                var setup = original.printSetup();
+                var devices =
+                        printerConnection != null || setup.workspaceSettings().containsKey(PrintTarget.PRINTER_ID)
+                                ? printerStore.load().devices()
+                                : List.<dev.voxelbrew.api.printer.Printer>of();
                 if (printerConnection != null) {
-                    var connections = printerStore.load().devices();
-                    var connection = connections.stream()
+                    var connection = devices.stream()
                             .filter(p -> p.name().equalsIgnoreCase(printerConnection.strip()))
                             .findFirst()
                             .orElseThrow(() -> new IllegalArgumentException("Unknown printer: " + printerConnection));
-                    var targetSession = new dev.voxelbrew.engine.model.ModelSession(document);
-                    targetSession.setPrintSetup(document.printSetup()
-                            .withPrinter(ProfileHardware.resolve(connection.profile()))
-                            .withPrintTarget(connection.id()));
-                    document = targetSession.document();
-                    selectedPrinterId = connection.id();
+                    setup = setup.withPrinter(ProfileHardware.resolve(connection.profile()))
+                            .withPrintTarget(connection.id());
                 }
-                var model = dev.voxelbrew.engine.printing.ManufacturingModels.evaluate(
-                        document, MeshOptions.DEFAULT, pluginDirectory);
-                registry.diagnostics().forEach(spec.commandLine().getErr()::println);
-                var result = slicing.slice(
-                        registry.require(model.setup().backendId()).configure(slicerOptions),
-                        document,
-                        model,
-                        exportRegistry,
-                        pluginDirectory,
-                        executable,
-                        output,
+                String target = setup.workspaceSettings().get(PrintTarget.PRINTER_ID);
+                var hardware = PrintProfile.resolve(setup).printer();
+                if (target != null
+                        && devices.stream()
+                                .noneMatch(p -> p.id().equals(target)
+                                        && p.profile().id().equals(hardware.id())
+                                        && Double.compare(p.profile().nozzleDiameter(), hardware.nozzleMm()) == 0)) {
+                    throw new IllegalArgumentException(
+                            "Selected printer connection is unavailable or references another profile");
+                }
+                var provider = registry.require(setup.backendId());
+                var options = new LinkedHashMap<>(slicerOptions);
+                if (executable != null) options.put("executable", executable.toString());
+                var window =
+                        new CliSlicerWindow(configuration, provider.descriptor().id(), options);
+                var results = new LinkedHashMap<String, SliceService.Result>();
+                var jobs = new LinkedHashMap<>(original.gcode());
+                var artifacts = new LinkedHashMap<>(original.printArtifacts());
+                for (String id : ids) {
+                    cancellation.check();
+                    var selected = withSetup(original, setup.selectPlate(id));
+                    var model = ManufacturingModels.evaluate(selected, MeshOptions.DEFAULT, pluginDirectory);
+                    var result = SliceService.slice(
+                            provider,
+                            model,
+                            window,
+                            cancellation,
+                            spec.commandLine().getErr()::println);
+                    if (result.isEmpty()) return 0;
+                    results.put(id, result.get());
+                    jobs.put(id, result.get().job().lines());
+                    artifacts.put(id, result.get().artifact());
+                }
+                var next = withSetup(original, setup).withGcode(jobs).withPrintArtifacts(artifacts);
+                var outputs = new LinkedHashMap<Path, PrintArtifact>();
+                if (output != null) {
+                    if (all) java.nio.file.Files.createDirectories(output);
+                    results.forEach((id, result) -> outputs.put(
+                            all ? output.resolve(id + "." + result.artifact().format()) : output, result.artifact()));
+                }
+                for (var destination : outputs.keySet()) {
+                    if (destination
+                                    .toAbsolutePath()
+                                    .normalize()
+                                    .equals(file.toAbsolutePath().normalize())
+                            || java.nio.file.Files.exists(destination)
+                                    && java.nio.file.Files.exists(file)
+                                    && java.nio.file.Files.isSameFile(destination, file))
+                        throw new IllegalArgumentException("Artifact destination is the document file");
+                }
+                String revision = dev.voxelbrew.engine.persistence.DocumentCodec.fingerprint(original);
+                SliceService.publish(
+                        outputs,
                         overwrite,
                         cancellation,
-                        spec.commandLine().getErr()::println,
-                        Slicing.DIRECT);
-                describe(result.job(), spec.commandLine().getOut());
-                var jobs = new java.util.HashMap<>(document.gcode());
-                jobs.put(document.printSetup().activePlateId(), result.job().lines());
-                var artifacts = new java.util.HashMap<>(document.printArtifacts());
-                artifacts.remove(document.printSetup().activePlateId());
-                var targetSettings =
-                        new java.util.HashMap<>(document.printSetup().workspaceSettings());
-                if (selectedPrinterId == null) targetSettings.remove(PrintTarget.PRINTER_ID);
-                else targetSettings.put(PrintTarget.PRINTER_ID, selectedPrinterId);
-                var targetSetup = document.printSetup().withWorkspaceSettings(targetSettings);
-                artifacts.put(
-                        document.printSetup().activePlateId(),
-                        PrintTarget.attach(result.artifact(), result.job().lines(), targetSetup));
-                documentWriter.save(
-                        WorkspaceCommands.selectPlate(
-                                document.withGcode(jobs).withPrintArtifacts(artifacts), activePlateId),
-                        file,
-                        true);
-                spec.commandLine().getOut().println("Job: " + result.output());
+                        () -> {
+                            var live = documents.load(file);
+                            if (!revision.equals(dev.voxelbrew.engine.persistence.DocumentCodec.fingerprint(live))
+                                    || !Objects.equals(
+                                            original.printSetup()
+                                                    .workspaceSettings()
+                                                    .get(PrintTarget.PRINTER_ID),
+                                            live.printSetup()
+                                                    .workspaceSettings()
+                                                    .get(PrintTarget.PRINTER_ID))
+                                    || !original.printArtifacts().equals(live.printArtifacts())
+                                    || !original.gcode().equals(live.gcode()))
+                                throw new SliceService.OutdatedException();
+                        },
+                        () -> documentWriter.save(next, file, true));
+                results.values()
+                        .forEach(result ->
+                                describe(result.job(), spec.commandLine().getOut()));
+                outputs.keySet().forEach(path -> spec.commandLine().getOut().println("Job: " + path));
                 return 0;
             } finally {
                 finished.countDown();
@@ -673,6 +670,20 @@ final class PrintingCommands {
                     /* cancellation hook is running */
                 }
             }
+        }
+
+        private static CadDocument withSetup(CadDocument document, PrintSetup setup) {
+            return new CadDocument(
+                    document.id(),
+                    document.features(),
+                    document.cursor(),
+                    setup,
+                    document.parameters(),
+                    document.bodyStyles(),
+                    document.bodyNames(),
+                    document.featureNames(),
+                    document.gcode(),
+                    document.printArtifacts());
         }
     }
 

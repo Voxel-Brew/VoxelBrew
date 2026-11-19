@@ -21,6 +21,7 @@ final class UiHelp {
         String key = id;
         if (id.startsWith("print-remove-plate-")) return translations.text("help.print-remove-plate");
         if (id.startsWith("choose-plane-")) return translations.text("help.choose-plane");
+        if (id.startsWith("slicer-settings-")) return translations.text("help.slicer-settings");
         if (id.startsWith("view-") && !id.startsWith("view-cube-")) return translations.text("help.standard-view");
         if (id.equals("menu-undo") || id.equals("menu-redo") || id.equals("menu-parameters") || id.equals("menu-fit"))
             key = id.substring(5);

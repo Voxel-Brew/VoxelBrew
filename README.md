@@ -17,7 +17,7 @@ modeling approachable for beginners while giving experienced designers room to
 experiment and extend their workflow.
 
 Create editable models in the desktop application, export them for printing, or
-use an integrated slicer backend to turn your designs into printer-ready jobs.
+use an integrated slicer provider to turn your designs into printer-ready jobs.
 A headless command-line interface also supports modeling and automation.
 
 VoxelBrew supports **Windows, macOS, and Linux**.
@@ -35,7 +35,7 @@ VoxelBrew supports **Windows, macOS, and Linux**.
   inspect toolpaths before printing.
 - **Desktop and command line:** work visually in the JavaFX desktop application
   or automate operations through the headless CLI.
-- **Extensible workflows:** add importers, exporters, slicer backends, and printer
+- **Extensible workflows:** add importers, exporters, slicer providers, and printer
   integrations through public APIs.
 
 ### Screenshots
@@ -88,8 +88,12 @@ repositories under the MIT license:
 | [Model](https://github.com/Voxel-Brew/api-model)     | Shared model values and validation helpers.        |
 | [Import](https://github.com/Voxel-Brew/api-import)   | File import contracts and provider interfaces.     |
 | [Export](https://github.com/Voxel-Brew/api-export)   | File export contracts and provider interfaces.     |
-| [Slicer](https://github.com/Voxel-Brew/api-slicer)   | Slicer backend and job execution contracts.        |
+| [Slicer](https://github.com/Voxel-Brew/api-slicer)   | Slicer provider and plate operation contracts.     |
 | [Printer](https://github.com/Voxel-Brew/api-printer) | Physical printer and device integration contracts. |
+
+The slicer API now uses provider discovery and operation dialogs. Existing slicer plugins
+must migrate their implementations and service registrations and recompile against the
+matching API. See the [developer guide](docs/DEV_README.md#develop-a-slicer-plugin).
 
 ## License
 

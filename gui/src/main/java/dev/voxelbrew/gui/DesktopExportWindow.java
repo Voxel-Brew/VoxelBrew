@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import javafx.beans.value.ObservableValue;
 import javafx.event.ActionEvent;
@@ -79,25 +80,50 @@ public final class DesktopExportWindow implements ExportWindow {
     Embedded embed(dev.voxelbrew.api.printer.driver.DriverGui gui, Map<String, String> initial, Runnable changed) {
         var inputs = new LinkedHashMap<String, InputBinding>();
         var node = render(gui.layout(), inputs, changed);
+        applyInitial(inputs, initial);
+        return new Embedded(node, () -> readValues(inputs));
+    }
+
+    private static void applyInitial(Map<String, InputBinding> inputs, Map<String, String> initial) {
         initial.forEach((id, value) -> {
             var binding = inputs.get(id);
             if (binding == null) return;
-            if (binding.control() instanceof TextInputControl input) input.setText(value);
-            else if (binding.control() instanceof CheckBox input) input.setSelected(Boolean.parseBoolean(value));
-            else if (binding.control() instanceof ComboBox<?> input)
-                input.getSelectionModel().select(input.getItems().indexOf(value));
+            switch (binding.control()) {
+                case TextInputControl input -> input.setText(value);
+                case CheckBox input -> input.setSelected(Boolean.parseBoolean(value));
+                case ComboBox<?> input ->
+                    input.getSelectionModel().select(input.getItems().indexOf(value));
+                case Slider input -> input.setValue(Double.parseDouble(value));
+                case VBox group ->
+                    group.getChildren().stream()
+                            .filter(RadioButton.class::isInstance)
+                            .map(RadioButton.class::cast)
+                            .filter(button -> Objects.equals(button.getUserData(), value))
+                            .findFirst()
+                            .ifPresent(button -> button.setSelected(true));
+                default -> {}
+            }
         });
-        return new Embedded(node, () -> readValues(inputs));
     }
 
     @Override
     public <R> Optional<R> show(ExportDialog<R> request) {
         Objects.requireNonNull(request, "request");
+        return show(request.title(), request.layout(), request::validate, request::buildSettings, Map.of(), true);
+    }
+
+    <R> Optional<R> show(
+            String title,
+            dev.voxelbrew.api.model.vui.Layout layout,
+            Function<Map<String, String>, Map<String, String>> validate,
+            Function<Map<String, String>, R> buildSettings,
+            Map<String, String> initial,
+            boolean confirmOverwrite) {
         if (!javafx.application.Platform.isFxApplicationThread())
             throw new IllegalStateException("Export dialogs must be shown on the JavaFX application thread");
         var inputs = new LinkedHashMap<String, InputBinding>();
         var dialog = new Dialog<R>();
-        dialog.setTitle(exporterVersion == null ? request.title() : request.title() + " (" + exporterVersion + ")");
+        dialog.setTitle(exporterVersion == null ? title : title + " (" + exporterVersion + ")");
         dialog.setResizable(true);
         dialog.getDialogPane().setPrefWidth(540);
         var error = new Label();
@@ -108,9 +134,10 @@ public final class DesktopExportWindow implements ExportWindow {
         error.managedProperty().bind(error.visibleProperty());
         var attempted = new boolean[1];
         Runnable revalidate = () -> {
-            if (attempted[0]) displayErrors(inputs, request.validate(readValues(inputs)), error);
+            if (attempted[0]) displayErrors(inputs, validate.apply(readValues(inputs)), error);
         };
-        var content = new VBox(14, render(request.layout(), inputs, revalidate));
+        var content = new VBox(14, render(layout, inputs, revalidate));
+        applyInitial(inputs, initial);
         content.getStyleClass().add("export-dialog-content");
         content.getChildren().add(error);
         double maxBodyHeight = Math.max(160, owner.getScene().getHeight() - 180);
@@ -134,7 +161,7 @@ public final class DesktopExportWindow implements ExportWindow {
             try {
                 attempted[0] = true;
                 var selected = readValues(inputs);
-                var errors = request.validate(selected);
+                var errors = validate.apply(selected);
                 displayErrors(inputs, errors, error);
                 if (!errors.isEmpty()) {
                     for (var entry : inputs.entrySet()) {
@@ -146,7 +173,8 @@ public final class DesktopExportWindow implements ExportWindow {
                     event.consume();
                     return;
                 }
-                if (selected.containsKey("destination")
+                if (confirmOverwrite
+                        && selected.containsKey("destination")
                         && selected.containsKey("overwrite")
                         && !Boolean.parseBoolean(selected.get("overwrite"))
                         && Files.exists(Path.of(selected.get("destination")))) {
@@ -161,7 +189,7 @@ public final class DesktopExportWindow implements ExportWindow {
                     }
                     selected.put("overwrite", "true");
                 }
-                accepted.set(Objects.requireNonNull(request.buildSettings(selected), "export settings"));
+                accepted.set(Objects.requireNonNull(buildSettings.apply(selected), "export settings"));
             } catch (RuntimeException failure) {
                 error.setText(Objects.toString(failure.getMessage(), failure.toString()));
                 error.setVisible(true);
@@ -190,6 +218,29 @@ public final class DesktopExportWindow implements ExportWindow {
         }
         if (component instanceof dev.voxelbrew.api.model.vui.Label label) return new Label(label.text());
         if (component instanceof dev.voxelbrew.api.model.vui.Separator) return new Separator();
+        if (component instanceof dev.voxelbrew.api.model.vui.FileSource source) {
+            var path = new javafx.scene.control.TextField(
+                    source.defaultPath() == null ? "" : source.defaultPath().toString());
+            path.setId(inputPrefix + source.id());
+            var caption = translations.text("import.source");
+            var browse = new Button(translations.text("gui.browse"));
+            browse.setOnAction(event -> {
+                var chooser = new FileChooser();
+                chooser.setTitle(caption);
+                chooser.getExtensionFilters()
+                        .add(new FileChooser.ExtensionFilter("*." + source.extension(), "*." + source.extension()));
+                var chosen = chooser.showOpenDialog(owner);
+                if (chosen != null) path.setText(chosen.toString());
+            });
+            return bind(
+                    inputs,
+                    source.id(),
+                    path::getText,
+                    path,
+                    field(caption, Dialogs.pathRow(path, browse)),
+                    path.textProperty(),
+                    onChange);
+        }
         if (component instanceof FileDestination destination) {
             var path = new javafx.scene.control.TextField();
             path.setId("export-path");

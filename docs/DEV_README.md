@@ -1,4 +1,4 @@
-# Develop printer integrations
+# Develop printer and slicer integrations
 
 Start with the [driver-authoring walkthrough](https://github.com/Voxel-Brew/api-printer/blob/f789baea542ac8daedc1e9d6852a69050ada2cbc/docs/DEV_README.md).
 It includes a complete Java 21 driver and Virtual UI form, Gradle setup, service
@@ -30,7 +30,8 @@ flowchart LR
     PI --> PA
     PI --> NET[Vendor transports]
     PI --> STORE[Printer JSON / profiles / images]
-    SA[slicer-api] --> PA
+    GUI --> SI[slicer-impl host services]
+    SI --> SA[slicer-api]
     SA --> MA[model-api]
     PA --> MA
 ```
@@ -87,12 +88,41 @@ Slicing offers saved printers by name and standalone profiles. Profile-only jobs
 expose artifact saving. Physical jobs expose submission and monitoring for the exact
 saved printer. Missing printers or drivers require explicit reconfiguration.
 
+## Develop a slicer plugin
+
+The provider-based slicer API is a breaking replacement. Recompile plugins against the
+matching API and register the provider under
+`META-INF/services/dev.voxelbrew.api.slicer.SlicerProvider`. The slicer developer guide
+includes a complete provider, Virtual UI settings, artifact provenance, and the host lifecycle.
+
+The host chooses the plate and printer target, resolves hardware, and evaluates geometry.
+Each provider operation receives one detached manufacturing model and collects settings
+before conversion. Open the **Slicer** menu, select a provider, and save its settings.
+VoxelBrew stores the inputs in `~/.voxelbrew/slicers/<provider-id>.properties`.
+Pick the slicer under **Process** for each print setup. Slicing uses the saved settings
+and dialog defaults automatically.
+
+The CLI uses the same settings with `slicer backend configure`. A slice command can
+override input IDs with repeatable `--slicer-option key=value` values. `--slicer`
+supplies the built-in executable field. Invocation values take priority over saved
+inputs and dialog defaults.
+
+Discovery lists descriptors without probing the environment. Executable and capability
+checks occur during operations. Built-in providers serialize the evaluated plate to
+private files with exporter implementation writers, invoke the executable, and return
+a portable artifact. The host independently inspects its contents and provenance before
+attaching it. Explicit output uses atomic publication. A multi-plate command evaluates
+and validates every job before attaching results.
+
 ## Build and verify in the workspace
 
-Use Java 21 and the checked-in wrapper. From the workspace root on Windows:
+Use Java 21 and the checked-in wrapper. Launch the desktop from the workspace
+root on Windows with `.\gradlew.bat :voxelbrew:gui:run`. For verification, run
+the following tasks from the same directory.
 
 ```powershell
-.\gradlew.bat :printer:check
+.\gradlew.bat :printer:check :slicer:check
+.\gradlew.bat :voxelbrew:slicer-impl:test :voxelbrew:slicer-impl:integrationTest
 .\gradlew.bat :voxelbrew:printer-impl:test
 .\gradlew.bat :voxelbrew:gui:test :voxelbrew:cli:test
 .\gradlew.bat :voxelbrew:gui:compileE2eTestJava :voxelbrew:cli:compileIntegrationTestJava

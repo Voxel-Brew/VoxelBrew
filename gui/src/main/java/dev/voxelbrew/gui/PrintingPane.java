@@ -7,13 +7,12 @@ import dev.voxelbrew.api.model.mesh.*;
 import dev.voxelbrew.api.model.parameters.*;
 import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.api.printer.PrinterProfileCatalog;
-import dev.voxelbrew.api.slicer.SlicerBackend;
-import dev.voxelbrew.api.slicer.SlicerCatalog;
-import dev.voxelbrew.api.slicer.Slicing;
+import dev.voxelbrew.api.slicer.*;
 import dev.voxelbrew.engine.parameters.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.printer.ProfileHardware;
+import dev.voxelbrew.slicer.SliceService;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
@@ -109,10 +108,8 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     private final javafx.scene.image.ImageView printerImage = new javafx.scene.image.ImageView();
     private final DocumentController document;
     private final PrintController jobs;
-    private final SlicerCatalog slicers;
+    private final SlicerProviderRegistry slicers;
     private final SlicerSettings slicerSettings;
-    private final SlicerAvailability availability;
-    private final SlicerStatusView backendStatus;
     private final ExecutorService validator;
     private final dev.voxelbrew.util.i18n.Translations translations;
     private Future<?> validationTask;
@@ -152,7 +149,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
             materials = new ComboBox<>(),
             supportIds = new ComboBox<>(),
             supportOwners = new ComboBox<>();
-    private final ComboBox<SlicerBackend.Descriptor> backends = new ComboBox<>();
+    private final ComboBox<SlicerDescriptor> backends = new ComboBox<>();
     private final ComboBox<SupportVolume.Role> supportRole = new ComboBox<>();
     private final Map<String, FormulaField> fields = new LinkedHashMap<>();
     private final CheckBox supportsEnabled = new CheckBox();
@@ -182,7 +179,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     private String selectedFaceBody;
     private boolean updating, dark, closed;
     private List<Double> previewLayers = List.of();
-    private Slicing.Result displayed;
+    private SliceService.Result displayed;
 
     PrintingPane(
             PrinterProfileCatalog printers,
@@ -190,14 +187,11 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
             PrinterVisibility printerVisibility,
             DocumentController document,
             PrintController jobs,
-            SlicerCatalog slicers,
+            SlicerProviderRegistry slicers,
             SlicerSettings slicerSettings,
-            SlicerAvailability availability,
             ExporterProviderRegistry exporters,
-            javafx.stage.Stage owner,
             ExecutorService validator,
-            dev.voxelbrew.util.i18n.Translations translations,
-            java.nio.file.Path defaultExecutable) {
+            dev.voxelbrew.util.i18n.Translations translations) {
         this.translations = translations;
         this.printers = printers;
         this.printerRuntime = printerRuntime;
@@ -227,8 +221,6 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         this.jobs = jobs;
         this.slicers = slicers;
         this.slicerSettings = slicerSettings;
-        this.availability = availability;
-        backendStatus = new SlicerStatusView(availability, translations, "print-backend-status");
         this.validator = validator;
         setId("printing-workspace");
         getStyleClass().add("slicer-workspace");
@@ -274,12 +266,12 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         backends.getItems().setAll(slicers.descriptors());
         backends.setConverter(new StringConverter<>() {
             @Override
-            public String toString(SlicerBackend.Descriptor descriptor) {
+            public String toString(SlicerDescriptor descriptor) {
                 return descriptor == null ? "" : descriptor.name();
             }
 
             @Override
-            public SlicerBackend.Descriptor fromString(String text) {
+            public SlicerDescriptor fromString(String text) {
                 throw new UnsupportedOperationException();
             }
         });
@@ -361,7 +353,6 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
                 nozzleRow,
                 new Label(translations.text("gui.slicer_backend")),
                 backends,
-                backendStatus,
                 new Label(translations.text("gui.material")),
                 materials,
                 row("print-layer-height", translations.text("gui.layer_height_mm"), "0.2"),
@@ -372,24 +363,6 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
                 row("print-interfaces", translations.text("gui.interface_layers"), "3"),
                 row("print-brim", translations.text("gui.brim_width_mm"), "0"),
                 row("print-raft", translations.text("gui.raft_layers"), "0"));
-
-        backends.valueProperty().addListener((o, a, b) -> backendStatus.showBackend(b == null ? null : b.id()));
-        var capabilities = new Label();
-        capabilities.setWrapText(true);
-        backends.valueProperty()
-                .addListener(
-                        (o, a, b) -> capabilities.setText(
-                                b == null
-                                        ? translations.text("gui.choose_an_available_backend")
-                                        : translations.text(
-                                                        "print.available",
-                                                        b.capabilities().stream()
-                                                                .map(c -> translations.text(
-                                                                        "print.capability." + c.name()))
-                                                                .collect(java.util.stream.Collectors.joining(", ")))
-                                                + translations.text(
-                                                        "gui.unavailable_here_adaptive_layers_organic_supports_painted_regions_multiple_materials_generated_")));
-        process.getChildren().addAll(capabilities, new Label(String.join("\n", slicers.diagnostics())));
 
         supportsEnabled.setId("print-supports-enabled");
         supportsEnabled.setText(translations.text("print.supportsEnabled"));
@@ -739,11 +712,6 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         actions.getStyleClass().add("slicer-status-bar");
         slice.getStyleClass().add("slicer-primary-action");
         slice.setText(translations.text("print.slicePlate"));
-        availability.statuses.addListener(
-                (javafx.collections.MapChangeListener<String, SlicerAvailability.Status>) change -> {
-                    if (!closed) updateJob();
-                });
-        availability.refresh();
         setBottom(new VBox(8, previewControls, actions));
         BorderPane.setMargin(tabs, new Insets(0, 0, 0, 8));
         fields.forEach((key, field) -> workspace.add(key, field::getText, field::setText));
@@ -1143,37 +1111,37 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         var target = setup().workspaceSettings().get(PrintTarget.PRINTER_ID);
         if (target != null && !printTarget.getItems().contains(target))
             throw new IllegalStateException("Selected printer connection is unavailable or references another profile");
-        if (!availability.working(setup().backendId()))
-            throw new IllegalStateException(availability.text(setup().backendId()));
         if (!document.canExport())
             throw new IllegalStateException(
                     translations.text("gui.slice_requires_a_complete_successful_rebuild_at_the_timeline_end"));
-        SlicerBackend backend;
-        try {
-            backend = slicerSettings.backend(setup().backendId());
-        } catch (java.io.IOException failure) {
-            throw new IllegalStateException(translations.text("slicer.settings.failed", failure.getMessage()), failure);
-        }
         applyNozzle();
         applyProcess();
         tabs.getSelectionModel().select(3);
         document.captureSlicerWorkspace();
         var snapshot = document.snapshot().document();
-        try {
-            jobs.startEmbedded(snapshot, backend, allPlates)
-                    .thenAccept(result -> {
-                        var stored = new LinkedHashMap<>(snapshot.gcode());
-                        stored.putAll(jobs.completedGcode());
-                        document.gcode(stored);
-                        var artifacts = new LinkedHashMap<>(snapshot.printArtifacts());
-                        jobs.completedGcode().keySet().forEach(artifacts::remove);
-                        artifacts.putAll(jobs.completedArtifacts());
-                        document.printArtifacts(artifacts);
-                    })
-                    .exceptionally(failure -> null);
-        } catch (java.io.IOException failure) {
-            throw new java.io.UncheckedIOException(failure);
-        }
+        var selectedDevice = target == null ? null : printTargetDevices.get(target);
+        if (selectedDevice != null
+                && Double.compare(
+                                selectedDevice.profile().nozzleDiameter(),
+                                PrintProfile.resolve(snapshot.printSetup())
+                                        .printer()
+                                        .nozzleMm())
+                        != 0) throw new IllegalStateException("Selected nozzle differs from the configured printer");
+        var provider = slicers.require(snapshot.printSetup().backendId());
+        jobs.startEmbedded(
+                        snapshot,
+                        provider,
+                        slicerSettings.window(provider.descriptor().id(), translations),
+                        allPlates)
+                .thenAccept(result -> {
+                    var live = document.snapshot().document();
+                    var stored = new LinkedHashMap<>(live.gcode());
+                    stored.putAll(jobs.completedGcode());
+                    var artifacts = new LinkedHashMap<>(live.printArtifacts());
+                    artifacts.putAll(jobs.completedArtifacts());
+                    document.attachPrintJobs(stored, artifacts);
+                })
+                .exceptionally(failure -> null);
     }
 
     void documentChanged() {
@@ -1340,14 +1308,12 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
                 model == null || model.instances().isEmpty() || !document.canExport() || jobs.running() || orienting;
         autoArrange.setDisable(placementUnavailable);
         orientAll.setDisable(placementUnavailable);
-        backendStatus.showBackend(
-                backends.getValue() == null ? null : backends.getValue().id());
-        slice.setDisable(!availability.working(setup().backendId())
+        slice.setDisable(backends.getValue() == null
                 || !document.canExport()
                 || jobs.running()
                 || validation == null
                 || !validation.valid());
-        sliceAll.setDisable(!availability.working(setup().backendId())
+        sliceAll.setDisable(backends.getValue() == null
                 || !document.canExport()
                 || jobs.running()
                 || setup().plates().stream().allMatch(plate -> plate.instances().isEmpty()));

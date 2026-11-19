@@ -404,7 +404,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             java.util.function.Supplier<dev.voxelbrew.api.importer.ImporterProviderRegistry> importers,
             PrintingPane printing,
             PrinterPane printer,
-            SlicerSettingsDialog slicerSettings,
+            SlicerSettings slicerSettings,
             Appearance appearance,
             Rendering rendering,
             ExecutorService preferencesWorker,
@@ -645,14 +645,18 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                                 "keyboard-shortcuts",
                                 true,
                                 () -> KeyboardShortcuts.show(stage, translations)));
-        var slicerMenu = menu("menu-slicer");
-        slicerMenu
-                .getItems()
-                .add(menuItem(
-                        translations.text("slicer.settings.title"),
-                        "slicer-settings",
-                        false,
-                        () -> slicerSettings.show(stage)));
+        var slicersMenu = menu("menu-slicer");
+        for (var descriptor : resources.slicers.descriptors()) {
+            slicersMenu
+                    .getItems()
+                    .add(menuItem(
+                            descriptor.name(),
+                            "slicer-settings-" + descriptor.id(),
+                            false,
+                            () -> slicerSettings.configure(
+                                    resources.slicers.require(descriptor.id()), stage, translations)));
+        }
+        slicersMenu.setDisable(slicersMenu.getItems().isEmpty());
         var printersMenu = menu("menu-printers");
         printersMenu
                 .getItems()
@@ -684,7 +688,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                                 "printers-visibility",
                                 false,
                                 printing::manageVisiblePrinters));
-        var menuBar = new MenuBar(fileMenu, editMenu, viewMenu, slicerMenu, printersMenu, settingsMenu);
+        var menuBar = new MenuBar(fileMenu, editMenu, viewMenu, slicersMenu, printersMenu, settingsMenu);
         menuBar.setId("main-menu");
         menuBar.disableProperty().bind(disabledProperty());
         menuBar.setMinWidth(Region.USE_PREF_SIZE);

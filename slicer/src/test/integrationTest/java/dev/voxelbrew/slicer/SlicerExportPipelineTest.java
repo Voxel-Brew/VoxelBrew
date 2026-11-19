@@ -2,141 +2,105 @@ package dev.voxelbrew.slicer;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.api.exporter.*;
 import dev.voxelbrew.api.model.mesh.MeshOptions;
 import dev.voxelbrew.api.model.printing.*;
-import dev.voxelbrew.api.slicer.SlicerBackend;
-import dev.voxelbrew.engine.printing.*;
-import dev.voxelbrew.exporter.*;
-import dev.voxelbrew.exporter.printing.*;
+import dev.voxelbrew.engine.printing.ManufacturingModels;
+import dev.voxelbrew.slicer.internal.ProcessSlicer;
+import dev.voxelbrew.slicer.internal.ProcessSlicerProvider;
 import dev.voxelbrew.slicer.prusa.PrusaSlicerBackend;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
-@SuppressWarnings("deprecation")
 class SlicerExportPipelineTest {
-    @TempDir
-    Path directory;
-
     @Test
-    void selectedExporterCreatesInputBeforeBackendRuns() throws Exception {
-        var document = PrintingTest.reference().document();
-        var model = ManufacturingModels.evaluate(document, MeshOptions.DEFAULT);
-        Path output = directory.resolve("preserved.gcode");
-        Files.writeString(output, "original");
-        try (var builtins = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(directory)) {
-            for (String format : List.of("stl", "3mf", "prusa-project")) {
-                var exports = new AtomicInteger();
-                var runs = new AtomicInteger();
-                var original = builtins.require(format);
-                if (!(original instanceof GeometryExporterProvider geometry))
-                    throw new AssertionError("Expected geometry exporter");
-                ExporterProvider<?> tracked =
-                        new GeometryExporterProvider(original.descriptor(), plugins -> (doc, window) -> {
-                            assertThat(doc).isSameAs(document);
-                            exports.incrementAndGet();
-                            return geometry.create().export(doc, window);
-                        });
-                try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(
-                        directory, List.of(tracked))) {
-                    var backend = backend(format, request -> {
-                        assertThat(exports.get()).isEqualTo(1);
-                        assertThat(Files.size(request.input()) > 100).isTrue();
-                        assertThat(request.input().getParent()).isEqualTo(request.workingDirectory());
-                        assertThat(request.model()).isSameAs(model);
-                        runs.incrementAndGet();
-                        throw new IOException("Backend reached after export");
-                    });
-                    var failure = org.assertj.core.api.Assertions.catchThrowableOfType(
-                            () -> SliceService.slice(
-                                    backend,
-                                    document,
-                                    model,
-                                    registry,
-                                    directory,
-                                    Path.of("unused"),
-                                    output,
-                                    true,
-                                    new Cancellation(),
-                                    line -> {},
-                                    dev.voxelbrew.api.slicer.Slicing.DIRECT),
-                            IOException.class);
-                    assertThat(failure.getMessage()).isEqualTo("Backend reached after export");
-                    assertThat(runs.get()).isEqualTo(1);
-                    assertThat(Files.readString(output)).isEqualTo("original");
-                    try (var files = Files.list(directory)) {
-                        assertThat(files.toList()).isEqualTo(List.of(output));
-                    }
-                }
-            }
-        }
-    }
-
-    @Test
-    void failedOrCancelledExportNeverStartsBackendOrPublishesOutput() throws Exception {
-        var document = PrintingTest.reference().document();
-        var model = ManufacturingModels.evaluate(document, MeshOptions.DEFAULT);
-        Path output = directory.resolve("preserved.gcode");
-        Files.writeString(output, "original");
-        for (boolean cancel : List.of(false, true)) {
-            ExporterProvider<?> provider = new GeometryExporterProvider(
-                    new ExporterDescriptor("input", "Failing input", "1.0"), plugins -> (doc, window) -> {
-                        if (window.show(new MeshExportDialog(
-                                        new MeshFormat("input", "Input", List.of("stl"), false, List.of())))
-                                .isEmpty()) return Optional.empty();
-                        if (cancel) return Optional.empty();
-                        throw new IOException("Export failed");
-                    });
-            try (var registry = new dev.voxelbrew.api.exporter.ServiceLoaderExporterProviderRegistry(
-                    directory, List.of(provider))) {
-                var backend = backend("input", request -> {
-                    fail("Backend started before a successful export");
-                    return null;
-                });
-                var failure = org.assertj.core.api.Assertions.catchThrowableOfType(
-                        () -> SliceService.slice(
-                                backend,
-                                document,
-                                model,
-                                registry,
-                                directory,
-                                Path.of("unused"),
-                                output,
-                                true,
-                                new Cancellation(),
-                                line -> {},
-                                dev.voxelbrew.api.slicer.Slicing.DIRECT),
-                        Exception.class);
-                if (cancel) assertThat(failure).isInstanceOf(CancellationException.class);
-                else assertThat(failure).isInstanceOf(IOException.class);
-                assertThat(Files.readString(output)).isEqualTo("original");
-                try (var files = Files.list(directory)) {
-                    assertThat(files.toList()).isEqualTo(List.of(output));
-                }
-            }
-        }
-    }
-
-    @FunctionalInterface
-    interface Run {
-        SlicerBackend.RunResult run(SlicerBackend.Request request) throws IOException;
-    }
-
-    private static SlicerBackend backend(String format, Run run) {
-        return new SlicerBackend() {
+    void simultaneousOperationsOwnSeparateScratchAndCancellation() throws Exception {
+        var model = ManufacturingModels.evaluate(SlicerAcceptanceTest.cube().document(), MeshOptions.DEFAULT);
+        var entered = new CountDownLatch(2);
+        var release = new CountDownLatch(1);
+        var directories = ConcurrentHashMap.<Path>newKeySet();
+        var provider = new ProcessSlicerProvider(() -> new ProcessSlicer() {
             @Override
             public Descriptor descriptor() {
                 return new PrusaSlicerBackend().descriptor();
             }
 
             @Override
+            public Path executable() {
+                return Path.of("unused");
+            }
+
+            @Override
             public Probe probe(Path executable, Cancellation cancellation) {
-                return new Probe("fixture", descriptor().capabilities());
+                return new Probe("concurrent process double", descriptor().capabilities());
+            }
+
+            @Override
+            public RunResult slice(Request request) throws IOException {
+                directories.add(request.workingDirectory());
+                entered.countDown();
+                try {
+                    if (!release.await(10, TimeUnit.SECONDS)) throw new IOException("Process double timed out");
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException(e);
+                }
+                request.cancellation().check();
+                Files.writeString(request.output(), ";TYPE:Perimeter\nG90\nM82\nG1 Z0.2\nG1 X10 E1\n");
+                return new RunResult(Map.of());
+            }
+        }) {};
+        var cancelled = new Cancellation();
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() ->
+                    SliceService.slice(provider, model, SlicerTestSupport.window(Map.of()), cancelled, ignored -> {}));
+            var second = executor.submit(() -> SliceService.slice(
+                    provider, model, SlicerTestSupport.window(Map.of()), new Cancellation(), ignored -> {}));
+            try {
+                assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+                assertThat(directories).hasSize(2);
+                cancelled.cancel();
+            } finally {
+                release.countDown();
+            }
+            assertThatThrownBy(() -> first.get(10, TimeUnit.SECONDS)).hasCauseInstanceOf(CancellationException.class);
+            assertThat(second.get(10, TimeUnit.SECONDS)).isPresent();
+        }
+        for (var directory : directories) assertThat(directory).doesNotExist();
+    }
+
+    @Test
+    void writesEvaluatedInputAndCleansScratchWhenProcessFails() throws Exception {
+        var model = ManufacturingModels.evaluate(SlicerAcceptanceTest.cube().document(), MeshOptions.DEFAULT);
+        for (String format : List.of("stl", "3mf", "prusa-project")) {
+            var work = new AtomicReference<Path>();
+            var provider = new ProcessSlicerProvider(() -> process(format, work)) {};
+            assertThatThrownBy(() -> SliceService.slice(
+                            provider, model, SlicerTestSupport.window(Map.of()), new Cancellation(), ignored -> {}))
+                    .isInstanceOf(IOException.class)
+                    .hasMessage("forced process failure");
+            assertThat(work.get()).isNotNull().doesNotExist();
+        }
+    }
+
+    private static ProcessSlicer process(String format, AtomicReference<Path> work) {
+        return new ProcessSlicer() {
+            @Override
+            public Descriptor descriptor() {
+                return new PrusaSlicerBackend().descriptor();
+            }
+
+            @Override
+            public Path executable() {
+                return Path.of("unused");
+            }
+
+            @Override
+            public Probe probe(Path executable, Cancellation cancellation) {
+                return new Probe("process double", descriptor().capabilities());
             }
 
             @Override
@@ -146,7 +110,11 @@ class SlicerExportPipelineTest {
 
             @Override
             public RunResult slice(Request request) throws IOException {
-                return run.run(request);
+                work.set(request.workingDirectory());
+                assertThat(request.input()).isRegularFile().hasParent(request.workingDirectory());
+                assertThat(Files.size(request.input())).isGreaterThan(100);
+                Files.writeString(request.output(), "partial");
+                throw new IOException("forced process failure");
             }
         };
     }

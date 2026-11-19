@@ -1,0 +1,3 @@
+dev.voxelbrew.slicer.prusa.PrusaSlicerProvider
+dev.voxelbrew.slicer.cura.CuraSlicerProvider
+dev.voxelbrew.slicer.orca.OrcaSlicerProvider

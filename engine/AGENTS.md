@@ -23,6 +23,12 @@ Use `./gradlew :engine:test` for Java logic, `:engine:integrationTest` for real-
 and `:engine:nativeIntegrationTest` for the native subset. Native changes require platform-native
 libraries and validation on each affected OS. Run Spotless after editing Java, C++, or Protobuf.
 
+## Pre-commit SpotBugs
+
+Before committing a change to this module, run
+`./gradlew :engine:spotbugsMain` from the application root.
+Use `.\gradlew.bat` in place of `./gradlew` on Windows.
+
 ## Lombok in Java code
 
 Use Lombok where it removes routine Java boilerplate without obscuring a public contract. Apply these annotations in Java-bearing repositories and modules; the website has no Java production code.

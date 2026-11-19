@@ -60,7 +60,9 @@ final class ExportDialog {
     }
 
     static Path destinationForFormat(Path source, String extension) {
-        String name = source.getFileName().toString();
+        Path filename = source.getFileName();
+        if (filename == null) throw new IllegalArgumentException("Expected a project file: " + source);
+        String name = filename.toString();
         int dot = name.lastIndexOf('.');
         return source.resolveSibling((dot > 0 ? name.substring(0, dot) : name) + "." + extension);
     }

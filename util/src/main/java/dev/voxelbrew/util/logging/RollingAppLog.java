@@ -101,8 +101,8 @@ final class RollingAppLog extends Handler {
         }
         try (var files = Files.list(directory)) {
             var old = files.filter(path -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS))
-                    .filter(path ->
-                            path.getFileName().toString().matches("app-\\d{8}-\\d{6}-\\d{9}-[0-9]+-[0-9]+\\.log"))
+                    .filter(path -> java.util.Objects.toString(path.getFileName(), "")
+                            .matches("app-\\d{8}-\\d{6}-\\d{9}-[0-9]+-[0-9]+\\.log"))
                     .sorted(Comparator.reverseOrder())
                     .skip(archives)
                     .toList();

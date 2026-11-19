@@ -15,6 +15,7 @@ import javax.measure.quantity.Volume;
  * invalidates the result. Access and close are serialized.
  */
 public final class Solid implements AutoCloseable {
+    private final Object lock = new Object();
     private long token;
 
     private Solid(long token) {
@@ -37,7 +38,7 @@ public final class Solid implements AutoCloseable {
         long[] handles = new long[snapshot.size()];
         for (int i = 0; i < handles.length; i++) {
             var solid = snapshot.get(i);
-            synchronized (solid) {
+            synchronized (solid.lock) {
                 solid.requireOpen();
                 handles[i] = solid.token;
             }
@@ -104,10 +105,12 @@ public final class Solid implements AutoCloseable {
                 profile.types(), profile.sizes(), profile.parameterSizes(), profile.parameters(), z, distance));
     }
 
-    public synchronized Solid cutThroughProfile(PlanarProfile profile) {
-        requireOpen();
-        return new Solid(NativeKernel.cutThroughProfile(
-                token, profile.types(), profile.sizes(), profile.parameterSizes(), profile.parameters()));
+    public Solid cutThroughProfile(PlanarProfile profile) {
+        synchronized (lock) {
+            requireOpen();
+            return new Solid(NativeKernel.cutThroughProfile(
+                    token, profile.types(), profile.sizes(), profile.parameterSizes(), profile.parameters()));
+        }
     }
 
     public static Solid circlePrism(double x, double y, double z, double diameter, double distance) {
@@ -139,65 +142,83 @@ public final class Solid implements AutoCloseable {
     /**
      * Subtracts a circle swept through the full current Z extent, including future thickness edits.
      */
-    public synchronized Solid cutThroughCircle(double x, double y, double diameter) {
-        requireOpen();
-        finite("centerX", x);
-        finite("centerY", y);
-        positive("diameter", diameter);
-        return new Solid(NativeKernel.cutThroughCircle(token, x, y, diameter));
+    public Solid cutThroughCircle(double x, double y, double diameter) {
+        synchronized (lock) {
+            requireOpen();
+            finite("centerX", x);
+            finite("centerY", y);
+            positive("diameter", diameter);
+            return new Solid(NativeKernel.cutThroughCircle(token, x, y, diameter));
+        }
     }
 
-    public synchronized double volume() {
-        requireOpen();
-        return NativeKernel.volume(token);
+    public double volume() {
+        synchronized (lock) {
+            requireOpen();
+            return NativeKernel.volume(token);
+        }
     }
 
-    public synchronized Solid edgeFinish(boolean fillet, double size, int[] edges) {
-        requireOpen();
-        positive("size", size);
-        if (edges.length == 0) throw new IllegalArgumentException("Select at least one edge");
-        return new Solid(NativeKernel.edgeFinish(token, fillet, size, edges.clone()));
+    public Solid edgeFinish(boolean fillet, double size, int[] edges) {
+        synchronized (lock) {
+            requireOpen();
+            positive("size", size);
+            if (edges.length == 0) throw new IllegalArgumentException("Select at least one edge");
+            return new Solid(NativeKernel.edgeFinish(token, fillet, size, edges.clone()));
+        }
     }
 
     /** Pairs of zero-based face index and one-based edge index from the same source topology. */
-    public synchronized int[] faceEdges() {
-        requireOpen();
-        return NativeKernel.faceEdges(token);
+    public int[] faceEdges() {
+        synchronized (lock) {
+            requireOpen();
+            return NativeKernel.faceEdges(token);
+        }
     }
 
     /** Nine sample points per OCCT edge, each encoded as edge index and XYZ coordinates. */
-    public synchronized double[] edgeSamples() {
-        requireOpen();
-        return NativeKernel.edgeSamples(token);
+    public double[] edgeSamples() {
+        synchronized (lock) {
+            requireOpen();
+            return NativeKernel.edgeSamples(token);
+        }
     }
 
-    public synchronized Solid shell(double thickness, int removedFace) {
-        requireOpen();
-        positive("thickness", thickness);
-        if (removedFace < 0) throw new IllegalArgumentException("removedFace must be nonnegative");
-        return new Solid(NativeKernel.shell(token, thickness, removedFace));
+    public Solid shell(double thickness, int removedFace) {
+        synchronized (lock) {
+            requireOpen();
+            positive("thickness", thickness);
+            if (removedFace < 0) throw new IllegalArgumentException("removedFace must be nonnegative");
+            return new Solid(NativeKernel.shell(token, thickness, removedFace));
+        }
     }
 
     /** Independently owned rigid copy; the source geometry is never changed. */
-    public synchronized Solid transformed(dev.voxelbrew.api.model.Transform placement) {
-        requireOpen();
-        return new Solid(NativeKernel.transform(token, placement.matrix()));
+    public Solid transformed(dev.voxelbrew.api.model.Transform placement) {
+        synchronized (lock) {
+            requireOpen();
+            return new Solid(NativeKernel.transform(token, placement.matrix()));
+        }
     }
 
     /** Detached exact planes, using the same face order as tessellation. */
-    public synchronized java.util.List<PlanarFace> planarFaces() {
-        requireOpen();
-        double[] data = NativeKernel.planarFaces(token);
-        var result = new java.util.ArrayList<PlanarFace>();
-        for (int i = 0; i < data.length; i += 5)
-            result.add(new PlanarFace((int) data[i], data[i + 1], data[i + 2], data[i + 3], data[i + 4]));
-        return java.util.List.copyOf(result);
+    public java.util.List<PlanarFace> planarFaces() {
+        synchronized (lock) {
+            requireOpen();
+            double[] data = NativeKernel.planarFaces(token);
+            var result = new java.util.ArrayList<PlanarFace>();
+            for (int i = 0; i < data.length; i += 5)
+                result.add(new PlanarFace((int) data[i], data[i + 1], data[i + 2], data[i + 3], data[i + 4]));
+            return java.util.List.copyOf(result);
+        }
     }
 
     /** Detached analytic topology data; face/edge/vertex indices are zero based. */
-    public synchronized double[] constructionInput(int topology, int index, double fraction) {
-        requireOpen();
-        return NativeKernel.constructionInput(token, topology, index, fraction);
+    public double[] constructionInput(int topology, int index, double fraction) {
+        synchronized (lock) {
+            requireOpen();
+            return NativeKernel.constructionInput(token, topology, index, fraction);
+        }
     }
 
     public record Split(Solid negative, Solid positive) implements AutoCloseable {
@@ -209,48 +230,57 @@ public final class Solid implements AutoCloseable {
     }
 
     /** Splits into independently owned solids on the negative and positive sides of a plane. */
-    public synchronized Split split(double nx, double ny, double nz, double offset) {
-        requireOpen();
-        finite("normalX", nx);
-        finite("normalY", ny);
-        finite("normalZ", nz);
-        finite("offset", offset);
-        if (Math.abs(Math.hypot(Math.hypot(nx, ny), nz) - 1) > 1e-9)
-            throw new IllegalArgumentException("split plane normal must have unit length");
-        long[] result = NativeKernel.split(token, nx, ny, nz, offset);
-        return new Split(new Solid(result[0]), new Solid(result[1]));
+    public Split split(double nx, double ny, double nz, double offset) {
+        synchronized (lock) {
+            requireOpen();
+            finite("normalX", nx);
+            finite("normalY", ny);
+            finite("normalZ", nz);
+            finite("offset", offset);
+            if (Math.abs(Math.hypot(Math.hypot(nx, ny), nz) - 1) > 1e-9)
+                throw new IllegalArgumentException("split plane normal must have unit length");
+            long[] result = NativeKernel.split(token, nx, ny, nz, offset);
+            return new Split(new Solid(result[0]), new Solid(result[1]));
+        }
     }
 
     /**
      * Detached mesh; face IDs are local to this tessellation, never persistent feature references.
      */
-    public synchronized dev.voxelbrew.api.model.mesh.MeshData tessellate(
-            dev.voxelbrew.api.model.mesh.MeshOptions options) {
-        requireOpen();
-        return TessellationCleanup.removeCollapsedTriangles(
-                NativeKernel.tessellate(token, options.chordToleranceMm(), value(options.angularTolerance(), RADIAN)));
+    public dev.voxelbrew.api.model.mesh.MeshData tessellate(dev.voxelbrew.api.model.mesh.MeshOptions options) {
+        synchronized (lock) {
+            requireOpen();
+            return TessellationCleanup.removeCollapsedTriangles(NativeKernel.tessellate(
+                    token, options.chordToleranceMm(), value(options.angularTolerance(), RADIAN)));
+        }
     }
 
-    public synchronized Bounds bounds() {
-        requireOpen();
-        double[] b = NativeKernel.bounds(token);
-        return new Bounds(b[0], b[1], b[2], b[3], b[4], b[5]);
+    public Bounds bounds() {
+        synchronized (lock) {
+            requireOpen();
+            double[] b = NativeKernel.bounds(token);
+            return new Bounds(b[0], b[1], b[2], b[3], b[4], b[5]);
+        }
     }
 
     /** True for material interior or its boundary (OCCT classifier tolerance 1e-7 mm). */
-    public synchronized boolean contains(double x, double y, double z) {
-        requireOpen();
-        finite("x", x);
-        finite("y", y);
-        finite("z", z);
-        return NativeKernel.contains(token, x, y, z);
+    public boolean contains(double x, double y, double z) {
+        synchronized (lock) {
+            requireOpen();
+            finite("x", x);
+            finite("y", y);
+            finite("z", z);
+            return NativeKernel.contains(token, x, y, z);
+        }
     }
 
     @Override
-    public synchronized void close() {
-        if (token != 0) {
-            NativeKernel.release(token);
-            token = 0;
+    public void close() {
+        synchronized (lock) {
+            if (token != 0) {
+                NativeKernel.release(token);
+                token = 0;
+            }
         }
     }
 

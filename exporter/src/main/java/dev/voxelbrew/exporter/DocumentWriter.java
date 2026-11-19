@@ -30,7 +30,8 @@ public class DocumentWriter {
             long previousVersion = document.parameters().builtins().fileVersion();
             long nextVersion = Math.incrementExact(previousVersion);
             ByteBuffer bytes = ByteBuffer.wrap(DocumentCodec.encode(document, nextVersion));
-            Path temporary = Files.createTempFile(target.getParent(), "." + target.getFileName() + "-", ".tmp");
+            Path temporary = Files.createTempFile(
+                    AtomicExport.parentDirectory(target), "." + target.getFileName() + "-", ".tmp");
             try {
                 try (FileChannel channel =
                         FileChannel.open(temporary, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {

@@ -47,10 +47,8 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
         private PrinterVisibility printerVisibility;
         private PrintController printController;
         private SlicerSettings slicerSettings;
-        private SlicerAvailability slicerAvailability;
         private PrintingPane printingPane;
         private PrinterPane printerPane;
-        private SlicerSettingsDialog slicerSettingsDialog;
         private Appearance appearance;
         private Rendering rendering;
         private RecentFiles recentFiles;
@@ -83,6 +81,7 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
             return windowResources;
         }
 
+        @Override
         public WindowResources resources() {
             return windowResources();
         }
@@ -109,23 +108,14 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
                         () -> documentController().snapshot().document(),
                         plugins,
                         resources().slicing,
-                        files.exporters(),
-                        files.slicing(),
                         files.gcode());
             return printController;
         }
 
         private SlicerSettings slicerSettings() {
             if (slicerSettings == null)
-                slicerSettings = new SlicerSettings(resources().slicers, application.configuration());
+                slicerSettings = new SlicerSettings(application.configuration(), resources().appearance);
             return slicerSettings;
-        }
-
-        private SlicerAvailability slicerAvailability() {
-            if (slicerAvailability == null)
-                slicerAvailability = new SlicerAvailability(
-                        resources().slicers, slicerSettings(), resources().appearance, translations);
-            return slicerAvailability;
         }
 
         private PrintingPane printingPane() {
@@ -138,12 +128,9 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
                         printController(),
                         resources().slicers,
                         slicerSettings(),
-                        slicerAvailability(),
                         resources().exporters,
-                        stage,
                         resources().validation,
-                        translations,
-                        files.slicerExecutable());
+                        translations);
             return printingPane;
         }
 
@@ -157,17 +144,6 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
                         translations,
                         resources().printer);
             return printerPane;
-        }
-
-        private SlicerSettingsDialog slicerSettingsDialog() {
-            if (slicerSettingsDialog == null)
-                slicerSettingsDialog = new SlicerSettingsDialog(
-                        resources().slicers,
-                        slicerSettings(),
-                        slicerAvailability(),
-                        translations,
-                        resources().appearance);
-            return slicerSettingsDialog;
         }
 
         private Appearance appearance() {
@@ -189,6 +165,7 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
             return new AboutDialog(application.updates(), translations, () -> WindowResources.worker("update"));
         }
 
+        @Override
         public Workbench workbench() {
             if (workbench == null)
                 workbench = new Workbench(
@@ -200,7 +177,7 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
                         files.importers(),
                         printingPane(),
                         printerPane(),
-                        slicerSettingsDialog(),
+                        slicerSettings(),
                         appearance(),
                         rendering(),
                         resources().appearance,

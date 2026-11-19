@@ -106,7 +106,7 @@ final class McpAutomation {
                         if (failure != null) result.completeExceptionally(failure);
                         else result.complete(state());
                     });
-            } catch (Exception failure) {
+            } catch (RuntimeException failure) {
                 result.completeExceptionally(failure);
             }
         });

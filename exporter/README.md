@@ -48,34 +48,11 @@ service resource have been removed. External exporters use `ExporterProvider` an
 can define their own typed dialog requests. Existing plugins must be recompiled and
 migrated to the unified contract; there is no legacy discovery adapter.
 
-Slicing uses the same registry and exporters:
-
-```text
-CadDocument + captured manufacturing state
-    -> Exporter.export(document, headless window)
-    -> private input file
-    -> SlicerBackend.slice(request)
-    -> inspected G-code, atomically published
-```
-
-[`SlicerBackend`](src/main/java/dev/voxelbrew/exporter/printing/SlicerBackend.java)
-is an implementation-module contract under `dev.voxelbrew.exporter.printing`, not
-part of `export-api`. Its `inputFormat()` declares an exporter ID, extension and export options.
-The host provides headless file/geometry dialog handlers and waits for successful
-export before invoking the backend. `SlicerBackend.Request.input()` is the completed
-input file; the backend consumes it rather than implementing another model writer.
-The slicer SPI is version 2 because its request now includes this input path.
-
-Prusa uses `prusa-project` (3MF) with solid supports included, preserving placements,
-profiles and support modifiers. Other backends may select STL, STEP or portable 3MF
-when those formats preserve the semantics they need. STEP currently exports design
-coordinates, so it is not a substitute for a placed build plate. Failed or cancelled
-exports prevent backend execution; temporary input is cleaned up with the slice job.
-
-The geometry dialog can carry a detached manufacturing snapshot for slicing. Its
-document ID and revision must match the exported document. Providers must not
-export stale geometry, and the existing publication guard still rejects G-code if
-the document changes while slicing.
+Built-in slicer providers call the exporter implementation serializers with an evaluated
+manufacturing view. Prusa uses project 3MF with solid supports included. Cura uses binary STL
+and Orca uses portable 3MF. Each operation owns its private input and cleans it up after the
+backend exits. The application independently inspects the returned artifact before attachment
+or publication.
 
 ## Verification
 

@@ -1,4 +1,7 @@
-plugins { `java-library` }
+plugins {
+    `java-library`
+    id("dev.voxelbrew.spotbugs")
+}
 
 group = "external.consumer"
 
@@ -55,7 +58,7 @@ tasks.named("jar") {
                 .filter { it.group.startsWith("dev.voxelbrew") }
                 .map { it.name }
                 .toSet()
-        check(hostModules == setOf("model", "import", "export", "printer", "slicer")) {
+        check(hostModules == setOf("model", "import", "export", "slicer")) {
             "The external consumer must compile with API/domain artifacts only: $hostModules"
         }
     }

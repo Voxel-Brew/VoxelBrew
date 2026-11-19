@@ -23,8 +23,10 @@ final class McpTokenStore {
     }
 
     static void save(Path file, String token) throws IOException {
-        Files.createDirectories(file.getParent());
-        Path temporary = Files.createTempFile(file.getParent(), "mcp-token-", ".tmp");
+        Path parent = file.toAbsolutePath().normalize().getParent();
+        if (parent == null) throw new IOException("Expected a credential file: " + file);
+        Files.createDirectories(parent);
+        Path temporary = Files.createTempFile(parent, "mcp-token-", ".tmp");
         try {
             restrict(temporary);
             Files.writeString(temporary, token);

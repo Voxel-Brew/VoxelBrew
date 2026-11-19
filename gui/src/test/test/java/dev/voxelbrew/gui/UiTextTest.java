@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.api.model.sketch.*;
-import dev.voxelbrew.api.slicer.SlicerBackend;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.engine.sketch.*;
 import dev.voxelbrew.exporter.ExportSelection;
@@ -63,7 +62,6 @@ class UiTextTest {
             choices(t, "tool.hint.", SketchTools.Tool.values());
             choices(t, "print.role.", GcodeJob.Role.values());
             choices(t, "print.support.", SupportVolume.Role.values());
-            choices(t, "print.capability.", SlicerBackend.Capability.values());
             choices(t, "print.state.", PrintController.State.values());
             choices(t, "export.space.", ExportSelection.Space.values());
             choices(t, "export.contents.", ExportSelection.Contents.values());

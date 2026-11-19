@@ -5,6 +5,54 @@ plugins {
 
 base { archivesName.set("slicer-impl") }
 
+val slicerPlatform =
+    when {
+        System.getProperty("os.name").startsWith("Windows") -> "windows"
+        System.getProperty("os.name").startsWith("Mac") -> "macos"
+        System.getProperty("os.name") == "Linux" -> "linux"
+        else -> null
+    }
+val supportsSlicerBundles =
+    slicerPlatform != null &&
+        (System.getProperty("os.arch") in setOf("amd64", "x86_64") ||
+            (slicerPlatform == "macos" &&
+                System.getProperty("os.arch") in setOf("aarch64", "arm64")))
+val bundleSlicers =
+    providers
+        .gradleProperty("bundleSlicers")
+        .map(String::toBoolean)
+        .getOrElse(supportsSlicerBundles)
+
+if (bundleSlicers) {
+    check(supportsSlicerBundles) {
+        "Bundled slicers are unavailable for this platform architecture"
+    }
+    val script = rootProject.file("scripts/bundle-slicers.py")
+    val platform = requireNotNull(slicerPlatform)
+    val cache = rootProject.file(".tools/bundled-slicers")
+    val resources = layout.buildDirectory.dir("bundled-slicers")
+    val stageBundledSlicers by
+        tasks.registering(Exec::class) {
+            inputs.file(script)
+            inputs.property("platform", platform)
+            outputs.dir(resources)
+            environment("VOXELBREW_BUNDLE_OFFLINE", gradle.startParameter.isOffline.toString())
+            commandLine(
+                providers
+                    .gradleProperty("slicerPython")
+                    .getOrElse(if (platform == "windows") "python" else "python3"),
+                script,
+                platform,
+                cache,
+                resources.get().asFile,
+            )
+        }
+    tasks.processResources {
+        from(stageBundledSlicers) { into("dev/voxelbrew/slicer/bundled/$platform") }
+    }
+    tasks.jar { entryCompression = ZipEntryCompression.STORED }
+}
+
 dependencies {
     api("dev.voxelbrew.api:slicer")
     implementation("com.google.code.gson:gson")

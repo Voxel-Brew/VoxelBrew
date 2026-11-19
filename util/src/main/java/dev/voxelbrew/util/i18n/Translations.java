@@ -35,8 +35,7 @@ public final class Translations {
         var english = ResourceBundle.getBundle("dev.voxelbrew.util.i18n.messages", Locale.ENGLISH, control);
         var catalogs = new TreeMap<String, Properties>();
         try (var files = Files.list(directory)) {
-            files.filter(path -> path.getFileName()
-                            .toString()
+            files.filter(path -> Objects.toString(path.getFileName(), "")
                             .matches("messages_[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*\\.properties"))
                     .forEach(path -> {
                         try (var reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
@@ -46,9 +45,8 @@ public final class Translations {
                                     properties.getProperty("language.i18n", "").strip();
                             String name =
                                     properties.getProperty("language.name", "").strip();
-                            String fileTag = path.getFileName()
-                                    .toString()
-                                    .substring(9, path.getFileName().toString().length() - 11);
+                            String filename = Objects.toString(path.getFileName(), "");
+                            String fileTag = filename.substring(9, filename.length() - 11);
                             if (!name.isEmpty()
                                     && tag.equalsIgnoreCase(fileTag)
                                     && !Locale.forLanguageTag(tag).getLanguage().isEmpty())

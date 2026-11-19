@@ -2,9 +2,7 @@ package dev.voxelbrew.cli;
 
 import dev.voxelbrew.api.exporter.*;
 import dev.voxelbrew.api.importer.*;
-import dev.voxelbrew.api.slicer.SlicerCatalog;
-import dev.voxelbrew.api.slicer.SlicerRuntime;
-import dev.voxelbrew.api.slicer.Slicing;
+import dev.voxelbrew.api.slicer.SlicerProviderRegistry;
 import dev.voxelbrew.importer.DocumentSource;
 import dev.voxelbrew.importer.GcodeSource;
 import dev.voxelbrew.importer.ImportRuntime;
@@ -23,27 +21,18 @@ public final class FileIoModule {
     @lombok.NonNull
     private final ImportRuntime imports;
 
-    @lombok.NonNull
-    private final SlicerRuntime slicerRuntime;
-
     public FileIoModule() {
         this(
                 dev.voxelbrew.util.services.Services.load(ImportRuntime.class),
-                dev.voxelbrew.exporter.DocumentWriter::save,
-                dev.voxelbrew.util.services.Services.load(SlicerRuntime.class));
+                dev.voxelbrew.exporter.DocumentWriter::save);
     }
 
-    private FileIoModule(ImportRuntime imports, DocumentSave sink, SlicerRuntime slicerRuntime) {
-        this(imports.documents(), sink, imports.gcode(), imports, slicerRuntime);
+    private FileIoModule(ImportRuntime imports, DocumentSave sink) {
+        this(imports.documents(), sink, imports.gcode(), imports);
     }
 
     public FileIoModule(DocumentSource source, DocumentSave sink, GcodeSource gcode) {
-        this(
-                source,
-                sink,
-                gcode,
-                dev.voxelbrew.util.services.Services.load(ImportRuntime.class),
-                dev.voxelbrew.util.services.Services.load(SlicerRuntime.class));
+        this(source, sink, gcode, dev.voxelbrew.util.services.Services.load(ImportRuntime.class));
     }
 
     DocumentSource source() {
@@ -66,15 +55,7 @@ public final class FileIoModule {
         return () -> dev.voxelbrew.util.services.Services.load(ImporterProviderRegistry.class);
     }
 
-    SlicerCatalog.Factory slicers() {
-        return slicerRuntime.slicers();
-    }
-
-    Slicing slicing() {
-        return slicerRuntime.slicing();
-    }
-
-    java.nio.file.Path slicerExecutable() {
-        return slicerRuntime.defaultSlicerExecutable();
+    java.util.function.Supplier<SlicerProviderRegistry> slicers() {
+        return () -> dev.voxelbrew.util.services.Services.load(SlicerProviderRegistry.class);
     }
 }

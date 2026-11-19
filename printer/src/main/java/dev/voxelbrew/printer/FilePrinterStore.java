@@ -50,7 +50,7 @@ public final class FilePrinterStore implements PrinterStore {
                         throw new IOException("Duplicate printer ID");
                     if (printers.stream().anyMatch(p -> p.name().equalsIgnoreCase(printer.name())))
                         throw new IOException("Duplicate printer name");
-                    if (!file.getFileName().toString().equals(printer.id() + ".json"))
+                    if (!(printer.id() + ".json").equals(java.util.Objects.toString(file.getFileName(), "")))
                         throw new IOException("Mismatched printer ID");
                     printers.add(printer);
                 } catch (IOException | RuntimeException failure) {

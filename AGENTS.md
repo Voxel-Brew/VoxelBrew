@@ -19,8 +19,10 @@ Java production code uses `src/main/java`. Tests intentionally use
 - `./gradlew :gui:run` launches the desktop application; `./gradlew :cli:run --args="--help"`
   runs the CLI.
 - `./gradlew spotlessApply` formats supported sources and documentation.
-- `./gradlew spotlessCheck basicChecks test` reproduces the fast CI gate: formatting, SpotBugs,
-  and unit tests.
+- To reproduce the SpotBugs gate in CI, run
+  `./gradlew basicChecks :engine:checkExporterFixture -PbundleSlicers=false`.
+  The unit, integration, and platform jobs wait for it to pass.
+- `./gradlew spotlessCheck test` runs formatting checks and unit tests.
 - `./gradlew integrationTest` runs native-backed integration tests. Bootstrap platform
   dependencies first with `scripts/bootstrap-native.sh` and `scripts/bootstrap-slicer.sh`.
 - `./gradlew check` runs the complete platform verification, including E2E tests, and is slower.
@@ -40,6 +42,20 @@ for methods and fields, and descriptive feature-oriented package names.
 Tests use JUnit 5 and should end in `Test` (for example, `SketchSolverTest`). Add focused unit tests
 in the owning module; reserve integration and E2E suites for native, packaged, or UI behavior.
 There is no numeric coverage quota, but every behavior change should include regression coverage.
+
+## Pre-commit SpotBugs
+
+For a standalone checkout, set `VOXELBREW_BOM_DIR` to a VoxelBrew BOM checkout that
+contains `spotbugs-conventions`. The composite workspace and CI supply it automatically.
+
+HTML and XML reports are under each module?s `build/reports/spotbugs/`. Analysis uses
+the JavaFX dependencies from the normal classpaths. SpotBugs has limited coverage of
+JavaFX thread violations, binding lifecycle issues, and UI resource leaks.
+
+Before committing, run `./gradlew spotbugsMain` from the application root to analyze
+production code across the Java modules. For a change limited to one module, use
+its qualified task, for example `./gradlew :gui:spotbugsMain`.
+Use `.\gradlew.bat` in place of `./gradlew` on Windows.
 
 ## Commit & Pull Request Guidelines
 

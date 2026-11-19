@@ -26,7 +26,7 @@ class CuraSlicerBackendTest {
         assertThat(settings.get("support_enable")).isEqualTo("false");
         assertThat(settings.get("center_object")).isEqualTo("false");
         assertThatThrownBy(() -> settings.put("layer_height", "1")).isInstanceOf(UnsupportedOperationException.class);
-        assertThatThrownBy(() -> backend.slice(new dev.voxelbrew.api.slicer.SlicerBackend.Request(
+        assertThatThrownBy(() -> backend.slice(new dev.voxelbrew.slicer.internal.ProcessSlicer.Request(
                         model,
                         file,
                         Path.of("unused"),
@@ -34,6 +34,6 @@ class CuraSlicerBackendTest {
                         directory.resolve("out.gcode"),
                         new Cancellation(),
                         line -> {})))
-                .isInstanceOf(java.io.IOException.class);
+                .isInstanceOf(dev.voxelbrew.api.slicer.SlicerException.Configuration.class);
     }
 }

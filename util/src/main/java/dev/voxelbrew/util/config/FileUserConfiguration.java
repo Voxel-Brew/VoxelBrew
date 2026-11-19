@@ -19,6 +19,7 @@ public final class FileUserConfiguration implements UserConfiguration {
     }
 
     private final Path file;
+    private final Path parent;
 
     public FileUserConfiguration() {
         this(dev.voxelbrew.util.services.Services.load(ApplicationPaths.class));
@@ -30,7 +31,8 @@ public final class FileUserConfiguration implements UserConfiguration {
 
     public FileUserConfiguration(@NonNull Path file) {
         this.file = file.toAbsolutePath().normalize();
-        if (this.file.getParent() == null) throw new IllegalArgumentException("Expected a file path");
+        parent = this.file.getParent();
+        if (parent == null) throw new IllegalArgumentException("Expected a file path");
     }
 
     public Path path() {
@@ -154,7 +156,7 @@ public final class FileUserConfiguration implements UserConfiguration {
     @SuppressWarnings("try")
     private void change(java.util.function.Consumer<Properties> operation) throws IOException {
         synchronized (LOCKS[Math.floorMod(file.hashCode(), LOCKS.length)]) {
-            Files.createDirectories(file.getParent());
+            Files.createDirectories(parent);
             Path lockFile = file.resolveSibling(file.getFileName() + ".lock");
             try (var channel = FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
                     var lock = channel.lock()) {
@@ -162,7 +164,7 @@ public final class FileUserConfiguration implements UserConfiguration {
                 operation.accept(properties);
                 var text = new StringWriter();
                 properties.store(text, "VoxelBrew user configuration");
-                Path temporary = Files.createTempFile(file.getParent(), ".config-", ".tmp");
+                Path temporary = Files.createTempFile(parent, ".config-", ".tmp");
                 try {
                     try (var output = FileChannel.open(temporary, StandardOpenOption.WRITE)) {
                         var bytes = ByteBuffer.wrap(text.toString().getBytes(StandardCharsets.UTF_8));

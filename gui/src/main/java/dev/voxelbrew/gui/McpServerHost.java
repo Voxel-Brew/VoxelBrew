@@ -16,13 +16,15 @@ import org.eclipse.jetty.server.*;
 
 /** Window-owned, authenticated loopback transport. Never executes CAD on HTTP threads. */
 final class McpServerHost implements AutoCloseable {
+    private static final SecureRandom RANDOM = new SecureRandom();
+
     private final McpAutomation automation;
     private Server http;
     private McpSyncServer mcp;
     private volatile String token = token();
     private java.nio.file.Path credentialFile;
-    private int port;
-    private int historyLimit = 100;
+    private volatile int port;
+    private volatile int historyLimit = 100;
     private final Deque<Map<String, Object>> activity = new ArrayDeque<>();
 
     McpServerHost(McpAutomation automation) {
@@ -33,7 +35,7 @@ final class McpServerHost implements AutoCloseable {
         automation.busy(value);
     }
 
-    String endpoint() {
+    synchronized String endpoint() {
         return http == null ? "" : "http://127.0.0.1:" + port + "/mcp";
     }
 
@@ -223,7 +225,7 @@ final class McpServerHost implements AutoCloseable {
 
     private static String token() {
         var bytes = new byte[32];
-        new SecureRandom().nextBytes(bytes);
+        RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 

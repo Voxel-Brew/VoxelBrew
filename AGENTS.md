@@ -19,7 +19,8 @@ Java production code uses `src/main/java`. Tests intentionally use
 - `./gradlew :gui:run` launches the desktop application; `./gradlew :cli:run --args="--help"`
   runs the CLI.
 - `./gradlew spotlessApply` formats supported sources and documentation.
-- `./gradlew basicChecks :engine:checkExporterFixture` reproduces the SpotBugs gate in CI.
+- To reproduce the SpotBugs gate in CI, run
+  `./gradlew basicChecks :engine:checkExporterFixture -PbundleSlicers=false`.
   The unit, integration, and platform jobs wait for it to pass.
 - `./gradlew spotlessCheck test` runs formatting checks and unit tests.
 - `./gradlew integrationTest` runs native-backed integration tests. Bootstrap platform

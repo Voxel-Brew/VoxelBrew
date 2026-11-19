@@ -1,4 +1,7 @@
-plugins { `java-library` }
+plugins {
+    `java-library`
+    id("dev.voxelbrew.spotbugs")
+}
 
 group = "external.consumer"
 

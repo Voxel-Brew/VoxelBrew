@@ -141,3 +141,15 @@ independent provider fixture still compiles against published artifacts.
 Cover rejection, uncertain submission, monitoring failure, timeout, interruption,
 resource cleanup, and plugin discovery. Record physical hardware qualification
 separately, including printer model, firmware, transport, and observed operations.
+
+## SpotBugs
+
+Application and public API builds use the convention from the VoxelBrew BOM checkout. The
+workspace layout and CI provide it automatically. For a standalone checkout, set
+`VOXELBREW_BOM_DIR` to the path of a BOM checkout that contains `spotbugs-conventions`.
+
+Run `./gradlew spotbugsMain` to analyze production code. Gradle `check` includes SpotBugs and
+writes HTML and XML reports under each Java module's `build/reports/spotbugs/` directory.
+The JavaFX module uses its normal dependency classpaths for analysis, including the platform
+JavaFX artifacts. SpotBugs does not comprehensively detect JavaFX thread violations, binding
+lifecycle issues, or UI resource leaks.

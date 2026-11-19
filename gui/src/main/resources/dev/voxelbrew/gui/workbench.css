@@ -659,6 +659,12 @@
 .export-dialog-field-label {
   -fx-font-weight: bold;
 }
+.export-dialog-success {
+  -fx-text-fill: #246044;
+}
+.dark .export-dialog-success {
+  -fx-text-fill: #a7e1c3;
+}
 .export-dialog-inline-error,
 .export-dialog-invalid-label,
 .check-box.export-dialog-invalid {
@@ -1068,6 +1074,134 @@
 }
 .printer-dialog-primary:hover {
   -fx-background-color: #7866de;
+}
+
+.slicer-installation-list {
+  -fx-background-color: derive(-fx-base, 34%);
+  -fx-background-insets: 0;
+  -fx-background-radius: 10;
+  -fx-border-color: derive(-fx-base, -10%);
+  -fx-border-radius: 10;
+  -fx-padding: 4;
+}
+.dark .slicer-installation-list {
+  -fx-background-color: derive(-fx-base, -9%);
+  -fx-border-color: derive(-fx-base, 25%);
+}
+.slicer-installation-list .list-cell {
+  -fx-padding: 0 12;
+  -fx-background-color: transparent;
+  -fx-background-radius: 7;
+  -fx-border-color: transparent;
+  -fx-border-radius: 7;
+}
+.slicer-installation-list .list-cell:filled:hover {
+  -fx-background-color: derive(-fx-base, 7%);
+}
+.slicer-installation-list .list-cell:filled:selected {
+  -fx-background-color: derive(-fx-accent, 81%);
+}
+.dark .slicer-installation-list .list-cell:filled:selected {
+  -fx-background-color: derive(-fx-accent, -65%);
+}
+.slicer-installation-list:focused .list-cell:filled:focused {
+  -fx-border-color: -fx-focus-color;
+}
+.slicer-installation-name {
+  -fx-font-size: 13px;
+  -fx-font-weight: bold;
+}
+.slicer-installation-version,
+.slicer-installation-detail {
+  -fx-font-size: 11px;
+  -fx-text-fill: #536176;
+}
+.dark .slicer-installation-version,
+.dark .slicer-installation-detail {
+  -fx-text-fill: #b5bed0;
+}
+.slicer-installation-state {
+  -fx-font-size: 11px;
+  -fx-font-weight: bold;
+  -fx-padding: 3 8;
+  -fx-background-radius: 12;
+}
+.slicer-state-ready {
+  -fx-background-color: #e1f3e9;
+  -fx-text-fill: #246044;
+}
+.dark .slicer-state-ready {
+  -fx-background-color: #24463b;
+  -fx-text-fill: #a7e1c3;
+}
+.slicer-state-bundled {
+  -fx-background-color: #e8edf6;
+  -fx-text-fill: #415570;
+}
+.dark .slicer-state-bundled {
+  -fx-background-color: #343f53;
+  -fx-text-fill: #c4d4eb;
+}
+.slicer-state-unavailable {
+  -fx-background-color: #fce7e3;
+  -fx-text-fill: #a73d34;
+}
+.dark .slicer-state-unavailable {
+  -fx-background-color: #552f2d;
+  -fx-text-fill: #ffc2b8;
+}
+.slicer-manager-action,
+.slicer-manager-create .combo-box {
+  -fx-min-height: 34;
+  -fx-background-color: -fx-control-inner-background;
+  -fx-background-insets: 0;
+  -fx-background-radius: 7;
+  -fx-border-color: derive(-fx-base, -13%);
+  -fx-border-radius: 7;
+}
+.dark .slicer-manager-action,
+.dark .slicer-manager-create .combo-box {
+  -fx-border-color: derive(-fx-base, 30%);
+}
+.slicer-manager-action {
+  -fx-padding: 5 12;
+}
+.slicer-manager-action:hover {
+  -fx-background-color: -fx-base;
+}
+.slicer-manager-remove {
+  -fx-text-fill: #a73d34;
+}
+.dark .slicer-manager-remove {
+  -fx-text-fill: #ff9d91;
+}
+.slicer-manager-create {
+  -fx-padding: 10 12;
+  -fx-background-color: derive(-fx-base, 10%);
+  -fx-background-radius: 9;
+}
+.dark .slicer-manager-create {
+  -fx-background-color: derive(-fx-base, 12%);
+}
+.slicer-manager-create > .label {
+  -fx-font-weight: bold;
+}
+.slicer-manager-primary {
+  -fx-background-color: #245fc9;
+  -fx-border-color: transparent;
+  -fx-text-fill: white;
+  -fx-font-weight: bold;
+}
+.slicer-manager-primary:hover {
+  -fx-background-color: #1d51b6;
+}
+.slicer-manager-action:focused,
+.slicer-manager-create .combo-box:focused {
+  -fx-border-color: -fx-focus-color;
+}
+.slicer-manager-primary:focused {
+  -fx-border-color: white;
+  -fx-border-insets: 2;
 }
 
 #device-config-content {

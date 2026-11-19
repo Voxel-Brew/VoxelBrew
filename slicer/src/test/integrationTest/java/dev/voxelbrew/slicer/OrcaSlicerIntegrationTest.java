@@ -8,7 +8,7 @@ import dev.voxelbrew.engine.persistence.DocumentCodec;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.printer.DefaultPrinterProfileCatalog;
 import dev.voxelbrew.printer.ProfileHardware;
-import dev.voxelbrew.slicer.orca.OrcaSlicerBackend;
+import dev.voxelbrew.slicer.orca.OrcaSlicerProvider;
 import java.nio.file.*;
 import java.util.*;
 import java.util.zip.ZipFile;
@@ -24,16 +24,15 @@ class OrcaSlicerIntegrationTest {
     @Test
     void realOrcaPackagePreservesPreviewAndDocumentBytes() throws Exception {
         Path fixtures = Path.of(System.getenv("VOXELBREW_ORCA_TEST"));
-        var backend = new OrcaSlicerBackend()
-                .configure(Map.of(
-                        "executable",
-                        fixtures.resolve("orca/orca-slicer.exe").toString(),
-                        "machine",
-                        fixtures.resolve("machine.json").toString(),
-                        "process",
-                        fixtures.resolve("process.json").toString(),
-                        "filament",
-                        fixtures.resolve("filament.json").toString()));
+        var options = Map.of(
+                "executable",
+                fixtures.resolve("orca/orca-slicer.exe").toString(),
+                "machine",
+                fixtures.resolve("machine.json").toString(),
+                "process",
+                fixtures.resolve("process.json").toString(),
+                "filament",
+                fixtures.resolve("filament.json").toString());
         var session = PrintingTest.reference();
         var catalog = new DefaultPrinterProfileCatalog(directory.resolve("profiles")).load();
         var setup =
@@ -41,15 +40,12 @@ class OrcaSlicerIntegrationTest {
         session.setPrintSetup(setup.withProfile("orca", setup.printerId(), setup.materialId(), setup.process()));
         var model = ManufacturingModels.evaluate(session.document(), MeshOptions.DEFAULT);
         var result = SliceService.slice(
-                backend,
-                session.document(),
-                model,
-                null,
-                directory.resolve("plate.gcode"),
-                false,
-                new Cancellation(),
-                System.out::println,
-                dev.voxelbrew.api.slicer.Slicing.DIRECT);
+                        new OrcaSlicerProvider(),
+                        model,
+                        SlicerTestSupport.window(options),
+                        new Cancellation(),
+                        System.out::println)
+                .orElseThrow();
         assertThat(result.artifact()).isNotNull();
         assertThat(result.job().modelLayers().isEmpty()).isFalse();
         assertThat(result.artifact().metadata().get("model")).isEqualTo("Bambu Lab A1");

@@ -26,10 +26,12 @@ public final class DefaultCliFactory implements CliComponent.Factory {
         private final PrinterStore printerStore;
         private final PrinterProfileCatalog profiles;
 
+        @Override
         public CommandFactory commands() {
             return commands;
         }
 
+        @Override
         public Translations translations() {
             return translations;
         }
@@ -258,13 +260,7 @@ public final class DefaultCliFactory implements CliComponent.Factory {
 
         private PrintingCommands.Slice printingCommandsSlice() {
             return new PrintingCommands.Slice(
-                    files.source(),
-                    files.sink(),
-                    files.slicers(),
-                    printerStore,
-                    files.exporters(),
-                    files.slicing(),
-                    files.slicerExecutable());
+                    files.source(), files.sink(), files.slicers(), printerStore, application.configuration());
         }
 
         private PrintingCommands.InspectJob printingCommandsInspectJob() {

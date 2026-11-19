@@ -1,224 +1,249 @@
 package dev.voxelbrew.slicer;
 
-import dev.voxelbrew.api.exporter.*;
-import dev.voxelbrew.api.model.CadDocument;
-import dev.voxelbrew.api.model.mesh.MeshOptions;
 import dev.voxelbrew.api.model.printing.*;
-import dev.voxelbrew.api.slicer.SlicerBackend;
-import dev.voxelbrew.api.slicer.Slicing.*;
+import dev.voxelbrew.api.slicer.*;
 import dev.voxelbrew.engine.printing.*;
-import dev.voxelbrew.exporter.*;
 import dev.voxelbrew.importer.GcodeReader;
 import java.io.*;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.zip.ZipException;
+import java.util.zip.ZipFile;
+import lombok.experimental.UtilityClass;
+import lombok.extern.slf4j.Slf4j;
 
-@lombok.extern.slf4j.Slf4j
-public final class SliceService {
-    private SliceService() {}
+/** Application-side validation and publication for evaluated plate jobs. */
+@Slf4j
+@UtilityClass
+public class SliceService {
+    private static final Object PUBLICATION_LOCK = new Object();
 
-    /** Standalone composition for scripts/tests; application roots supply their registry. */
-    public static Result slice(
-            SlicerBackend backend,
-            CadDocument document,
-            ManufacturingModel model,
-            Path executable,
-            Path destination,
-            boolean overwrite,
-            Cancellation cancellation,
-            Consumer<String> diagnostics,
-            PublicationGuard guard)
-            throws IOException {
-        var pluginDirectory = dev.voxelbrew.util.services.Services.load(
-                        dev.voxelbrew.util.config.ApplicationPaths.class)
-                .plugins();
-        try (var exporters = ServiceLoader.load(ExporterProviderRegistry.class)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("No ExporterProviderRegistry service found"))
-                .withDirectory(pluginDirectory)) {
-            return slice(
-                    backend,
-                    document,
-                    model,
-                    exporters,
-                    pluginDirectory,
-                    executable,
-                    destination,
-                    overwrite,
-                    cancellation,
-                    diagnostics,
-                    guard);
+    public record Result(GcodeJob job, PrintArtifact artifact) {}
+
+    public static final class OutdatedException extends IllegalStateException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
+        public OutdatedException() {
+            super("The document changed while slicing");
         }
     }
 
-    public static Result slice(
-            SlicerBackend backend,
-            CadDocument document,
+    public static Optional<Result> slice(
+            SlicerProvider provider,
             ManufacturingModel model,
-            ExporterProviderRegistry exporters,
-            Path pluginDirectory,
-            Path executable,
-            Path destination,
-            boolean overwrite,
+            SlicerWindow window,
             Cancellation cancellation,
-            Consumer<String> diagnostics,
-            PublicationGuard guard)
-            throws IOException {
+            Consumer<String> diagnostics)
+            throws Exception {
         cancellation.check();
-        PrintValidation.validate(model).requireValid();
-        var descriptor = backend.descriptor();
-        if (!descriptor.id().equals(model.setup().backendId()))
-            throw new IOException("Selected backend does not match print setup");
-        if (!descriptor.outputFormats().contains(model.profile().printer().outputFormat()))
-            throw new IOException("Backend cannot produce required printer format "
-                    + model.profile().printer().outputFormat());
-        if (!model.profile().printer().outputFormat().equals("gcode"))
-            throw new IOException("No independent job inspector for selected output format");
-        if (!destination.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".gcode"))
-            throw new IOException("The selected printer requires a .gcode destination");
-        Path target = destination.toAbsolutePath().normalize();
-        if (Files.exists(target) && !overwrite)
-            throw new IOException("Destination exists; explicit overwrite required: " + target);
-        if (executable == null) executable = backend.executable();
-        Path command =
-                executable.getParent() != null || Files.exists(executable) ? executable.toAbsolutePath() : executable;
-        var probe = backend.probe(command, cancellation);
-        var required = java.util.EnumSet.noneOf(SlicerBackend.Capability.class);
-        var settings = model.profile().process();
-        if (settings.automaticSupports()) required.add(SlicerBackend.Capability.AUTOMATIC_SUPPORTS);
-        if (settings.supportsOnBedOnly()) required.add(SlicerBackend.Capability.BUILD_PLATE_SUPPORTS);
-        if (settings.brimWidth() > 0) required.add(SlicerBackend.Capability.BRIM);
-        if (settings.raftLayers() > 0) required.add(SlicerBackend.Capability.RAFT);
-        if (model.setup().supports().stream().anyMatch(s -> s.role() != SupportVolume.Role.SOLID_SUPPORT))
-            required.add(SlicerBackend.Capability.SUPPORT_VOLUMES);
-        if (!descriptor.capabilities().containsAll(required)
-                || !probe.capabilities().containsAll(required))
-            throw new IOException("Backend does not support the requested process capabilities: " + required);
-        diagnostics.accept("Backend: " + probe.actualVersion());
-        log.info(
-                "Slicing document {} revision {} using {} ({})",
+        var validation = PrintValidation.validate(model);
+        if (!validation.valid())
+            throw new SlicerException.UnsupportedInput("Print setup is invalid: " + validation.diagnostics());
+        var id = provider.descriptor().id();
+        if (!id.equals(model.setup().backendId()))
+            throw new SlicerException.UnsupportedInput("Selected slicer does not match print setup");
+        var setup = model.setup();
+        var target = setup.workspaceSettings().get(PrintTarget.PRINTER_ID);
+        var input = new ManufacturingModel(
                 model.documentId(),
                 model.revision(),
-                descriptor.id(),
-                probe.actualVersion());
-        Path work = Files.createTempDirectory(target.getParent(), ".voxelbrew-slice-");
-        try {
-            Path raw = work.resolve("sliced.gcode"), complete = work.resolve("complete.gcode");
-            var format = backend.inputFormat();
-            Path input = work.resolve("input." + format.extension());
-            class SlicerExportWindow implements ExportWindow, dev.voxelbrew.util.config.PluginDirectorySource {
-                @Override
-                public Path pluginDirectory() {
-                    return pluginDirectory;
-                }
+                setup.withWorkspaceSettings(Map.of()).withPrintTarget(target),
+                model.profile(),
+                model.meshes());
+        var artifact = provider.create().slice(input, window, cancellation, diagnostics);
+        cancellation.check();
+        if (artifact.isEmpty()) return Optional.empty();
+        var result = inspect(input, id, artifact.get());
+        cancellation.check();
+        return Optional.of(result);
+    }
 
-                @Override
-                @SuppressWarnings("unchecked")
-                public <R> Optional<R> show(ExportDialog<R> dialog) {
-                    if (dialog instanceof FileExportDialog)
-                        return (Optional<R>) Optional.of(new FileExportDialog.Destination(input, false));
-                    if (dialog instanceof MeshExportDialog)
-                        return (Optional<R>) Optional.of(new MeshExportDialog.Settings(
-                                new ExportSelection(
-                                        ExportSelection.Space.BUILD_PLATE, ExportSelection.Contents.MODEL, null, null),
-                                MeshOptions.DEFAULT,
-                                format.options(),
-                                new FileExportDialog.Destination(input, false),
-                                model));
-                    throw new UnsupportedOperationException("Unsupported export dialog: " + dialog.getClass());
+    public static Map<String, String> provenance(ManufacturingModel model, String providerId) {
+        var profile = model.profile().printer();
+        var target = model.setup().workspaceSettings().getOrDefault(PrintTarget.PRINTER_ID, "");
+        return Map.of(
+                "document", model.documentId(),
+                "revision", model.revision(),
+                "backend", providerId,
+                "printer", profile.id(),
+                "nozzle_mm", Double.toString(profile.nozzleMm()),
+                "target_kind", target.isBlank() ? "profile" : "printer",
+                "target_id", target.isBlank() ? model.setup().printerId() : target,
+                "target_profile", model.setup().printerId());
+    }
+
+    public static Result inspect(ManufacturingModel model, String providerId, PrintArtifact artifact)
+            throws IOException, SlicerException.InvalidArtifact {
+        for (var entry : provenance(model, providerId).entrySet()) {
+            if (!entry.getValue().equals(artifact.metadata().get(entry.getKey())))
+                throw new SlicerException.InvalidArtifact(
+                        "Slicer artifact does not match plate provenance: " + entry.getKey());
+        }
+        if (artifact.metadata().getOrDefault("backend_version", "").isBlank())
+            throw new SlicerException.InvalidArtifact("Slicer artifact lacks the actual backend version");
+        String required = model.profile().printer().outputFormat();
+        boolean bambu = model.profile().printer().id().startsWith("bambu-lab-");
+        if (bambu
+                && required.equals("gcode")
+                && artifact.metadata().get("target_kind").equals("printer")) required = "gcode.3mf";
+        boolean packageCompatible =
+                required.equals("gcode") && artifact.format().equals("gcode.3mf") && bambu;
+        if (!artifact.format().equals(required) && !packageCompatible)
+            throw new SlicerException.InvalidArtifact(
+                    "Slicer artifact format does not match printer format: " + required);
+        byte[] content = switch (artifact.format()) {
+            case "gcode" -> artifact.bytes();
+            case "gcode.3mf" -> unpack(artifact.bytes());
+            default ->
+                throw new SlicerException.InvalidArtifact("No inspector for artifact format " + artifact.format());
+        };
+        GcodeJob job;
+        try {
+            StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(content));
+            job = GcodeReader.read(new ByteArrayInputStream(content));
+        } catch (IOException invalid) {
+            throw new SlicerException.InvalidArtifact("Cannot read the artifact's G-code", invalid);
+        }
+        if (job.modelLayers().isEmpty())
+            throw new SlicerException.InvalidArtifact("Slicer artifact has no identifiable model deposition layers");
+        return new Result(job, artifact);
+    }
+
+    private static byte[] unpack(byte[] bytes) throws IOException, SlicerException.InvalidArtifact {
+        Path packageFile = Files.createTempFile("voxelbrew-inspect-", ".gcode.3mf");
+        try {
+            Files.write(packageFile, bytes);
+            try (var zip = new ZipFile(packageFile.toFile())) {
+                var entry = zip.getEntry("Metadata/plate_1.gcode");
+                if (entry == null || entry.isDirectory())
+                    throw new SlicerException.InvalidArtifact("Slicer package lacks plate 1 G-code");
+                int limit = 64 * 1024 * 1024;
+                if (entry.getSize() < 1 || entry.getSize() > limit)
+                    throw new SlicerException.InvalidArtifact("Invalid packaged G-code size");
+                try (var input = zip.getInputStream(entry)) {
+                    var content = input.readNBytes(limit + 1);
+                    if (content.length != entry.getSize())
+                        throw new SlicerException.InvalidArtifact("Invalid packaged G-code size");
+                    return content;
                 }
             }
-            ExportWindow parent = new SlicerExportWindow();
-            try {
-                exporters
-                        .require(format.exporterId())
-                        .create()
-                        .export(document, parent)
-                        .orElseThrow(java.util.concurrent.CancellationException::new);
-            } catch (java.util.concurrent.CancellationException cancelled) {
-                throw cancelled;
-            } catch (Exception failure) {
-                throw new IOException("Slicer input export failed: " + format.exporterId(), failure);
-            }
-            cancellation.check();
-            if (!Files.isRegularFile(input)) throw new IOException("Exporter did not create slicer input: " + input);
-            var run = backend.slice(
-                    new SlicerBackend.Request(model, input, command, work, raw, cancellation, diagnostics));
-            cancellation.check();
-            var inspected = GcodeReader.read(raw);
-            if (inspected.modelLayers().isEmpty())
-                throw new IOException("Slicer output has no identifiable model deposition layers");
-            var report = new LinkedHashMap<String, String>();
-            report.put("document", model.documentId());
-            report.put("revision", model.revision());
-            report.put("backend", descriptor.id());
-            report.put("backend_version", probe.actualVersion());
-            report.put("printer", model.profile().printer().id());
-            report.put("nozzle_mm", Double.toString(model.profile().printer().nozzleMm()));
-            report.put("material", model.profile().material().id());
-            report.put("firmware", model.profile().printer().firmware());
-            report.put("format", model.profile().printer().outputFormat());
-            report.put("units", "millimeter");
-            report.put("model_layers", Integer.toString(inspected.modelLayers().size()));
-            report.put("hardware_verified", "false");
-            for (var setting : new TreeMap<>(run.resolvedSettings()).entrySet())
-                report.put("process." + setting.getKey(), setting.getValue());
-            try (var output = Files.newBufferedWriter(complete, StandardCharsets.UTF_8)) {
-                for (var entry : report.entrySet())
-                    output.write("; VOXELBREW "
-                            + entry.getKey()
-                            + " = "
-                            + entry.getValue().replace("\r", "\\r").replace("\n", "\\n")
-                            + "\n");
-                try (var rawInput = Files.newBufferedReader(raw, StandardCharsets.UTF_8)) {
-                    rawInput.transferTo(output);
-                }
-                output.write("\n; VOXELBREW complete = true\n");
-            }
-            try (var channel = FileChannel.open(complete, StandardOpenOption.WRITE)) {
-                channel.force(true);
-            }
-            var job = GcodeReader.read(complete);
-            guard.publish(
-                    model.revision(),
-                    () -> cancellation.publish(() -> {
-                        if (overwrite)
-                            Files.move(
-                                    complete,
-                                    target,
-                                    StandardCopyOption.ATOMIC_MOVE,
-                                    StandardCopyOption.REPLACE_EXISTING);
-                        else Files.createLink(target, complete);
-                    }));
-            log.info(
-                    "Published sliced job {} with {} model layers",
-                    target,
-                    job.modelLayers().size());
-            var artifact = run.artifact();
-            if (artifact != null) {
-                var metadata = new LinkedHashMap<>(artifact.metadata());
-                metadata.put("backend_version", probe.actualVersion());
-                artifact = new PrintArtifact(artifact.format(), artifact.base64(), artifact.sha256(), metadata);
-            }
-            return new Result(target, job, probe.actualVersion(), artifact);
-        } catch (java.util.concurrent.CancellationException cancelled) {
-            log.info("Slicing cancelled for document {}", model.documentId());
-            throw cancelled;
-        } catch (OutdatedException outdated) {
-            log.warn("Discarded sliced job for outdated revision {}", model.revision());
-            throw outdated;
-        } catch (IOException | RuntimeException failure) {
-            log.error("Slicing failed for document {}", model.documentId(), failure);
-            throw failure;
+        } catch (ZipException invalid) {
+            throw new SlicerException.InvalidArtifact("Cannot read the sliced 3MF package", invalid);
         } finally {
-            List<Path> cleanup;
-            try (var files = Files.walk(work)) {
-                cleanup = files.sorted(Comparator.reverseOrder()).toList();
+            StagedFile.delete(packageFile);
+        }
+    }
+
+    /** Publishes inspected artifacts and attaches them within the caller's revision and cancellation guard. */
+    public static void publish(Map<Path, PrintArtifact> artifacts, boolean overwrite, Cancellation.Publication attach)
+            throws IOException {
+        synchronized (PUBLICATION_LOCK) {
+            var files = new LinkedHashMap<Path, StagedFile>();
+            var published = new ArrayList<StagedFile>();
+            try {
+                for (var entry : artifacts.entrySet()) {
+                    var target = entry.getKey().toAbsolutePath().normalize();
+                    if (files.containsKey(target))
+                        throw new IllegalArgumentException("Duplicate artifact destination: " + target);
+                    files.put(target, StagedFile.prepare(target, entry.getValue(), overwrite));
+                }
+                for (var file : files.values()) {
+                    file.publish(overwrite);
+                    published.add(file);
+                }
+                attach.run();
+            } catch (IOException | RuntimeException failure) {
+                for (var file : published.reversed()) {
+                    try {
+                        file.restore();
+                    } catch (IOException rollback) {
+                        failure.addSuppressed(rollback);
+                    }
+                }
+                throw failure;
+            } finally {
+                files.values().forEach(StagedFile::cleanup);
             }
-            for (var path : cleanup) Files.deleteIfExists(path);
+        }
+    }
+
+    public static void publish(
+            Map<Path, PrintArtifact> artifacts,
+            boolean overwrite,
+            Cancellation cancellation,
+            Cancellation.Publication checkRevision,
+            Cancellation.Publication attach)
+            throws IOException {
+        synchronized (PUBLICATION_LOCK) {
+            cancellation.publish(() -> {
+                checkRevision.run();
+                publish(artifacts, overwrite, attach);
+            });
+        }
+    }
+
+    public static void save(PrintArtifact artifact, Path destination, boolean overwrite) throws IOException {
+        publish(Map.of(destination, artifact), overwrite, () -> {});
+    }
+
+    private record StagedFile(Path target, Path scratch, Path backup) {
+        static StagedFile prepare(Path target, PrintArtifact artifact, boolean overwrite) throws IOException {
+            Path filename = target.getFileName();
+            Path parent = target.getParent();
+            if (filename == null
+                    || parent == null
+                    || !filename.toString().toLowerCase(Locale.ROOT).endsWith("." + artifact.format()))
+                throw new IllegalArgumentException("Artifact requires a ." + artifact.format() + " destination");
+            boolean exists = Files.exists(target, LinkOption.NOFOLLOW_LINKS);
+            if (exists && (!overwrite || !Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)))
+                throw new FileAlreadyExistsException(
+                        target.toString(), null, overwrite ? "Expected a regular file" : "Explicit overwrite required");
+            Path scratch = Files.createTempFile(parent, ".voxelbrew-slice-", ".tmp");
+            Path backup = null;
+            try {
+                if (exists) {
+                    backup = Files.createTempFile(parent, ".voxelbrew-slice-backup-", ".tmp");
+                    Files.copy(target, backup, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+                }
+                Files.write(scratch, artifact.bytes());
+                try (var channel = FileChannel.open(scratch, StandardOpenOption.WRITE)) {
+                    channel.force(true);
+                }
+                return new StagedFile(target, scratch, backup);
+            } catch (IOException | RuntimeException failure) {
+                new StagedFile(target, scratch, backup).cleanup();
+                throw failure;
+            }
+        }
+
+        void publish(boolean overwrite) throws IOException {
+            if (overwrite && backup != null)
+                Files.move(scratch, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            else Files.createLink(target, scratch);
+        }
+
+        void restore() throws IOException {
+            if (backup != null)
+                Files.move(backup, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            else Files.deleteIfExists(target);
+        }
+
+        void cleanup() {
+            delete(scratch);
+            if (backup != null) delete(backup);
+        }
+
+        private static void delete(Path path) {
+            try {
+                Files.deleteIfExists(path);
+            } catch (IOException failure) {
+                log.warn("Could not remove temporary slicer output {}", path, failure);
+            }
         }
     }
 }

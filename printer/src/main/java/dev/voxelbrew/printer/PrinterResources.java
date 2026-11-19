@@ -50,13 +50,17 @@ public final class PrinterResources {
         }
         if (Files.exists(directory)) {
             try (var files = Files.list(directory)) {
-                for (var file : files.filter(p -> p.getFileName().toString().endsWith(".json"))
+                for (var file : files.filter(p ->
+                                java.util.Objects.toString(p.getFileName(), "").endsWith(".json"))
                         .sorted()
                         .toList()) {
                     try {
                         if (Files.size(file) > 1024 * 1024) throw new IOException("Preset exceeds 1 MiB");
-                        sources.add(
-                                new Source(file.getFileName().toString(), Files.readString(file), directory, false));
+                        sources.add(new Source(
+                                java.util.Objects.toString(file.getFileName(), ""),
+                                Files.readString(file),
+                                directory,
+                                false));
                     } catch (IOException ex) {
                         diagnostics.add(file + ": " + ex.getMessage());
                     }
@@ -89,7 +93,7 @@ public final class PrinterResources {
         var extensions = List.of("png", "jpg", "jpeg", "webp", "gif", "bmp");
         try (var files = Files.list(source.directory())) {
             var candidates = files.filter(path -> {
-                        String filename = path.getFileName().toString();
+                        String filename = java.util.Objects.toString(path.getFileName(), "");
                         int dot = filename.lastIndexOf('.');
                         return dot >= 0
                                 && filename.substring(0, dot).equals(stem)
@@ -97,11 +101,11 @@ public final class PrinterResources {
                                         filename.substring(dot + 1).toLowerCase(Locale.ROOT));
                     })
                     .sorted(Comparator.<Path>comparingInt(path -> {
-                                String filename = path.getFileName().toString();
+                                String filename = java.util.Objects.toString(path.getFileName(), "");
                                 return extensions.indexOf(filename.substring(filename.lastIndexOf('.') + 1)
                                         .toLowerCase(Locale.ROOT));
                             })
-                            .thenComparing(path -> path.getFileName().toString()))
+                            .thenComparing(path -> java.util.Objects.toString(path.getFileName(), "")))
                     .toList();
             for (var path : candidates) {
                 try {

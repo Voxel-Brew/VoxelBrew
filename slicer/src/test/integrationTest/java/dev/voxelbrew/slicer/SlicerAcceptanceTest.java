@@ -79,16 +79,14 @@ class SlicerAcceptanceTest {
         Files.createDirectories(artifacts);
         DocumentWriter.save(s.document(), artifacts.resolve(name + ".vxb"), true);
         var messages = new ArrayList<String>();
-        var result = SliceService.slice(
-                new PrusaSlicerBackend(),
-                s.document(),
+        var result = SlicerTestSupport.slice(
+                new dev.voxelbrew.slicer.prusa.PrusaSlicerProvider(),
                 dev.voxelbrew.engine.printing.ManufacturingModels.evaluate(s.document(), MeshOptions.DEFAULT),
-                PrusaSlicerBackend.defaultExecutable(),
+                java.util.Map.of(),
                 artifacts.resolve(name + ".gcode"),
                 true,
                 new Cancellation(),
-                messages::add,
-                dev.voxelbrew.api.slicer.Slicing.DIRECT);
+                messages::add);
         Files.write(artifacts.resolve(name + ".log"), messages);
         System.out.println(name
                 + ": model layers="

@@ -84,7 +84,10 @@ class UpdateArchive {
                     Files.createDirectories(target);
                     continue;
                 }
-                Files.createDirectories(target.getParent());
+                Path parent = target.getParent();
+                if (parent == null)
+                    throw new IOException("Archive entry requires a parent directory: " + entry.getName());
+                Files.createDirectories(parent);
                 var crc = new CRC32();
                 long size = 0;
                 try (var input = zip.getInputStream(entry);

@@ -17,6 +17,15 @@ class AtomicExportTest {
     Path directory;
 
     @Test
+    void rejectsFilesystemRootAsDestination() {
+        Path root = directory.toAbsolutePath().getRoot();
+        assertThatThrownBy(() ->
+                        AtomicExport.write(new FileExportDialog.Destination(root, true), output -> output.write('x')))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("Destination must name a file");
+    }
+
+    @Test
     void createRequiresExplicitConsentBeforeReplacingOutput() throws Exception {
         Path target = directory.resolve("output.txt");
         AtomicExport.write(

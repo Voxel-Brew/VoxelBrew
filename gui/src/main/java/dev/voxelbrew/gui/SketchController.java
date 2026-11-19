@@ -7,6 +7,7 @@ import dev.voxelbrew.engine.sketch.*;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import lombok.AccessLevel;
@@ -61,18 +62,19 @@ final class SketchController implements AutoCloseable {
     private Runnable onChanged = () -> {};
 
     private Request pending;
-    private boolean running, dragging;
+    private boolean running;
+    private volatile boolean dragging;
 
     @Getter(AccessLevel.PACKAGE)
     @Accessors(fluent = true)
-    private boolean busy;
+    private volatile boolean busy;
 
     @Getter(AccessLevel.PACKAGE)
     @Accessors(fluent = true)
     private String interactionError = "";
 
     private volatile boolean closed;
-    private volatile long sequence;
+    private final AtomicLong sequence = new AtomicLong();
 
     SketchController(SketchGeometry geometry, Consumer<Runnable> dispatch) {
         this(geometry, dispatch, SketchSolver::solve);
@@ -180,7 +182,7 @@ final class SketchController implements AutoCloseable {
         if (closed) return;
         busy = true;
         dragging = point != null;
-        var request = new Request(++sequence, definition, parameters, point, target, commit);
+        var request = new Request(sequence.incrementAndGet(), definition, parameters, point, target, commit);
         synchronized (lock) {
             pending = request;
             if (!running) {
@@ -221,7 +223,7 @@ final class SketchController implements AutoCloseable {
             }
             var completed = solved;
             dispatch.accept(() -> {
-                if (closed || request.sequence() != sequence) return;
+                if (closed || request.sequence() != sequence.get()) return;
                 busy = false;
                 result = completed;
                 displayed = completed.solved() ? completed.geometry() : definition;
@@ -248,7 +250,7 @@ final class SketchController implements AutoCloseable {
     @Override
     public void close() {
         closed = true;
-        sequence++;
+        sequence.incrementAndGet();
         synchronized (lock) {
             pending = null;
         }

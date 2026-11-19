@@ -283,27 +283,56 @@ publishing {
     }
 }
 
-val buildExporterFixture by
-    tasks.registering(GradleBuild::class) {
-        if (System.getProperty("voxelbrew.workspace") != null && gradle.parent != null) {
+// A separate Gradle invocation lets the fixture resolve the BOM convention as an included build.
+val fixtureTasks =
+    mapOf("buildExporterFixture" to "jar", "checkExporterFixture" to "check").mapValues {
+        (taskName, fixtureTask) ->
+        tasks.register<Exec>(taskName) {
+            val composite = gradle.parent ?: gradle
+            val dependencies = listOf("bom", "model", "import", "export", "slicer", "printer")
+            val workspaceBuild = composite.includedBuilds.map { it.name }.containsAll(dependencies)
+            if (workspaceBuild) {
+                dependsOn(
+                    dependencies.map { composite.includedBuild(it).task(":publishToMavenLocal") }
+                )
+            }
             dependsOn(
-                listOf("bom", "model", "import", "export", "slicer", "printer").map {
-                    gradle.parent!!.includedBuild(it).task(":publishToMavenLocal")
-                }
+                "publishEnginePublicationToFixtureRepository",
+                ":util:publishUtilPublicationToFixtureRepository",
             )
+            workingDir(rootProject.projectDir)
+            commandLine(
+                rootProject.file(if (windows) "gradlew.bat" else "gradlew").absolutePath,
+                "-p",
+                "fixtures/exporter-plugin",
+                fixtureTask,
+            )
+            if (gradle.startParameter.isOffline) args("--offline")
+            environment(
+                "ORG_GRADLE_PROJECT_bomVersion",
+                providers.gradleProperty("bomVersion").get(),
+            )
+            if (workspaceBuild || providers.gradleProperty("useMavenLocal").orNull == "true") {
+                environment("ORG_GRADLE_PROJECT_useMavenLocal", "true")
+            }
+            listOf("githubPackagesUser", "githubPackagesToken").forEach { key ->
+                providers.gradleProperty(key).orNull?.let {
+                    environment("ORG_GRADLE_PROJECT_$key", it)
+                }
+            }
         }
-        dependsOn(
-            "publishEnginePublicationToFixtureRepository",
-            ":util:publishUtilPublicationToFixtureRepository",
-        )
-        dir = rootProject.file("fixtures/exporter-plugin")
-        tasks = listOf("jar")
-        startParameter.projectProperties =
-            mapOf("bomVersion" to providers.gradleProperty("bomVersion").get()) +
-                listOf("useMavenLocal", "githubPackagesUser", "githubPackagesToken")
-                    .mapNotNull { key -> providers.gradleProperty(key).orNull?.let { key to it } }
-                    .toMap()
     }
+
+val buildExporterFixture = fixtureTasks.getValue("buildExporterFixture")
+val checkExporterFixture = fixtureTasks.getValue("checkExporterFixture")
+
+checkExporterFixture.configure {
+    group = "verification"
+    description = "Run checks on the standalone exporter provider fixture."
+    mustRunAfter(buildExporterFixture)
+}
+
+tasks.named("check") { dependsOn(checkExporterFixture) }
 
 tasks.named<Test>("integrationTest") {
     inputs.file(rootProject.file("fixtures/exporter-plugin/build/libs/fixture-exporter-1.0.jar"))

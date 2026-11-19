@@ -98,6 +98,7 @@ final class SessionCommand implements Callable<Integer> {
             volatile IOException outputFailure;
             String fingerprint;
             String target;
+            String slicerInstallation;
             String state = "running";
         }
 
@@ -245,6 +246,7 @@ final class SessionCommand implements Callable<Integer> {
                 job.target = current.printSetup()
                         .workspaceSettings()
                         .get(dev.voxelbrew.api.model.printing.PrintTarget.PRINTER_ID);
+                job.slicerInstallation = dev.voxelbrew.slicer.SlicerInstallation.selectedId(current.printSetup());
                 var command = new ArrayList<String>();
                 boolean windows =
                         System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win");
@@ -294,7 +296,9 @@ final class SessionCommand implements Callable<Integer> {
                                 job.target,
                                 current.printSetup()
                                         .workspaceSettings()
-                                        .get(dev.voxelbrew.api.model.printing.PrintTarget.PRINTER_ID)))
+                                        .get(dev.voxelbrew.api.model.printing.PrintTarget.PRINTER_ID))
+                        || !job.slicerInstallation.equals(
+                                dev.voxelbrew.slicer.SlicerInstallation.selectedId(current.printSetup())))
                     job.state = "outdated";
                 else {
                     var result = source.load(job.snapshot);

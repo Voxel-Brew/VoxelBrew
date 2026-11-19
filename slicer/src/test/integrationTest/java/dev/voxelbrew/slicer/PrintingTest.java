@@ -11,7 +11,6 @@ import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.exporter.DocumentWriter;
 import dev.voxelbrew.exporter.printing.*;
 import dev.voxelbrew.importer.DocumentReader;
-import dev.voxelbrew.slicer.prusa.PrusaSlicerBackend;
 import java.nio.file.*;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -53,16 +52,14 @@ class PrintingTest {
         assertThat(PrusaProjectExporter.volumes(model, model.instances().getFirst())
                         .size())
                 .isEqualTo(1);
-        var result = SliceService.slice(
-                new PrusaSlicerBackend(),
-                session.document(),
+        var result = SlicerTestSupport.slice(
+                new dev.voxelbrew.slicer.prusa.PrusaSlicerProvider(),
                 model,
-                PrusaSlicerBackend.defaultExecutable(),
+                Map.of(),
                 directory.resolve("supports-off.gcode"),
                 false,
                 new Cancellation(),
-                System.out::println,
-                dev.voxelbrew.api.slicer.Slicing.DIRECT);
+                System.out::println);
         assertThat(result.job().segments().stream()
                         .anyMatch(segment -> segment.deposits()
                                 && (segment.role() == GcodeJob.Role.SUPPORT
@@ -83,16 +80,14 @@ class PrintingTest {
         var session = reference();
         var model = dev.voxelbrew.engine.printing.ManufacturingModels.evaluate(session.document(), MeshOptions.DEFAULT);
         var output = directory.resolve("real reference job.gcode");
-        var result = SliceService.slice(
-                new PrusaSlicerBackend(),
-                session.document(),
+        var result = SlicerTestSupport.slice(
+                new dev.voxelbrew.slicer.prusa.PrusaSlicerProvider(),
                 model,
-                PrusaSlicerBackend.defaultExecutable(),
+                Map.of(),
                 output,
                 false,
                 new Cancellation(),
-                System.out::println,
-                dev.voxelbrew.api.slicer.Slicing.DIRECT);
+                System.out::println);
         var job = result.job();
         assertThat(job.modelLayers().size()).isEqualTo(40);
         assertThat(job.modelLayers().getFirst()).isCloseTo(0.2, org.assertj.core.data.Offset.offset(1e-6));
@@ -128,16 +123,14 @@ class PrintingTest {
         session.setPrintSetup(session.document().printSetup().withNozzle(0.6));
         var model = ManufacturingModels.evaluate(session.document(), MeshOptions.DEFAULT);
         var output = directory.resolve("0.6-mm-nozzle.gcode");
-        var result = SliceService.slice(
-                new PrusaSlicerBackend(),
-                session.document(),
+        var result = SlicerTestSupport.slice(
+                new dev.voxelbrew.slicer.prusa.PrusaSlicerProvider(),
                 model,
-                PrusaSlicerBackend.defaultExecutable(),
+                Map.of(),
                 output,
                 false,
                 new Cancellation(),
-                System.out::println,
-                dev.voxelbrew.api.slicer.Slicing.DIRECT);
+                System.out::println);
         assertThat(result.job().report().get("nozzle_mm")).isEqualTo("0.6");
         assertThat(result.job().modelLayers().isEmpty()).isFalse();
         assertThat(Files.size(output) > 0).isTrue();

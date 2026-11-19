@@ -7,8 +7,8 @@ import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.exporter.printing.PrusaConfiguration;
 import dev.voxelbrew.printer.ProfileHardware;
-import dev.voxelbrew.slicer.prusa.PrusaSlicerBackend;
 import java.nio.file.*;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -29,16 +29,14 @@ class PrinterPresetSlicingTest {
                 .isEqualTo("0.0x0.0,240.0x0.0,240.0x230.0,0.0x230.0");
         assertThat(PrusaConfiguration.settings(model).get("max_print_height")).isEqualTo("260.0");
         var target = directory.resolve("printer.gcode");
-        var result = SliceService.slice(
-                new PrusaSlicerBackend(),
-                session.document(),
+        var result = SlicerTestSupport.slice(
+                new dev.voxelbrew.slicer.prusa.PrusaSlicerProvider(),
                 model,
-                PrusaSlicerBackend.defaultExecutable(),
+                Map.of(),
                 target,
                 false,
                 new Cancellation(),
-                ignored -> {},
-                dev.voxelbrew.api.slicer.Slicing.DIRECT);
+                ignored -> {});
         assertThat(result.job().modelLayers().isEmpty()).isFalse();
         for (String id : java.util.List.of("bambu-lab-a1-mini", "prusa-xl-5-tool")) {
             session.setPrintSetup(
@@ -49,16 +47,14 @@ class PrinterPresetSlicingTest {
             assertThat(settings.get("printer_settings_id")).isEqualTo(id);
             assertThat(settings.get("max_print_height"))
                     .isEqualTo(Double.toString(catalog.require(id).printer().usableHeight()));
-            var sliced = SliceService.slice(
-                    new PrusaSlicerBackend(),
-                    session.document(),
+            var sliced = SlicerTestSupport.slice(
+                    new dev.voxelbrew.slicer.prusa.PrusaSlicerProvider(),
                     vendorModel,
-                    PrusaSlicerBackend.defaultExecutable(),
+                    Map.of(),
                     target,
                     true,
                     new Cancellation(),
-                    ignored -> {},
-                    dev.voxelbrew.api.slicer.Slicing.DIRECT);
+                    ignored -> {});
             assertThat(sliced.job().modelLayers().isEmpty()).isFalse();
         }
         session.setPrintSetup(session.document()

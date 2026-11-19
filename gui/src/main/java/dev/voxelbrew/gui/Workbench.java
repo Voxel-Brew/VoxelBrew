@@ -404,7 +404,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             java.util.function.Supplier<dev.voxelbrew.api.importer.ImporterProviderRegistry> importers,
             PrintingPane printing,
             PrinterPane printer,
-            SlicerSettingsDialog slicerSettings,
+            SlicerSettings slicerSettings,
             Appearance appearance,
             Rendering rendering,
             ExecutorService preferencesWorker,
@@ -645,14 +645,15 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                                 "keyboard-shortcuts",
                                 true,
                                 () -> KeyboardShortcuts.show(stage, translations)));
-        var slicerMenu = menu("menu-slicer");
-        slicerMenu
+        var slicersMenu = menu("menu-slicer");
+        slicersMenu
                 .getItems()
                 .add(menuItem(
                         translations.text("slicer.settings.title"),
                         "slicer-settings",
                         false,
-                        () -> slicerSettings.show(stage)));
+                        () -> slicerSettings.configure(
+                                resources.slicers, stage, translations, printing::reloadSlicers)));
         var printersMenu = menu("menu-printers");
         printersMenu
                 .getItems()
@@ -684,7 +685,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                                 "printers-visibility",
                                 false,
                                 printing::manageVisiblePrinters));
-        var menuBar = new MenuBar(fileMenu, editMenu, viewMenu, slicerMenu, printersMenu, settingsMenu);
+        var menuBar = new MenuBar(fileMenu, editMenu, viewMenu, slicersMenu, printersMenu, settingsMenu);
         menuBar.setId("main-menu");
         menuBar.disableProperty().bind(disabledProperty());
         menuBar.setMinWidth(Region.USE_PREF_SIZE);

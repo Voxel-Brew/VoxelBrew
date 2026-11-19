@@ -364,7 +364,8 @@ tasks.wrapper {
     distributionSha256Sum = "a17ddd85a26b6a7f5ddb71ff8b05fc5104c0202c6e64782429790c933686c806"
 }
 
-// Frontends use APIs for operations. Composition roots construct the printer store directly.
+// Frontends use APIs for operations. The host uses application services for slicing and printer
+// storage.
 for (module in listOf(":cli", ":gui")) {
     project(module) {
         val verifyFrontendIoDependencies by
@@ -387,18 +388,23 @@ for (module in listOf(":cli", ":gui")) {
                         setOf("import", "export", "slicer", "printer").map {
                             "dev.voxelbrew.api:$it"
                         }
-                    val implementations =
+                    val hostServices =
                         setOf("importer", "exporter", "slicer", "printer").map {
                             "dev.voxelbrew:$it-impl"
                         }
                     check(compile.containsAll(apis)) {
                         "$module is missing public API dependencies"
                     }
-                    val runtimeOnlyImplementations = implementations - "dev.voxelbrew:printer-impl"
-                    check(compile.intersect(runtimeOnlyImplementations.toSet()).isEmpty()) {
-                        "$module compiles against implementations"
+                    val applicationModules = compile.filter { it.startsWith("dev.voxelbrew:") }
+                    val allowed =
+                        hostServices +
+                            listOf("bom", "engine", "util", module.removePrefix(":")).map {
+                                "dev.voxelbrew:$it"
+                            }
+                    check(allowed.containsAll(applicationModules)) {
+                        "$module has unexpected compile dependencies: ${applicationModules - allowed.toSet()}"
                     }
-                    check(runtime.containsAll(apis + implementations)) {
+                    check(runtime.containsAll(apis + hostServices)) {
                         "$module runtime is missing APIs or implementations"
                     }
                 }

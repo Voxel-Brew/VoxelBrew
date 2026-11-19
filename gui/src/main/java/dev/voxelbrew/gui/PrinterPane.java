@@ -4,6 +4,7 @@ import dev.voxelbrew.api.model.CadDocument;
 import dev.voxelbrew.api.model.printing.PrintArtifact;
 import dev.voxelbrew.api.printer.*;
 import dev.voxelbrew.api.printer.driver.*;
+import dev.voxelbrew.slicer.SliceService;
 import dev.voxelbrew.util.i18n.Translations;
 import java.nio.file.*;
 import java.util.*;
@@ -428,6 +429,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
 
     private void exportGcode() {
         if (document == null || plates.getValue() == null) return;
+        long revision = jobGeneration;
         var lines = document.gcode().getOrDefault(plates.getValue().id(), List.of());
         if (lines.isEmpty()) return;
         var artifact = document.printArtifacts().get(plates.getValue().id());
@@ -440,25 +442,31 @@ final class PrinterPane extends VBox implements AutoCloseable {
         var chosen = chooser.showSaveDialog(getScene().getWindow());
         if (chosen == null) return;
         var path = chosen.toPath();
-        if (Files.exists(path)) {
+        boolean overwrite = Files.exists(path);
+        if (overwrite) {
             var confirmation = new Alert(
                     Alert.AlertType.CONFIRMATION, text.text("file.replace", path), ButtonType.YES, ButtonType.NO);
             if (Dialogs.show(confirmation, getScene().getWindow(), text).orElse(ButtonType.NO) != ButtonType.YES)
                 return;
         }
         try {
-            saveArtifact(path, artifact, lines);
-        } catch (java.io.IOException failure) {
+            var payload = artifact == null
+                    ? PrintArtifact.of(
+                            "gcode",
+                            (String.join("\n", lines) + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                            java.util.Map.of())
+                    : artifact;
+            SliceService.publish(
+                    java.util.Map.of(path, payload),
+                    overwrite,
+                    new dev.voxelbrew.api.model.printing.Cancellation(),
+                    () -> {
+                        if (revision != jobGeneration) throw new SliceService.OutdatedException();
+                    },
+                    () -> {});
+        } catch (java.io.IOException | IllegalArgumentException | SliceService.OutdatedException failure) {
             error(failure);
         }
-    }
-
-    static void saveArtifact(Path path, PrintArtifact artifact, List<String> lines) throws java.io.IOException {
-        Files.write(
-                path,
-                artifact == null
-                        ? (String.join("\n", lines) + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8)
-                        : artifact.bytes());
     }
 
     private void submit() {

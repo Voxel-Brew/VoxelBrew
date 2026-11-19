@@ -1,15 +1,18 @@
 package dev.voxelbrew.slicer.cura;
 
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonParser;
 import dev.voxelbrew.api.model.printing.*;
-import dev.voxelbrew.api.slicer.SlicerBackend;
+import dev.voxelbrew.api.slicer.SlicerException;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.slicer.internal.ProcessRunner;
+import dev.voxelbrew.slicer.internal.ProcessSlicer;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
 
 /** Headless CuraEngine adapter using matching, user-supplied machine definitions. */
-public final class CuraSlicerBackend implements SlicerBackend {
+public final class CuraSlicerBackend implements ProcessSlicer {
     private final Map<String, String> configuration;
 
     public CuraSlicerBackend() {
@@ -22,7 +25,7 @@ public final class CuraSlicerBackend implements SlicerBackend {
 
     @Override
     public Descriptor descriptor() {
-        return new Descriptor("cura", "CuraEngine", API_VERSION, "5.x", Set.of(), Set.of("gcode"));
+        return new Descriptor("cura", "CuraEngine", Set.of(), Set.of("gcode"));
     }
 
     @Override
@@ -31,7 +34,7 @@ public final class CuraSlicerBackend implements SlicerBackend {
     }
 
     @Override
-    public SlicerBackend configure(Map<String, String> options) {
+    public ProcessSlicer configure(Map<String, String> options) {
         if (!configurationOptions().keySet().containsAll(options.keySet()))
             throw new IllegalArgumentException("Unknown Cura option");
         var merged = new TreeMap<>(configuration);
@@ -46,32 +49,49 @@ public final class CuraSlicerBackend implements SlicerBackend {
     }
 
     @Override
-    public Probe probe(Path executable, Cancellation cancellation) throws IOException {
+    public Probe probe(Path executable, Cancellation cancellation) throws IOException, SlicerException {
         String definition = configuration.getOrDefault("definition", "");
         if (definition.isBlank() || !Files.isRegularFile(Path.of(definition)))
-            throw new IOException("Configure slicer.cura.definition with a CuraEngine definition JSON file");
+            throw new SlicerException.Configuration(
+                    "Configure slicer.cura.definition with a CuraEngine definition JSON file");
+        try (var reader = Files.newBufferedReader(Path.of(definition))) {
+            var value = JsonParser.parseReader(reader);
+            if (!value.isJsonObject() || !value.getAsJsonObject().has("version"))
+                throw new SlicerException.Configuration("Expected a versioned CuraEngine machine definition");
+        } catch (JsonParseException invalid) {
+            throw new SlicerException.Configuration("Invalid CuraEngine definition JSON: " + invalid.getMessage());
+        }
         String settings = configuration.getOrDefault("settings", "");
         if (!settings.isBlank() && !Files.isReadable(Path.of(settings)))
-            throw new IOException("Cannot read CuraEngine settings: " + settings);
+            throw new SlicerException.Configuration("Cannot read CuraEngine settings: " + settings);
+        if (!settings.isBlank()) {
+            try (var reader = Files.newBufferedReader(Path.of(settings))) {
+                new Properties().load(reader);
+            } catch (IllegalArgumentException invalid) {
+                throw new SlicerException.Configuration("Invalid CuraEngine settings: " + invalid.getMessage());
+            }
+        }
         String output = ProcessRunner.run(List.of(executable.toString(), "help"), null, cancellation, line -> {});
         var version = java.util.regex.Pattern.compile("Cura_SteamEngine version (5\\.[^\\s]+)")
                 .matcher(output);
-        if (!version.find()) throw new IOException("Expected CuraEngine 5.x; executable reported: " + output);
+        if (!version.find())
+            throw new SlicerException.Configuration("Expected CuraEngine 5.x; executable reported: " + output);
         return new Probe("CuraEngine " + version.group(1), Set.of());
     }
 
-    Map<String, String> settings(ManufacturingModel model) throws IOException {
+    Map<String, String> settings(ManufacturingModel model) throws IOException, SlicerException {
         var profile = model.profile();
         var process = profile.process();
         if ((!profile.printer().firmware().equals("marlin2")
                         && !profile.printer().firmware().equals("vendor"))
                 || !profile.printer().outputFormat().equals("gcode"))
-            throw new IOException("Cura adapter requires Marlin 2 text G-code");
+            throw new SlicerException.UnsupportedInput("Cura adapter requires Marlin 2 text G-code");
         if (!model.setup().supports().isEmpty()
                 || process.automaticSupports()
                 || process.brimWidth() > 0
                 || process.raftLayers() > 0)
-            throw new IOException("Cura support volumes, automatic supports, brim and raft are not yet supported");
+            throw new SlicerException.UnsupportedInput(
+                    "Cura support volumes, automatic supports, brim and raft are not yet supported");
         var result = new TreeMap<String, String>();
         String settings = configuration.getOrDefault("settings", "");
         if (!settings.isBlank()) {
@@ -123,10 +143,11 @@ public final class CuraSlicerBackend implements SlicerBackend {
     }
 
     @Override
-    public RunResult slice(Request request) throws IOException {
+    public RunResult slice(Request request) throws IOException, SlicerException {
         String definition = configuration.getOrDefault("definition", "");
         if (definition.isBlank() || !Files.isRegularFile(Path.of(definition)))
-            throw new IOException("Configure slicer.cura.definition with a CuraEngine definition JSON file");
+            throw new SlicerException.Configuration(
+                    "Configure slicer.cura.definition with a CuraEngine definition JSON file");
         var settings = settings(request.model());
         var arguments = new ArrayList<>(List.of(
                 request.executable().toString(),

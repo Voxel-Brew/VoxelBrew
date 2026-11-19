@@ -2215,70 +2215,154 @@ class WorkbenchUiTest {
     }
 
     @Test
-    void slicerMenuPersistsSeparateProviderSettingsAndDiscardsUnsavedEdits() throws Exception {
+    void namedSlicerInstallationsAreCheckedBeforeTheyCanBeSelected() throws Exception {
+        ready();
+        openPrepared("plate-5mm.vxb");
+        click("workspace-print");
+        ready();
+        click("print-add");
+        ready();
+        var store = new dev.voxelbrew.slicer.SlicerInstallationStore(configuration.path());
+
+        click("menu-slicer");
+        click("slicer-settings");
+        var bundled = store.load().stream()
+                .filter(installation -> installation.bundled())
+                .toList();
+        if (!bundled.isEmpty()) {
+            assertThat(bundled)
+                    .extracting(installation -> installation.name())
+                    .containsExactly("OrcaSlicer", "PrusaSlicer");
+            assertThat(fx(() -> node("#slicer-installation-edit").isDisabled())).isTrue();
+            assertThat(fx(() -> ((Label) node("#slicer-installation-status")).getText()))
+                    .contains("Bundled and read-only");
+        }
+        openPrusaInstallation("Prusa first");
+        assertSlicerInstallationRejected("Choose a slicer executable");
+        assertThat(store.load()).allMatch(dev.voxelbrew.slicer.SlicerInstallation::bundled);
+        text("slicer-input-executable", "missing-voxelbrew-test-slicer.exe");
+        assertSlicerInstallationRejected("missing-voxelbrew-test-slicer.exe");
+        assertThat(store.load()).allMatch(dev.voxelbrew.slicer.SlicerInstallation::bundled);
+        String executable = PrusaSlicerBackend.defaultExecutable().toString();
+        text("slicer-input-executable", executable);
+        saveSlicerInstallation("Prusa first");
+        assertThat(store.load())
+                .filteredOn(installation -> !installation.bundled())
+                .singleElement()
+                .satisfies(installation -> {
+                    assertThat(installation.name()).isEqualTo("Prusa first");
+                    assertThat(installation.operational()).isTrue();
+                    assertThat(installation.version()).startsWith("PrusaSlicer-");
+                });
+        openPrusaInstallation("Prusa second");
+        text("slicer-input-executable", executable);
+        saveSlicerInstallation("Prusa second");
+        assertThat(store.load())
+                .filteredOn(installation -> !installation.bundled())
+                .hasSize(2);
+        assertThat(fx(() -> ((Label) node("#slicer-installation-status")).getText()))
+                .contains("Operational");
+        fx(() -> {
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "slicer-installations.png"));
+            return null;
+        });
+        key(KeyCode.ESCAPE);
+
+        click("print-tab-process");
+        var slicerNames = fx(() -> ((ComboBox<?>) node("#print-backend"))
+                .getItems().stream()
+                        .map(dev.voxelbrew.slicer.SlicerInstallation.class::cast)
+                        .map(dev.voxelbrew.slicer.SlicerInstallation::name)
+                        .toList());
+        assertThat(slicerNames).containsSubsequence("Prusa first", "Prusa second");
+        assertThat(slicerNames)
+                .containsAll(bundled.stream()
+                        .map(installation -> installation.name())
+                        .toList());
+        choice("print-backend", slicerNames.indexOf("Prusa second"));
+        ready();
+        var selected = store.require(
+                dev.voxelbrew.slicer.SlicerInstallation.selectedId(document().printSetup()));
+        assertThat(selected.name()).isEqualTo("Prusa second");
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+        while (fx(() -> node("#print-slice").isDisabled()) && System.nanoTime() < deadline) Thread.sleep(25);
+        click("print-slice");
+        deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().running()) && System.nanoTime() < deadline)
+            Thread.sleep(25);
+        assertThat(fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()))
+                .isEqualTo(PrintController.State.SUCCEEDED);
+        assertThat(document().printArtifacts().get("plate-1").metadata()).containsEntry("backend", "prusa-slicer");
+    }
+
+    @Test
+    void curaInstallationShowsReadableLabelsAndFilePickers() throws Exception {
         ready();
         click("menu-slicer");
         click("slicer-settings");
-        click("slicer-settings-prusa-slicer");
-        text("slicer-option-prusa-slicer-executable", "C:/Slicers/prusa.exe");
-        click("slicer-settings-cura");
-        text("slicer-option-cura-executable", "C:/Slicers/CuraEngine.exe");
-        text("slicer-option-cura-definition", "C:/Slicers/machine.json");
-        text("slicer-option-cura-settings", "C:/Slicers/process.properties");
-        click("slicer-settings-save");
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-        while (fx(() -> node("#slicer-settings-save").isDisabled()) && System.nanoTime() < deadline) Thread.sleep(25);
-        assertThat(fx(() -> ((Label) node("#slicer-settings-status")).getText().contains("saved")))
-                .isTrue();
-        long probeDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
-        while (fx(() -> ((Label) node("#slicer-status-cura")).getText().contains("Checking"))
-                && System.nanoTime() < probeDeadline) Thread.sleep(25);
-        assertThat(fx(() -> ((Label) node("#slicer-status-cura")).getText().contains("Not working")))
-                .isTrue();
+        chooseSlicerProvider("cura");
+        click("slicer-installation-add");
         fx(() -> {
-            var statusPanel = node("#slicer-status-cura").getParent();
-            assertThat(statusPanel.getStyleClass().contains("unavailable")).isTrue();
-            var saveButton = (Button) node("#slicer-settings-save");
-            var cancelButton = (Button) node("#slicer-settings-close");
-            assertThat(cancelButton.getParent()).isSameAs(saveButton.getParent());
-            assertThat(saveButton.isDefaultButton()).isTrue();
-            assertThat(cancelButton.getText()).isEqualTo("Cancel");
-            assertThat(cancelButton
-                            .localToScene(cancelButton.getBoundsInLocal())
-                            .getCenterY())
-                    .isCloseTo(
-                            saveButton
-                                    .localToScene(saveButton.getBoundsInLocal())
-                                    .getCenterY(),
-                            org.assertj.core.data.Offset.offset(1.0));
-            return null;
-        });
-        assertThat(fx(() -> workbench.lookup("#print-slice").isDisabled())).isTrue();
-        assertThat(fx(() -> workbench.lookup("#print-slice-all").isDisabled())).isTrue();
-        assertThat(configuration.section("slicer", "prusa-slicer").get("executable", ""))
-                .isEqualTo("C:/Slicers/prusa.exe");
-        assertThat(configuration.section("slicer", "cura").get("executable", ""))
-                .isEqualTo("C:/Slicers/CuraEngine.exe");
-        assertThat(configuration.section("slicer", "cura").get("definition", ""))
-                .isEqualTo("C:/Slicers/machine.json");
-        assertThat(configuration.section("slicer", "cura").get("settings", ""))
-                .isEqualTo("C:/Slicers/process.properties");
-        fx(() -> {
+            assertThat(node("#slicer-input-executable")).isInstanceOf(TextField.class);
+            assertThat(node("#slicer-input-executable-browse")).isInstanceOf(Button.class);
+            assertThat(node("#slicer-input-definition-browse")).isInstanceOf(Button.class);
+            assertThat(node("#slicer-input-settings-browse")).isInstanceOf(Button.class);
+            var labels = stage.getScene().getRoot().lookupAll(".export-dialog-field-label");
+            assertThat(labels.stream().map(Label.class::cast).map(Label::getText))
+                    .contains(
+                            "Installation name",
+                            "Slicer executable",
+                            "Machine definition (JSON)",
+                            "Settings overrides (optional)");
+            assertThat(node("#slicer-input-executable").localToScene(0, 0).getY())
+                    .isLessThan(
+                            node("#slicer-input-definition").localToScene(0, 0).getY());
             Screenshot.save(
-                    stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "slicer-settings.png"));
+                    stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "cura-installation.png"));
             return null;
         });
-        click("slicer-settings-close");
-        click("menu-slicer");
-        click("slicer-settings");
-        click("slicer-settings-prusa-slicer");
-        assertThat(fx(() -> ((TextField) node("#slicer-option-prusa-slicer-executable")).getText()))
-                .isEqualTo("C:/Slicers/prusa.exe");
-        text("slicer-option-prusa-slicer-executable", "discarded");
         key(KeyCode.ESCAPE);
-        assertThat(configuration.section("slicer", "prusa-slicer").get("executable", ""))
-                .isEqualTo("C:/Slicers/prusa.exe");
-        assertThat(fx(() -> workbench.controller().dirty())).isFalse();
+        key(KeyCode.ESCAPE);
+    }
+
+    private void openPrusaInstallation(String name) throws Exception {
+        chooseSlicerProvider("prusa-slicer");
+        click("slicer-installation-add");
+        text("slicer-input-voxelbrew-installation-name", name);
+    }
+
+    private void chooseSlicerProvider(String id) throws Exception {
+        String combo = "slicer-installation-provider";
+        int index = fx(() -> ((ComboBox<?>) node("#" + combo))
+                .getItems().stream()
+                        .map(dev.voxelbrew.api.slicer.SlicerDescriptor.class::cast)
+                        .map(dev.voxelbrew.api.slicer.SlicerDescriptor::id)
+                        .toList()
+                        .indexOf(id));
+        choice(combo, index);
+    }
+
+    private void assertSlicerInstallationRejected(String message) throws Exception {
+        click("export-confirm");
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+        while (!fx(() -> stage.getScene().lookup("#export-error") instanceof Label label
+                        && label.isVisible()
+                        && label.getText().contains(message))
+                && System.nanoTime() < deadline) Thread.sleep(25);
+        assertThat(fx(() -> ((Label) node("#export-error")).getText())).contains(message);
+    }
+
+    private void saveSlicerInstallation(String name) throws Exception {
+        click("export-confirm");
+        var store = new dev.voxelbrew.slicer.SlicerInstallationStore(configuration.path());
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+        while (store.load().stream().noneMatch(entry -> entry.name().equals(name)) && System.nanoTime() < deadline)
+            Thread.sleep(25);
+        assertThat(store.load())
+                .extracting(dev.voxelbrew.slicer.SlicerInstallation::name)
+                .contains(name);
     }
 
     @Test
@@ -3318,6 +3402,11 @@ class WorkbenchUiTest {
         configuration =
                 new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("preferences.properties"));
         String testName = info.getTestMethod().orElseThrow().getName();
+        if (!testName.equals("namedSlicerInstallationsAreCheckedBeforeTheyCanBeSelected")) {
+            var store = new dev.voxelbrew.slicer.SlicerInstallationStore(configuration.path());
+            store.save(new dev.voxelbrew.slicer.SlicerInstallation(
+                    UUID.randomUUID(), "prusa-slicer", "PrusaSlicer", "test installation", "", Map.of()));
+        }
         boolean firstLaunch = testName.startsWith("firstLaunch");
         if (!firstLaunch) configuration.set("language", testName.startsWith("polish") ? "pl" : "en");
         configuration.set("external.setting", "preserve me");

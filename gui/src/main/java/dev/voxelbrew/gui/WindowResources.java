@@ -1,7 +1,7 @@
 package dev.voxelbrew.gui;
 
 import dev.voxelbrew.api.exporter.ExporterProviderRegistry;
-import dev.voxelbrew.api.slicer.SlicerCatalog;
+import dev.voxelbrew.api.slicer.SlicerProviderRegistry;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -14,7 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 final class WindowResources implements AutoCloseable {
     final ExporterProviderRegistry exporters;
     final dev.voxelbrew.api.printer.driver.DriverRegistry printers;
-    final SlicerCatalog slicers;
+    final SlicerProviderRegistry slicers;
     final ExecutorService rebuild, files, slicing, validation, appearance, printer;
     private boolean closed;
     private final CompletableFuture<Void> disposal = new CompletableFuture<>();
@@ -22,13 +22,14 @@ final class WindowResources implements AutoCloseable {
     WindowResources(
             Path plugins,
             java.util.function.Supplier<ExporterProviderRegistry> exporterSupplier,
-            SlicerCatalog.Factory slicerFactory) {
+            java.util.function.Supplier<SlicerProviderRegistry> slicerSupplier) {
         ExporterProviderRegistry opened = null;
-        SlicerCatalog openedSlicers = null;
+        SlicerProviderRegistry openedSlicers = null;
         dev.voxelbrew.api.printer.driver.DriverRegistry openedPrinters = null;
         try {
             opened = exporterSupplier.get().withDirectory(plugins);
-            openedSlicers = slicerFactory.open(plugins);
+            openedSlicers = slicerSupplier.get();
+            openedSlicers.withDirectory(plugins);
             slicers = openedSlicers;
             exporters = opened;
             openedPrinters = java.util.ServiceLoader.load(dev.voxelbrew.api.printer.driver.DriverRegistry.class)

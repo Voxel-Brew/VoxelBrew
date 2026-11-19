@@ -22,6 +22,12 @@ Place unit tests in `src/test/test/java` and use temporary paths for filesystem 
 process, or service-boundary behavior. Also run the root formatting and basic-check commands before
 submitting changes.
 
+## Pre-commit SpotBugs
+
+Before committing a change to this module, run
+`./gradlew :util:spotbugsMain` from the application root.
+Use `.\gradlew.bat` in place of `./gradlew` on Windows.
+
 ## Lombok in Java code
 
 Use Lombok where it removes routine Java boilerplate without obscuring a public contract. Apply these annotations in Java-bearing repositories and modules; the website has no Java production code.

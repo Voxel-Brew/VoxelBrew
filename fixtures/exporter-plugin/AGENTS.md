@@ -11,6 +11,13 @@
 - Validate provider discovery, duplicate handling and failure handling with relevant
   host tests. Compilation alone does not verify plugin loading or native behavior.
 
+## Pre-commit SpotBugs
+
+Before committing fixture changes, run `./gradlew :engine:buildExporterFixture` from
+the application root to prepare the fixture dependencies. Then run
+`./gradlew -p fixtures/exporter-plugin spotbugsMain spotbugsFeatures`.
+Use `.\gradlew.bat` in place of `./gradlew` on Windows.
+
 ## Lombok in Java code
 
 Use Lombok where it removes routine Java boilerplate without obscuring a public contract. Apply these annotations in Java-bearing repositories and modules; the website has no Java production code.

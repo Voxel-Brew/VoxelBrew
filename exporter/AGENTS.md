@@ -22,6 +22,12 @@ Add focused tests under `src/test/test/` and fixtures under test resources. Run
 geometry, plugin, or round-trip changes. New formats need success, invalid-input, cancellation, and
 destination-preservation coverage.
 
+## Pre-commit SpotBugs
+
+Before committing a change to this module, run
+`./gradlew :exporter-impl:spotbugsMain` from the application root.
+Use `.\gradlew.bat` in place of `./gradlew` on Windows.
+
 ## Lombok in Java code
 
 Use Lombok where it removes routine Java boilerplate without obscuring a public contract. Apply these annotations in Java-bearing repositories and modules; the website has no Java production code.

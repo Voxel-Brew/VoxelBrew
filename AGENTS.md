@@ -41,6 +41,13 @@ Tests use JUnit 5 and should end in `Test` (for example, `SketchSolverTest`). Ad
 in the owning module; reserve integration and E2E suites for native, packaged, or UI behavior.
 There is no numeric coverage quota, but every behavior change should include regression coverage.
 
+## Pre-commit SpotBugs
+
+Before committing, run `./gradlew spotbugsMain` from the application root to analyze
+production code across the Java modules. For a change limited to one module, use
+its qualified task, for example `./gradlew :gui:spotbugsMain`.
+Use `.\gradlew.bat` in place of `./gradlew` on Windows.
+
 ## Commit & Pull Request Guidelines
 
 Start every commit subject with `feat:`, `fix:`, or `chore:` and follow it with a concise,

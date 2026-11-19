@@ -18,7 +18,9 @@ final class Screenshot {
         snapshot.getPixelReader().getPixels(0, 0, width, height, PixelFormat.getIntArgbInstance(), pixels, 0, width);
         var image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         image.setRGB(0, 0, width, height, pixels, 0, width);
-        Files.createDirectories(path.toAbsolutePath().getParent());
+        Path parent = path.toAbsolutePath().getParent();
+        if (parent == null) throw new java.io.IOException("Expected a screenshot file: " + path);
+        Files.createDirectories(parent);
         ImageIO.write(image, "png", path.toFile());
     }
 }

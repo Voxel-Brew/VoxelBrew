@@ -22,7 +22,7 @@ public final class StepDocumentWriter {
                     .map(Evaluation.Body::solid)
                     .toList());
         }
-        Path temporary = Files.createTempFile(target.getParent(), ".voxelbrew-step-", ".tmp");
+        Path temporary = Files.createTempFile(AtomicExport.parentDirectory(target), ".voxelbrew-step-", ".tmp");
         try {
             try (var channel = FileChannel.open(temporary, StandardOpenOption.WRITE)) {
                 var bytes = ByteBuffer.wrap(encoded);

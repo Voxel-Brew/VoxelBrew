@@ -1,5 +1,6 @@
 package dev.voxelbrew.gui;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import javafx.animation.PauseTransition;
@@ -75,11 +76,13 @@ final class PackageSmoke {
                                         + System.getProperty("java.runtime.version")
                                         + "; runtime="
                                         + System.getProperty("java.home");
-                                String filename = file.getFileName().toString();
+                                Path name = file.getFileName();
+                                if (name == null) throw new IOException("Expected a smoke-test output file: " + file);
+                                String filename = name.toString();
                                 Files.writeString(
                                         file.resolveSibling(filename.replaceFirst("\\.[^.]+$", "") + ".txt"), result);
                                 System.out.println(result);
-                            } catch (java.io.IOException failure) {
+                            } catch (IOException failure) {
                                 throw new java.io.UncheckedIOException(failure);
                             }
                             w.close();

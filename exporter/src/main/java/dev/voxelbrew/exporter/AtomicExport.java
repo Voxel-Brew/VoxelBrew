@@ -14,13 +14,17 @@ public class AtomicExport {
         void write(OutputStream output) throws IOException;
     }
 
+    static Path parentDirectory(Path target) throws IOException {
+        Path parent = target.getParent();
+        if (parent == null) throw new IOException("Destination must name a file: " + target);
+        return parent;
+    }
+
     public static void write(FileExportDialog.Destination destination, Writer writer) throws IOException {
         Path target = destination.path().toAbsolutePath().normalize();
         if (!destination.overwrite() && Files.exists(target))
             throw new IOException("Destination exists; use explicit overwrite: " + target);
-        Path parent = target.getParent();
-        if (parent == null) throw new IOException("Destination must name a file: " + target);
-        Path temporary = Files.createTempFile(parent, ".voxelbrew-export-", ".tmp");
+        Path temporary = Files.createTempFile(parentDirectory(target), ".voxelbrew-export-", ".tmp");
         try {
             try (var channel = FileChannel.open(temporary, StandardOpenOption.WRITE);
                     var stream = Channels.newOutputStream(channel)) {

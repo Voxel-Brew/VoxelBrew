@@ -7,6 +7,7 @@ import dev.voxelbrew.importer.ImportRuntime;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import lombok.AccessLevel;
@@ -128,11 +129,11 @@ public final class DocumentController implements AutoCloseable {
     private Request pending;
     private boolean running;
     private volatile boolean closed;
-    private volatile long sequence;
-    private long documentGeneration;
+    private final AtomicLong sequence = new AtomicLong();
+    private final AtomicLong documentGeneration = new AtomicLong();
     private ModelSession session = new ModelSession(newDesktopDocument());
     private CadDocument saved = session.document();
-    private boolean unsavedImport;
+    private volatile boolean unsavedImport;
 
     @Getter
     @Accessors(fluent = true)
@@ -147,11 +148,11 @@ public final class DocumentController implements AutoCloseable {
 
     @Getter
     @Accessors(fluent = true)
-    private boolean rebuilding;
+    private volatile boolean rebuilding;
 
     @Getter
     @Accessors(fluent = true)
-    private boolean ioBusy;
+    private volatile boolean ioBusy;
 
     @Getter
     @Accessors(fluent = true)
@@ -215,7 +216,7 @@ public final class DocumentController implements AutoCloseable {
     }
 
     long generation() {
-        return documentGeneration;
+        return documentGeneration.get();
     }
 
     public List<Feature> effectiveFeatures() {
@@ -314,7 +315,7 @@ public final class DocumentController implements AutoCloseable {
         unsavedImport = false;
         path = source;
         preview = null;
-        documentGeneration++;
+        documentGeneration.incrementAndGet();
         build = new Build(List.of(), List.of(), true);
         schedule(document, false);
     }
@@ -516,7 +517,7 @@ public final class DocumentController implements AutoCloseable {
         requireIdleIo();
         capturePrintWorkspace();
         var captured = session.document();
-        long generation = documentGeneration;
+        long generation = documentGeneration.get();
         ioBusy = true;
         onChanged.run();
         var result = new CompletableFuture<Void>();
@@ -529,7 +530,7 @@ public final class DocumentController implements AutoCloseable {
                         return;
                     }
                     ioBusy = false;
-                    if (documentGeneration == generation) {
+                    if (documentGeneration.get() == generation) {
                         saved = captured;
                         unsavedImport = false;
                         path = destination.toAbsolutePath();
@@ -575,7 +576,7 @@ public final class DocumentController implements AutoCloseable {
 
         capturePrintWorkspace();
         var captured = session.document();
-        long generation = documentGeneration;
+        long generation = documentGeneration.get();
         ioBusy = true;
         onChanged.run();
         var result = new CompletableFuture<Void>();
@@ -649,7 +650,7 @@ public final class DocumentController implements AutoCloseable {
                             }
                             ioBusy = false;
                             Path savedPath = selectedPath.get();
-                            if (savesDocument && savedPath != null && documentGeneration == generation) {
+                            if (savesDocument && savedPath != null && documentGeneration.get() == generation) {
                                 saved = captured;
                                 unsavedImport = false;
                                 path = savedPath;
@@ -710,7 +711,7 @@ public final class DocumentController implements AutoCloseable {
     public CompletableFuture<Void> importDocument(
             dev.voxelbrew.api.importer.ImporterProvider provider, dev.voxelbrew.api.importer.ImportWindow parent) {
         requireIdleIo();
-        long generation = documentGeneration;
+        long generation = documentGeneration.get();
         ioBusy = true;
         onChanged.run();
         var result = new CompletableFuture<Void>();
@@ -750,7 +751,7 @@ public final class DocumentController implements AutoCloseable {
                             return;
                         }
                         dispatch.accept(() -> {
-                            if (closed || documentGeneration != generation) {
+                            if (closed || documentGeneration.get() != generation) {
                                 result.cancel(false);
                                 return;
                             }
@@ -796,12 +797,12 @@ public final class DocumentController implements AutoCloseable {
 
     private void schedule(CadDocument document, boolean isPreview) {
         if (closed) return;
-        long ticket = ++sequence;
+        long ticket = sequence.incrementAndGet();
         log.debug("Queued rebuild {} for document {} (preview={})", ticket, document.id(), isPreview);
         rebuilding = true;
         error = "";
         synchronized (queueLock) {
-            pending = new Request(ticket, documentGeneration, session.revision(), document, isPreview);
+            pending = new Request(ticket, documentGeneration.get(), session.revision(), document, isPreview);
             if (!running) {
                 running = true;
                 worker.execute(this::drain);
@@ -839,8 +840,8 @@ public final class DocumentController implements AutoCloseable {
             dispatch.accept(() -> {
                 var current = session.snapshot();
                 if (closed
-                        || request.sequence() != sequence
-                        || request.generation() != documentGeneration
+                        || request.sequence() != sequence.get()
+                        || request.generation() != documentGeneration.get()
                         || request.revision() != current.revision()
                         || !request.document().id().equals(current.document().id())) {
                     log.debug("Discarding obsolete rebuild {}", request.sequence());
@@ -937,7 +938,7 @@ public final class DocumentController implements AutoCloseable {
     public void close() {
         log.debug("Closing document controller for {}", session.document().id());
         closed = true;
-        ++sequence;
+        sequence.incrementAndGet();
         synchronized (queueLock) {
             pending = null;
         }

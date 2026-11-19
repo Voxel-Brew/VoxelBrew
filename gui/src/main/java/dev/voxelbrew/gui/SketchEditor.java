@@ -1643,7 +1643,6 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         graphics.setStroke(Color.web(dark ? "#2a3541" : "#e1e7ed"));
         double spacing = Math.pow(10, Math.floor(Math.log10(60 / Math.max(scale, 0.15))));
         var lo = model(0, h);
-        var hi = model(w, 0);
         double firstX = Math.ceil(lo.x() / spacing) * spacing;
         double firstY = Math.ceil(lo.y() / spacing) * spacing;
         // Bound work by screen pixels, including the first layout pulse and extreme coordinates.

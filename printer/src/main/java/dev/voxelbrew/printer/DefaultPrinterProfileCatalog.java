@@ -80,7 +80,9 @@ public final class DefaultPrinterProfileCatalog implements PrinterProfileCatalog
 
     private static boolean copyNew(java.io.InputStream input, java.nio.file.Path target) throws java.io.IOException {
         if (java.nio.file.Files.exists(target)) return false;
-        var temporary = java.nio.file.Files.createTempFile(target.getParent(), ".printer-export-", ".tmp");
+        var parent = target.getParent();
+        if (parent == null) throw new java.io.IOException("Expected a profile destination file: " + target);
+        var temporary = java.nio.file.Files.createTempFile(parent, ".printer-export-", ".tmp");
         try {
             java.nio.file.Files.copy(input, temporary, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             try {
@@ -208,8 +210,9 @@ public final class DefaultPrinterProfileCatalog implements PrinterProfileCatalog
                 if (javax.imageio.ImageIO.read(input) == null)
                     throw new java.io.IOException("Unsupported profile image");
             }
-            String extension =
-                    image.getFileName().toString().replaceFirst("^.*\\.", "").toLowerCase(java.util.Locale.ROOT);
+            String extension = java.util.Objects.toString(image.getFileName(), "")
+                    .replaceFirst("^.*\\.", "")
+                    .toLowerCase(java.util.Locale.ROOT);
             if (!java.util.Set.of("png", "jpg", "jpeg", "gif", "bmp").contains(extension))
                 throw new java.io.IOException("Unsupported profile image type");
             imageName = profile.id() + "-" + java.util.UUID.randomUUID() + "." + extension;
@@ -234,13 +237,12 @@ public final class DefaultPrinterProfileCatalog implements PrinterProfileCatalog
         json.add("excludedZones", zones);
         if (imageName != null) json.addProperty("image", imageName);
         else if (profile.imageReference() != null
-                && "file".equals(profile.imageReference().getScheme())
-                && java.nio.file.Path.of(profile.imageReference()).getParent().equals(directory()))
-            json.addProperty(
-                    "image",
-                    java.nio.file.Path.of(profile.imageReference())
-                            .getFileName()
-                            .toString());
+                && "file".equals(profile.imageReference().getScheme())) {
+            var path = java.nio.file.Path.of(profile.imageReference());
+            var filename = path.getFileName();
+            if (filename != null && directory().equals(path.getParent()))
+                json.addProperty("image", filename.toString());
+        }
         var temporary = java.nio.file.Files.createTempFile(directory(), ".profile-", ".tmp");
         try {
             java.nio.file.Files.writeString(temporary, gson.toJson(json));

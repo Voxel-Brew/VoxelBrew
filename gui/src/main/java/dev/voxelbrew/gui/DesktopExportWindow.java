@@ -281,9 +281,10 @@ public final class DesktopExportWindow implements ExportWindow {
                                 "*." + destination.extension(), "*." + destination.extension()));
                 if (!path.getText().isBlank()) {
                     Path initial = Path.of(path.getText()).toAbsolutePath().normalize();
-                    if (initial.getParent() != null && Files.isDirectory(initial.getParent()))
-                        chooser.setInitialDirectory(initial.getParent().toFile());
-                    chooser.setInitialFileName(initial.getFileName().toString());
+                    Path parent = initial.getParent();
+                    Path filename = initial.getFileName();
+                    if (parent != null && Files.isDirectory(parent)) chooser.setInitialDirectory(parent.toFile());
+                    if (filename != null) chooser.setInitialFileName(filename.toString());
                 }
                 var chosen = chooser.showSaveDialog(owner);
                 if (chosen != null) path.setText(chosen.toString());

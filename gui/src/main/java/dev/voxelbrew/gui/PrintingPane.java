@@ -2170,7 +2170,9 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
 
     static Path jobDestination(Path project, String plateName, int plateNumber, int plateCount) {
         if (plateNumber < 1 || plateNumber > plateCount) throw new IllegalArgumentException("Invalid plate number");
-        String name = project.getFileName().toString();
+        Path filename = project.getFileName();
+        if (filename == null) throw new IllegalArgumentException("Expected a project file: " + project);
+        String name = filename.toString();
         int extension = name.lastIndexOf('.');
         String number =
                 String.format(Locale.ROOT, "%0" + Integer.toString(plateCount).length() + "d", plateNumber);

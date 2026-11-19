@@ -277,10 +277,13 @@ public final class VoxelBrew implements Runnable {
                     .getCodeSource()
                     .getLocation()
                     .toURI());
-            Path runtime = jar.getParent().resolve("native");
-            if (!Files.isDirectory(runtime))
-                runtime = jar.getParent().getParent().resolve("native");
-            if (Files.isDirectory(runtime)) {
+            Path parent = jar.getParent();
+            Path runtime = parent == null ? null : parent.resolve("native");
+            if (runtime != null && !Files.isDirectory(runtime)) {
+                Path image = parent.getParent();
+                runtime = image == null ? null : image.resolve("native");
+            }
+            if (runtime != null && Files.isDirectory(runtime)) {
                 System.setProperty("voxelbrew.native.path", runtime.toString());
             }
         } catch (java.net.URISyntaxException ignored) {

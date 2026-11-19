@@ -20,7 +20,8 @@ public class UpdateHelper {
         } catch (Exception failure) {
             failure.printStackTrace(System.err);
             try {
-                status(job.getParent(), "FAILED", failure.toString());
+                Path stage = job.getParent();
+                if (stage != null) status(stage, "FAILED", failure.toString());
             } catch (IOException ignored) {
                 /* stderr remains the recovery log. */
             }
@@ -31,12 +32,15 @@ public class UpdateHelper {
     @SuppressWarnings("try") // Leases protect replacement for their entire lexical lifetime.
     static void run(Path job) throws IOException, InterruptedException {
         Path stage = job.getParent();
-        if (!job.getFileName().toString().equals("job.properties")
-                || !stage.getFileName().toString().startsWith(".VoxelBrew-update-")
+        Path stageName = stage == null ? null : stage.getFileName();
+        if (!"job.properties".equals(java.util.Objects.toString(job.getFileName(), ""))
+                || stage == null
+                || stageName == null
+                || !stageName.toString().startsWith(".VoxelBrew-update-")
                 || Files.isSymbolicLink(stage)) throw new IOException("Invalid update staging directory");
         Properties p = ApplicationImage.read(job);
         Path target = Path.of(p.getProperty("target")).toAbsolutePath().normalize();
-        if (!target.getParent().equals(stage.getParent()) || Files.isSymbolicLink(target))
+        if (!java.util.Objects.equals(target.getParent(), stage.getParent()) || Files.isSymbolicLink(target))
             throw new IOException("Update must remain beside its original installation");
         var component = ApplicationImage.Component.valueOf(p.getProperty("component"));
         String platform = p.getProperty("platform");
@@ -50,7 +54,7 @@ public class UpdateHelper {
         Path backup = target.resolveSibling("."
                 + target.getFileName()
                 + "-backup-"
-                + stage.getFileName().toString().substring(".VoxelBrew-update-".length()));
+                + stageName.toString().substring(".VoxelBrew-update-".length()));
         long pid = Long.parseLong(p.getProperty("pid"));
         Instant start = Instant.parse(p.getProperty("processStart"));
         long deadline = System.nanoTime() + java.time.Duration.ofMinutes(2).toNanos();

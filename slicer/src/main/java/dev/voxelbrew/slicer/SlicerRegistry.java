@@ -45,8 +45,7 @@ public final class SlicerRegistry implements SlicerProviderRegistry {
             var urls = new ArrayList<URL>();
             try (var paths = Files.list(directory)) {
                 for (var jar : paths.filter(path -> Files.isRegularFile(path)
-                                && path.getFileName()
-                                        .toString()
+                                && java.util.Objects.toString(path.getFileName(), "")
                                         .toLowerCase(Locale.ROOT)
                                         .endsWith(".jar"))
                         .sorted()

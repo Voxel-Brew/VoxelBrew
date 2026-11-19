@@ -14,9 +14,35 @@ env:
   GITHUB_PACKAGES_USER: ${{ vars.PACKAGES_USER || github.actor }}
   GITHUB_PACKAGES_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN || github.token }}
 jobs:
-  unit:
+  spotbugs:
     if: ${{ !contains(github.event.head_commit.message, '[migration]') }}
-    name: Unit tests and basic checks (Ubuntu)
+    name: SpotBugs (Ubuntu)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Voxel-Brew/BOM
+          path: .tools/bom
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Analyze application and fixture bytecode
+        run: ./gradlew --build-cache basicChecks :engine:checkExporterFixture -PbundleSlicers=false
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: spotbugs
+          retention-days: 3
+          path: "**/build/reports/spotbugs/"
+  unit:
+    needs: spotbugs
+    if: ${{ !contains(github.event.head_commit.message, '[migration]') }}
+    name: Unit tests and formatting (Ubuntu)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -43,8 +69,8 @@ jobs:
         with:
           path: .tools/bundled-slicers
           key: bundled-slicers-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/bundle-slicers.py') }}
-      - name: Unit tests, formatting and basic correctness checks
-        run: ./gradlew --build-cache spotlessCheck basicChecks test
+      - name: Unit tests and formatting
+        run: ./gradlew --build-cache spotlessCheck test
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -54,6 +80,7 @@ jobs:
             **/build/reports/
             **/build/test-results/test/
   integration:
+    needs: spotbugs
     if: ${{ !contains(github.event.head_commit.message, '[migration]') }}
     name: Integration tests
     secrets: inherit
@@ -63,6 +90,7 @@ jobs:
       suite: integrationTest
       artifact-name: integration-ubuntu-24.04
   platform:
+    needs: spotbugs
     if: ${{ !contains(github.event.head_commit.message, '[migration]') }}
     name: Platform checks
     strategy:
@@ -89,16 +117,18 @@ jobs:
   full-check:
     name: Full check
     if: ${{ always() && !contains(github.event.head_commit.message, '[migration]') }}
-    needs: [unit, integration, platform]
+    needs: [spotbugs, unit, integration, platform]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Require every suite and platform to pass
+      - name: Require SpotBugs, tests, and platform checks to pass
         env:
+          SPOTBUGS_RESULT: ${{ needs.spotbugs.result }}
           UNIT_RESULT: ${{ needs.unit.result }}
           INTEGRATION_RESULT: ${{ needs.integration.result }}
           PLATFORM_RESULT: ${{ needs.platform.result }}
         run: |
+          test "$SPOTBUGS_RESULT" = success
           test "$UNIT_RESULT" = success
           test "$INTEGRATION_RESULT" = success
           test "$PLATFORM_RESULT" = success

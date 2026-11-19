@@ -7768,6 +7768,13 @@ class WorkbenchUiTest {
             Screenshot.save(stage.getScene(), evidence.resolve("printing-light.png"));
             return null;
         });
+        // Both frontends need the same named installation, even with separate test homes.
+        var installationId = dev.voxelbrew.slicer.SlicerInstallation.selectedId(
+                DocumentReader.load(file).printSetup());
+        var guiInstallations = new dev.voxelbrew.slicer.SlicerInstallationStore(configuration.path());
+        var cliInstallations =
+                new dev.voxelbrew.slicer.SlicerInstallationStore(directory.resolve("cli-settings/config.properties"));
+        cliInstallations.save(guiInstallations.require(installationId));
         Path cliJob = directory.resolve("CLI printer job.gcode");
         assertThat(cli("slicer", "validate", file.toString()).contains("VALID")).isTrue();
         cli(

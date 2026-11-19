@@ -20,6 +20,8 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @UtilityClass
 public class SliceService {
+    private static final Object PUBLICATION_LOCK = new Object();
+
     public record Result(GcodeJob job, PrintArtifact artifact) {}
 
     public static final class OutdatedException extends IllegalStateException {
@@ -138,47 +140,51 @@ public class SliceService {
     }
 
     /** Publishes inspected artifacts and attaches them within the caller's revision and cancellation guard. */
-    public static synchronized void publish(
-            Map<Path, PrintArtifact> artifacts, boolean overwrite, Cancellation.Publication attach) throws IOException {
-        var files = new LinkedHashMap<Path, StagedFile>();
-        var published = new ArrayList<StagedFile>();
-        try {
-            for (var entry : artifacts.entrySet()) {
-                var target = entry.getKey().toAbsolutePath().normalize();
-                if (files.containsKey(target))
-                    throw new IllegalArgumentException("Duplicate artifact destination: " + target);
-                files.put(target, StagedFile.prepare(target, entry.getValue(), overwrite));
-            }
-            for (var file : files.values()) {
-                file.publish(overwrite);
-                published.add(file);
-            }
-            attach.run();
-        } catch (IOException | RuntimeException failure) {
-            for (var file : published.reversed()) {
-                try {
-                    file.restore();
-                } catch (IOException rollback) {
-                    failure.addSuppressed(rollback);
+    public static void publish(Map<Path, PrintArtifact> artifacts, boolean overwrite, Cancellation.Publication attach)
+            throws IOException {
+        synchronized (PUBLICATION_LOCK) {
+            var files = new LinkedHashMap<Path, StagedFile>();
+            var published = new ArrayList<StagedFile>();
+            try {
+                for (var entry : artifacts.entrySet()) {
+                    var target = entry.getKey().toAbsolutePath().normalize();
+                    if (files.containsKey(target))
+                        throw new IllegalArgumentException("Duplicate artifact destination: " + target);
+                    files.put(target, StagedFile.prepare(target, entry.getValue(), overwrite));
                 }
+                for (var file : files.values()) {
+                    file.publish(overwrite);
+                    published.add(file);
+                }
+                attach.run();
+            } catch (IOException | RuntimeException failure) {
+                for (var file : published.reversed()) {
+                    try {
+                        file.restore();
+                    } catch (IOException rollback) {
+                        failure.addSuppressed(rollback);
+                    }
+                }
+                throw failure;
+            } finally {
+                files.values().forEach(StagedFile::cleanup);
             }
-            throw failure;
-        } finally {
-            files.values().forEach(StagedFile::cleanup);
         }
     }
 
-    public static synchronized void publish(
+    public static void publish(
             Map<Path, PrintArtifact> artifacts,
             boolean overwrite,
             Cancellation cancellation,
             Cancellation.Publication checkRevision,
             Cancellation.Publication attach)
             throws IOException {
-        cancellation.publish(() -> {
-            checkRevision.run();
-            publish(artifacts, overwrite, attach);
-        });
+        synchronized (PUBLICATION_LOCK) {
+            cancellation.publish(() -> {
+                checkRevision.run();
+                publish(artifacts, overwrite, attach);
+            });
+        }
     }
 
     public static void save(PrintArtifact artifact, Path destination, boolean overwrite) throws IOException {
@@ -187,17 +193,21 @@ public class SliceService {
 
     private record StagedFile(Path target, Path scratch, Path backup) {
         static StagedFile prepare(Path target, PrintArtifact artifact, boolean overwrite) throws IOException {
-            if (!target.getFileName().toString().toLowerCase(Locale.ROOT).endsWith("." + artifact.format()))
+            Path filename = target.getFileName();
+            Path parent = target.getParent();
+            if (filename == null
+                    || parent == null
+                    || !filename.toString().toLowerCase(Locale.ROOT).endsWith("." + artifact.format()))
                 throw new IllegalArgumentException("Artifact requires a ." + artifact.format() + " destination");
             boolean exists = Files.exists(target, LinkOption.NOFOLLOW_LINKS);
             if (exists && (!overwrite || !Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)))
                 throw new FileAlreadyExistsException(
                         target.toString(), null, overwrite ? "Expected a regular file" : "Explicit overwrite required");
-            Path scratch = Files.createTempFile(target.getParent(), ".voxelbrew-slice-", ".tmp");
+            Path scratch = Files.createTempFile(parent, ".voxelbrew-slice-", ".tmp");
             Path backup = null;
             try {
                 if (exists) {
-                    backup = Files.createTempFile(target.getParent(), ".voxelbrew-slice-backup-", ".tmp");
+                    backup = Files.createTempFile(parent, ".voxelbrew-slice-backup-", ".tmp");
                     Files.copy(target, backup, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
                 }
                 Files.write(scratch, artifact.bytes());

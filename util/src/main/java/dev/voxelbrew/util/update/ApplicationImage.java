@@ -88,11 +88,11 @@ public record ApplicationImage(
                     .toURI());
             if (!Files.isRegularFile(jar)) return Optional.empty();
             Path app = jar.getParent();
-            if (!Files.isRegularFile(app.resolve(MARKER))) return Optional.empty();
+            if (app == null || !Files.isRegularFile(app.resolve(MARKER))) return Optional.empty();
             String platform = currentPlatform();
-            Path root = platform.startsWith("windows-")
-                    ? app.getParent()
-                    : app.getParent().getParent();
+            Path root = app.getParent();
+            if (root != null && !platform.startsWith("windows-")) root = root.getParent();
+            if (root == null) return Optional.empty();
             var image = open(root, component, platform);
             if (!Path.of(System.getProperty("java.home"))
                     .toRealPath()
@@ -109,7 +109,8 @@ public record ApplicationImage(
         if (!Set.of("windows-x64", "linux-x64", "macos-x64").contains(platform))
             throw new IOException("Unqualified platform: " + platform);
         Path root = directory.toAbsolutePath().normalize();
-        if (!root.getFileName().toString().equals(component.imageName(platform)) || Files.isSymbolicLink(root))
+        if (!java.util.Objects.toString(root.getFileName(), "").equals(component.imageName(platform))
+                || Files.isSymbolicLink(root))
             throw new IOException("Expected an unlinked " + component.imageName(platform) + " app directory");
         var temporary = new ApplicationImage(root, component, platform, null, "", "");
         Properties p = read(temporary.appDirectory().resolve(MARKER));
@@ -168,7 +169,7 @@ public record ApplicationImage(
                 if (jar.getJarEntry(component.entry) == null) throw new IOException("Wrong application entry point");
             }
             return result;
-        } catch (IllegalArgumentException | NullPointerException failure) {
+        } catch (IllegalArgumentException failure) {
             throw new IOException("Invalid installation metadata", failure);
         }
     }

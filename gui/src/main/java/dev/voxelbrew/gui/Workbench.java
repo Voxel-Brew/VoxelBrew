@@ -1298,7 +1298,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             documentTitle.setText((controller.dirty() ? "● " : "")
                     + (controller.path() == null
                             ? translations.text("gui.untitled")
-                            : controller.path().getFileName().toString()));
+                            : java.util.Objects.toString(
+                                    controller.path().getFileName(), translations.text("gui.untitled"))));
             UiHelp.describe(
                     documentTitle,
                     controller.path() == null
@@ -2495,7 +2496,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     static Path exportSuggestion(Path saveFolder, Path projectPath) {
         return saveFolder.resolve(
-                projectPath == null ? "Untitled.vxb" : projectPath.getFileName().toString());
+                projectPath == null
+                        ? "Untitled.vxb"
+                        : java.util.Objects.toString(projectPath.getFileName(), "Untitled.vxb"));
     }
 
     private void saveFolder() {

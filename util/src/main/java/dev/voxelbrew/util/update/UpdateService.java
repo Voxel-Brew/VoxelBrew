@@ -97,7 +97,9 @@ public final class UpdateService {
         boolean complete = false;
         try {
             cancellation.check();
-            stage = Files.createTempDirectory(image.root().getParent(), ".VoxelBrew-update-");
+            Path parent = image.root().getParent();
+            if (parent == null) throw new IOException("Installation has no parent directory");
+            stage = Files.createTempDirectory(parent, ".VoxelBrew-update-");
             Path archive = stage.resolve(check.asset()), checksums = stage.resolve("SHA256SUMS");
             progress.accept("Downloading " + check.asset());
             source.download(check.release(), check.asset(), archive, cancellation);
@@ -156,7 +158,8 @@ public final class UpdateService {
         private final Path stage;
         private ApplicationImage.Lease lease;
         private final String platform;
-        private boolean handedOff, closed;
+        private final Object handoffLock = new Object();
+        private boolean handingOff, handedOff, closed;
 
         Prepared(Path stage, ApplicationImage.Lease lease, String platform) {
             this.stage = stage;
@@ -172,8 +175,23 @@ public final class UpdateService {
             return stage.resolve("helper.log");
         }
 
-        public synchronized void handOff() throws IOException {
-            if (closed || handedOff) throw new IOException("Update is no longer available");
+        public void handOff() throws IOException {
+            synchronized (handoffLock) {
+                if (closed || handedOff || handingOff || lease == null)
+                    throw new IOException("Update is no longer available");
+                handingOff = true;
+            }
+            try {
+                launchHelper();
+            } finally {
+                synchronized (handoffLock) {
+                    handingOff = false;
+                    handoffLock.notifyAll();
+                }
+            }
+        }
+
+        private void launchHelper() throws IOException {
             Path worker = stage.resolve("worker");
             String executable = platform.startsWith("windows-") ? "javaw.exe" : "java";
             if (platform.startsWith("windows-") && !Files.isRegularFile(worker.resolve("runtime/bin/" + executable)))
@@ -221,11 +239,26 @@ public final class UpdateService {
         }
 
         @Override
-        public synchronized void close() throws IOException {
-            if (closed) return;
-            closed = true;
-            if (lease != null) lease.close();
-            if (!handedOff) UpdateFiles.deleteStage(stage);
+        public void close() throws IOException {
+            boolean interrupted = false;
+            try {
+                synchronized (handoffLock) {
+                    if (closed) return;
+                    closed = true;
+                    // The helper must stop using the staging directory before cleanup.
+                    while (handingOff) {
+                        try {
+                            handoffLock.wait();
+                        } catch (InterruptedException failure) {
+                            interrupted = true;
+                        }
+                    }
+                    if (lease != null) lease.close();
+                    if (!handedOff) UpdateFiles.deleteStage(stage);
+                }
+            } finally {
+                if (interrupted) Thread.currentThread().interrupt();
+            }
         }
     }
 }

@@ -13,54 +13,59 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public final class Logging {
     private static final Logger APPLICATION = Logger.getLogger("dev.voxelbrew");
+    private static final Object LOCK = new Object();
     private static boolean initialized;
     private static Thread.UncaughtExceptionHandler previousUncaught;
     private static Thread.UncaughtExceptionHandler applicationUncaught;
 
     private Logging() {}
 
-    public static synchronized void initialize(String component) {
-        if (initialized) return;
-        try {
-            configure(
-                    UserConfiguration.user(),
-                    dev.voxelbrew.util.services.Services.load(ApplicationPaths.class)
-                            .logs(),
-                    component);
-        } catch (IOException | IllegalArgumentException failure) {
-            install(Level.WARNING, console(Level.WARNING));
-            log.warn("Cannot configure file logging; using console diagnostics", failure);
+    public static void initialize(String component) {
+        synchronized (LOCK) {
+            if (initialized) return;
+            try {
+                configure(
+                        UserConfiguration.user(),
+                        dev.voxelbrew.util.services.Services.load(ApplicationPaths.class)
+                                .logs(),
+                        component);
+            } catch (IOException | IllegalArgumentException failure) {
+                install(Level.WARNING, console(Level.WARNING));
+                log.warn("Cannot configure file logging; using console diagnostics", failure);
+            }
+            initialized = true;
+            previousUncaught = Thread.getDefaultUncaughtExceptionHandler();
+            var previous = previousUncaught;
+            applicationUncaught = (thread, failure) -> {
+                log.error("Uncaught exception on thread {}", thread.getName(), failure);
+                if (previous != null) previous.uncaughtException(thread, failure);
+            };
+            Thread.setDefaultUncaughtExceptionHandler(applicationUncaught);
+            log.info(
+                    "Starting {} version {} on {} / Java {}",
+                    component,
+                    dev.voxelbrew.util.Version.version(),
+                    System.getProperty("os.name"),
+                    System.getProperty("java.version"));
         }
-        initialized = true;
-        previousUncaught = Thread.getDefaultUncaughtExceptionHandler();
-        var previous = previousUncaught;
-        applicationUncaught = (thread, failure) -> {
-            log.error("Uncaught exception on thread {}", thread.getName(), failure);
-            if (previous != null) previous.uncaughtException(thread, failure);
-        };
-        Thread.setDefaultUncaughtExceptionHandler(applicationUncaught);
-        log.info(
-                "Starting {} version {} on {} / Java {}",
-                component,
-                dev.voxelbrew.util.Version.version(),
-                System.getProperty("os.name"),
-                System.getProperty("java.version"));
     }
 
-    public static synchronized void configure(UserConfiguration configuration, Path directory, String component)
-            throws IOException {
-        if (!component.matches("[a-zA-Z0-9_-]+")) throw new IllegalArgumentException("Invalid logging component");
-        Map<String, String> options = configuration.read();
-        Level level = level(options.getOrDefault("logging.level", "INFO"));
-        Level consoleLevel = level(options.getOrDefault("logging.console.level", "WARNING"));
-        long bytes = Long.parseLong(options.getOrDefault("logging.file.limit", "20971520"));
-        int count = Integer.parseInt(options.getOrDefault("logging.file.count", "10"));
-        if (bytes < 1024 || count < 1 || count > 20) throw new IllegalArgumentException("Invalid log rotation limits");
-        var file = new RollingAppLog(directory, bytes, count);
-        file.setFormatter(new AppLogFormatter(component));
-        file.setLevel(level);
-        var console = console(consoleLevel);
-        install(level.intValue() < consoleLevel.intValue() ? level : consoleLevel, file, console);
+    public static void configure(UserConfiguration configuration, Path directory, String component) throws IOException {
+        synchronized (LOCK) {
+            if (!component.matches("[a-zA-Z0-9_-]+")) throw new IllegalArgumentException("Invalid logging component");
+            Map<String, String> options = configuration.read();
+            Level level = level(options.getOrDefault("logging.level", "INFO"));
+            Level consoleLevel = level(options.getOrDefault("logging.console.level", "WARNING"));
+            long bytes = Long.parseLong(options.getOrDefault("logging.file.limit", "20971520"));
+            int count = Integer.parseInt(options.getOrDefault("logging.file.count", "10"));
+            if (bytes < 1024 || count < 1 || count > 20)
+                throw new IllegalArgumentException("Invalid log rotation limits");
+            var file = new RollingAppLog(directory, bytes, count);
+            file.setFormatter(new AppLogFormatter(component));
+            file.setLevel(level);
+            var console = console(consoleLevel);
+            install(level.intValue() < consoleLevel.intValue() ? level : consoleLevel, file, console);
+        }
     }
 
     private static ConsoleHandler console(Level level) {
@@ -96,18 +101,20 @@ public final class Logging {
         };
     }
 
-    public static synchronized void close() {
-        if (initialized) log.info("Application logging stopped");
-        if (applicationUncaught != null && Thread.getDefaultUncaughtExceptionHandler() == applicationUncaught)
-            Thread.setDefaultUncaughtExceptionHandler(previousUncaught);
-        applicationUncaught = null;
-        previousUncaught = null;
-        for (Handler handler : APPLICATION.getHandlers()) {
-            APPLICATION.removeHandler(handler);
-            handler.close();
+    public static void close() {
+        synchronized (LOCK) {
+            if (initialized) log.info("Application logging stopped");
+            if (applicationUncaught != null && Thread.getDefaultUncaughtExceptionHandler() == applicationUncaught)
+                Thread.setDefaultUncaughtExceptionHandler(previousUncaught);
+            applicationUncaught = null;
+            previousUncaught = null;
+            for (Handler handler : APPLICATION.getHandlers()) {
+                APPLICATION.removeHandler(handler);
+                handler.close();
+            }
+            APPLICATION.setUseParentHandlers(true);
+            APPLICATION.setLevel(null);
+            initialized = false;
         }
-        APPLICATION.setUseParentHandlers(true);
-        APPLICATION.setLevel(null);
-        initialized = false;
     }
 }

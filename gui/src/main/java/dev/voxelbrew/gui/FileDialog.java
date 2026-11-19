@@ -86,9 +86,12 @@ final class FileDialog {
             try {
                 Path selected = Path.of(path.evaluatedText()).toAbsolutePath();
                 Path parent = selected.getParent();
-                if (save) java.nio.file.Files.createDirectories(parent);
-                if (java.nio.file.Files.isDirectory(parent)) chooser.setInitialDirectory(parent.toFile());
-                chooser.setInitialFileName(selected.getFileName().toString());
+                Path filename = selected.getFileName();
+                if (parent != null && filename != null) {
+                    if (save) java.nio.file.Files.createDirectories(parent);
+                    if (java.nio.file.Files.isDirectory(parent)) chooser.setInitialDirectory(parent.toFile());
+                    chooser.setInitialFileName(filename.toString());
+                }
             } catch (java.io.IOException | IllegalArgumentException failure) {
                 Dialogs.show(
                         new Alert(Alert.AlertType.ERROR, failure.getMessage(), ButtonType.OK), owner, translations);
@@ -133,7 +136,9 @@ final class FileDialog {
                 if (path.evaluatedText().isBlank())
                     throw new IllegalArgumentException(translations.text("gui.choose_a_file_path"));
                 Path selected = Path.of(path.evaluatedText()).toAbsolutePath();
-                if (save) java.nio.file.Files.createDirectories(selected.getParent());
+                Path parent = selected.getParent();
+                if (parent == null) throw new IllegalArgumentException("Expected a file path: " + selected);
+                if (save) java.nio.file.Files.createDirectories(parent);
             } catch (java.io.IOException | IllegalArgumentException failure) {
                 error.setText(failure.getMessage());
                 e.consume();

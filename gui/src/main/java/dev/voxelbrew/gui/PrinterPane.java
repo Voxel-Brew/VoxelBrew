@@ -9,6 +9,7 @@ import dev.voxelbrew.util.i18n.Translations;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
 import javafx.animation.*;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -79,11 +80,11 @@ final class PrinterPane extends VBox implements AutoCloseable {
     // Accessed only by the serialized device worker, including final cleanup.
 
     private DriverStatus current = DriverStatus.unknown("");
-    private long generation;
-    private boolean busy;
+    private final AtomicLong generation = new AtomicLong();
+    private volatile boolean busy;
     private volatile boolean closed;
-    private boolean startPending;
-    private volatile long jobGeneration;
+    private volatile boolean startPending;
+    private final AtomicLong jobGeneration = new AtomicLong();
 
     PrinterPane(
             PrinterStore runtime,
@@ -262,7 +263,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
     void documentChanged(CadDocument value) {
         if (document == null
                 || !document.gcode().equals(value.gcode())
-                || !document.printArtifacts().equals(value.printArtifacts())) jobGeneration++;
+                || !document.printArtifacts().equals(value.printArtifacts())) jobGeneration.incrementAndGet();
         document = value;
         String selected = plates.getValue() == null
                 ? value.printSetup().activePlateId()
@@ -369,7 +370,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
     private void connect() {
         busy = false;
         startPending = false;
-        long token = ++generation;
+        long token = generation.incrementAndGet();
         var device = selectedDevice;
         session = null;
         current = DriverStatus.unknown(t("connecting"));
@@ -384,14 +385,14 @@ final class PrinterPane extends VBox implements AutoCloseable {
                                         + "'. Install its plugin or edit this printer configuration."));
                 var initial = readStatus(driver, device);
                 Platform.runLater(() -> {
-                    if (closed || token != generation) return;
+                    if (closed || token != generation.get()) return;
                     session = driver;
                     current = initial;
                     update();
                 });
             } catch (Exception failure) {
                 Platform.runLater(() -> {
-                    if (closed || token != generation) return;
+                    if (closed || token != generation.get()) return;
                     current = DriverStatus.unknown(t("offline"));
                     message.setText(failure.getMessage());
                     update();
@@ -404,7 +405,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
         if (closed || busy || session == null) return;
         var connected = session;
         var configuredPrinter = selectedDevice;
-        long token = generation;
+        long token = generation.get();
         busy = true;
         worker.submit(() -> {
             DriverStatus next;
@@ -415,7 +416,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
             }
             var result = next;
             Platform.runLater(() -> {
-                if (!closed && token == generation) {
+                if (!closed && token == generation.get()) {
                     busy = false;
                     current = result;
                     if (current.state() == DriverStatus.State.PRINTING
@@ -429,7 +430,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
 
     private void exportGcode() {
         if (document == null || plates.getValue() == null) return;
-        long revision = jobGeneration;
+        long revision = jobGeneration.get();
         var lines = document.gcode().getOrDefault(plates.getValue().id(), List.of());
         if (lines.isEmpty()) return;
         var artifact = document.printArtifacts().get(plates.getValue().id());
@@ -461,7 +462,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
                     overwrite,
                     new dev.voxelbrew.api.model.printing.Cancellation(),
                     () -> {
-                        if (revision != jobGeneration) throw new SliceService.OutdatedException();
+                        if (revision != jobGeneration.get()) throw new SliceService.OutdatedException();
                     },
                     () -> {});
         } catch (java.io.IOException | IllegalArgumentException | SliceService.OutdatedException failure) {
@@ -480,7 +481,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
         var plate = plates.getValue().id();
         var connected = session;
         var configuredPrinter = selectedDevice;
-        long token = generation;
+        long token = generation.get();
         busy = true;
         startPending = true;
         transfer.setProgress(-1);
@@ -491,7 +492,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
                 var result = submitArtifact(
                         connected, configuredPrinter, job.printArtifacts().get(plate));
                 Platform.runLater(() -> {
-                    if (closed || token != generation) return;
+                    if (closed || token != generation.get()) return;
                     if (result instanceof Driver.PrintResult.Failure failure) {
                         startPending = failure.submissionUncertain();
                         message.setText(String.join("\n", failure.messages()));
@@ -502,7 +503,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
                 error(failure);
             } finally {
                 Platform.runLater(() -> {
-                    if (closed || token != generation) return;
+                    if (closed || token != generation.get()) return;
                     busy = false;
                     transfer.setVisible(false);
                     update();
@@ -735,8 +736,8 @@ final class PrinterPane extends VBox implements AutoCloseable {
     @Override
     public void close() {
         closed = true;
-        generation++;
-        jobGeneration++;
+        generation.incrementAndGet();
+        jobGeneration.incrementAndGet();
         polling.stop();
     }
 }

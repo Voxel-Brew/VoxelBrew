@@ -16,7 +16,7 @@ public final class JsonDocumentWriter {
         String json = DocumentCodec.encodeJson(document);
         Path target = destination.toAbsolutePath().normalize();
         if (!overwrite && Files.exists(target)) throw new IOException("Destination exists: " + target);
-        Path temporary = Files.createTempFile(target.getParent(), "." + target.getFileName(), ".tmp");
+        Path temporary = Files.createTempFile(AtomicExport.parentDirectory(target), "." + target.getFileName(), ".tmp");
         try {
             Files.writeString(temporary, json + "\n", StandardCharsets.UTF_8);
             if (overwrite) {

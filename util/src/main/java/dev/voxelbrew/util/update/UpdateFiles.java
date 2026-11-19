@@ -35,8 +35,8 @@ class UpdateFiles {
     // Called only for a freshly allocated staging directory, never an installation or backup.
     static void deleteStage(Path stage) throws IOException {
         Path root = stage.toAbsolutePath().normalize();
-        if (!root.getFileName().toString().startsWith(".VoxelBrew-update-") || Files.isSymbolicLink(root))
-            throw new IOException("Refusing to remove an unknown staging directory");
+        if (!java.util.Objects.toString(root.getFileName(), "").startsWith(".VoxelBrew-update-")
+                || Files.isSymbolicLink(root)) throw new IOException("Refusing to remove an unknown staging directory");
         if (!Files.exists(root)) return;
         Files.walkFileTree(root, new SimpleFileVisitor<>() {
             @Override

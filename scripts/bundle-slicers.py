@@ -29,6 +29,7 @@ ASSETS = {
 }
 ORCA_SOURCE = "https://codeload.github.com/OrcaSlicer/OrcaSlicer/tar.gz/refs/tags/v2.5.0"
 ORCA_SOURCE_SHA256 = "f2130592babc4f48194ebe0031065572dc0556bbed46245d660dd259645f0713"
+MACOS_EXECUTABLE_NAMES = {"prusaslicer", "orcaslicer", "orca-slicer"}
 
 
 def sha256(file):
@@ -66,17 +67,31 @@ def copy_orca_presets(source, target):
                     shutil.copyfileobj(data, output)
 
 
+def macos_applications(directory):
+    return [
+        app
+        for app in directory.rglob("*.app")
+        if any(
+            executable.is_file() and executable.name.lower() in MACOS_EXECUTABLE_NAMES
+            for executable in (app / "Contents/MacOS").glob("*")
+        )
+    ]
+
+
 def extract_macos(image, target, work):
     mount = work / "mount"
     mount.mkdir()
     subprocess.run(["hdiutil", "attach", "-nobrowse", "-readonly", "-mountpoint", mount, image], check=True)
     try:
-        applications = list(mount.glob("*.app"))
+        # Vendor images may put the application or installer inside a subdirectory.
+        applications = macos_applications(mount)
         if not applications:
-            package = next(mount.glob("*.pkg"))
+            packages = list(mount.rglob("*.pkg"))
+            if len(packages) != 1:
+                raise ValueError(f"Expected one application or installer package in {image.name}")
             expanded = work / "expanded"
-            subprocess.run(["pkgutil", "--expand-full", package, expanded], check=True)
-            applications = list(expanded.rglob("*.app"))
+            subprocess.run(["pkgutil", "--expand-full", packages[0], expanded], check=True)
+            applications = macos_applications(expanded)
         if len(applications) != 1:
             raise ValueError(f"Expected one application in {image.name}")
         app = applications[0]
@@ -98,7 +113,7 @@ def prepare(platform, provider, vendor, orca_source, output):
         elif platform == "macos":
             extract_macos(vendor, payload, work)
             candidates = [p for p in payload.glob("*.app/Contents/MacOS/*")
-                          if p.name.lower() in {"prusaslicer", "orcaslicer", "orca-slicer"}]
+                          if p.name.lower() in MACOS_EXECUTABLE_NAMES]
         else:
             image = work / vendor.name
             shutil.copyfile(vendor, image)

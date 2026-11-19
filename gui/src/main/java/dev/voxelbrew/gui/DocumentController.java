@@ -356,8 +356,13 @@ public final class DocumentController implements AutoCloseable {
     }
 
     public void printSetup(dev.voxelbrew.api.model.printing.PrintSetup setup) {
+        var previous = session.document().printSetup();
         session.setPrintSetup(setup);
         preview = null;
+        if (previous.withWorkspaceSettings(setup.workspaceSettings()).equals(setup)) {
+            onChanged.run();
+            return;
+        }
         schedule(session.document(), false);
     }
 
@@ -367,7 +372,10 @@ public final class DocumentController implements AutoCloseable {
         onChanged.run();
     }
 
-    void printArtifacts(java.util.Map<String, dev.voxelbrew.api.model.printing.PrintArtifact> artifacts) {
+    void attachPrintJobs(
+            java.util.Map<String, java.util.List<String>> jobs,
+            java.util.Map<String, dev.voxelbrew.api.model.printing.PrintArtifact> artifacts) {
+        session.setGcode(jobs);
         session.setPrintArtifacts(artifacts);
         onChanged.run();
     }

@@ -48,7 +48,7 @@ class EmbeddedPreviewTest {
     };
 
     private PrintController controller() {
-        return new PrintController(ui::add, current::get, Path.of("."), worker, null, null, new GcodeSource() {
+        return new PrintController(ui::add, current::get, Path.of("."), worker, new GcodeSource() {
             @Override
             public GcodeJob read(Path path) {
                 throw new AssertionError("Embedded jobs require no files");

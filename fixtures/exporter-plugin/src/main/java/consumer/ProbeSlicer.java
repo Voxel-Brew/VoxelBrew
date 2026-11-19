@@ -1,23 +1,30 @@
 package consumer;
 
-import dev.voxelbrew.api.model.printing.Cancellation;
-import dev.voxelbrew.api.slicer.SlicerBackend;
+import dev.voxelbrew.api.model.printing.*;
+import dev.voxelbrew.api.slicer.*;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.util.Set;
+import java.util.Optional;
+import java.util.function.Consumer;
 
-/** Independent API-only consumer; intentionally does not execute an external process. */
-public final class ProbeSlicer implements SlicerBackend {
-    public Descriptor descriptor() {
-        return new Descriptor("probe-slicer", "API fixture slicer", API_VERSION, "1", Set.of(), Set.of("gcode"));
+/** Independent API-only discovery fixture. */
+public final class ProbeSlicer implements SlicerProvider {
+    @Override
+    public SlicerDescriptor descriptor() {
+        return new SlicerDescriptor("probe-slicer", "API fixture slicer", "1");
     }
 
-    public Probe probe(Path executable, Cancellation cancellation) {
-        cancellation.check();
-        return new Probe("fixture", Set.of());
+    @Override
+    public Slicer create() {
+        return new ProbeOperation();
     }
 
-    public RunResult slice(Request request) throws IOException {
-        throw new IOException("Fixture slicer does not produce jobs");
+    private static final class ProbeOperation implements Slicer {
+        @Override
+        public Optional<PrintArtifact> slice(
+                ManufacturingModel model, SlicerWindow window, Cancellation cancellation, Consumer<String> diagnostics)
+                throws IOException {
+            cancellation.check();
+            throw new IOException("Fixture slicer does not produce jobs");
+        }
     }
 }

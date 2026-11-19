@@ -19,12 +19,13 @@ class PreferenceIntegrationTest {
     private String output;
 
     private int run(String... args) {
-        var runtime = SlicerRuntime.load();
         var root = new CommandLine(CommandLine.Model.CommandSpec.create().name("test"));
         new PreferenceCommands(
                         new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties")),
                         new dev.voxelbrew.printer.DefaultPrinterProfileCatalog(directory.resolve("printers")),
-                        runtime.slicers())
+                        () -> ServiceLoader.load(SlicerProviderRegistry.class)
+                                .findFirst()
+                                .orElseThrow())
                 .install(root);
         var text = new StringWriter();
         root.setOut(new PrintWriter(text));
@@ -101,7 +102,7 @@ class PreferenceIntegrationTest {
                 .section("slicer", "prusa-slicer");
         assertThat(section.get("executable", "")).isEqualTo(executable);
         byte[] before = Files.readAllBytes(section.path());
-        assertThat(run("slicer", "backend", "configure", "--id", "prusa-slicer", "--option", "not-an-option=value"))
+        assertThat(run("slicer", "backend", "configure", "--id", "prusa-slicer", "--option", "invalid"))
                 .isEqualTo(1);
         assertThat(Files.readAllBytes(section.path())).containsExactly(before);
         assertThat(run("slicer", "backend", "describe", "--id", "prusa-slicer")).isEqualTo(0);

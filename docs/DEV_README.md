@@ -1,4 +1,4 @@
-# Develop printer integrations
+# Develop printer and slicer integrations
 
 Start with the [driver-authoring walkthrough](https://github.com/Voxel-Brew/api-printer/blob/f789baea542ac8daedc1e9d6852a69050ada2cbc/docs/DEV_README.md).
 It includes a complete Java 21 driver and Virtual UI form, Gradle setup, service
@@ -30,7 +30,8 @@ flowchart LR
     PI --> PA
     PI --> NET[Vendor transports]
     PI --> STORE[Printer JSON / profiles / images]
-    SA[slicer-api] --> PA
+    GUI --> SI[slicer-impl host services]
+    SI --> SA[slicer-api]
     SA --> MA[model-api]
     PA --> MA
 ```
@@ -87,12 +88,65 @@ Slicing offers saved printers by name and standalone profiles. Profile-only jobs
 expose artifact saving. Physical jobs expose submission and monitoring for the exact
 saved printer. Missing printers or drivers require explicit reconfiguration.
 
+## Develop a slicer plugin
+
+The provider-based slicer API is a breaking replacement. Recompile plugins against the
+matching API and register the provider under
+`META-INF/services/dev.voxelbrew.api.slicer.SlicerProvider`. The slicer developer guide
+includes a complete provider, Virtual UI settings, artifact provenance, and the host lifecycle.
+
+The host chooses the plate and printer target, resolves hardware, and evaluates geometry.
+Each provider operation receives one detached manufacturing model and collects settings
+before conversion. Open **Slicers → Configure slicers**, choose a type, and give
+each installation a name. **Test and save** runs the provider's operational check
+and displays its detected version or the reason it failed. A successful check saves
+the installation. Installations are stored
+individually under `~/.voxelbrew/slicers/`. The **Process** tab lists verified
+custom installations alongside the bundled PrusaSlicer and OrcaSlicer entries.
+The bundled entries have stable IDs and read-only settings. The document remembers
+the selected installation ID.
+
+Use **Discover** beside the executable field to list candidates for the selected provider.
+Built-in providers search the command path and common installation locations on the current
+platform. Selecting a result fills the field. **Test and save** verifies the complete setup.
+Use `slicer backend discover --id prusa-slicer` to list candidates from the CLI.
+
+The CLI uses the named installation selected in the document. For documents with
+only a provider ID, use `slicer backend configure` to set provider defaults. A slice command can
+override input IDs with repeatable `--slicer-option key=value` values. `--slicer`
+supplies the built-in executable field. Invocation values take priority over saved
+inputs and dialog defaults for custom installations.
+
+On supported hosts, the build verifies pinned upstream artifacts and embeds
+their platform-specific payloads in `slicer-impl`. Builds with the bundles require
+Python 3.11 or later and curl. Linux and macOS also use tar. Run a thin build with
+`-PbundleSlicers=false`, or set `-PslicerPython=/path/to/python` to choose an
+interpreter. Downloads are cached in `.tools/bundled-slicers/`. Each app package
+contains the binaries for its own operating system. The Windows x64 package uses
+the portable ZIPs, the Ubuntu 24.04 x64 package uses the AppImage contents, and
+macOS uses the universal app bundles. Orca uses the pinned
+release's Bambu presets to resolve the selected printer, nozzle and material.
+An unavailable combination fails before slicing. Bundled payloads are unpacked
+to private temporary directories during the operation and removed afterward.
+The Ubuntu 24.04 bundles use the system GTK, OpenGL and WebKitGTK libraries,
+including `libgtk-3-0t64`, `libglu1-mesa`, `libopengl0` and `libwebkit2gtk-4.1-0`.
+
+Discovery lists descriptors without probing the environment. Executable and capability
+checks occur during operations. Built-in providers serialize the evaluated plate to
+private files with exporter implementation writers, invoke the executable, and return
+a portable artifact. The host independently inspects its contents and provenance before
+attaching it. Explicit output uses atomic publication. A multi-plate command evaluates
+and validates every job before attaching results.
+
 ## Build and verify in the workspace
 
-Use Java 21 and the checked-in wrapper. From the workspace root on Windows:
+Use Java 21 and the checked-in wrapper. Launch the desktop from the workspace
+root on Windows with `.\gradlew.bat :voxelbrew:gui:run`. For verification, run
+the following tasks from the same directory.
 
 ```powershell
-.\gradlew.bat :printer:check
+.\gradlew.bat :printer:check :slicer:check
+.\gradlew.bat :voxelbrew:slicer-impl:test :voxelbrew:slicer-impl:integrationTest
 .\gradlew.bat :voxelbrew:printer-impl:test
 .\gradlew.bat :voxelbrew:gui:test :voxelbrew:cli:test
 .\gradlew.bat :voxelbrew:gui:compileE2eTestJava :voxelbrew:cli:compileIntegrationTestJava

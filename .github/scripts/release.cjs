@@ -359,7 +359,7 @@ class Release {
     const files = manifest(directory, m);
     const notes =
       `VoxelBrew ${m.version}\n\nSource: ${m.release} (base ${m.base}).\n\n` +
-      "Extract the complete archive; Java 21, OCCT/JNI and native launchers are bundled. Windows x64 and Ubuntu 24.04 x64: GUI and CLI. macOS 15 Intel: CLI only; GUI qualification is deferred. No ARM builds, installers or signing/notarization. PrusaSlicer 2.7.2 is external. See docs/releases.md at this tag.\n\n" +
+      "Extract the complete archive to use the bundled Java 21 runtime, OCCT/JNI, native launchers, PrusaSlicer 2.7.2 and OrcaSlicer 2.5.0. GUI and CLI packages target Windows x64 and Ubuntu 24.04 x64. The macOS 15 Intel package contains the CLI. See THIRD_PARTY_NOTICES.md at this tag for the slicer licenses and corresponding source.\n\n" +
       "Verify downloads against SHA256SUMS. CI evidence expires after three days; these release assets persist.\n\n" +
       this.git("log", "-20", "--format=- %s (%h)", m.base) +
       "\n";

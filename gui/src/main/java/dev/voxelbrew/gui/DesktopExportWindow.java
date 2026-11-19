@@ -243,9 +243,9 @@ public final class DesktopExportWindow implements ExportWindow {
                         .add(new FileChooser.ExtensionFilter(translations.text("gui.allFiles"), "*"));
                 try {
                     Path initial = Path.of(path.getText());
-                    if (initial.getParent() != null && Files.isDirectory(initial.getParent()))
-                        chooser.setInitialDirectory(
-                                initial.toAbsolutePath().getParent().toFile());
+                    Path parent = initial.getParent();
+                    if (parent != null && Files.isDirectory(parent))
+                        chooser.setInitialDirectory(parent.toAbsolutePath().toFile());
                 } catch (InvalidPathException ignored) {
                     // A file can still be chosen to replace invalid input.
                 }

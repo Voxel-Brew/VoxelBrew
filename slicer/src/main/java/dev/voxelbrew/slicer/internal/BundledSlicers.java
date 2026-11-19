@@ -110,7 +110,9 @@ public class BundledSlicers {
                 if (entry.isDirectory()) {
                     Files.createDirectories(target);
                 } else {
-                    Files.createDirectories(target.getParent());
+                    Path parent = target.getParent();
+                    if (parent == null) throw new IOException("Slicer archive entry has no parent: " + entry.getName());
+                    Files.createDirectories(parent);
                     copy(zip, target, cancellation);
                 }
             }

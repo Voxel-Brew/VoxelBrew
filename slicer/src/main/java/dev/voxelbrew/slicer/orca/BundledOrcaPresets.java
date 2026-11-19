@@ -74,7 +74,9 @@ public class BundledOrcaPresets {
                 cancellation.check();
                 try (var reader = Files.newBufferedReader(path)) {
                     var preset = JsonParser.parseReader(reader).getAsJsonObject();
-                    catalog.put(path.getFileName().toString().replaceFirst("\\.json$", ""), preset);
+                    Path name = path.getFileName();
+                    if (name == null) throw new IOException("Expected a bundled preset file: " + path);
+                    catalog.put(name.toString().replaceFirst("\\.json$", ""), preset);
                 }
             }
         } catch (JsonParseException | IllegalStateException invalid) {

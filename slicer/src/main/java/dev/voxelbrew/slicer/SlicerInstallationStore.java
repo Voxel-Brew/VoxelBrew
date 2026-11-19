@@ -26,7 +26,9 @@ public final class SlicerInstallationStore {
         if (Files.exists(directory))
             try (var paths = Files.list(directory)) {
                 for (var path : paths.filter(Files::isRegularFile).toList()) {
-                    var file = path.getFileName().toString();
+                    Path name = path.getFileName();
+                    if (name == null) continue;
+                    String file = name.toString();
                     if (!file.startsWith(PREFIX) || !file.endsWith(EXTENSION)) continue;
                     String id = file.substring(PREFIX.length(), file.length() - EXTENSION.length());
                     try {

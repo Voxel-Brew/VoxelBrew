@@ -34,9 +34,10 @@ public class ExecutableDiscovery {
             String local = System.getenv("LOCALAPPDATA");
             if (local != null && !local.isBlank()) addDirectory(roots, local + File.separator + "Programs");
         } else {
-            path.addAll(List.of(Path.of("/usr/local/bin"), Path.of("/usr/bin"), home.resolve(".local/bin")));
-            if (os.startsWith("Mac")) roots.add(Path.of("/Applications"));
-            else roots.add(Path.of("/opt"));
+            Path systemRoot = Path.of(File.separator);
+            path.addAll(List.of(
+                    systemRoot.resolve("usr/local/bin"), systemRoot.resolve("usr/bin"), home.resolve(".local/bin")));
+            roots.add(systemRoot.resolve(os.startsWith("Mac") ? "Applications" : "opt"));
             roots.add(home.resolve("Applications"));
         }
         return scan(
@@ -99,7 +100,7 @@ public class ExecutableDiscovery {
     }
 
     private static String name(Path path) {
-        return path.getFileName().toString().toLowerCase(Locale.ROOT);
+        return Objects.toString(path.getFileName(), "").toLowerCase(Locale.ROOT);
     }
 
     private static void addCandidate(Map<Path, Path> results, Path path, Cancellation cancellation) {

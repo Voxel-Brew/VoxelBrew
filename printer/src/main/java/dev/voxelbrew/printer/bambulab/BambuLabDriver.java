@@ -5,6 +5,9 @@ import dev.voxelbrew.api.printer.driver.*;
 import dev.voxelbrew.printer.internal.JobRejectedException;
 import dev.voxelbrew.printer.internal.TransportFactory;
 import java.io.IOException;
+import java.net.ConnectException;
+import java.net.NoRouteToHostException;
+import java.net.SocketTimeoutException;
 import java.nio.file.*;
 import java.util.*;
 import lombok.extern.slf4j.Slf4j;
@@ -53,7 +56,11 @@ public final class BambuLabDriver implements Driver {
         try (var session = transports.open(config)) {
             return session.status();
         } catch (IOException | RuntimeException failure) {
-            log.warn("Cannot read BambuLab printer status", failure);
+            if (isConnectionFailure(failure)) {
+                log.debug("Cannot connect to BambuLab for printer status", failure);
+            } else {
+                log.warn("Cannot read BambuLab printer status", failure);
+            }
             return new DriverStatus(
                     DriverStatus.State.ERROR,
                     "",
@@ -63,6 +70,17 @@ public final class BambuLabDriver implements Driver {
                     OptionalDouble.empty(),
                     message("Cannot read BambuLab printer status", failure));
         }
+    }
+
+    private static boolean isConnectionFailure(Throwable failure) {
+        for (var cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof ConnectException
+                    || cause instanceof NoRouteToHostException
+                    || cause instanceof SocketTimeoutException) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

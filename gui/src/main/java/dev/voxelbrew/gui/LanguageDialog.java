@@ -18,26 +18,28 @@ final class LanguageDialog {
         dialog.setTitle(translations.translate("language.title").orElseThrow());
         var choice = new ComboBox<String>();
         choice.setId("language-choice");
+        var languages = translations.languages();
         choice.getItems().add("system");
-        choice.getItems().addAll(translations.languages().keySet());
+        choice.getItems().addAll(languages.keySet());
         UiText.choices(
                 choice,
                 value -> value.equals("system")
                         ? translations.translate("language.system").orElseThrow()
-                        : translations.languages().get(value));
+                        : languages.get(value));
         var message = new Label(translations.translate("language.restart").orElseThrow());
         message.setWrapText(true);
         message.setId("language-status");
         try {
             String saved =
                     configuration.readUserConfig("language").orElse("system").strip();
-            String selected = translations.languages().keySet().stream()
-                    .filter(tag -> tag.equalsIgnoreCase(saved)
-                            || Locale.forLanguageTag(tag)
-                                    .getLanguage()
-                                    .equalsIgnoreCase(
-                                            Locale.forLanguageTag(saved).getLanguage()))
+            String savedLanguage = Locale.forLanguageTag(saved).getLanguage();
+            String selected = languages.keySet().stream()
+                    .filter(tag -> tag.equalsIgnoreCase(saved))
                     .findFirst()
+                    .or(() -> languages.keySet().stream()
+                            .filter(tag ->
+                                    Locale.forLanguageTag(tag).getLanguage().equals(savedLanguage))
+                            .findFirst())
                     .orElse("system");
             choice.setValue(saved.isEmpty() || saved.equalsIgnoreCase("system") ? "system" : selected);
         } catch (UserConfigException failure) {

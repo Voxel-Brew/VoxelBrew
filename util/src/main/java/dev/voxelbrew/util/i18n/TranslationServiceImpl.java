@@ -28,8 +28,6 @@ public final class TranslationServiceImpl implements TranslationService {
 
     private final Map<Locale, Map<String, String>> translations = new ConcurrentHashMap<>();
 
-    private final Map<String, String> languages;
-
     private record Startup(Locale locale, Path directory, String source) {}
 
     private static Map<String, Properties> readExternalCatalogs(Path directory) {
@@ -97,7 +95,7 @@ public final class TranslationServiceImpl implements TranslationService {
 
     TranslationServiceImpl(@NonNull Locale locale, Path directory) {
         var catalogs = loadCatalogs(directory);
-        languages = registerExternalCatalogs(catalogs);
+        catalogs.forEach(this::registerExternalCatalog);
         this.locale = selectLocale(locale, catalogs);
     }
 
@@ -143,17 +141,7 @@ public final class TranslationServiceImpl implements TranslationService {
         }
     }
 
-    private Map<String, String> registerExternalCatalogs(Map<String, Properties> catalogs) {
-        var names = new TreeMap<String, String>();
-        translations.forEach((language, messages) -> names.put(
-                messages.getOrDefault("language.i18n", language.toLanguageTag()),
-                messages.getOrDefault("language.name", language.getDisplayName(language))));
-        catalogs.forEach((tag, properties) -> registerExternalCatalog(tag, properties, names));
-        return Collections.unmodifiableMap(names);
-    }
-
-    private void registerExternalCatalog(String tag, Properties properties, Map<String, String> names) {
-        names.put(properties.getProperty("language.i18n"), properties.getProperty("language.name"));
+    private void registerExternalCatalog(String tag, Properties properties) {
         Locale language = Locale.forLanguageTag(tag);
         properties
                 .stringPropertyNames()
@@ -223,7 +211,18 @@ public final class TranslationServiceImpl implements TranslationService {
 
     @Override
     public Map<String, String> languages() {
-        return Collections.unmodifiableMap(languages);
+        var names = new TreeMap<String, String>();
+        var catalogs = Map.copyOf(translations);
+        catalogs.forEach((language, messages) -> {
+            String tag = messages.getOrDefault("language.i18n", language.toLanguageTag());
+            Locale taggedLocale = Locale.forLanguageTag(tag);
+            // A catalog alias must not hide a separately registered locale.
+            if (!language.equals(taggedLocale) && catalogs.containsKey(taggedLocale)) {
+                tag = language.toLanguageTag();
+            }
+            names.put(tag, messages.getOrDefault("language.name", language.getDisplayName(language)));
+        });
+        return Collections.unmodifiableMap(names);
     }
 
     @Override

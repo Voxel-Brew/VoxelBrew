@@ -61,8 +61,9 @@ class ManufacturingTest {
                     assertThat(xml.getElementsByTagName("volume").getLength()).isEqualTo(includeSolids ? 3 : 2);
                     var metadata = xml.getElementsByTagName("metadata");
                     var values = new ArrayList<String>();
-                    for (int i = 0; i < metadata.getLength(); i++)
+                    for (int i = 0; i < metadata.getLength(); i++) {
                         values.add(((Element) metadata.item(i)).getAttribute("value"));
+                    }
                     assertThat(values.contains("part/thickness.body")).isTrue();
                     assertThat(values.contains("part/block")).isTrue();
                     assertThat(values.contains("SupportBlocker")).isTrue();
@@ -144,10 +145,11 @@ class ManufacturingTest {
                 "rotated:EXCLUDED_ZONE",
                 "rotated:OVERLAP",
                 "tall:OVER_HEIGHT",
-                "lost:MISSING_INSTANCE"))
+                "lost:MISSING_INSTANCE")) {
             assertThat(report.diagnostics().stream().anyMatch(d -> (d.objectId() + ":" + d.code()).equals(expected)))
                     .as(report.toString())
                     .isTrue();
+        }
     }
 
     @Test
@@ -197,11 +199,14 @@ class ManufacturingTest {
                         mesh,
                         MeshGeometry.layOnFace(
                                 mesh, face, Transform.translation(80, 80, 0).compose(Transform.rotation(0, 0, 90))));
-                for (int t = 0; t < placed.triangleCount(); t++)
-                    if (placed.faceIndex(t) == face)
-                        for (int c = 0; c < 3; c++)
+                for (int t = 0; t < placed.triangleCount(); t++) {
+                    if (placed.faceIndex(t) == face) {
+                        for (int c = 0; c < 3; c++) {
                             assertThat(placed.coordinate(placed.vertexIndex(t, c), 2))
                                     .isCloseTo(0, org.assertj.core.data.Offset.offset(.001));
+                        }
+                    }
+                }
                 assertThat(MeshGeometry.bounds(placed).minZ()).isCloseTo(0, org.assertj.core.data.Offset.offset(.001));
                 planar++;
             } catch (IllegalArgumentException curved) {

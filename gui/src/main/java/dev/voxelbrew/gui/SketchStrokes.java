@@ -9,8 +9,9 @@ final class SketchStrokes {
     record Segment(Vec a, Vec b) {}
 
     static MeshData mesh(List<Segment> segments, double z, double radius) {
-        if (!Double.isFinite(z) || !Double.isFinite(radius) || radius <= 0)
+        if (!Double.isFinite(z) || !Double.isFinite(radius) || radius <= 0) {
             throw new IllegalArgumentException("Invalid sketch stroke dimensions");
+        }
         var lines = segments.stream().filter(s -> s.a().distance(s.b()) >= 1e-9).toList();
         if (lines.isEmpty()) throw new IllegalArgumentException("No sketch stroke segments");
         var points = new double[lines.size() * 14 * 3];

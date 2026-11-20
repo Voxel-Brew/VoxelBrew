@@ -213,10 +213,11 @@ class FeatureProviderTest {
         var plugins = plugins();
         try (var registry = new FeatureRegistry(plugins)) {
             assertThat(registry.descriptors().size()).isEqualTo(2);
-            for (var word : List.of("Duplicate", "Incompatible", "MissingFeatureProvider"))
+            for (var word : List.of("Duplicate", "Incompatible", "MissingFeatureProvider")) {
                 assertThat(registry.diagnostics().stream().anyMatch(d -> d.contains(word)))
                         .as(registry.diagnostics().toString())
                         .isTrue();
+            }
             var session = new ModelSession(CadDocument.empty());
             session.add(registry.create("good", "example.spacer", "spacer", Map.of()));
             var before = session.snapshot();

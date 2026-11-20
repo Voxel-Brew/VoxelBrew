@@ -55,7 +55,9 @@ public final class MoonrakerDriverGui implements DriverGui {
                     || uri.getQuery() != null
                     || !Set.of("http", "https").contains(uri.getScheme())
                     || uri.getPort() == 0
-                    || uri.getPort() > 65535) throw new IllegalArgumentException();
+                    || uri.getPort() > 65535) {
+                throw new IllegalArgumentException();
+            }
         } catch (IllegalArgumentException failure) {
             errors.put(
                     MOONRAKER_URL_ID,
@@ -67,9 +69,10 @@ public final class MoonrakerDriverGui implements DriverGui {
     @Override
     public DriverConfiguration buildConfiguration(Map<String, String> values) {
         var errors = validate(values);
-        if (!errors.isEmpty())
+        if (!errors.isEmpty()) {
             throw new IllegalArgumentException(
                     translations.translate("printer.invalid", errors).orElseThrow());
+        }
         return new DriverConfiguration(Map.of(
                 MOONRAKER_URL_ID, URI.create(values.get(MOONRAKER_URL_ID)),
                 MOONRAKER_SERIAL_ID, values.getOrDefault(MOONRAKER_SERIAL_ID, ""),

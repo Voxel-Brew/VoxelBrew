@@ -11,8 +11,9 @@ class ParallelSketchTest {
     @Test
     void largeJacobianKeepsSerialGeometryRankAndConflictDiagnostics() {
         var entities = new ArrayList<Entity>();
-        for (int i = 0; i < 48; i++)
+        for (int i = 0; i < 48; i++) {
             entities.add(Sketches.entity("line" + i, Kind.LINE, false, 0, i * 3, 9, i * 3 + 1));
+        }
         var geometry = new SketchGeometry(entities, List.of(), List.of());
         for (var entity : entities) {
             geometry = geometry.add(SketchConstraints.create(

@@ -202,7 +202,9 @@ class ServiceLoaderDriverRegistry implements DriverRegistry {
                 loader.close();
             } catch (IOException error) {
                 if (failure == null) failure = error;
-                else failure.addSuppressed(error);
+                else {
+                    failure.addSuppressed(error);
+                }
             }
         }
         if (failure != null) throw failure;

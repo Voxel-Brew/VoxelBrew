@@ -39,8 +39,9 @@ public final class FeatureRegistry implements AutoCloseable {
             parameter.validate(value);
             result.put(parameter.key(), value);
         }
-        for (var key : values.keySet())
+        for (var key : values.keySet()) {
             if (!result.containsKey(key)) throw new IllegalArgumentException("Unknown parameter " + key);
+        }
         return Collections.unmodifiableMap(result);
     }
 
@@ -56,7 +57,9 @@ public final class FeatureRegistry implements AutoCloseable {
                 for (var jar : files.filter(
                                 p -> Files.isRegularFile(p) && p.toString().endsWith(".jar"))
                         .sorted()
-                        .toList()) urls.add(jar.toUri().toURL());
+                        .toList()) {
+                    urls.add(jar.toUri().toURL());
+                }
             }
         }
         loader = new URLClassLoader(urls.toArray(URL[]::new), FeatureProvider.class.getClassLoader());
@@ -67,10 +70,11 @@ public final class FeatureRegistry implements AutoCloseable {
                 if (!providers.hasNext()) break;
                 var provider = providers.next();
                 var descriptor = Objects.requireNonNull(provider.descriptor());
-                if (descriptor.apiVersion() != FeatureProvider.API_VERSION)
+                if (descriptor.apiVersion() != FeatureProvider.API_VERSION) {
                     diagnostics.add("Incompatible feature " + descriptor.key() + ": API " + descriptor.apiVersion());
-                else if (entries.putIfAbsent(descriptor.key(), new Entry(descriptor, provider)) != null)
+                } else if (entries.putIfAbsent(descriptor.key(), new Entry(descriptor, provider)) != null) {
                     diagnostics.add("Duplicate feature ID: " + descriptor.key());
+                }
                 failures = 0;
             } catch (ServiceConfigurationError | LinkageError | RuntimeException | AssertionError failure) {
                 diagnostics.add("Feature provider load failed: " + failure);
@@ -97,13 +101,14 @@ public final class FeatureRegistry implements AutoCloseable {
 
     private Entry require(String provider, String type) {
         var entry = entries.get(provider + "/" + type);
-        if (entry == null)
+        if (entry == null) {
             throw new IllegalArgumentException("Missing feature provider '"
                     + provider
                     + "/"
                     + type
                     + "'. Install a compatible trusted JAR and rebuild; the saved payload is preserved."
                     + (diagnostics.isEmpty() ? "" : " " + String.join("; ", diagnostics)));
+        }
         return entry;
     }
 
@@ -130,8 +135,9 @@ public final class FeatureRegistry implements AutoCloseable {
                 descriptor.payloadVersion(),
                 entry.provider().encode(normalized));
         // A provider must be able to reopen exactly the parameters it just encoded.
-        if (!normalized.equals(parameters(feature)))
+        if (!normalized.equals(parameters(feature))) {
             throw new IllegalArgumentException("Feature codec did not preserve parameters");
+        }
         return feature;
     }
 
@@ -165,8 +171,9 @@ public final class FeatureRegistry implements AutoCloseable {
                     "Provider returned no solid");
             try {
                 double volume = solid.volume();
-                if (!Double.isFinite(volume) || volume <= 0)
+                if (!Double.isFinite(volume) || volume <= 0) {
                     throw new IllegalArgumentException("Provider returned an invalid volume");
+                }
                 return solid;
             } catch (RuntimeException | LinkageError | ServiceConfigurationError | AssertionError failure) {
                 solid.close();

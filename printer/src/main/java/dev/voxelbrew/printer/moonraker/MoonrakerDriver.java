@@ -78,9 +78,10 @@ public final class MoonrakerDriver implements Driver {
         var form = gui();
         var values = config.toInput();
         var errors = form.validate(values);
-        if (!errors.isEmpty())
+        if (!errors.isEmpty()) {
             throw new IllegalArgumentException(
                     translations.translate("printer.invalid", errors).orElseThrow());
+        }
     }
 
     @Override
@@ -116,15 +117,17 @@ public final class MoonrakerDriver implements Driver {
         boolean submitted = false;
         try {
             validate(config);
-            if (!artifact.format().equals("gcode"))
+            if (!artifact.format().equals("gcode")) {
                 return new PrintResult.Failure(Set.of(
                         translations.translate("printer.moonraker.format").orElseThrow()));
+            }
             temporary = Files.createTempFile("voxelbrew-job-", ".gcode");
             Files.write(temporary, artifact.bytes());
             try (var session = transports.open(config)) {
-                if (!session.status().canStart())
+                if (!session.status().canStart()) {
                     return new PrintResult.Failure(Set.of(
                             translations.translate("printer.moonraker.busy").orElseThrow()));
+                }
                 var uploaded = session.upload(temporary, progress -> {});
                 submissionAttempted = true;
                 session.start(uploaded);

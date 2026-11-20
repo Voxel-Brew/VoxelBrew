@@ -9,23 +9,23 @@ import java.util.logging.LogRecord;
 final class AppLogFormatter extends Formatter {
     private final String identity;
 
+    private static String severity(int level) {
+        if (level >= Level.SEVERE.intValue()) return "ERROR";
+        if (level >= Level.WARNING.intValue()) return "WARN";
+        if (level >= Level.INFO.intValue()) return "INFO";
+        return level >= Level.FINE.intValue() ? "DEBUG" : "TRACE";
+    }
+
     AppLogFormatter(String component) {
         identity = component + ":" + ProcessHandle.current().pid();
     }
 
     @Override
     public String format(LogRecord record) {
-        String severity = record.getLevel().intValue() >= Level.SEVERE.intValue()
-                ? "ERROR"
-                : record.getLevel().intValue() >= Level.WARNING.intValue()
-                        ? "WARN"
-                        : record.getLevel().intValue() >= Level.INFO.intValue()
-                                ? "INFO"
-                                : record.getLevel().intValue() >= Level.FINE.intValue() ? "DEBUG" : "TRACE";
         var text = new StringBuilder()
                 .append(record.getInstant())
                 .append(' ')
-                .append(severity)
+                .append(severity(record.getLevel().intValue()))
                 .append(" [")
                 .append(identity)
                 .append("/thread-")

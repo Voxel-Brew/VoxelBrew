@@ -54,24 +54,27 @@ final class WindowResources implements AutoCloseable {
                             () -> new IllegalStateException("No DriverRegistry service found; install printer-impl"));
             printers = openedPrinters.withDirectory(plugins);
         } catch (IOException | RuntimeException | Error failure) {
-            if (openedPrinters != null)
+            if (openedPrinters != null) {
                 try {
                     openedPrinters.close();
                 } catch (IOException close) {
                     failure.addSuppressed(close);
                 }
-            if (openedSlicers != null)
+            }
+            if (openedSlicers != null) {
                 try {
                     openedSlicers.close();
                 } catch (IOException close) {
                     failure.addSuppressed(close);
                 }
-            if (opened != null)
+            }
+            if (opened != null) {
                 try {
                     opened.close();
                 } catch (IOException close) {
                     failure.addSuppressed(close);
                 }
+            }
             if (failure instanceof IOException io) throw new UncheckedIOException(io);
             if (failure instanceof RuntimeException runtime) throw runtime;
             throw (Error) failure;

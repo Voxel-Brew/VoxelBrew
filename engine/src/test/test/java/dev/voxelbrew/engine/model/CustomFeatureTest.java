@@ -39,8 +39,9 @@ class CustomFeatureTest {
         assertThatThrownBy(() -> new Feature.Custom("id", "bad/provider", "type", 1, new byte[0]))
                 .isInstanceOf(IllegalArgumentException.class);
         var p = new FeatureParameter("height", "Height", "mm", 8, 0.001, 1000);
-        for (double value : new double[] {Double.NaN, Double.POSITIVE_INFINITY, 0, 1001})
+        for (double value : new double[] {Double.NaN, Double.POSITIVE_INFINITY, 0, 1001}) {
             assertThatThrownBy(() -> p.validate(value)).isInstanceOf(IllegalArgumentException.class);
+        }
         assertThatThrownBy(() -> new FeatureDescriptor("provider", "type", "Name", 1, 1, List.of(p, p)))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new FeatureParameter("height", "Height", "mm", 8, 10, 20))

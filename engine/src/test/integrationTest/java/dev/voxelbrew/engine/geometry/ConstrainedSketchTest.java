@@ -96,13 +96,14 @@ class ConstrainedSketchTest {
     void constrainedProfileThroughCutTracksFutureThicknessAndPreservesSource() {
         var g = Sketches.rectangle("slot", 20, 10, 10, 5, true);
         var profile = SketchProfiles.profile(g);
-        for (double thickness : new double[] {5, 8})
+        for (double thickness : new double[] {5, 8}) {
             try (var source = Solid.rectanglePrism(0, 0, 0, 60, 40, thickness);
                     var cut = source.cutThroughProfile(profile)) {
                 assertThat(source.volume()).isCloseTo(2400 * thickness, org.assertj.core.data.Offset.offset(1e-6));
                 assertThat(cut.volume()).isCloseTo((2400 - 50) * thickness, org.assertj.core.data.Offset.offset(1e-6));
                 assertThat(cut.contains(25, 12, thickness / 2)).isFalse();
             }
+        }
     }
 
     @Test

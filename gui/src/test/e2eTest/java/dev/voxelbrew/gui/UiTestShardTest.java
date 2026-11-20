@@ -32,8 +32,9 @@ class UiTestShardTest {
                         .isFalse();
                 minimum = Math.min(minimum, selected.size());
                 maximum = Math.max(maximum, selected.size());
-                for (String name : selected)
+                for (String name : selected) {
                     assertThat(assigned.add(name)).as("Duplicate test " + name).isTrue();
+                }
             }
             assertThat(assigned).isEqualTo(new HashSet<>(methods));
             assertThat(maximum - minimum <= 1)

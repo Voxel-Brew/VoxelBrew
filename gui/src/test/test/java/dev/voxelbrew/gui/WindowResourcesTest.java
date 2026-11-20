@@ -48,7 +48,9 @@ class WindowResourcesTest {
         } finally {
             System.setProperty("user.home", home);
             if (override == null) System.clearProperty("voxelbrew.home");
-            else System.setProperty("voxelbrew.home", override);
+            else {
+                System.setProperty("voxelbrew.home", override);
+            }
         }
     }
 

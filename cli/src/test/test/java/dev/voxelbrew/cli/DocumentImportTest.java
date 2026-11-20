@@ -22,7 +22,9 @@ class DocumentImportTest {
             Path source = directory.resolve("source." + format);
             Path target = directory.resolve(format + "-copy.vxb");
             if (format.equals("vxb")) Files.write(source, DocumentCodec.encode(expected));
-            else Files.writeString(source, DocumentCodec.encodeJson(expected));
+            else {
+                Files.writeString(source, DocumentCodec.encodeJson(expected));
+            }
             byte[] original = Files.readAllBytes(source);
             var cli = VoxelBrew.commandLine();
             cli.setOut(new PrintWriter(new StringWriter()));

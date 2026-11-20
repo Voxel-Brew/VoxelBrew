@@ -15,9 +15,10 @@ public final class FileExportWindows {
         return new ExportWindow() {
             @Override
             public <R> Optional<R> show(ExportDialog<R> dialog) {
-                if (!(dialog instanceof FileExportDialog fileDialog))
+                if (!(dialog instanceof FileExportDialog fileDialog)) {
                     throw new UnsupportedOperationException(
                             "Unsupported export dialog: " + dialog.getClass().getName());
+                }
                 var values = Map.of(
                         fileDialog.destinationInput().id(), path.toString(),
                         fileDialog.overwriteInput().id(), Boolean.toString(overwrite));

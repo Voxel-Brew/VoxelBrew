@@ -130,16 +130,20 @@ final class AboutDialog {
                             : translations
                                     .translate("about.current", result.release().version())
                                     .orElseThrow();
-                    if (!result.installable())
+                    if (!result.installable()) {
                         message += "\n"
                                 + translations.translate("about.development").orElseThrow();
+                    }
                     status.setText(message);
                     finished();
                 });
             } catch (Exception failure) {
                 if (failure instanceof CancellationException
-                        || Thread.currentThread().isInterrupted()) log.debug("About release lookup cancelled");
-                else log.warn("About release lookup failed", failure);
+                        || Thread.currentThread().isInterrupted()) {
+                    log.debug("About release lookup cancelled");
+                } else {
+                    log.warn("About release lookup failed", failure);
+                }
                 Platform.runLater(() -> {
                     if (closed) return;
                     status.setText(translations.translate("about.failed").orElseThrow());

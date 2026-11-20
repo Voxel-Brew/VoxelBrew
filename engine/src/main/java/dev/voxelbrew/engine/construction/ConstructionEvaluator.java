@@ -47,8 +47,9 @@ public final class ConstructionEvaluator {
         Vector normalAt(Vector point) {
             if (datum instanceof Plane || type() == 1) {
                 var plane = plane();
-                if (Math.abs(point.minus(plane.origin()).dot(plane.normal())) > 1e-7)
+                if (Math.abs(point.minus(plane.origin()).dot(plane.normal())) > 1e-7) {
                     throw new IllegalArgumentException("Point must lie on the selected surface");
+                }
                 return plane.normal();
             }
             if (type() < 2 || type() > 5) throw new IllegalArgumentException("Select an analytic surface");
@@ -114,8 +115,9 @@ public final class ConstructionEvaluator {
                 yield new Plane(a.sample(), a.vector(13));
             }
             case AXIS_SURFACE -> {
-                if (a.type() != 2 && a.type() != 3 && a.type() != 5)
+                if (a.type() != 2 && a.type() != 3 && a.type() != 5) {
                     throw new IllegalArgumentException("Select a cylinder, cone or torus face");
+                }
                 yield axisSurface(a.vector(1), a.vector(4));
             }
             case AXIS_NORMAL -> {
@@ -129,8 +131,9 @@ public final class ConstructionEvaluator {
             case POINT_TWO_EDGES -> pointTwoEdges(a.axis(), b.axis());
             case POINT_THREE_PLANES -> pointThreePlanes(a.plane(), b.plane(), c.plane());
             case POINT_CENTER -> {
-                if (a.type() != 4 && a.type() != 5 && a.type() != 7)
+                if (a.type() != 4 && a.type() != 5 && a.type() != 7) {
                     throw new IllegalArgumentException("Select a circle edge, sphere or torus face");
+                }
                 yield pointCenter(a.vector(1));
             }
             case POINT_EDGE_PLANE -> pointEdgePlane(a.axis(), b.plane());

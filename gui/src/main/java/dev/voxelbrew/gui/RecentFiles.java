@@ -51,8 +51,9 @@ final class RecentFiles {
     void save() {
         var snapshot = paths();
         var values = new LinkedHashMap<String, String>();
-        for (int i = 0; i < LIMIT; i++)
+        for (int i = 0; i < LIMIT; i++) {
             values.put(PREFIX + i, i < snapshot.size() ? snapshot.get(i).toString() : "");
+        }
         try {
             configuration.update(values, java.util.Set.of());
         } catch (UserConfigException | SecurityException failure) {

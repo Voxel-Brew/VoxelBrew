@@ -76,23 +76,27 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
     }
 
     private static Node featureIcon(Feature feature) {
-        if (feature instanceof dev.voxelbrew.api.model.ConstructionFeature construction)
+        if (feature instanceof dev.voxelbrew.api.model.ConstructionFeature construction) {
             return ConstructionIcons.icon(construction.tool());
-        if (feature instanceof Feature.Sketch)
+        }
+        if (feature instanceof Feature.Sketch) {
             return new Group(
                     path("M2 4H15V17H2Z", "timeline-sketch-icon"),
                     path("M7 18L8 14L17 5L20 8L11 17Z", "timeline-pencil-icon"));
+        }
         var cube = new Group(
                 path("M2 6L10 2L18 6L10 10Z", "timeline-cube-top"),
                 path("M2 6L10 10V20L2 16Z", "timeline-cube-left"),
                 path("M10 10L18 6V16L10 20Z", "timeline-cube-right"));
-        if (feature instanceof Feature.Extrude)
+        if (feature instanceof Feature.Extrude) {
             cube.getChildren().add(path("M17 5L20 1L23 5H21V14H19V5Z", "timeline-extrude-icon"));
-        else if (feature instanceof Feature.ThroughCut)
+        } else if (feature instanceof Feature.ThroughCut) {
             cube.getChildren().add(path("M8 5L10 4L13 5L13 8L11 9L8 8Z M10 9V16", "timeline-cut-icon"));
-        else if (feature instanceof Feature.SplitBody)
+        } else if (feature instanceof Feature.SplitBody) {
             cube.getChildren().add(path("M6 1L14 21", "timeline-split-icon"));
-        else cube.getChildren().add(path("M17 2V10 M13 6H21", "timeline-plugin-icon"));
+        } else {
+            cube.getChildren().add(path("M17 2V10 M13 6H21", "timeline-plugin-icon"));
+        }
         return cube;
     }
 
@@ -235,45 +239,8 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
                 if (!closed) revealMarker();
             });
         }
-        count.setText(position + " / " + definitions.size());
-        marker.resizeRelocate(INSET + position * STEP - 7, 3, 14, 48);
-        marker.setAccessibleHelp(translations
-                        .translate("timeline.markerPosition", position, definitions.size())
-                        .orElseThrow()
-                + " "
-                + translations.translate("help.history-cursor").orElseThrow());
-        marker.setDisable(unavailable || definitions.isEmpty());
-        first.setDisable(unavailable || position == 0);
-        previous.setDisable(unavailable || position == 0);
-        next.setDisable(unavailable || position == definitions.size());
-        last.setDisable(unavailable || position == definitions.size());
-        play.setDisable(unavailable || definitions.isEmpty() || failed);
-        for (int i = 0; i < definitions.size(); i++) {
-            var feature = definitions.get(i);
-            var button = (Button) features.getChildren().get(i);
-            button.getStyleClass()
-                    .setAll("button", "timeline-feature", i < position ? "history-active" : "history-future");
-            if (feature.id().equals(selection)) button.getStyleClass().add("history-selected");
-            var diagnostic = diagnostics.stream()
-                    .filter(d -> d.featureId().equals(feature.id())
-                            && (d.state() == Evaluation.State.FAILED || d.state() == Evaluation.State.BLOCKED))
-                    .findFirst();
-            // Diagnostics belong to the evaluated prefix, never to rolled-back future operations.
-            boolean broken = i < position && !rebuilding && diagnostic.isPresent();
-            if (broken) button.getStyleClass().add("history-error");
-            String description = (i + 1)
-                    + " · "
-                    + name.apply(feature)
-                    + "\n"
-                    + translations
-                            .translate(i < position ? "timeline.evaluated" : "timeline.rolledBack")
-                            .orElseThrow()
-                    + (broken ? "\n" + diagnostic.orElseThrow().message() : "")
-                    + "\n"
-                    + translations.translate("help.history-feature").orElseThrow();
-            UiHelp.describe(button, description);
-            button.setDisable(unavailable);
-        }
+        updateControls();
+        updateDiagnostics(selection, diagnostics);
     }
 
     private void rebuildFeatures() {
@@ -319,7 +286,11 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
             ticks.getChildren().add(tick);
         }
         // Pane must not resize the explicitly positioned marker or rail to their preferred size.
-        for (var node : track.getChildren()) if (node != empty) node.setManaged(false);
+        for (var node : track.getChildren()) {
+            if (node != empty) {
+                node.setManaged(false);
+            }
+        }
         empty.setVisible(definitions.isEmpty());
         if (definitions.isEmpty()) track.setMinWidth(220);
     }
@@ -409,12 +380,59 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
         }
         double left = scroll.getHvalue() * overflow, x = INSET + position * STEP;
         if (x < left + 12) scroll.setHvalue(Math.max(0, (x - 12) / overflow));
-        else if (x > left + viewport - 12) scroll.setHvalue(Math.min(1, (x - viewport + 12) / overflow));
+        else if (x > left + viewport - 12) {
+            scroll.setHvalue(Math.min(1, (x - viewport + 12) / overflow));
+        }
     }
 
     @Override
     public void close() {
         closed = true;
         stop();
+    }
+
+    private void updateControls() {
+        count.setText(position + " / " + definitions.size());
+        marker.resizeRelocate(INSET + position * STEP - 7, 3, 14, 48);
+        marker.setAccessibleHelp(translations
+                        .translate("timeline.markerPosition", position, definitions.size())
+                        .orElseThrow()
+                + " "
+                + translations.translate("help.history-cursor").orElseThrow());
+        marker.setDisable(unavailable || definitions.isEmpty());
+        first.setDisable(unavailable || position == 0);
+        previous.setDisable(unavailable || position == 0);
+        next.setDisable(unavailable || position == definitions.size());
+        last.setDisable(unavailable || position == definitions.size());
+        play.setDisable(unavailable || definitions.isEmpty() || failed);
+    }
+
+    private void updateDiagnostics(String selection, List<Evaluation.Diagnostic> diagnostics) {
+        for (int i = 0; i < definitions.size(); i++) {
+            var feature = definitions.get(i);
+            var button = (Button) features.getChildren().get(i);
+            button.getStyleClass()
+                    .setAll("button", "timeline-feature", i < position ? "history-active" : "history-future");
+            if (feature.id().equals(selection)) button.getStyleClass().add("history-selected");
+            var diagnostic = diagnostics.stream()
+                    .filter(d -> d.featureId().equals(feature.id())
+                            && (d.state() == Evaluation.State.FAILED || d.state() == Evaluation.State.BLOCKED))
+                    .findFirst();
+            // Diagnostics belong to the evaluated prefix, never to rolled-back future operations.
+            boolean broken = i < position && !rebuilding && diagnostic.isPresent();
+            if (broken) button.getStyleClass().add("history-error");
+            String description = (i + 1)
+                    + " · "
+                    + name.apply(feature)
+                    + "\n"
+                    + translations
+                            .translate(i < position ? "timeline.evaluated" : "timeline.rolledBack")
+                            .orElseThrow()
+                    + (broken ? "\n" + diagnostic.orElseThrow().message() : "")
+                    + "\n"
+                    + translations.translate("help.history-feature").orElseThrow();
+            UiHelp.describe(button, description);
+            button.setDisable(unavailable);
+        }
     }
 }

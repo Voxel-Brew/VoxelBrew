@@ -18,41 +18,8 @@ final class NumericFieldDrag {
 
     NumericFieldDrag(FormulaField field) {
         this.field = field;
-        field.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
-            original = null;
-            if (event.getButton() != MouseButton.MIDDLE || !editable() || !Expressions.isNumber(field.getText()))
-                return;
-            try {
-                startValue = new BigDecimal(field.getText().strip());
-                if (!Double.isFinite(startValue.doubleValue())) return;
-            } catch (NumberFormatException invalid) {
-                return;
-            }
-            original = field.getText();
-            step = BigDecimal.valueOf(field.dragStep());
-            startX = event.getScreenX();
-            field.requestFocus();
-            event.consume();
-        });
-        field.addEventFilter(MouseEvent.MOUSE_DRAGGED, event -> {
-            if (original == null || !event.isMiddleButtonDown()) return;
-            if (!editable()) {
-                original = null;
-                return;
-            }
-            // Capture the step at press and calculate from the origin to avoid drift or mid-drag jumps.
-            double pixels = Math.rint(event.getScreenX() - startX);
-            if (Double.isFinite(pixels)) {
-                var value = constrain(startValue.add(BigDecimal.valueOf(pixels).multiply(step)));
-                if (field.bounds().accepts(value.doubleValue())) {
-                    field.setText(
-                            value.compareTo(startValue) == 0
-                                    ? original
-                                    : value.stripTrailingZeros().toPlainString());
-                }
-            }
-            event.consume();
-        });
+        field.addEventFilter(MouseEvent.MOUSE_PRESSED, this::start);
+        field.addEventFilter(MouseEvent.MOUSE_DRAGGED, this::drag);
         field.addEventFilter(MouseEvent.MOUSE_RELEASED, event -> {
             if (original == null || event.getButton() != MouseButton.MIDDLE) return;
             original = null;
@@ -96,5 +63,43 @@ final class NumericFieldDrag {
         return field.isEditable()
                 && !field.isDisabled()
                 && !field.textProperty().isBound();
+    }
+
+    private void start(MouseEvent event) {
+        original = null;
+        if (event.getButton() != MouseButton.MIDDLE || !editable() || !Expressions.isNumber(field.getText())) {
+            return;
+        }
+        try {
+            startValue = new BigDecimal(field.getText().strip());
+            if (!Double.isFinite(startValue.doubleValue())) return;
+        } catch (NumberFormatException invalid) {
+            return;
+        }
+        original = field.getText();
+        step = BigDecimal.valueOf(field.dragStep());
+        startX = event.getScreenX();
+        field.requestFocus();
+        event.consume();
+    }
+
+    private void drag(MouseEvent event) {
+        if (original == null || !event.isMiddleButtonDown()) return;
+        if (!editable()) {
+            original = null;
+            return;
+        }
+        // Capture the step at press and calculate from the origin to avoid drift or mid-drag jumps.
+        double pixels = Math.rint(event.getScreenX() - startX);
+        if (Double.isFinite(pixels)) {
+            var value = constrain(startValue.add(BigDecimal.valueOf(pixels).multiply(step)));
+            if (field.bounds().accepts(value.doubleValue())) {
+                field.setText(
+                        value.compareTo(startValue) == 0
+                                ? original
+                                : value.stripTrailingZeros().toPlainString());
+            }
+        }
+        event.consume();
     }
 }

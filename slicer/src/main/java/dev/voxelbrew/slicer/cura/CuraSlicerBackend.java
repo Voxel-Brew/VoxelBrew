@@ -35,8 +35,9 @@ public final class CuraSlicerBackend implements ProcessSlicer {
 
     @Override
     public ProcessSlicer configure(Map<String, String> options) {
-        if (!configurationOptions().keySet().containsAll(options.keySet()))
+        if (!configurationOptions().keySet().containsAll(options.keySet())) {
             throw new IllegalArgumentException("Unknown Cura option");
+        }
         var merged = new TreeMap<>(configuration);
         merged.putAll(options);
         return new CuraSlicerBackend(merged);
@@ -51,31 +52,37 @@ public final class CuraSlicerBackend implements ProcessSlicer {
     @Override
     public Probe probe(Path executable, Cancellation cancellation) throws IOException, SlicerException {
         String definition = configuration.getOrDefault("definition", "");
-        if (definition.isBlank() || !Files.isRegularFile(Path.of(definition)))
+        if (definition.isBlank() || !Files.isRegularFile(Path.of(definition))) {
             throw new SlicerException.Configuration(
                     "Configure slicer.cura.definition with a CuraEngine definition JSON file");
+        }
         try (var reader = Files.newBufferedReader(Path.of(definition))) {
             var value = JsonParser.parseReader(reader);
-            if (!value.isJsonObject() || !value.getAsJsonObject().has("version"))
+            if (!value.isJsonObject() || !value.getAsJsonObject().has("version")) {
                 throw new SlicerException.Configuration("Expected a versioned CuraEngine machine definition");
+            }
         } catch (JsonParseException invalid) {
-            throw new SlicerException.Configuration("Invalid CuraEngine definition JSON: " + invalid.getMessage());
+            throw new SlicerException.Configuration(
+                    "Invalid CuraEngine definition JSON: " + invalid.getMessage(), invalid);
         }
         String settings = configuration.getOrDefault("settings", "");
-        if (!settings.isBlank() && !Files.isReadable(Path.of(settings)))
+        if (!settings.isBlank() && !Files.isReadable(Path.of(settings))) {
             throw new SlicerException.Configuration("Cannot read CuraEngine settings: " + settings);
+        }
         if (!settings.isBlank()) {
             try (var reader = Files.newBufferedReader(Path.of(settings))) {
                 new Properties().load(reader);
             } catch (IllegalArgumentException invalid) {
-                throw new SlicerException.Configuration("Invalid CuraEngine settings: " + invalid.getMessage());
+                throw new SlicerException.Configuration(
+                        "Invalid CuraEngine settings: " + invalid.getMessage(), invalid);
             }
         }
         String output = ProcessRunner.run(List.of(executable.toString(), "help"), null, cancellation, line -> {});
         var version = java.util.regex.Pattern.compile("Cura_SteamEngine version (5\\.[^\\s]+)")
                 .matcher(output);
-        if (!version.find())
+        if (!version.find()) {
             throw new SlicerException.Configuration("Expected CuraEngine 5.x; executable reported: " + output);
+        }
         return new Probe("CuraEngine " + version.group(1), Set.of());
     }
 
@@ -84,14 +91,16 @@ public final class CuraSlicerBackend implements ProcessSlicer {
         var process = profile.process();
         if ((!profile.printer().firmware().equals("marlin2")
                         && !profile.printer().firmware().equals("vendor"))
-                || !profile.printer().outputFormat().equals("gcode"))
+                || !profile.printer().outputFormat().equals("gcode")) {
             throw new SlicerException.UnsupportedInput("Cura adapter requires Marlin 2 text G-code");
+        }
         if (!model.setup().supports().isEmpty()
                 || process.automaticSupports()
                 || process.brimWidth() > 0
-                || process.raftLayers() > 0)
+                || process.raftLayers() > 0) {
             throw new SlicerException.UnsupportedInput(
                     "Cura support volumes, automatic supports, brim and raft are not yet supported");
+        }
         var result = new TreeMap<String, String>();
         String settings = configuration.getOrDefault("settings", "");
         if (!settings.isBlank()) {
@@ -110,8 +119,9 @@ public final class CuraSlicerBackend implements ProcessSlicer {
                 "wall_line_width_0",
                 "wall_line_width_x",
                 "infill_line_width",
-                "skin_line_width"))
+                "skin_line_width")) {
             result.put(key, Double.toString(profile.printer().nozzleMm()));
+        }
         result.put("material_diameter", Double.toString(profile.material().filamentDiameter()));
         result.put(
                 "material_print_temperature", Double.toString(profile.material().nozzleTemperature()));
@@ -145,9 +155,10 @@ public final class CuraSlicerBackend implements ProcessSlicer {
     @Override
     public RunResult slice(Request request) throws IOException, SlicerException {
         String definition = configuration.getOrDefault("definition", "");
-        if (definition.isBlank() || !Files.isRegularFile(Path.of(definition)))
+        if (definition.isBlank() || !Files.isRegularFile(Path.of(definition))) {
             throw new SlicerException.Configuration(
                     "Configure slicer.cura.definition with a CuraEngine definition JSON file");
+        }
         var settings = settings(request.model());
         var arguments = new ArrayList<>(List.of(
                 request.executable().toString(),

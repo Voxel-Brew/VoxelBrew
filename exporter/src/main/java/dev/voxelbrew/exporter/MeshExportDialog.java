@@ -118,11 +118,11 @@ public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Set
     public Map<String, String> validate(Map<String, String> values) {
         var errors = new LinkedHashMap<String, String>();
         var destination = values.get("destination");
-        if (destination == null || destination.isBlank())
+        if (destination == null || destination.isBlank()) {
             errors.put(
                     "destination",
                     translations.translate("export.mesh.destination").orElseThrow());
-        else {
+        } else {
             try {
                 Path.of(destination);
             } catch (java.nio.file.InvalidPathException failure) {
@@ -134,20 +134,29 @@ public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Set
             }
         }
         if (!"true".equals(values.getOrDefault("overwrite", "false"))
-                && !"false".equals(values.getOrDefault("overwrite", "false")))
+                && !"false".equals(values.getOrDefault("overwrite", "false"))) {
             errors.put(
                     "overwrite",
                     translations.translate("export.mesh.invalidOverwrite").orElseThrow());
+        }
         if (!"DESIGN".equals(values.getOrDefault("space", "DESIGN"))
-                && !"BUILD_PLATE".equals(values.getOrDefault("space", "DESIGN")))
+                && !"BUILD_PLATE".equals(values.getOrDefault("space", "DESIGN"))) {
             errors.put(
                     "space", translations.translate("export.mesh.invalidSpace").orElseThrow());
+        }
         if (!"MODEL".equals(values.getOrDefault("selection", "MODEL"))
                 && !"SUPPORTS".equals(values.getOrDefault("selection", "MODEL"))
-                && !"ALL".equals(values.getOrDefault("selection", "MODEL")))
+                && !"ALL".equals(values.getOrDefault("selection", "MODEL"))) {
             errors.put(
                     "selection",
                     translations.translate("export.mesh.invalidContents").orElseThrow());
+        }
+        validateTolerances(values, errors);
+        validateFormatOptions(values, errors);
+        return errors;
+    }
+
+    private void validateTolerances(Map<String, String> values, Map<String, String> errors) {
         try {
             double chord = Double.parseDouble(values.getOrDefault("chord-tolerance", "0.02"));
             if (!Double.isFinite(chord) || chord < 1e-6) throw new NumberFormatException();
@@ -164,6 +173,9 @@ public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Set
                     "angular-tolerance",
                     translations.translate("export.mesh.invalidAngle").orElseThrow());
         }
+    }
+
+    private void validateFormatOptions(Map<String, String> values, Map<String, String> errors) {
         for (var option : format.options()) {
             var id = "option." + option.key();
             var value = values.getOrDefault(id, option.defaultValue());
@@ -183,11 +195,11 @@ public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Set
         }
         for (var key : values.keySet()) {
             if (key.startsWith("option.")
-                    && format.options().stream().noneMatch(option -> key.equals("option." + option.key())))
+                    && format.options().stream().noneMatch(option -> key.equals("option." + option.key()))) {
                 errors.put(
                         key, translations.translate("export.mesh.unknown", key).orElseThrow());
+            }
         }
-        return errors;
     }
 
     @Override
@@ -211,9 +223,10 @@ public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Set
             options.put(option.key(), value);
         }
         for (var key : values.keySet()) {
-            if (key.startsWith("option.") && !options.containsKey(key.substring("option.".length())))
+            if (key.startsWith("option.") && !options.containsKey(key.substring("option.".length()))) {
                 throw new IllegalArgumentException(
                         translations.translate("export.mesh.unknown", key).orElseThrow());
+            }
         }
         return new Settings(
                 selection,

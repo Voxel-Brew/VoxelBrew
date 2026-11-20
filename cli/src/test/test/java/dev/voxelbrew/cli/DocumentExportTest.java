@@ -118,7 +118,9 @@ class DocumentExportTest {
         } finally {
             System.setProperty("user.home", home);
             if (override == null) System.clearProperty("voxelbrew.home");
-            else System.setProperty("voxelbrew.home", override);
+            else {
+                System.setProperty("voxelbrew.home", override);
+            }
         }
     }
 
@@ -180,9 +182,11 @@ class DocumentExportTest {
                             target.toString(),
                             "--overwrite"))
                     .isEqualTo(0);
-            if (format.equals("vxb"))
+            if (format.equals("vxb")) {
                 assertThat(DocumentReader.load(target).id()).isEqualTo(document.id());
-            else assertThat(Files.readString(target).contains("\"documentId\"")).isTrue();
+            } else {
+                assertThat(Files.readString(target).contains("\"documentId\"")).isTrue();
+            }
         }
     }
 }

@@ -80,26 +80,7 @@ final class FileDialog {
         browse.setId("file-browse");
         UiHelp.install(browse, translations);
         browse.setOnAction(e -> {
-            var chooser = new FileChooser();
-            chooser.setTitle(dialog.getTitle());
-            chooser.getExtensionFilters()
-                    .add(new FileChooser.ExtensionFilter("VoxelBrew (*." + extension + ")", "*." + extension));
-            try {
-                Path selected = Path.of(path.evaluatedText()).toAbsolutePath();
-                Path parent = selected.getParent();
-                Path filename = selected.getFileName();
-                if (parent != null && filename != null) {
-                    if (save) java.nio.file.Files.createDirectories(parent);
-                    if (java.nio.file.Files.isDirectory(parent)) chooser.setInitialDirectory(parent.toFile());
-                    chooser.setInitialFileName(filename.toString());
-                }
-            } catch (java.io.IOException | IllegalArgumentException failure) {
-                Dialogs.show(
-                        new Alert(Alert.AlertType.ERROR, failure.getMessage(), ButtonType.OK), owner, translations);
-                return;
-            }
-            var file = save ? chooser.showSaveDialog(owner) : chooser.showOpenDialog(owner);
-            if (file != null) path.setText(file.toString());
+            browse(owner, save, dialog.getTitle(), extension, path, translations);
         });
         var error = new Label();
         error.getStyleClass().add("error");
@@ -140,22 +121,60 @@ final class FileDialog {
             box.getChildren().add(2, recent);
         }
         button.addEventFilter(ActionEvent.ACTION, e -> {
-            try {
-                if (path.evaluatedText().isBlank())
-                    throw new IllegalArgumentException(
-                            translations.translate("gui.choose_a_file_path").orElseThrow());
-                Path selected = Path.of(path.evaluatedText()).toAbsolutePath();
-                Path parent = selected.getParent();
-                if (parent == null) throw new IllegalArgumentException("Expected a file path: " + selected);
-                if (save) java.nio.file.Files.createDirectories(parent);
-            } catch (java.io.IOException | IllegalArgumentException failure) {
-                error.setText(failure.getMessage());
-                e.consume();
-            }
+            validatePath(e, save, path, error, translations);
         });
         dialog.setResultConverter(
                 b -> b == confirm ? Path.of(path.evaluatedText()).toAbsolutePath() : null);
         return Dialogs.show(dialog, owner, translations);
+    }
+
+    private static void browse(
+            Window owner,
+            boolean save,
+            String title,
+            String extension,
+            FormulaField path,
+            dev.voxelbrew.api.i18n.TranslationService translations) {
+        var chooser = new FileChooser();
+        chooser.setTitle(title);
+        chooser.getExtensionFilters()
+                .add(new FileChooser.ExtensionFilter("VoxelBrew (*." + extension + ")", "*." + extension));
+        try {
+            Path selected = Path.of(path.evaluatedText()).toAbsolutePath();
+            Path parent = selected.getParent();
+            Path filename = selected.getFileName();
+            if (parent != null && filename != null) {
+                if (save) java.nio.file.Files.createDirectories(parent);
+                if (java.nio.file.Files.isDirectory(parent)) chooser.setInitialDirectory(parent.toFile());
+                chooser.setInitialFileName(filename.toString());
+            }
+        } catch (java.io.IOException | IllegalArgumentException failure) {
+            Dialogs.show(new Alert(Alert.AlertType.ERROR, failure.getMessage(), ButtonType.OK), owner, translations);
+            return;
+        }
+        var file = save ? chooser.showSaveDialog(owner) : chooser.showOpenDialog(owner);
+        if (file != null) path.setText(file.toString());
+    }
+
+    private static void validatePath(
+            ActionEvent e,
+            boolean save,
+            FormulaField path,
+            Label error,
+            dev.voxelbrew.api.i18n.TranslationService translations) {
+        try {
+            if (path.evaluatedText().isBlank()) {
+                throw new IllegalArgumentException(
+                        translations.translate("gui.choose_a_file_path").orElseThrow());
+            }
+            Path selected = Path.of(path.evaluatedText()).toAbsolutePath();
+            Path parent = selected.getParent();
+            if (parent == null) throw new IllegalArgumentException("Expected a file path: " + selected);
+            if (save) java.nio.file.Files.createDirectories(parent);
+        } catch (java.io.IOException | IllegalArgumentException failure) {
+            error.setText(failure.getMessage());
+            e.consume();
+        }
     }
 
     private FileDialog() {}

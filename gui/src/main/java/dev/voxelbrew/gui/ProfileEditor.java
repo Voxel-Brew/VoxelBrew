@@ -23,29 +23,7 @@ final class ProfileEditor {
                 && catalog.load().entries().stream()
                         .anyMatch(e -> e.bundled() && e.definition().id().equals(source.id()));
         String[] keys = {"id", "name", "manufacturer", "height", "nozzle", "filament", "tools", "firmware", "format"};
-        String[] values = source == null
-                ? new String[] {
-                    "custom-" + UUID.randomUUID(),
-                    "New profile",
-                    "Custom",
-                    "200",
-                    "0.4",
-                    "1.75",
-                    "1",
-                    "marlin2",
-                    "gcode"
-                }
-                : new String[] {
-                    bundled ? "custom-" + source.id() : source.id(),
-                    source.name(),
-                    source.manufacturer(),
-                    "" + source.usableHeight(),
-                    "" + source.nozzleDiameter(),
-                    "" + source.filamentDiameter(),
-                    "" + source.toolCount(),
-                    source.firmware(),
-                    source.outputFormat()
-                };
+        String[] values = initialValues(source, bundled);
         String[] labels = {
             "Profile ID",
             "Name",
@@ -161,6 +139,25 @@ final class ProfileEditor {
                     return new Point(Double.parseDouble(xy[0]), Double.parseDouble(xy[1]));
                 })
                 .toList();
+    }
+
+    private static String[] initialValues(Profile source, boolean bundled) {
+        if (source == null) {
+            return new String[] {
+                "custom-" + UUID.randomUUID(), "New profile", "Custom", "200", "0.4", "1.75", "1", "marlin2", "gcode"
+            };
+        }
+        return new String[] {
+            bundled ? "custom-" + source.id() : source.id(),
+            source.name(),
+            source.manufacturer(),
+            "" + source.usableHeight(),
+            "" + source.nozzleDiameter(),
+            "" + source.filamentDiameter(),
+            "" + source.toolCount(),
+            source.firmware(),
+            source.outputFormat()
+        };
     }
 
     private ProfileEditor() {}

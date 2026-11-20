@@ -59,8 +59,9 @@ class UnifiedExportTest {
                     "support_material_interface_layers = 4",
                     "brim_width = 6.0",
                     "raft_layers = 2",
-                    "filament_type = PETG"))
+                    "filament_type = PETG")) {
                 assertThat(config.contains("; " + setting + "\n")).as(setting).isTrue();
+            }
             try (var input = zip.getInputStream(zip.getEntry("3D/3dmodel.model"))) {
                 var factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
                 factory.setNamespaceAware(true);

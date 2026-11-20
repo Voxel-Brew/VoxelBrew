@@ -57,12 +57,27 @@ final class SessionCommand implements Callable<Integer> {
         int execute(String[] args) throws Exception {
             if (args.length == 0) return 0;
             if (args[0].equals("session")) throw new IllegalArgumentException("Nested sessions are unavailable");
+            Integer result = handleJob(args);
+            if (result == null) result = handleSketch(args);
+            if (result == null) result = handleHistory(args);
+            if (result == null) result = handleDocument(args);
+            if (result != null) return result;
+            return executeDocumentCommand(args);
+        }
+
+        private Integer handleJob(String[] args) throws Exception {
             if (args.length >= 3 && args[0].equals("slicer") && args[1].equals("job")) {
-                if (args[2].equals("slice") && Arrays.asList(args).contains("--background"))
+                if (args[2].equals("slice") && Arrays.asList(args).contains("--background")) {
                     return startBackground(args);
-                if (args.length == 3 && Set.of("status", "wait", "cancel").contains(args[2]))
+                }
+                if (args.length == 3 && Set.of("status", "wait", "cancel").contains(args[2])) {
                     return background(args[2]);
+                }
             }
+            return null;
+        }
+
+        private Integer handleSketch(String[] args) throws Exception {
             if (args.length == 3 && args[0].equals("designer") && args[1].equals("sketch")) {
                 switch (args[2]) {
                     case "begin" -> {
@@ -87,6 +102,10 @@ final class SessionCommand implements Callable<Integer> {
                     default -> {}
                 }
             }
+            return null;
+        }
+
+        private Integer handleHistory(String[] args) throws Exception {
             if (Arrays.equals(args, new String[] {"undo"}) || Arrays.equals(args, new String[] {"redo"})) {
                 var backwards = sketchDraft == null ? undo : draftUndo;
                 var forwards = sketchDraft == null ? redo : draftRedo;
@@ -97,13 +116,19 @@ final class SessionCommand implements Callable<Integer> {
                 restore(from.pop());
                 return 0;
             }
+            return null;
+        }
+
+        private Integer handleDocument(String[] args) throws Exception {
             if (args.length >= 2 && args[0].equals("document")) {
-                if (sketchDraft != null)
+                if (sketchDraft != null) {
                     throw new IllegalArgumentException("Finish or cancel the sketch draft before document operations");
+                }
                 switch (args[1]) {
                     case "save" -> {
-                        if (args.length != 2)
+                        if (args.length != 2) {
                             throw new IllegalArgumentException("Use document save-as PATH for a new destination");
+                        }
                         sink.save(current, path, true);
                         return 0;
                     }
@@ -115,8 +140,9 @@ final class SessionCommand implements Callable<Integer> {
                         return 0;
                     }
                     case "open" -> {
-                        if (args.length != 3)
+                        if (args.length != 3) {
                             throw new IllegalArgumentException("document open PATH (discards unsaved edits)");
+                        }
                         var destination = Path.of(args[2]).toAbsolutePath().normalize();
                         var loaded = source.load(destination);
                         current = loaded;
@@ -128,17 +154,24 @@ final class SessionCommand implements Callable<Integer> {
                     default -> {}
                 }
             }
+            return null;
+        }
+
+        private int executeDocumentCommand(String[] args) throws Exception {
             if (sketchDraft != null
                     && !(args.length > 1
                             && args[0].equals("designer")
-                            && Set.of("sketch", "parameter", "configuration").contains(args[1])))
+                            && Set.of("sketch", "parameter", "configuration").contains(args[1]))) {
                 throw new IllegalArgumentException("Finish or cancel the sketch draft first");
+            }
             var before = current;
             var files = new FileIoModule(
                     requested -> same(requested) ? current : source.load(requested),
                     (next, requested, overwrite) -> {
                         if (same(requested)) current = next;
-                        else sink.save(next, requested, overwrite);
+                        else {
+                            sink.save(next, requested, overwrite);
+                        }
                     },
                     gcode);
             var parser = CliComponent.factory()
@@ -169,15 +202,17 @@ final class SessionCommand implements Callable<Integer> {
 
         private int startBackground(String[] args) throws Exception {
             if (sketchDraft != null) throw new IllegalArgumentException("Finish or cancel the sketch draft first");
-            if (background != null && background.process != null && background.process.isAlive())
+            if (background != null && background.process != null && background.process.isAlive()) {
                 throw new IllegalArgumentException("A slice is already running");
+            }
             if (Arrays.stream(args)
                     .anyMatch(a -> a.equals("--output")
                             || a.startsWith("--output=")
                             || a.equals("--document")
-                            || a.startsWith("--document=")))
+                            || a.startsWith("--document="))) {
                 throw new IllegalArgumentException(
                         "Background slicing stores jobs in the session; export after job wait");
+            }
             cleanupBackground();
             var job = new Background();
             job.directory = Files.createTempDirectory("voxelbrew-session-slice-");
@@ -234,26 +269,31 @@ final class SessionCommand implements Callable<Integer> {
             if (action.equals("wait") && job.process.isAlive()) job.process.waitFor();
             if (!job.process.isAlive() && job.reader != null) job.reader.join();
             if (!job.process.isAlive() && job.state.equals("running")) {
-                if (job.process.exitValue() != 0 || job.outputFailure != null) job.state = "failed";
-                else if (!job.fingerprint.equals(dev.voxelbrew.engine.persistence.DocumentCodec.fingerprint(current))
-                        || !Objects.equals(
-                                job.target,
-                                current.printSetup()
-                                        .workspaceSettings()
-                                        .get(dev.voxelbrew.api.model.printing.PrintTarget.PRINTER_ID))
-                        || !job.slicerInstallation.equals(
-                                dev.voxelbrew.slicer.SlicerInstallation.selectedId(current.printSetup())))
-                    job.state = "outdated";
-                else {
-                    var result = source.load(job.snapshot);
-                    current = current.withGcode(result.gcode()).withPrintArtifacts(result.printArtifacts());
-                    job.state = "complete";
-                }
+                finishJob(job);
             }
             spec.commandLine().getOut().println("Slice " + job.state);
-            if (!job.process.isAlive())
+            if (!job.process.isAlive()) {
                 Files.readAllLines(job.log).forEach(spec.commandLine().getErr()::println);
+            }
             return job.state.equals("failed") || job.state.equals("outdated") ? 1 : 0;
+        }
+
+        private void finishJob(Background job) throws Exception {
+            if (job.process.exitValue() != 0 || job.outputFailure != null) job.state = "failed";
+            else if (!job.fingerprint.equals(dev.voxelbrew.engine.persistence.DocumentCodec.fingerprint(current))
+                    || !Objects.equals(
+                            job.target,
+                            current.printSetup()
+                                    .workspaceSettings()
+                                    .get(dev.voxelbrew.api.model.printing.PrintTarget.PRINTER_ID))
+                    || !job.slicerInstallation.equals(
+                            dev.voxelbrew.slicer.SlicerInstallation.selectedId(current.printSetup()))) {
+                job.state = "outdated";
+            } else {
+                var result = source.load(job.snapshot);
+                current = current.withGcode(result.gcode()).withPrintArtifacts(result.printArtifacts());
+                job.state = "complete";
+            }
         }
 
         private void stop(Process process) throws InterruptedException {
@@ -333,8 +373,9 @@ final class SessionCommand implements Callable<Integer> {
                 if (script != null) {
                     try (var reader = Files.newBufferedReader(script)) {
                         String[][] commands = new Gson().fromJson(reader, String[][].class);
-                        if (commands == null)
+                        if (commands == null) {
                             throw new IllegalArgumentException("Expected an array of argument arrays");
+                        }
                         for (var args : commands) {
                             if (args == null) throw new IllegalArgumentException("Null command");
                             int result = state.execute(args);

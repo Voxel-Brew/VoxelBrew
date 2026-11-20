@@ -43,8 +43,9 @@ class ParallelGeometryTest {
             }
             assertThatThrownBy(() -> ParallelWork.map(bodies, body -> {
                         var mesh = body.solid().tessellate(MeshOptions.DEFAULT);
-                        if (body.id().equals(bodies.getFirst().id()))
+                        if (body.id().equals(bodies.getFirst().id())) {
                             throw new IllegalStateException("injected batch failure");
+                        }
                         return mesh;
                     }))
                     .isInstanceOf(IllegalStateException.class);

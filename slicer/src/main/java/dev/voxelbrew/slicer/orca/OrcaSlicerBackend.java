@@ -41,8 +41,9 @@ public final class OrcaSlicerBackend implements ProcessSlicer {
 
     @Override
     public ProcessSlicer configure(Map<String, String> values) {
-        if (!configurationOptions().keySet().containsAll(values.keySet()))
+        if (!configurationOptions().keySet().containsAll(values.keySet())) {
             throw new IllegalArgumentException("Unknown OrcaSlicer option");
+        }
         var merged = new HashMap<>(options);
         merged.putAll(values);
         return new OrcaSlicerBackend(merged);
@@ -60,8 +61,9 @@ public final class OrcaSlicerBackend implements ProcessSlicer {
 
     private Path preset(String key) throws SlicerException.Configuration {
         String value = options.getOrDefault(key, "");
-        if (value.isBlank() || !Files.isRegularFile(Path.of(value)))
+        if (value.isBlank() || !Files.isRegularFile(Path.of(value))) {
             throw new SlicerException.Configuration("Configure OrcaSlicer " + key + " preset JSON");
+        }
         return Path.of(value).toAbsolutePath();
     }
 
@@ -78,15 +80,17 @@ public final class OrcaSlicerBackend implements ProcessSlicer {
                     directory,
                     cancellation,
                     line -> {});
-            if (!Files.isRegularFile(settings) || Files.size(settings) > 4 * 1024 * 1024)
+            if (!Files.isRegularFile(settings) || Files.size(settings) > 4 * 1024 * 1024) {
                 throw new SlicerException.Execution("Orca CLI did not export settings");
+            }
             JsonObject exported;
             try (var reader = Files.newBufferedReader(settings)) {
                 exported = JsonParser.parseReader(reader).getAsJsonObject();
             }
             if (!exported.has("version")
-                    || !"2.5.0".equals(exported.get("version").getAsString()))
+                    || !"2.5.0".equals(exported.get("version").getAsString())) {
                 throw new SlicerException.Configuration("Expected qualified OrcaSlicer 2.5.0");
+            }
             return new Probe("OrcaSlicer 2.5.0", CAPABILITIES);
         } finally {
             List<Path> cleanup;
@@ -102,7 +106,8 @@ public final class OrcaSlicerBackend implements ProcessSlicer {
             var value = JsonParser.parseReader(reader);
             if (value.isJsonObject() && !value.getAsJsonObject().isEmpty()) return value.getAsJsonObject();
         } catch (JsonParseException invalid) {
-            throw new SlicerException.Configuration("Invalid Orca " + key + " preset JSON: " + invalid.getMessage());
+            throw new SlicerException.Configuration(
+                    "Invalid Orca " + key + " preset JSON: " + invalid.getMessage(), invalid);
         }
         throw new SlicerException.Configuration("Expected a nonempty Orca " + key + " preset");
     }
@@ -116,15 +121,18 @@ public final class OrcaSlicerBackend implements ProcessSlicer {
                 || nozzle == null
                 || !nozzle.isJsonArray()
                 || nozzle.getAsJsonArray().isEmpty()
-                || !nozzle.getAsJsonArray().get(0).isJsonPrimitive())
+                || !nozzle.getAsJsonArray().get(0).isJsonPrimitive()) {
             throw new SlicerException.Configuration(
                     "Export a complete Orca machine preset including printer_model and nozzle_diameter");
-        if (!model.getAsString().startsWith("Bambu Lab "))
+        }
+        if (!model.getAsString().startsWith("Bambu Lab ")) {
             throw new SlicerException.Configuration("Select a Bambu Lab machine preset");
+        }
         try {
             double diameter = nozzle.getAsJsonArray().get(0).getAsDouble();
-            if (!Double.isFinite(diameter) || diameter <= 0)
+            if (!Double.isFinite(diameter) || diameter <= 0) {
                 throw new SlicerException.Configuration("Orca machine preset needs a positive nozzle diameter");
+            }
         } catch (NumberFormatException invalid) {
             throw new SlicerException.Configuration("Orca machine preset needs a numeric nozzle diameter");
         }
@@ -133,19 +141,22 @@ public final class OrcaSlicerBackend implements ProcessSlicer {
 
     @Override
     public RunResult slice(Request request) throws IOException, SlicerException {
-        if (!request.model().setup().supports().isEmpty())
+        if (!request.model().setup().supports().isEmpty()) {
             throw new SlicerException.UnsupportedInput(
                     "Orca support volumes are not supported; remove explicit supports before slicing");
+        }
         var machine = machinePreset();
         String model = machine.get("printer_model").getAsString();
         var nozzles = machine.getAsJsonArray("nozzle_diameter");
         double nozzle = nozzles.get(0).getAsDouble();
-        if (Math.abs(nozzle - request.model().profile().printer().nozzleMm()) > 0.0001)
+        if (Math.abs(nozzle - request.model().profile().printer().nozzleMm()) > 0.0001) {
             throw new SlicerException.UnsupportedInput("Orca machine nozzle differs from selected slicer printer");
+        }
         String target = request.model().profile().printer().id();
-        if (!normalize(model).equals(normalize(target)))
+        if (!normalize(model).equals(normalize(target))) {
             throw new SlicerException.UnsupportedInput(
                     "Orca machine model differs from selected slicer printer: " + model);
+        }
         var process = request.model().profile().process();
         var overrides = new LinkedHashMap<String, String>();
         overrides.put("layer-height", Double.toString(process.layerHeight()));
@@ -194,16 +205,19 @@ public final class OrcaSlicerBackend implements ProcessSlicer {
         command.add(request.input().toString());
         ProcessRunner.run(command, request.workingDirectory(), request.cancellation(), request.diagnostics());
         request.cancellation().check();
-        if (!Files.isRegularFile(packageFile) || Files.size(packageFile) > 48L * 1024 * 1024)
+        if (!Files.isRegularFile(packageFile) || Files.size(packageFile) > 48L * 1024 * 1024) {
             throw new SlicerException.InvalidArtifact("Missing or oversized Orca package");
+        }
         try (var zip = new ZipFile(packageFile.toFile())) {
             var entry = zip.getEntry("Metadata/plate_1.gcode");
-            if (entry == null || entry.getSize() < 1 || entry.getSize() > 64L * 1024 * 1024)
+            if (entry == null || entry.getSize() < 1 || entry.getSize() > 64L * 1024 * 1024) {
                 throw new SlicerException.InvalidArtifact("Orca package lacks bounded plate 1 G-code");
+            }
             try (var input = zip.getInputStream(entry)) {
                 byte[] content = input.readNBytes(64 * 1024 * 1024 + 1);
-                if (content.length > 64 * 1024 * 1024)
+                if (content.length > 64 * 1024 * 1024) {
                     throw new SlicerException.InvalidArtifact("Oversized packaged G-code");
+                }
                 Files.write(request.output(), content);
             }
         }

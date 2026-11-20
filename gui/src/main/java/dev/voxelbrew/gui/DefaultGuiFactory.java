@@ -61,20 +61,22 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
         }
 
         private PrinterStore printerRuntime() {
-            if (printerRuntime == null)
+            if (printerRuntime == null) {
                 printerRuntime = new dev.voxelbrew.printer.FilePrinterStore(application.configuration());
+            }
             return printerRuntime;
         }
 
         private PrinterProfileCatalog profiles() {
-            if (profiles == null)
+            if (profiles == null) {
                 profiles = new dev.voxelbrew.printer.DefaultPrinterProfileCatalog(
                         application.configuration().profilesFolder());
+            }
             return profiles;
         }
 
         private DocumentController documentController() {
-            if (documentController == null)
+            if (documentController == null) {
                 documentController = new DocumentController(
                         Platform::runLater,
                         plugins,
@@ -82,12 +84,14 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
                         resources().files,
                         files.source(),
                         files.sink());
+            }
             return documentController;
         }
 
         private WindowResources windowResources() {
-            if (windowResources == null)
+            if (windowResources == null) {
                 windowResources = new WindowResources(plugins, files.exporters(), files.slicers());
+            }
             return windowResources;
         }
 
@@ -112,24 +116,26 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
         }
 
         private PrintController printController() {
-            if (printController == null)
+            if (printController == null) {
                 printController = new PrintController(
                         Platform::runLater,
                         () -> documentController().snapshot().document(),
                         plugins,
                         resources().slicing,
                         files.gcode());
+            }
             return printController;
         }
 
         private SlicerSettings slicerSettings() {
-            if (slicerSettings == null)
+            if (slicerSettings == null) {
                 slicerSettings = new SlicerSettings(application.configuration(), resources().appearance);
+            }
             return slicerSettings;
         }
 
         private PrintingPane printingPane() {
-            if (printingPane == null)
+            if (printingPane == null) {
                 printingPane = new PrintingPane(
                         profiles(),
                         printerRuntime(),
@@ -141,11 +147,12 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
                         resources().exporters,
                         resources().validation,
                         translations);
+            }
             return printingPane;
         }
 
         private PrinterPane printerPane() {
-            if (printerPane == null)
+            if (printerPane == null) {
                 printerPane = new PrinterPane(
                         printerRuntime(),
                         resources().printers,
@@ -153,6 +160,7 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
                         printerVisibility(),
                         translations,
                         resources().printer);
+            }
             return printerPane;
         }
 
@@ -177,7 +185,7 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
 
         @Override
         public Workbench workbench() {
-            if (workbench == null)
+            if (workbench == null) {
                 workbench = new Workbench(
                         stage,
                         plugins,
@@ -201,6 +209,7 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
                         FeatureRegistry::new,
                         (geometry, parameters, id) ->
                                 new SketchController(geometry, parameters, id, Platform::runLater));
+            }
             return workbench;
         }
     }

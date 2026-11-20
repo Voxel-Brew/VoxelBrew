@@ -52,12 +52,13 @@ public final class BinaryStlExporter extends MeshExporter {
             double length = Math.hypot(Math.hypot(n[0], n[1]), n[2]);
             facet.clear();
             for (double value : n) facet.putFloat((float) (value / length));
-            for (double[] point : p)
+            for (double[] point : p) {
                 for (double value : point) {
                     float coordinate = (float) value;
                     if (!Float.isFinite(coordinate)) throw new IOException("STL coordinate exceeds float range");
                     facet.putFloat(coordinate);
                 }
+            }
             facet.putShort((short) 0);
             output.write(facet.array());
         }

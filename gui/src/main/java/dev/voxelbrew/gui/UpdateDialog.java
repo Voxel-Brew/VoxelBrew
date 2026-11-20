@@ -130,10 +130,11 @@ final class UpdateDialog {
         install.addEventFilter(ActionEvent.ACTION, e -> {
             if (scheduled) return;
             e.consume();
-            if (!busy && prepared != null)
+            if (!busy && prepared != null) {
                 beforeInstall.accept(() -> {
                     if (!closed && !busy) handOff();
                 });
+            }
         });
     }
 
@@ -239,7 +240,9 @@ final class UpdateDialog {
 
     private void failed(Exception failure) {
         if (failure instanceof CancellationException) log.debug("Update operation cancelled");
-        else log.error("Update operation failed", failure);
+        else {
+            log.error("Update operation failed", failure);
+        }
         Platform.runLater(() -> {
             if (closed) return;
             status.setText(

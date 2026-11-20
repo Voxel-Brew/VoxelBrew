@@ -31,9 +31,13 @@ final class Appearance {
         if (value.contains("prefer-light")) return false;
         if (command(List.of("gsettings", "get", "org.gnome.desktop.interface", "gtk-theme"))
                 .toLowerCase(Locale.ROOT)
-                .contains("dark")) return true;
-        if (System.getenv("WSL_DISTRO_NAME") != null && Files.isRegularFile(Path.of("/mnt/c/Windows/System32/reg.exe")))
+                .contains("dark")) {
+            return true;
+        }
+        if (System.getenv("WSL_DISTRO_NAME") != null
+                && Files.isRegularFile(Path.of("/mnt/c/Windows/System32/reg.exe"))) {
             return windowsDark("/mnt/c/Windows/System32/reg.exe");
+        }
         return false;
     }
 

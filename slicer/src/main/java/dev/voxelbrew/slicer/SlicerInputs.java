@@ -23,8 +23,9 @@ public class SlicerInputs {
     public static Map<String, String> resolve(Layout layout, Map<String, String> saved, Map<String, String> overrides) {
         var values = new LinkedHashMap<String, String>();
         collect(layout, values);
-        for (var id : overrides.keySet())
+        for (var id : overrides.keySet()) {
             if (!values.containsKey(id)) throw new IllegalArgumentException("Unknown slicer input: " + id);
+        }
         saved.forEach((id, value) -> values.computeIfPresent(id, (key, fallback) -> value));
         values.putAll(overrides);
         return Map.copyOf(values);
@@ -52,8 +53,9 @@ public class SlicerInputs {
                     case FileSource source -> Objects.toString(source.defaultPath(), "");
                     case FileDestination destination -> Objects.toString(destination.defaultPath(), "");
                 };
-                if (values.putIfAbsent(input.id(), fallback) != null)
+                if (values.putIfAbsent(input.id(), fallback) != null) {
                     throw new IllegalArgumentException("Duplicate slicer input: " + input.id());
+                }
             }
             default -> {}
         }

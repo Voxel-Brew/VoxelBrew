@@ -62,7 +62,9 @@ final class SketchSnapping {
             for (int iteration = 0; iteration < 45; iteration++) {
                 double left = lo + (hi - lo) / 3, right = hi - (hi - lo) / 3;
                 if (curve.at(left).distance(pointer) < curve.at(right).distance(pointer)) hi = right;
-                else lo = left;
+                else {
+                    lo = left;
+                }
             }
             var point = curve.at((lo + hi) / 2);
             if (point.distance(pointer) < distance) {

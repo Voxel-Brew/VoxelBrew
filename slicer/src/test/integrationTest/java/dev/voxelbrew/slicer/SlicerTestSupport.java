@@ -14,8 +14,9 @@ final class SlicerTestSupport {
             public <T> Optional<T> show(SlicerDialog<T> dialog) {
                 var values = new LinkedHashMap<String, String>();
                 if (dialog.layout() instanceof VerticalLayout column) {
-                    for (Component component : column.children())
+                    for (Component component : column.children()) {
                         if (component instanceof TextField field) values.put(field.id(), field.value());
+                    }
                 }
                 values.putAll(overrides);
                 var errors = dialog.validate(values);

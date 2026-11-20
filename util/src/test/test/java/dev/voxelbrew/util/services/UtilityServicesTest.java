@@ -37,7 +37,9 @@ class UtilityServicesTest {
 
     private static void restore(String key, String previous) {
         if (previous == null) System.clearProperty(key);
-        else System.setProperty(key, previous);
+        else {
+            System.setProperty(key, previous);
+        }
     }
 
     @Test

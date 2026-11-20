@@ -42,8 +42,9 @@ class BambuSessionTest {
         public void submit(JsonObject command) throws IOException {
             this.command = command;
             submissions++;
-            if (reject)
+            if (reject) {
                 reports.accept("{\"print\":{\"result\":\"FAIL\"}}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
             if (fail) throw new IOException("Connection lost");
         }
 

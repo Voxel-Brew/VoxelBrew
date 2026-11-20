@@ -74,7 +74,7 @@ final class ParameterCommands {
             var values = p.values();
             var out = spec.commandLine().getOut();
             out.println("configuration=" + p.activeName());
-            for (var parameter : p.parameters())
+            for (var parameter : p.parameters()) {
                 out.printf(
                         java.util.Locale.ROOT,
                         "%s\t%s\texpression=%s\tvalue=%.12g\tid=%s\t%s%n",
@@ -84,10 +84,12 @@ final class ParameterCommands {
                         parameter.unit().displayValue(values.get(parameter.name())),
                         parameter.id(),
                         parameter.comment());
-            for (var builtin : p.builtins().parameters())
+            }
+            for (var builtin : p.builtins().parameters()) {
                 out.printf(
                         "%s\tvalue=%s\t%s%n",
                         builtin.name(), Expressions.format(p.builtins().value(builtin.name())), builtin.comment());
+            }
             for (var binding : p.bindings()) out.println("bind\t" + binding.target() + "\t" + binding.expression());
             return 0;
         }
@@ -207,12 +209,13 @@ final class ParameterCommands {
             out.println((p.active().isEmpty() ? "* " : "  ") + "Default");
             for (var c : p.configurations()) {
                 out.println((p.active().equals(c.id()) ? "* " : "  ") + c.name() + "\tid=" + c.id());
-                for (var parameter : p.parameters())
+                for (var parameter : p.parameters()) {
                     out.println("  "
                             + parameter.name()
                             + "="
                             + p.expression(parameter, c.id())
                             + (c.overrides().containsKey(parameter.id()) ? "" : " (inherited)"));
+                }
             }
             return 0;
         }

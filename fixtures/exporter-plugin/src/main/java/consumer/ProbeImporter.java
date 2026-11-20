@@ -35,8 +35,9 @@ public class ProbeImporter implements ImporterProvider {
             else {
                 try {
                     var file = Path.of(path);
-                    if (!Files.isRegularFile(file) || !Files.isReadable(file))
+                    if (!Files.isRegularFile(file) || !Files.isReadable(file)) {
                         errors.put("source", "Source must be a readable file");
+                    }
                 } catch (java.nio.file.InvalidPathException failure) {
                     errors.put("source", "Invalid source path");
                 }

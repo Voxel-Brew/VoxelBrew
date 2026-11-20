@@ -79,13 +79,15 @@ class DocumentWriterTest {
         var upgradedDefinitions = message(baseline).toBuilder()
                 .setSchemaVersion(DocumentCodec.SCHEMA_VERSION)
                 .clearApplicationVersion();
-        for (var feature : upgradedDefinitions.getFeaturesBuilderList())
-            if (feature.hasSketch())
+        for (var feature : upgradedDefinitions.getFeaturesBuilderList()) {
+            if (feature.hasSketch()) {
                 feature.getSketchBuilder()
                         .getPlaneBuilder()
                         .addAllFrame(Arrays.stream(dev.voxelbrew.api.model.Transform.IDENTITY.matrix())
                                 .boxed()
                                 .toList());
+            }
+        }
         assertThat(DocumentCodec.fingerprint(document))
                 .isEqualTo(HexFormat.of()
                         .formatHex(MessageDigest.getInstance("SHA-256")
@@ -168,7 +170,7 @@ class DocumentWriterTest {
         var start = new CountDownLatch(1);
         var results = new ArrayList<Future<Boolean>>();
         try (var workers = Executors.newFixedThreadPool(2)) {
-            for (var document : documents)
+            for (var document : documents) {
                 results.add(workers.submit(() -> {
                     ready.countDown();
                     if (!start.await(10, TimeUnit.SECONDS)) throw new AssertionError("Writer start timed out");
@@ -179,6 +181,7 @@ class DocumentWriterTest {
                         return false;
                     }
                 }));
+            }
             assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
             start.countDown();
             int winner = -1;

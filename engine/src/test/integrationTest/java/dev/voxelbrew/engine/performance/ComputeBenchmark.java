@@ -47,8 +47,9 @@ public final class ComputeBenchmark {
 
     private static SketchGeometry sketch(int lines) {
         var entities = new ArrayList<Entity>();
-        for (int i = 0; i < lines; i++)
+        for (int i = 0; i < lines; i++) {
             entities.add(Sketches.entity("line" + i, Kind.LINE, false, 0, i * 3, 9, i * 3 + 1));
+        }
         var geometry = new SketchGeometry(entities, List.of(), List.of());
         for (var entity : entities) {
             geometry = geometry.add(SketchConstraints.create(
@@ -105,8 +106,9 @@ public final class ComputeBenchmark {
             for (int i = 0; i < serial.size(); i++) {
                 var mesh = detached.meshes().get(evaluation.bodies().get(i).id());
                 if (!Arrays.equals(serial.get(i).vertices(), mesh.vertices())
-                        || !Arrays.equals(serial.get(i).triangles(), mesh.triangles()))
+                        || !Arrays.equals(serial.get(i).triangles(), mesh.triangles())) {
                     throw new AssertionError("Non-deterministic mesh");
+                }
             }
             measure(
                     "mesh_12_bodies_144_holes",

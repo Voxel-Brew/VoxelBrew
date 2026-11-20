@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import lombok.NonNull;
 
 /** Resolves exporter inputs from namespaced CLI arguments and optional terminal prompts. */
@@ -66,8 +67,9 @@ final class CliExportWindow implements ExportWindow, PluginDirectorySource {
 
     private static void collect(Component component, Map<String, Input> inputs) {
         if (component instanceof Input input) {
-            if (inputs.putIfAbsent(input.id(), input) != null)
+            if (inputs.putIfAbsent(input.id(), input) != null) {
                 throw new IllegalArgumentException("Duplicate export input: " + input.id());
+            }
         } else if (component instanceof HorizontalLayout horizontal) {
             horizontal.children().forEach(child -> collect(child, inputs));
         } else if (component instanceof VerticalLayout vertical) {
@@ -92,8 +94,9 @@ final class CliExportWindow implements ExportWindow, PluginDirectorySource {
         if (input instanceof ComboBox box) return box.selected();
         if (input instanceof RadioButtonGroup group) return group.selected();
         if (input instanceof Slider slider) return Double.toString(slider.value());
-        if (input instanceof FileDestination destination && destination.defaultPath() != null)
+        if (input instanceof FileDestination destination && destination.defaultPath() != null) {
             return destination.defaultPath().toString();
+        }
         return null;
     }
 
@@ -131,14 +134,34 @@ final class CliExportWindow implements ExportWindow, PluginDirectorySource {
 
     @Override
     public <R> Optional<R> show(ExportDialog<R> dialog) {
-        if (meshFlagsProvided && dialog instanceof FileExportDialog)
+        if (meshFlagsProvided && dialog instanceof FileExportDialog) {
             throw new IllegalArgumentException("This exporter requires the complete design without mesh options");
+        }
         var inputs = new LinkedHashMap<String, Input>();
         collect(dialog.layout(), inputs);
         var resolved = new LinkedHashMap<>(supplied);
         var explicit = new HashSet<>(supplied.keySet());
-        var namespaced = new HashSet<String>();
         String prefix = "--export." + exporterId + ".";
+        readArguments(inputs, resolved, explicit, prefix);
+        for (var input : inputs.values()) {
+            if (!resolved.containsKey(input.id()) && defaultValue(input) != null) {
+                resolved.put(input.id(), defaultValue(input));
+            }
+        }
+        var initialErrors = dialog.validate(resolved);
+        boolean invalidExplicit = initialErrors.keySet().stream().anyMatch(explicit::contains);
+        if (invalidExplicit || failOnMissing || !promptForMissing) {
+            var failure = validationFailure(inputs, resolved, initialErrors, prefix);
+            if (failure != null) throw failure;
+        }
+        if (promptForMissing && !promptForSettings(dialog, inputs, resolved, explicit, prefix)) return Optional.empty();
+        values = Map.copyOf(resolved);
+        return Optional.of(dialog.buildSettings(values));
+    }
+
+    private void readArguments(
+            Map<String, Input> inputs, Map<String, String> resolved, Set<String> explicit, String prefix) {
+        var namespaced = new HashSet<String>();
         for (int index = 0; index < arguments.length; index++) {
             String argument = arguments[index];
             if (!argument.startsWith(prefix)) throw new IllegalArgumentException("Unknown export input: " + argument);
@@ -146,41 +169,39 @@ final class CliExportWindow implements ExportWindow, PluginDirectorySource {
             String id = argument.substring(prefix.length(), separator < 0 ? argument.length() : separator);
             if (!inputs.containsKey(id)) throw new IllegalArgumentException("Unknown export input: " + id);
             if (!namespaced.add(id)) throw new IllegalArgumentException("Duplicate export input: " + id);
-            if (separator < 0 && index + 1 >= arguments.length)
+            if (separator < 0 && index + 1 >= arguments.length) {
                 throw new IllegalArgumentException("Missing value for export input: " + id);
+            }
             String value = separator < 0 ? arguments[++index] : argument.substring(separator + 1);
             resolved.put(id, value);
             explicit.add(id);
         }
-        for (var input : inputs.values())
-            if (!resolved.containsKey(input.id()) && defaultValue(input) != null)
-                resolved.put(input.id(), defaultValue(input));
-        var initialErrors = dialog.validate(resolved);
-        boolean invalidExplicit = initialErrors.keySet().stream().anyMatch(explicit::contains);
-        if (invalidExplicit || failOnMissing || !promptForMissing) {
-            var failure = validationFailure(inputs, resolved, initialErrors, prefix);
-            if (failure != null) throw failure;
+    }
+
+    private <R> boolean promptForSettings(
+            ExportDialog<R> dialog,
+            Map<String, Input> inputs,
+            Map<String, String> resolved,
+            Set<String> explicit,
+            String prefix) {
+        for (var input : inputs.values()) {
+            if (explicit.contains(input.id())) continue;
+            if (!prompt(dialog, input, resolved)) return false;
         }
-        if (promptForMissing) {
+        while (true) {
+            var errors = dialog.validate(resolved);
+            if (errors.isEmpty()) break;
+            if (errors.keySet().stream().anyMatch(id -> explicit.contains(id) || !inputs.containsKey(id))) {
+                throw validationFailure(inputs, resolved, errors, prefix);
+            }
             for (var input : inputs.values()) {
-                if (explicit.contains(input.id())) continue;
-                if (!prompt(dialog, input, resolved)) return Optional.empty();
-            }
-            while (true) {
-                var errors = dialog.validate(resolved);
-                if (errors.isEmpty()) break;
-                if (errors.keySet().stream().anyMatch(id -> explicit.contains(id) || !inputs.containsKey(id)))
-                    throw validationFailure(inputs, resolved, errors, prefix);
-                for (var input : inputs.values()) {
-                    var message = errors.get(input.id());
-                    if (message == null) continue;
-                    err.println(label(input) + "[" + input.id() + "]: " + message);
-                    if (!prompt(dialog, input, resolved)) return Optional.empty();
-                }
+                var message = errors.get(input.id());
+                if (message == null) continue;
+                err.println(label(input) + "[" + input.id() + "]: " + message);
+                if (!prompt(dialog, input, resolved)) return false;
             }
         }
-        values = Map.copyOf(resolved);
-        return Optional.of(dialog.buildSettings(values));
+        return true;
     }
 
     private <R> boolean prompt(ExportDialog<R> dialog, Input input, Map<String, String> resolved) {

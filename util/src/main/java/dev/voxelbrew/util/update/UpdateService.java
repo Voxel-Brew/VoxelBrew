@@ -19,8 +19,9 @@ public final class UpdateService {
 
     public record Request(ReleaseVersion version, boolean force) {
         public Request {
-            if (version != null && version.snapshot())
+            if (version != null && version.snapshot()) {
                 throw new IllegalArgumentException("Select a published release version");
+            }
         }
     }
 
@@ -50,8 +51,9 @@ public final class UpdateService {
 
         public void handOff() throws IOException {
             synchronized (handoffLock) {
-                if (closed || handedOff || handingOff || lease == null)
+                if (closed || handedOff || handingOff || lease == null) {
                     throw new IOException("Update is no longer available");
+                }
                 handingOff = true;
             }
             try {
@@ -67,8 +69,9 @@ public final class UpdateService {
         private void launchHelper() throws IOException {
             Path worker = stage.resolve("worker");
             String executable = platform.startsWith("windows-") ? "javaw.exe" : "java";
-            if (platform.startsWith("windows-") && !Files.isRegularFile(worker.resolve("runtime/bin/" + executable)))
+            if (platform.startsWith("windows-") && !Files.isRegularFile(worker.resolve("runtime/bin/" + executable))) {
                 executable = "java.exe";
+            }
             var process = new ProcessBuilder(
                             worker.resolve("runtime/bin/" + executable).toString(),
                             "-cp",
@@ -90,8 +93,9 @@ public final class UpdateService {
                         handedOff = true;
                         return;
                     }
-                    if ("FAILED".equals(status.getProperty("state")))
+                    if ("FAILED".equals(status.getProperty("state"))) {
                         throw new IOException(status.getProperty("message"));
+                    }
                     Thread.sleep(50);
                 }
                 String detail = Files.exists(logFile()) ? Files.readString(logFile()) : "No helper output";
@@ -158,8 +162,9 @@ public final class UpdateService {
         installation.ifPresent(image -> {
             if (image.component() != component
                     || !image.platform().equals(platform)
-                    || !image.version().equals(current))
+                    || !image.version().equals(current)) {
                 throw new IllegalArgumentException("Updater and installation identities must match");
+            }
         });
     }
 
@@ -167,23 +172,27 @@ public final class UpdateService {
         log.info("Checking {} updates for {} from version {}", component, platform, current);
         var release = source.fetch(request.version(), cancellation);
         cancellation.check();
-        if (request.version() != null && !release.version().equals(request.version()))
+        if (request.version() != null && !release.version().equals(request.version())) {
             throw new IOException("Release source returned the wrong version");
+        }
         String asset = component.asset(release.version(), platform);
         boolean available = request.version() != null
                 ? !release.version().equals(current) || request.force()
                 : release.version().compareTo(current) > 0
                         || (request.force() && release.version().equals(current));
-        if (!release.assets().contains(asset))
+        if (!release.assets().contains(asset)) {
             throw new IOException(
                     "Release " + release.tag() + " has no qualified " + component + " download for " + platform);
-        if (!release.assets().contains("SHA256SUMS"))
+        }
+        if (!release.assets().contains("SHA256SUMS")) {
             throw new IOException("Release is missing required SHA256SUMS; update refused");
+        }
         String message = available
                 ? "Update available: " + current + " → " + release.version()
                 : "Already current: " + current + " (selected release " + release.version() + ")";
-        if (installation.isEmpty())
+        if (installation.isEmpty()) {
             message += ". Installation requires a released app image; development distributions are not replaced.";
+        }
         log.info(
                 "Update check completed: selected {}, available={}, installable={}",
                 release.version(),
@@ -198,8 +207,9 @@ public final class UpdateService {
         var image = installation.orElseThrow(
                 () -> new IOException(
                         "Cannot self-update a development distribution or standalone JAR. Use the released bundled application."));
-        if (!check.asset().equals(component.asset(check.release().version(), platform)))
+        if (!check.asset().equals(component.asset(check.release().version(), platform))) {
             throw new IOException("Wrong application update asset");
+        }
         ApplicationImage.Lease lease = ApplicationImage.lock(image.updateLock(), false);
         log.info(
                 "Preparing verified {} update to {}", component, check.release().version());
@@ -220,12 +230,14 @@ public final class UpdateService {
             Path payload = UpdateArchive.extract(
                     archive, stage.resolve("payload"), component.imageName(platform), cancellation);
             var replacement = ApplicationImage.open(payload, component, platform);
-            if (!replacement.version().equals(check.release().version()))
+            if (!replacement.version().equals(check.release().version())) {
                 throw new IOException("Downloaded image has the wrong product version");
+            }
             if (!platform.startsWith("windows-")
                     && (!Files.isExecutable(replacement.launcher())
-                            || !Files.isExecutable(replacement.runtime().resolve("bin/java"))))
+                            || !Files.isExecutable(replacement.runtime().resolve("bin/java")))) {
                 throw new IOException("Downloaded image is missing Unix executable permissions");
+            }
             progress.accept("Preparing independent update helper");
             Path worker = Files.createDirectory(stage.resolve("worker"));
             UpdateFiles.copyTree(image.runtime(), worker.resolve("runtime"), cancellation);

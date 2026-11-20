@@ -32,8 +32,13 @@ class JobCompatibilityTest {
     void rejectsCredentialUrlsAndMalformedAddresses() {
         var gui = new MoonrakerDriverGui();
         for (var url : java.util.List.of(
-                "http://user:secret@host", "ftp://host", "http://host:0", "http://host/?x=y", "http://host/#fragment"))
+                "http://user:secret@host",
+                "ftp://host",
+                "http://host:0",
+                "http://host/?x=y",
+                "http://host/#fragment")) {
             assertThat(gui.validate(Map.of(MoonrakerDriverGui.MOONRAKER_URL_ID, url)))
                     .containsKey(MoonrakerDriverGui.MOONRAKER_URL_ID);
+        }
     }
 }

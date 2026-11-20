@@ -50,13 +50,7 @@ final class ParameterSuggestions {
         while (start > 0 && identifier(text.charAt(start - 1))) start--;
         if (start == 0 || text.charAt(start - 1) != '$') return null;
         if (start < caret && !asciiLetter(text.charAt(start))) return null;
-        boolean quoted = false;
-        for (int i = 0; i < start - 1; i++) {
-            if (text.charAt(i) != '"') continue;
-            if (quoted && i + 1 < start - 1 && text.charAt(i + 1) == '"') i++;
-            else quoted = !quoted;
-        }
-        if (quoted) return null;
+        if (insideQuotedString(text, start)) return null;
         int end = caret;
         while (end < text.length() && identifier(text.charAt(end))) end++;
         return new Reference(start - 1, end, text.substring(start, caret));
@@ -70,6 +64,18 @@ final class ParameterSuggestions {
         return asciiLetter(c) || c >= '0' && c <= '9' || c == '_' || c == '.';
     }
 
+    private static boolean insideQuotedString(String text, int start) {
+        boolean quoted = false;
+        for (int i = 0; i < start - 1; i++) {
+            if (text.charAt(i) != '"') continue;
+            if (quoted && i + 1 < start - 1 && text.charAt(i + 1) == '"') i++;
+            else {
+                quoted = !quoted;
+            }
+        }
+        return quoted;
+    }
+
     ParameterSuggestions(FormulaField field, Supplier<ParameterSet> parameters, TranslationService translations) {
         this.field = field;
         this.parameters = parameters;
@@ -79,7 +85,9 @@ final class ParameterSuggestions {
         field.selectionProperty().addListener(o -> edited());
         field.focusedProperty().addListener((o, before, focused) -> {
             if (focused) edited();
-            else hide();
+            else {
+                hide();
+            }
         });
         field.disabledProperty().addListener(o -> {
             if (field.isDisabled()) hide();
@@ -116,11 +124,7 @@ final class ParameterSuggestions {
         }
         if (popup == null) createPopup();
         var matches = matches(parameters.get(), reference.prefix(), field.expressionType());
-        String selected = names.getSelectionModel().getSelectedItem();
-        if (!names.getItems().equals(matches)) names.getItems().setAll(matches);
-        if (selected != null && matches.contains(selected))
-            names.getSelectionModel().select(selected);
-        else names.getSelectionModel().selectFirst();
+        updateMatches(matches);
         heading.setText(translations.translate("formula.parameters").orElseThrow());
         hint.setText(translations.translate("formula.completionKeys").orElseThrow());
         empty.setText(translations.translate("formula.noParameters").orElseThrow());
@@ -234,5 +238,15 @@ final class ParameterSuggestions {
 
     private void hide() {
         if (popup != null) popup.hide();
+    }
+
+    private void updateMatches(List<String> matches) {
+        String selected = names.getSelectionModel().getSelectedItem();
+        if (!names.getItems().equals(matches)) names.getItems().setAll(matches);
+        if (selected != null && matches.contains(selected)) {
+            names.getSelectionModel().select(selected);
+        } else {
+            names.getSelectionModel().selectFirst();
+        }
     }
 }

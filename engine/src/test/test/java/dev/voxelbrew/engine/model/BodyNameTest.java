@@ -88,8 +88,9 @@ class BodyNameTest {
     void invalidNamesLeaveTheDocumentAndUndoHistoryUntouched() {
         var session = new ModelSession(CadDocument.empty());
         var before = session.snapshot();
-        for (String name : List.of("", "   ", "line\nbreak", "x\u0000y", "x".repeat(129)))
+        for (String name : List.of("", "   ", "line\nbreak", "x\u0000y", "x".repeat(129))) {
             assertThatThrownBy(() -> session.renameBody("body.one", name)).isInstanceOf(IllegalArgumentException.class);
+        }
         assertThatThrownBy(() -> session.renameBody("invalid body ID", "Plate"))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(session.snapshot()).isEqualTo(before);

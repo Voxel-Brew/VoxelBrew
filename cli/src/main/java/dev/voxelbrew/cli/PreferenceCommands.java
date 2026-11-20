@@ -18,20 +18,29 @@ final class PreferenceCommands {
     private final java.util.function.Supplier<SlicerProviderRegistry> slicers;
 
     void install(CommandLine root) {
+        registerPreferences(root);
+        registerProfiles(root);
+        registerVisibility(root);
+        registerBackends(root);
+    }
+
+    private void registerPreferences(CommandLine root) {
         for (String action : List.of("show", "set", "reset")) {
             var spec = command(
                     root,
                     "settings " + action,
                     s -> {
-                        if (action.equals("show"))
+                        if (action.equals("show")) {
                             s.commandLine().getOut().println(new TreeMap<>(configuration.readUserConfig()));
-                        else if (action.equals("set"))
+                        } else if (action.equals("set")) {
                             configuration.saveUserConfig(value(s, "--key"), value(s, "--value"));
-                        else configuration.remove(value(s, "--key"));
+                        } else {
+                            configuration.remove(value(s, "--key"));
+                        }
                         return 0;
                     },
                     false);
-            if (!action.equals("show"))
+            if (!action.equals("show")) {
                 option(
                         spec,
                         "--key",
@@ -39,8 +48,12 @@ final class PreferenceCommands {
                         true,
                         null,
                         "Preference key (language, appearance, rendering.style)");
+            }
             if (action.equals("set")) option(spec, "--value", String.class, true, null, "Preference value");
         }
+    }
+
+    private void registerProfiles(CommandLine root) {
         command(
                 root,
                 "slicer profile path",
@@ -69,12 +82,17 @@ final class PreferenceCommands {
                         var catalog = printers.load();
                         catalog.diagnostics().forEach(s.commandLine().getErr()::println);
                         if (action.equals("show")) s.commandLine().getOut().println(catalog.require(value(s, "--id")));
-                        else catalog.entries().forEach(s.commandLine().getOut()::println);
+                        else {
+                            catalog.entries().forEach(s.commandLine().getOut()::println);
+                        }
                         return 0;
                     },
                     false);
             if (action.equals("show")) option(spec, "--id", String.class, true, null, "Profile ID");
         }
+    }
+
+    private void registerVisibility(CommandLine root) {
         var visibility = command(
                 root,
                 "slicer profile visibility",
@@ -102,10 +120,13 @@ final class PreferenceCommands {
                             });
                         case "hide", "unhide" -> {
                             String id = value(s, "--id");
-                            if (!defaults.contains(id))
+                            if (!defaults.contains(id)) {
                                 throw new IllegalArgumentException("Expected a bundled profile ID");
+                            }
                             if (operation.equals("hide")) hidden.add(id);
-                            else hidden.remove(id);
+                            else {
+                                hidden.remove(id);
+                            }
                         }
                         default -> throw new IllegalArgumentException("Unknown visibility operation");
                     }
@@ -121,6 +142,9 @@ final class PreferenceCommands {
                 "show",
                 "show, hide, unhide, select-all, deselect-all, invert");
         option(visibility, "--id", String.class, false, null, "Bundled profile ID for hide/unhide");
+    }
+
+    private void registerBackends(CommandLine root) {
         for (String action : List.of("describe", "configure", "discover")) {
             var spec = command(
                     root,
@@ -140,8 +164,9 @@ final class PreferenceCommands {
                                 var overrides = new LinkedHashMap<String, String>();
                                 for (String setting : (String[]) value(s, "--option")) {
                                     int equals = setting.indexOf('=');
-                                    if (equals < 1)
+                                    if (equals < 1) {
                                         throw new IllegalArgumentException("Unknown provider option: " + setting);
+                                    }
                                     overrides.put(setting.substring(0, equals), setting.substring(equals + 1));
                                 }
                                 var dialog = backend.settingsDialog()
@@ -167,8 +192,9 @@ final class PreferenceCommands {
                             .pluginsFolder()
                             .toString(),
                     "Trusted plugins directory");
-            if (action.equals("configure"))
+            if (action.equals("configure")) {
                 option(spec, "--option", String[].class, true, null, "Repeat provider key=value");
+            }
         }
     }
 }

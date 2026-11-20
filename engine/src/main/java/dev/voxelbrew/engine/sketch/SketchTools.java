@@ -102,18 +102,15 @@ public final class SketchTools {
         }
 
         public Options {
-            for (double v : new double[] {radius, rho, height, angle, spacing})
+            for (double v : new double[] {radius, rho, height, angle, spacing}) {
                 if (!Double.isFinite(v)) throw new IllegalArgumentException("Tool options must be finite");
+            }
         }
     }
 
     public static SketchGeometry add(
             SketchGeometry source, Tool tool, String id, List<Vec> p, List<Ref> refs, Options o) {
-        if (tool.clicks() != 0 && p.size() != tool.clicks()) throw new IllegalArgumentException(tool.instructions());
-        if (tool.clicks() == 0 && p.size() < 2) throw new IllegalArgumentException("Place at least two spline points");
-        for (var point : p)
-            if (!Double.isFinite(point.x()) || !Double.isFinite(point.y()))
-                throw new IllegalArgumentException("Points must be finite");
+        validatePoints(tool, p);
         var entities = new ArrayList<Entity>();
         SketchGeometry addition = null;
         Vec a = p.getFirst(), b = p.size() > 1 ? p.get(1) : a;
@@ -168,8 +165,9 @@ public final class SketchTools {
             case ARC_TANGENT -> {
                 if (refs.size() != 1
                         || (refs.getFirst().part() != Part.START
-                                && refs.getFirst().part() != Part.END))
+                                && refs.getFirst().part() != Part.END)) {
                     throw new IllegalArgumentException(tool.instructions());
+                }
                 var ref = refs.getFirst();
                 var curve = source.entity(ref.entityId());
                 double t = ref.part() == Part.START ? 0 : 1;
@@ -178,8 +176,9 @@ public final class SketchTools {
                 var normal = tangent.normal();
                 var d = a.minus(start);
                 double dot = d.dot(normal);
-                if (Math.abs(dot) < 1e-9)
+                if (Math.abs(dot) < 1e-9) {
                     throw new IllegalArgumentException("Tangent arc endpoint must be off the tangent line");
+                }
                 double r = d.dot(d) / (2 * dot);
                 var center = start.plus(normal.times(r));
                 double angle = Math.atan2(start.y() - center.y(), start.x() - center.x());
@@ -216,13 +215,14 @@ public final class SketchTools {
                     entities.add(e.withValues(values));
                 }
                 addition = base.withEntities(entities);
-                if (orientation < 0)
+                if (orientation < 0) {
                     addition = addition.withConstraints(List.of(SketchConstraints.create(
                             addition,
                             id + "-regular",
                             Type.POLYGON,
                             entities.stream().map(Entity::ref).toList(),
                             0)));
+                }
             }
             case ELLIPSE -> {
                 var axis = b.minus(a);
@@ -236,8 +236,9 @@ public final class SketchTools {
                 Vec first = a, last = b;
                 if (tool == Tool.SLOT_CENTER_POINT) first = a.times(2).minus(b);
                 if (tool == Tool.SLOT_OVERALL) {
-                    if (2 * r >= a.distance(b) - 1e-6)
+                    if (2 * r >= a.distance(b) - 1e-6) {
                         throw new IllegalArgumentException("Overall length must exceed slot width");
+                    }
                     first = a.plus(direction.times(r));
                     last = b.minus(direction.times(r));
                 }
@@ -282,8 +283,9 @@ public final class SketchTools {
                 String path = "";
                 double x = a.x(), y = a.y();
                 if (tool == Tool.TEXT_ON_PATH) {
-                    if (refs.size() != 1 || refs.getFirst().part() != Part.OBJECT)
+                    if (refs.size() != 1 || refs.getFirst().part() != Part.OBJECT) {
                         throw new IllegalArgumentException(tool.instructions());
+                    }
                     path = refs.getFirst().entityId();
                     var curve = source.entity(path);
                     var samples = curve.sample();
@@ -313,14 +315,16 @@ public final class SketchTools {
                         o.construction()));
             }
         }
-        if (addition == null)
+        if (addition == null) {
             addition = new SketchGeometry(
                     entities, List.of(), entities.stream().map(Entity::id).toList());
-        if (o.construction())
+        }
+        if (o.construction()) {
             addition = addition.withEntities(addition.entities().stream()
                             .map(e -> e.withConstruction(true))
                             .toList())
                     .withBoundary(List.of());
+        }
         var all = new ArrayList<>(source.entities());
         all.addAll(addition.entities());
         var constraints = new ArrayList<>(source.constraints());
@@ -330,16 +334,41 @@ public final class SketchTools {
         if (tool == Tool.TEXT_ON_PATH) boundary.remove(refs.getFirst().entityId());
         var result = new SketchGeometry(all, constraints, boundary);
         if (tool == Tool.CIRCLE_TWO_TANGENT || tool == Tool.CIRCLE_THREE_TANGENT) {
-            for (int i = 0; i < refs.size(); i++)
+            for (int i = 0; i < refs.size(); i++) {
                 result = constrain(result, id + "-tangent-" + i, Type.TANGENT, new Ref(id, Part.OBJECT), refs.get(i));
-            if (tool == Tool.CIRCLE_TWO_TANGENT)
+            }
+            if (tool == Tool.CIRCLE_TWO_TANGENT) {
                 result = result.add(SketchConstraints.create(
                         result, id + "-radius", Type.RADIUS, List.of(new Ref(id, Part.OBJECT)), o.radius()));
+            }
         }
-        if (tool == Tool.ARC_TANGENT)
+        if (tool == Tool.ARC_TANGENT) {
             result = constrain(result, id + "-tangent", Type.TANGENT, refs.getFirst(), new Ref(id, Part.START));
+        }
         SketchConstraints.validateGeometry(result);
         return result;
+    }
+
+    private static List<Entity> selectedLines(SketchGeometry source, List<Ref> refs) {
+        return refs.stream()
+                .map(r -> {
+                    var e = source.entity(r.entityId());
+                    if (r.part() != Part.OBJECT || e.kind() != Kind.LINE) {
+                        throw new IllegalArgumentException("Select sketch lines");
+                    }
+                    return e;
+                })
+                .toList();
+    }
+
+    private static void validatePoints(Tool tool, List<Vec> p) {
+        if (tool.clicks() != 0 && p.size() != tool.clicks()) throw new IllegalArgumentException(tool.instructions());
+        if (tool.clicks() == 0 && p.size() < 2) throw new IllegalArgumentException("Place at least two spline points");
+        for (var point : p) {
+            if (!Double.isFinite(point.x()) || !Double.isFinite(point.y())) {
+                throw new IllegalArgumentException("Points must be finite");
+            }
+        }
     }
 
     private static Entity line(String id, Vec a, Vec b) {
@@ -361,13 +390,14 @@ public final class SketchTools {
     private static SketchGeometry join(List<Entity> entities) {
         var g = new SketchGeometry(
                 entities, List.of(), entities.stream().map(Entity::id).toList());
-        for (int i = 0; i < entities.size(); i++)
+        for (int i = 0; i < entities.size(); i++) {
             g = constrain(
                     g,
                     entities.get(i).id() + "-join",
                     Type.COINCIDENT,
                     entities.get(i).ref(Part.END),
                     entities.get((i + 1) % entities.size()).ref(Part.START));
+        }
         return g;
     }
 
@@ -399,8 +429,9 @@ public final class SketchTools {
     }
 
     private static SketchGeometry straightSlot(String id, Vec a, Vec b, double r) {
-        if (a.distance(b) < 1e-6 || r < 1e-6)
+        if (a.distance(b) < 1e-6 || r < 1e-6) {
             throw new IllegalArgumentException("Slot length and width must be positive");
+        }
         var u = b.minus(a).unit();
         var n = u.normal().times(r);
         double angle = Math.atan2(u.y(), u.x());
@@ -410,13 +441,14 @@ public final class SketchTools {
                 line(id + "-bottom", b.minus(n), a.minus(n)),
                 arc(id + "-start", a, r, angle - Math.PI / 2, -Math.PI));
         var g = join(entities);
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 4; i++) {
             g = constrain(
                     g,
                     id + "-smooth-" + i,
                     Type.TANGENT,
                     entities.get(i).ref(Part.END),
                     entities.get((i + 1) % 4).ref(Part.START));
+        }
         g = constrain(
                 g,
                 id + "-parallel",
@@ -432,9 +464,10 @@ public final class SketchTools {
     }
 
     private static SketchGeometry arcSlot(String id, Vec c, double radius, double start, double sweep, double r) {
-        if (r < 1e-6 || r >= radius)
+        if (r < 1e-6 || r >= radius) {
             throw new IllegalArgumentException(
                     "Arc slot half-width must be positive and smaller than its centerline radius");
+        }
         if (sweep < 0) {
             start += sweep;
             sweep = -sweep;
@@ -447,13 +480,14 @@ public final class SketchTools {
                 arc(id + "-inner", c, radius - r, start + sweep, -sweep),
                 arc(id + "-start", a, r, start + Math.PI, Math.PI));
         var g = join(entities);
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 4; i++) {
             g = constrain(
                     g,
                     id + "-smooth-" + i,
                     Type.TANGENT,
                     entities.get(i).ref(Part.END),
                     entities.get((i + 1) % 4).ref(Part.START));
+        }
         g = constrain(
                 g,
                 id + "-concentric",
@@ -470,20 +504,15 @@ public final class SketchTools {
 
     private static Entity tangentCircle(
             SketchGeometry source, String id, List<Ref> refs, Vec hint, double radius, boolean three) {
-        if (refs.size() != (three ? 3 : 2))
-            throw new IllegalArgumentException("Select " + (three ? 3 : 2) + " lines first");
-        var lines = refs.stream()
-                .map(r -> {
-                    var e = source.entity(r.entityId());
-                    if (r.part() != Part.OBJECT || e.kind() != Kind.LINE)
-                        throw new IllegalArgumentException("Select sketch lines");
-                    return e;
-                })
-                .toList();
+        int count = three ? 3 : 2;
+        if (refs.size() != count) {
+            throw new IllegalArgumentException("Select " + count + " lines first");
+        }
+        var lines = selectedLines(source, refs);
         Entity best = null;
         double bestDistance = Double.POSITIVE_INFINITY;
         for (int bits = 0; bits < (1 << refs.size()); bits++) {
-            int n = three ? 3 : 2;
+            int n = count;
             double[][] matrix = new double[n][n];
             double[] rhs = new double[n];
             for (int i = 0; i < n; i++) {
@@ -494,7 +523,9 @@ public final class SketchTools {
                 matrix[i][1] = normal.y();
                 rhs[i] = normal.dot(line.at(0));
                 if (three) matrix[i][2] = -sign;
-                else rhs[i] += sign * radius;
+                else {
+                    rhs[i] += sign * radius;
+                }
             }
             var solver = new SingularValueDecomposition(new Array2DRowRealMatrix(matrix, false)).getSolver();
             var answer = solver.solve(new ArrayRealVector(rhs, false));

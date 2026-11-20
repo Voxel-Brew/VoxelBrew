@@ -33,7 +33,7 @@ class SketchPlaneTest {
                 Feature.Plane.origin("XZ"),
                 Feature.Plane.origin("YZ"),
                 new Feature.Plane(
-                        "tilted", 4, Transform.translation(11, -5, 7).compose(Transform.rotation(17, 33, 47)), null)))
+                        "tilted", 4, Transform.translation(11, -5, 7).compose(Transform.rotation(17, 33, 47)), null))) {
             for (double distance : new double[] {5, -8}) {
                 var session = plate(plane, distance);
                 session.add(new Feature.Sketch("hole", "hole.profile", plane, new Feature.Circle(10, 10, 4)));
@@ -61,8 +61,8 @@ class SketchPlaneTest {
                     var bounds = solid.bounds();
                     double[] low = {Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY};
                     double[] high = {-Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE};
-                    for (double x : new double[] {0, 60})
-                        for (double y : new double[] {0, 40})
+                    for (double x : new double[] {0, 60}) {
+                        for (double y : new double[] {0, 40}) {
                             for (double z : new double[] {0, distance}) {
                                 var p = plane.placement().apply(x, y, z);
                                 for (int a = 0; a < 3; a++) {
@@ -70,6 +70,8 @@ class SketchPlaneTest {
                                     high[a] = Math.max(high[a], p[a]);
                                 }
                             }
+                        }
+                    }
                     assertThat(new double[] {bounds.minX(), bounds.minY(), bounds.minZ()})
                             .usingComparatorWithPrecision(.001)
                             .containsExactly(low);
@@ -78,6 +80,7 @@ class SketchPlaneTest {
                             .containsExactly(high);
                 }
             }
+        }
     }
 
     @Test
@@ -149,7 +152,7 @@ class SketchPlaneTest {
             var mesh = moved.tessellate(MeshOptions.DEFAULT);
             for (var face : faces) {
                 int triangles = 0;
-                for (int t = 0; t < mesh.triangleCount(); t++)
+                for (int t = 0; t < mesh.triangleCount(); t++) {
                     if (mesh.faceIndex(t) == face.faceIndex()) {
                         triangles++;
                         for (int c = 0; c < 3; c++) {
@@ -160,6 +163,7 @@ class SketchPlaneTest {
                                     .isCloseTo(face.offset(), org.assertj.core.data.Offset.offset(1e-7));
                         }
                     }
+                }
                 assertThat(triangles > 0).isTrue();
                 var p = face.frame().apply(2, 3, 0);
                 assertThat(face.nx() * p[0] + face.ny() * p[1] + face.nz() * p[2])

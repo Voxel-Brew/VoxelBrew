@@ -21,6 +21,20 @@ import javafx.stage.WindowEvent;
 
 /** Window-local modal controls keep keyboard focus within the document on WSLg. */
 final class Dialogs {
+    private static final java.util.Map<ButtonType, String> BUTTON_LABELS = java.util.Map.of(
+            ButtonType.OK,
+            "dialog.ok",
+            ButtonType.CANCEL,
+            "action.cancel",
+            ButtonType.APPLY,
+            "dialog.apply",
+            ButtonType.CLOSE,
+            "dialog.close",
+            ButtonType.YES,
+            "dialog.yes",
+            ButtonType.NO,
+            "dialog.no");
+
     /** Give the action its full translated label width; the editable path takes the remainder. */
     static HBox pathRow(TextField path, Button browse) {
         path.setMinWidth(0);
@@ -41,33 +55,8 @@ final class Dialogs {
         var previousClose = owner.getOnCloseRequest();
         var pane = dialog.getDialogPane();
         var converter = dialog.getResultConverter();
-        var buttons = new LinkedHashMap<ButtonType, ButtonBase>();
-        for (var type : pane.getButtonTypes()) {
-            buttons.put(type, (ButtonBase) pane.lookupButton(type));
-            String key = type == ButtonType.OK
-                    ? "dialog.ok"
-                    : type == ButtonType.CANCEL
-                            ? "action.cancel"
-                            : type == ButtonType.APPLY
-                                    ? "dialog.apply"
-                                    : type == ButtonType.CLOSE
-                                            ? "dialog.close"
-                                            : type == ButtonType.YES
-                                                    ? "dialog.yes"
-                                                    : type == ButtonType.NO ? "dialog.no" : null;
-            if (key != null)
-                buttons.get(type).setText(translations.translate(key).orElseThrow());
-            buttons.get(type).setMinWidth(Region.USE_PREF_SIZE);
-            UiHelp.dialogButton(buttons.get(type), type, translations);
-        }
-        Node body = pane.getContent();
-        pane.setContent(null);
-        pane.getButtonTypes().clear();
-        if (body == null) {
-            var label = new Label(pane.getContentText());
-            label.setWrapText(true);
-            body = label;
-        }
+        var buttons = translatedButtons(pane, translations);
+        Node body = detachBody(pane);
         var title = new Label(pane.getHeaderText() == null ? dialog.getTitle() : pane.getHeaderText());
         title.getStyleClass().add("selection-title");
         var actions = new HBox(10);
@@ -91,7 +80,7 @@ final class Dialogs {
         boolean[] completed = {false};
         Consumer<ButtonType> finish = button -> {
             if (completed[0]) return;
-            T result = button == null ? null : converter == null ? (T) button : converter.call(button);
+            T result = dialogResult(button, converter);
             completed[0] = true;
             Platform.exitNestedEventLoop(loop, result);
         };
@@ -102,8 +91,9 @@ final class Dialogs {
             // Existing action filters still validate inputs before this handler runs.
             button.setOnAction(e -> finish.accept(type));
             if (type.getButtonData().isDefaultButton()) initial = button;
-            if (type.getButtonData().isCancelButton() || type.getButtonData() == ButtonBar.ButtonData.NO)
+            if (type.getButtonData().isCancelButton() || type.getButtonData() == ButtonBar.ButtonData.NO) {
                 cancel = button;
+            }
         }
         ButtonBase cancelButton = cancel;
         EventHandler<KeyEvent> escape = e -> {
@@ -121,7 +111,7 @@ final class Dialogs {
         });
         EventHandler<WindowEvent> hidden = e -> finish.accept(null);
         owner.addEventHandler(WindowEvent.WINDOW_HIDDEN, hidden);
-        Node initialFocus = initial != null ? initial : cancel != null ? cancel : panel;
+        Node initialFocus = focusTarget(initial, cancel, panel);
         initialFocus.requestFocus();
         // A newly attached overlay may not yet be focusable until its first scene pulse.
         Platform.runLater(() -> {
@@ -138,6 +128,44 @@ final class Dialogs {
             content.setDisable(disabled);
             if (previousFocus != null) previousFocus.requestFocus();
         }
+    }
+
+    private static LinkedHashMap<ButtonType, ButtonBase> translatedButtons(
+            DialogPane pane, dev.voxelbrew.api.i18n.TranslationService translations) {
+        var buttons = new LinkedHashMap<ButtonType, ButtonBase>();
+        for (var type : pane.getButtonTypes()) {
+            buttons.put(type, (ButtonBase) pane.lookupButton(type));
+            String key = BUTTON_LABELS.get(type);
+            if (key != null) {
+                buttons.get(type).setText(translations.translate(key).orElseThrow());
+            }
+            buttons.get(type).setMinWidth(Region.USE_PREF_SIZE);
+            UiHelp.dialogButton(buttons.get(type), type, translations);
+        }
+        return buttons;
+    }
+
+    @SuppressWarnings("unchecked") // JavaFX uses ButtonType when a dialog has no converter.
+    private static <T> T dialogResult(ButtonType button, javafx.util.Callback<ButtonType, T> converter) {
+        if (button == null) return null;
+        return converter == null ? (T) button : converter.call(button);
+    }
+
+    private static Node focusTarget(Node initial, Node cancel, Node panel) {
+        if (initial != null) return initial;
+        return cancel != null ? cancel : panel;
+    }
+
+    private static Node detachBody(DialogPane pane) {
+        Node body = pane.getContent();
+        pane.setContent(null);
+        pane.getButtonTypes().clear();
+        if (body == null) {
+            var label = new Label(pane.getContentText());
+            label.setWrapText(true);
+            body = label;
+        }
+        return body;
     }
 
     private Dialogs() {}

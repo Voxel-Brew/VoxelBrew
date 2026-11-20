@@ -28,7 +28,9 @@ class DocumentImportersTest {
         for (var format : List.of("vxb", "json")) {
             Path source = directory.resolve("editable design." + format);
             if (format.equals("vxb")) Files.write(source, DocumentCodec.encode(document));
-            else Files.writeString(source, DocumentCodec.encodeJson(document));
+            else {
+                Files.writeString(source, DocumentCodec.encodeJson(document));
+            }
             byte[] original = Files.readAllBytes(source);
             try (var registry = new ServiceLoaderImporterProviderRegistry(directory)) {
                 var actual = registry.require(format)

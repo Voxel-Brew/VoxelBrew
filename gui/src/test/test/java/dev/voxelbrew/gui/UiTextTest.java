@@ -20,9 +20,10 @@ class UiTextTest {
     Path directory;
 
     private static void choices(TranslationService t, String prefix, Enum<?>[] values) {
-        for (var value : values)
+        for (var value : values) {
             assertThat(t.translate(prefix + value.name()).orElseThrow().isBlank())
                     .isFalse();
+        }
     }
 
     @Test
@@ -62,10 +63,11 @@ class UiTextTest {
                         sources.filter(p -> p.toString().endsWith(".java")).toList()) {
                     var matcher = Pattern.compile("translations\\s*\\.translate\\(\\s*\"([^\"]+)\"\\s*[,)]")
                             .matcher(Files.readString(file));
-                    while (matcher.find())
+                    while (matcher.find()) {
                         assertThat(t.translate(matcher.group(1)).orElseThrow().isBlank())
                                 .as(file + ": " + matcher.group(1))
                                 .isFalse();
+                    }
                 }
             }
             choices(t, "constraint.", SketchGeometry.Type.values());
@@ -120,17 +122,19 @@ class UiTextTest {
                 "history-cursor"));
         for (var locale : List.of(Locale.ENGLISH, Locale.forLanguageTag("pl"))) {
             var translations = TranslationCatalogs.forLocale(locale, directory);
-            for (var id : ids)
+            for (var id : ids) {
                 assertThat(UiHelp.description(translations, id).isBlank())
                         .as(id)
                         .isFalse();
+            }
             for (var draw : SketchEditor.Draw.values()) {
-                if (draw != SketchEditor.Draw.ADVANCED)
+                if (draw != SketchEditor.Draw.ADVANCED) {
                     assertThat(UiHelp.description(
                                             translations,
                                             "sketch-tool-" + draw.name().toLowerCase(Locale.ROOT))
                                     .isBlank())
                             .isFalse();
+                }
             }
             for (var type : SketchGeometry.Type.values()) {
                 if (!type.dimension()) {

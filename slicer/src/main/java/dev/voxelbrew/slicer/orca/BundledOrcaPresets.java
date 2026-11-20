@@ -47,7 +47,9 @@ public class BundledOrcaPresets {
                 var preset = entry.getValue();
                 if (!field(preset, "type").equals("filament")
                         || !entry.getKey().startsWith("Bambu " + material)
-                        || !values(preset, "compatible_printers").contains(machineName)) continue;
+                        || !values(preset, "compatible_printers").contains(machineName)) {
+                    continue;
+                }
                 var candidate = resolve(catalog, entry.getKey(), new HashSet<>());
                 if (values(candidate, "filament_type").contains(material)) {
                     filament = candidate;
@@ -55,9 +57,10 @@ public class BundledOrcaPresets {
                 }
             }
         }
-        if (filament == null)
+        if (filament == null) {
             throw new SlicerException.UnsupportedInput(
                     "Bundled OrcaSlicer has no " + material + " preset for " + machineName);
+        }
         return Map.of(
                 "machine", write(root, "machine", machine),
                 "process", write(root, "process", process),
@@ -80,7 +83,8 @@ public class BundledOrcaPresets {
                 }
             }
         } catch (JsonParseException | IllegalStateException invalid) {
-            throw new SlicerException.Configuration("Invalid bundled OrcaSlicer preset: " + invalid.getMessage());
+            throw new SlicerException.Configuration(
+                    "Invalid bundled OrcaSlicer preset: " + invalid.getMessage(), invalid);
         }
         return catalog;
     }
@@ -88,8 +92,9 @@ public class BundledOrcaPresets {
     private static JsonObject resolve(Map<String, JsonObject> catalog, String name, Set<String> parents)
             throws SlicerException.Configuration {
         var preset = catalog.get(name);
-        if (preset == null || !parents.add(name))
+        if (preset == null || !parents.add(name)) {
             throw new SlicerException.Configuration("Cannot resolve bundled OrcaSlicer preset " + name);
+        }
         String parent = field(preset, "inherits");
         var resolved = parent.isEmpty() ? new JsonObject() : resolve(catalog, parent, parents);
         for (String included : values(preset, "include")) merge(resolved, resolve(catalog, included, parents));

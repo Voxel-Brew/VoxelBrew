@@ -17,9 +17,10 @@ class PrintArrangementTest {
         var mesh = MeshGeometry.box(
                 new SupportVolume("box", "part", SupportVolume.Role.SOLID_SUPPORT, 0, 0, 0, width, 40, 5));
         var instances = new ArrayList<BodyInstance>();
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < count; i++) {
             instances.add(new BodyInstance(
                     "part" + i, "body", Transform.translation(90, 90, 3).compose(Transform.rotation(0, 0, 15))));
+        }
         var setup = PrintSetup.empty().withInstances(instances);
         return new ManufacturingModel("doc", "rev", setup, PrintProfile.resolve(setup), Map.of("body", mesh));
     }
@@ -32,8 +33,9 @@ class PrintArrangementTest {
             assertThat(result.get(i).id()).isEqualTo(model.instances().get(i).id());
             var before = model.instances().get(i).transform().matrix();
             var after = result.get(i).transform().matrix();
-            for (int j = 0; j < 12; j++)
+            for (int j = 0; j < 12; j++) {
                 if (j != 3 && j != 7) assertThat(after[j]).isEqualTo(before[j]);
+            }
             var bounds = MeshGeometry.bounds(model.placedMesh(result.get(i)));
             assertThat(bounds.minX() >= 5 - 1e-8
                             && bounds.minY() >= 5 - 1e-8

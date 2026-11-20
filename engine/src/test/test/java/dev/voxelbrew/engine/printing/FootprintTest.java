@@ -17,7 +17,9 @@ class FootprintTest {
             for (int c = 0; c < 3; c++) {
                 int v = mesh.vertexIndex(t, c);
                 if (c == 0) path.moveTo(mesh.coordinate(v, 0), mesh.coordinate(v, 1));
-                else path.lineTo(mesh.coordinate(v, 0), mesh.coordinate(v, 1));
+                else {
+                    path.lineTo(mesh.coordinate(v, 0), mesh.coordinate(v, 1));
+                }
             }
             path.closePath();
             area.add(new Area(path));
@@ -28,17 +30,20 @@ class FootprintTest {
     @Test
     void batchedProjectionPreservesHolesOverlapsOppositeWindingsAndDisconnectedRegions() {
         var points = new ArrayList<Double>();
-        for (int y = 0; y < 3; y++)
+        for (int y = 0; y < 3; y++) {
             for (int x = 0; x < 3; x++) {
                 if (x == 1 && y == 1) continue;
                 for (double value :
-                        new double[] {x, y, 0, x + 1, y, 0, x + 1, y + 1, 0, x, y, 0, x, y + 1, 0, x + 1, y + 1, 0})
+                        new double[] {x, y, 0, x + 1, y, 0, x + 1, y + 1, 0, x, y, 0, x, y + 1, 0, x + 1, y + 1, 0}) {
                     points.add(value);
+                }
             }
+        }
         // Opposite duplicate, a disjoint island and an edge-on triangle.
         for (double value :
-                new double[] {0, 0, 2, 1, 1, 2, 1, 0, 2, 5, 0, 0, 6, 0, 0, 5, 1, 0, 0, 0, 0, 0, 0, 1, 0, 3, 1})
+                new double[] {0, 0, 2, 1, 1, 2, 1, 0, 2, 5, 0, 0, 6, 0, 0, 5, 1, 0, 0, 0, 0, 0, 0, 1, 0, 3, 1}) {
             points.add(value);
+        }
         double[] vertices = points.stream().mapToDouble(Double::doubleValue).toArray();
         int[] triangles =
                 java.util.stream.IntStream.range(0, vertices.length / 3).toArray();
@@ -54,11 +59,13 @@ class FootprintTest {
             var placed = MeshGeometry.transform(mesh, transform);
             var expected = triangleUnion(placed);
             var actual = MeshGeometry.footprint(placed);
-            for (double x = -12.13; x < 9; x += .37)
-                for (double y = -.17; y < 22; y += .43)
+            for (double x = -12.13; x < 9; x += .37) {
+                for (double y = -.17; y < 22; y += .43) {
                     assertThat(actual.contains(x, y))
                             .as("Projected occupancy at " + x + "," + y)
                             .isEqualTo(expected.contains(x, y));
+                }
+            }
         }
     }
 }

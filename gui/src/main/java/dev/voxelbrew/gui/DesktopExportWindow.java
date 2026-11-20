@@ -67,10 +67,12 @@ public final class DesktopExportWindow implements ExportWindow {
                 if (caption != null) caption.getStyleClass().remove("export-dialog-invalid-label");
                 control.setAccessibleHelp(null);
             } else {
-                if (!control.getStyleClass().contains("export-dialog-invalid"))
+                if (!control.getStyleClass().contains("export-dialog-invalid")) {
                     control.getStyleClass().add("export-dialog-invalid");
-                if (caption != null && !caption.getStyleClass().contains("export-dialog-invalid-label"))
+                }
+                if (caption != null && !caption.getStyleClass().contains("export-dialog-invalid-label")) {
                     caption.getStyleClass().add("export-dialog-invalid-label");
+                }
                 control.setAccessibleHelp(error);
             }
             message.setText(error == null ? "" : error);
@@ -79,6 +81,15 @@ public final class DesktopExportWindow implements ExportWindow {
     }
 
     record Embedded(Node node, Supplier<Map<String, String>> values) {}
+
+    private static void focusFirstError(Map<String, InputBinding> inputs, Map<String, String> errors) {
+        for (var entry : inputs.entrySet()) {
+            if (errors.containsKey(entry.getKey())) {
+                entry.getValue().control().requestFocus();
+                break;
+            }
+        }
+    }
 
     private static void applyInitial(Map<String, InputBinding> inputs, Map<String, String> initial) {
         initial.forEach((id, value) -> {
@@ -126,8 +137,9 @@ public final class DesktopExportWindow implements ExportWindow {
         container.getChildren().add(message);
         Label caption = container.getChildren().getFirst() instanceof Label label ? label : null;
         if (caption != null) caption.setLabelFor(control);
-        if (inputs.putIfAbsent(id, new InputBinding(value, control, caption, message)) != null)
+        if (inputs.putIfAbsent(id, new InputBinding(value, control, caption, message)) != null) {
             throw new IllegalArgumentException("Duplicate export input: " + id);
+        }
         changed.addListener((observable, before, after) -> onChange.run());
         return container;
     }
@@ -205,8 +217,9 @@ public final class DesktopExportWindow implements ExportWindow {
             Function<Map<String, String>, R> buildSettings,
             Map<String, String> initial,
             boolean confirmOverwrite) {
-        if (!javafx.application.Platform.isFxApplicationThread())
+        if (!javafx.application.Platform.isFxApplicationThread()) {
             throw new IllegalStateException("Export dialogs must be shown on the JavaFX application thread");
+        }
         var inputs = new LinkedHashMap<String, InputBinding>();
         var dialog = new Dialog<R>();
         dialog.setTitle(exporterVersion == null ? title : title + " (" + exporterVersion + ")");
@@ -235,17 +248,7 @@ public final class DesktopExportWindow implements ExportWindow {
         content.getStyleClass().add("export-dialog-content");
         if (checkAction != null) content.getChildren().add(checked);
         content.getChildren().add(error);
-        double maxBodyHeight = Math.max(160, owner.getScene().getHeight() - 180);
-        if (content.prefHeight(500) > maxBodyHeight) {
-            var scroll = new ScrollPane(content);
-            scroll.setFitToWidth(true);
-            scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-            scroll.setPrefViewportHeight(maxBodyHeight);
-            scroll.getStyleClass().add("export-dialog-scroll");
-            dialog.getDialogPane().setContent(scroll);
-        } else {
-            dialog.getDialogPane().setContent(content);
-        }
+        setDialogContent(dialog, content);
         var confirm = new ButtonType(
                 confirmLabel == null ? translations.translate("gui.export").orElseThrow() : confirmLabel,
                 ButtonBar.ButtonData.OK_DONE);
@@ -260,12 +263,7 @@ public final class DesktopExportWindow implements ExportWindow {
                 var errors = validator.apply(selected);
                 displayErrors(inputs, errors, error);
                 if (!errors.isEmpty()) {
-                    for (var entry : inputs.entrySet()) {
-                        if (errors.containsKey(entry.getKey())) {
-                            entry.getValue().control().requestFocus();
-                            break;
-                        }
-                    }
+                    focusFirstError(inputs, errors);
                     event.consume();
                     return;
                 }
@@ -274,23 +272,9 @@ public final class DesktopExportWindow implements ExportWindow {
                     checked.setVisible(true);
                     return;
                 }
-                if (confirmOverwrite
-                        && selected.containsKey("destination")
-                        && selected.containsKey("overwrite")
-                        && !Boolean.parseBoolean(selected.get("overwrite"))
-                        && Files.exists(Path.of(selected.get("destination")))) {
-                    var confirmation = new Alert(
-                            Alert.AlertType.CONFIRMATION,
-                            translations
-                                    .translate("file.replace", Path.of(selected.get("destination")))
-                                    .orElseThrow(),
-                            ButtonType.YES,
-                            ButtonType.NO);
-                    if (Dialogs.show(confirmation, owner, translations).orElse(ButtonType.NO) != ButtonType.YES) {
-                        event.consume();
-                        return;
-                    }
-                    selected.put("overwrite", "true");
+                if (confirmOverwrite && !allowOverwrite(selected)) {
+                    event.consume();
+                    return;
                 }
                 accepted.set(Objects.requireNonNull(buildSettings.apply(selected), "export settings"));
             } catch (RuntimeException failure) {
@@ -333,75 +317,10 @@ public final class DesktopExportWindow implements ExportWindow {
         if (component instanceof dev.voxelbrew.api.model.vui.Label label) return new Label(label.text());
         if (component instanceof dev.voxelbrew.api.model.vui.Separator) return new Separator();
         if (component instanceof dev.voxelbrew.api.model.vui.FileSource source) {
-            var path = new javafx.scene.control.TextField(
-                    source.defaultPath() == null ? "" : source.defaultPath().toString());
-            path.setId(inputPrefix + source.id());
-            var caption = sourceCaption == null
-                    ? translations.translate("import.source").orElseThrow()
-                    : sourceCaption.apply(source.id());
-            var browse = new Button(translations.translate("gui.browse").orElseThrow());
-            browse.setId(inputPrefix + source.id() + "-browse");
-            browse.setOnAction(event -> {
-                var chooser = new FileChooser();
-                chooser.setTitle(caption);
-                if (!source.extension().equals("*")) {
-                    String pattern = "*." + source.extension();
-                    chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(pattern, pattern));
-                }
-                chooser.getExtensionFilters()
-                        .add(new FileChooser.ExtensionFilter(
-                                translations.translate("gui.allFiles").orElseThrow(), "*"));
-                try {
-                    Path initial = Path.of(path.getText());
-                    Path parent = initial.getParent();
-                    if (parent != null && Files.isDirectory(parent))
-                        chooser.setInitialDirectory(parent.toAbsolutePath().toFile());
-                } catch (InvalidPathException ignored) {
-                    // A file can still be chosen to replace invalid input.
-                }
-                var chosen = chooser.showOpenDialog(owner);
-                if (chosen != null) path.setText(chosen.toString());
-            });
-            var row = Dialogs.pathRow(path, browse);
-            addPathAction(source.id(), path, row);
-            return bind(inputs, source.id(), path::getText, path, field(caption, row), path.textProperty(), onChange);
+            return renderFileSource(source, inputs, onChange);
         }
         if (component instanceof FileDestination destination) {
-            var path = new javafx.scene.control.TextField();
-            path.setId("export-path");
-            Path suggestion = destination.defaultPath() != null
-                    ? destination.defaultPath()
-                    : suggestedDestination == null ? current : suggestedDestination;
-            if (suggestion != null)
-                path.setText(dev.voxelbrew.gui.ExportDialog.destinationForFormat(suggestion, destination.extension())
-                        .toString());
-            var browse = new Button(translations.translate("gui.browse").orElseThrow());
-            browse.setId("file-browse");
-            UiHelp.install(browse, translations);
-            browse.setOnAction(event -> {
-                var chooser = new FileChooser();
-                chooser.setTitle(translations.translate("gui.destination").orElseThrow());
-                chooser.getExtensionFilters()
-                        .add(new FileChooser.ExtensionFilter(
-                                "*." + destination.extension(), "*." + destination.extension()));
-                if (!path.getText().isBlank()) {
-                    Path initial = Path.of(path.getText()).toAbsolutePath().normalize();
-                    Path parent = initial.getParent();
-                    Path filename = initial.getFileName();
-                    if (parent != null && Files.isDirectory(parent)) chooser.setInitialDirectory(parent.toFile());
-                    if (filename != null) chooser.setInitialFileName(filename.toString());
-                }
-                var chosen = chooser.showSaveDialog(owner);
-                if (chosen != null) path.setText(chosen.toString());
-            });
-            return bind(
-                    inputs,
-                    destination.id(),
-                    path::getText,
-                    path,
-                    field(translations.translate("gui.destination").orElseThrow(), Dialogs.pathRow(path, browse)),
-                    path.textProperty(),
-                    onChange);
+            return renderFileDestination(destination, inputs, onChange);
         }
         if (component instanceof dev.voxelbrew.api.model.vui.PasswordField field) {
             var input = new javafx.scene.control.PasswordField();
@@ -449,6 +368,131 @@ public final class DesktopExportWindow implements ExportWindow {
                     input.textProperty(),
                     onChange);
         }
+        return renderChoice(component, inputs, onChange);
+    }
+
+    private void addPathAction(String id, TextField input, HBox row) {
+        if (pathAction == null || !pathAction.inputId().equals(id)) return;
+        var action = new Button(pathAction.label());
+        action.setId(inputPrefix + id + "-discover");
+        action.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
+        action.setOnAction(event -> pathAction.selectPath().get().ifPresent(path -> input.setText(path.toString())));
+        row.getChildren().add(action);
+    }
+
+    private Node renderFileSource(
+            dev.voxelbrew.api.model.vui.FileSource source, Map<String, InputBinding> inputs, Runnable onChange) {
+        var path = new javafx.scene.control.TextField(
+                source.defaultPath() == null ? "" : source.defaultPath().toString());
+        path.setId(inputPrefix + source.id());
+        var caption = sourceCaption == null
+                ? translations.translate("import.source").orElseThrow()
+                : sourceCaption.apply(source.id());
+        var browse = new Button(translations.translate("gui.browse").orElseThrow());
+        browse.setId(inputPrefix + source.id() + "-browse");
+        browse.setOnAction(event -> {
+            var chooser = new FileChooser();
+            chooser.setTitle(caption);
+            if (!source.extension().equals("*")) {
+                String pattern = "*." + source.extension();
+                chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(pattern, pattern));
+            }
+            chooser.getExtensionFilters()
+                    .add(new FileChooser.ExtensionFilter(
+                            translations.translate("gui.allFiles").orElseThrow(), "*"));
+            try {
+                Path initial = Path.of(path.getText());
+                Path parent = initial.getParent();
+                if (parent != null && Files.isDirectory(parent)) {
+                    chooser.setInitialDirectory(parent.toAbsolutePath().toFile());
+                }
+            } catch (InvalidPathException ignored) {
+                // A file can still be chosen to replace invalid input.
+            }
+            var chosen = chooser.showOpenDialog(owner);
+            if (chosen != null) path.setText(chosen.toString());
+        });
+        var row = Dialogs.pathRow(path, browse);
+        addPathAction(source.id(), path, row);
+        return bind(inputs, source.id(), path::getText, path, field(caption, row), path.textProperty(), onChange);
+    }
+
+    private Node renderFileDestination(
+            FileDestination destination, Map<String, InputBinding> inputs, Runnable onChange) {
+        var path = new javafx.scene.control.TextField();
+        path.setId("export-path");
+        Path suggestion;
+        if (destination.defaultPath() != null) {
+            suggestion = destination.defaultPath();
+        } else if (suggestedDestination == null) {
+            suggestion = current;
+        } else {
+            suggestion = suggestedDestination;
+        }
+        if (suggestion != null) {
+            path.setText(dev.voxelbrew.gui.ExportDialog.destinationForFormat(suggestion, destination.extension())
+                    .toString());
+        }
+        var browse = new Button(translations.translate("gui.browse").orElseThrow());
+        browse.setId("file-browse");
+        UiHelp.install(browse, translations);
+        browse.setOnAction(event -> {
+            var chooser = new FileChooser();
+            chooser.setTitle(translations.translate("gui.destination").orElseThrow());
+            chooser.getExtensionFilters()
+                    .add(new FileChooser.ExtensionFilter(
+                            "*." + destination.extension(), "*." + destination.extension()));
+            if (!path.getText().isBlank()) {
+                Path initial = Path.of(path.getText()).toAbsolutePath().normalize();
+                Path parent = initial.getParent();
+                Path filename = initial.getFileName();
+                if (parent != null && Files.isDirectory(parent)) chooser.setInitialDirectory(parent.toFile());
+                if (filename != null) chooser.setInitialFileName(filename.toString());
+            }
+            var chosen = chooser.showSaveDialog(owner);
+            if (chosen != null) path.setText(chosen.toString());
+        });
+        return bind(
+                inputs,
+                destination.id(),
+                path::getText,
+                path,
+                field(translations.translate("gui.destination").orElseThrow(), Dialogs.pathRow(path, browse)),
+                path.textProperty(),
+                onChange);
+    }
+
+    private boolean allowOverwrite(Map<String, String> selected) {
+        if (!selected.containsKey("destination")
+                || !selected.containsKey("overwrite")
+                || Boolean.parseBoolean(selected.get("overwrite"))) return true;
+        Path path = Path.of(selected.get("destination"));
+        if (!Files.exists(path)) return true;
+        var confirmation = new Alert(
+                Alert.AlertType.CONFIRMATION,
+                translations.translate("file.replace", path).orElseThrow(),
+                ButtonType.YES,
+                ButtonType.NO);
+        if (Dialogs.show(confirmation, owner, translations).orElse(ButtonType.NO) != ButtonType.YES) return false;
+        selected.put("overwrite", "true");
+        return true;
+    }
+
+    private void setDialogContent(Dialog<?> dialog, VBox content) {
+        double maxBodyHeight = Math.max(160, owner.getScene().getHeight() - 180);
+        if (content.prefHeight(500) > maxBodyHeight) {
+            var scroll = new ScrollPane(content);
+            scroll.setFitToWidth(true);
+            scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+            scroll.setPrefViewportHeight(maxBodyHeight);
+            scroll.getStyleClass().add("export-dialog-scroll");
+            dialog.getDialogPane().setContent(scroll);
+        } else {
+            dialog.getDialogPane().setContent(content);
+        }
+    }
+
+    private Node renderChoice(Component component, Map<String, InputBinding> inputs, Runnable onChange) {
         if (component instanceof dev.voxelbrew.api.model.vui.CheckBox box) {
             var input = new javafx.scene.control.CheckBox(box.label());
             input.setId(inputPrefix + box.id());
@@ -516,14 +560,5 @@ public final class DesktopExportWindow implements ExportWindow {
         }
         throw new UnsupportedOperationException(
                 "Unsupported export component: " + component.getClass().getName());
-    }
-
-    private void addPathAction(String id, TextField input, HBox row) {
-        if (pathAction == null || !pathAction.inputId().equals(id)) return;
-        var action = new Button(pathAction.label());
-        action.setId(inputPrefix + id + "-discover");
-        action.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
-        action.setOnAction(event -> pathAction.selectPath().get().ifPresent(path -> input.setText(path.toString())));
-        row.getChildren().add(action);
     }
 }

@@ -59,11 +59,12 @@ class AdditionalFormatsTest {
             double[] min = {Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY};
             double[] max = {Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY};
             double volume = 0;
-            for (int v = 0; v < mesh.vertexCount(); v++)
+            for (int v = 0; v < mesh.vertexCount(); v++) {
                 for (int axis = 0; axis < 3; axis++) {
                     min[axis] = Math.min(min[axis], mesh.coordinate(v, axis));
                     max[axis] = Math.max(max[axis], mesh.coordinate(v, axis));
                 }
+            }
             for (int triangle = 0; triangle < mesh.triangleCount(); triangle++) {
                 int a = mesh.vertexIndex(triangle, 0),
                         b = mesh.vertexIndex(triangle, 1),

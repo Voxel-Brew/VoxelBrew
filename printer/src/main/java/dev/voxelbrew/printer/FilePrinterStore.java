@@ -41,7 +41,9 @@ public final class FilePrinterStore implements PrinterStore {
                 type = "password";
                 item.addProperty("value", new String(v));
                 Arrays.fill(v, '\0');
-            } else throw new IllegalArgumentException("Unsupported configuration value");
+            } else {
+                throw new IllegalArgumentException("Unsupported configuration value");
+            }
             item.addProperty("type", type);
             result.add(key, item);
         });
@@ -57,8 +59,9 @@ public final class FilePrinterStore implements PrinterStore {
                 case "string" -> value.getAsString();
                 case "integer" -> value.getAsBigDecimal().intValueExact();
                 case "boolean" -> {
-                    if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isBoolean())
+                    if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isBoolean()) {
                         throw new IllegalArgumentException("Invalid boolean");
+                    }
                     yield value.getAsBoolean();
                 }
                 case "decimal" -> new java.math.BigDecimal(value.getAsString());
@@ -109,20 +112,24 @@ public final class FilePrinterStore implements PrinterStore {
                 try {
                     if (Files.size(file) > 1024 * 1024) throw new IOException("Printer file too large");
                     var json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
-                    if (json.get("version").getAsBigDecimal().intValueExact() != 1)
+                    if (json.get("version").getAsBigDecimal().intValueExact() != 1) {
                         throw new IOException("Unsupported printer version");
+                    }
                     var printer = new Printer(
                             json.get("id").getAsString(),
                             json.get("name").getAsString(),
                             json.get("driverId").getAsString(),
                             decode(json.getAsJsonObject("configuration")),
                             JSON.fromJson(json.get("profile"), Profile.class));
-                    if (printers.stream().anyMatch(p -> p.id().equals(printer.id())))
+                    if (printers.stream().anyMatch(p -> p.id().equals(printer.id()))) {
                         throw new IOException("Duplicate printer ID");
-                    if (printers.stream().anyMatch(p -> p.name().equalsIgnoreCase(printer.name())))
+                    }
+                    if (printers.stream().anyMatch(p -> p.name().equalsIgnoreCase(printer.name()))) {
                         throw new IOException("Duplicate printer name");
-                    if (!(printer.id() + ".json").equals(java.util.Objects.toString(file.getFileName(), "")))
+                    }
+                    if (!(printer.id() + ".json").equals(java.util.Objects.toString(file.getFileName(), ""))) {
                         throw new IOException("Mismatched printer ID");
+                    }
                     printers.add(printer);
                 } catch (IOException | RuntimeException failure) {
                     diagnostics.add("Invalid printer file " + file.getFileName()
@@ -137,9 +144,11 @@ public final class FilePrinterStore implements PrinterStore {
     public synchronized void save(Printer printer) throws IOException {
         Files.createDirectories(directory);
         restrict(directory, true);
-        for (var existing : load().devices())
-            if (!existing.id().equals(printer.id()) && existing.name().equalsIgnoreCase(printer.name()))
+        for (var existing : load().devices()) {
+            if (!existing.id().equals(printer.id()) && existing.name().equalsIgnoreCase(printer.name())) {
                 throw new IOException("A printer with this name already exists");
+            }
+        }
         var json = new JsonObject();
         json.addProperty("version", 1);
         json.addProperty("id", printer.id());

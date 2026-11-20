@@ -115,7 +115,9 @@ final class KeyboardShortcuts {
         event.consume();
         if (event.isShortcutDown()
                 || event.isAltDown()
-                || !(event.getCode().isLetterKey() || event.getCode().isDigitKey())) return;
+                || !(event.getCode().isLetterKey() || event.getCode().isDigitKey())) {
+            return;
+        }
         // KEY_TYPED is a separate event. Opening an editor on KEY_PRESSED can otherwise
         // insert the shortcut letter into its newly focused field (for example K into plane Z).
         class TypedGuard implements javafx.event.EventHandler<KeyEvent> {
@@ -185,9 +187,11 @@ final class KeyboardShortcuts {
     static boolean textUndo(KeyEvent event, Node focus) {
         if (!(focus instanceof TextInputControl input)) return false;
         if (primary("undo").match(event)) input.undo();
-        else if (BINDINGS.stream().filter(b -> b.id().equals("redo")).anyMatch(b -> b.matches(event, false)))
+        else if (BINDINGS.stream().filter(b -> b.id().equals("redo")).anyMatch(b -> b.matches(event, false))) {
             input.redo();
-        else return false;
+        } else {
+            return false;
+        }
         event.consume();
         return true;
     }

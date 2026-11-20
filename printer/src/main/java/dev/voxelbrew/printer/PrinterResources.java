@@ -31,11 +31,17 @@ public final class PrinterResources {
             try {
                 if (selected.toRealPath().startsWith(source.directory().toRealPath())
                         && Files.isRegularFile(selected)
-                        && Files.size(selected) <= 5 * 1024 * 1024)
+                        && Files.size(selected) <= 5 * 1024 * 1024) {
                     return selected.toUri().toString();
+                }
             } catch (IOException ignored) {
+                // Fall back to an image matching the profile name when the selected file is inaccessible.
             }
         }
+        return matchingImage(source);
+    }
+
+    private static String matchingImage(Source source) {
         if (!source.name().endsWith(".json")) return null;
         String stem = source.name().substring(0, source.name().length() - ".json".length());
         var extensions = List.of("png", "jpg", "jpeg", "webp", "gif", "bmp");
@@ -60,8 +66,9 @@ public final class PrinterResources {
                     if (Files.isRegularFile(path)
                             && Files.isReadable(path)
                             && path.toRealPath().startsWith(source.directory().toRealPath())
-                            && Files.size(path) <= 5 * 1024 * 1024)
+                            && Files.size(path) <= 5 * 1024 * 1024) {
                         return path.toUri().toString();
+                    }
                 } catch (IOException ignored) {
                     // A removed or inaccessible candidate must not hide another supported image.
                 }

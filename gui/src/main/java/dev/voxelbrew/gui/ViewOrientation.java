@@ -27,14 +27,16 @@ record ViewOrientation(double tilt, double orbit) {
     }
 
     ViewOrientation {
-        if (!Double.isFinite(tilt) || !Double.isFinite(orbit) || Math.abs(tilt) > 90)
+        if (!Double.isFinite(tilt) || !Double.isFinite(orbit) || Math.abs(tilt) > 90) {
             throw new IllegalArgumentException("Camera angles must be finite, with tilt in [-90, 90]");
+        }
         orbit = ((orbit % 360) + 540) % 360 - 180;
     }
 
     String name() {
-        for (String name : new String[] {"Isometric", "Top", "Front", "Right", "Back", "Left", "Bottom"})
+        for (String name : new String[] {"Isometric", "Top", "Front", "Right", "Back", "Left", "Bottom"}) {
             if (equals(named(name))) return name;
+        }
         return "Custom";
     }
 

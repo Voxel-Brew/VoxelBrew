@@ -48,8 +48,9 @@ class ExportTest {
         var result = new ArrayList<double[][]>();
         for (int t = 0; t < mesh.triangleCount(); t++) {
             double[][] points = new double[3][3];
-            for (int c = 0; c < 3; c++)
+            for (int c = 0; c < 3; c++) {
                 for (int a = 0; a < 3; a++) points[c][a] = mesh.coordinate(mesh.vertexIndex(t, c), a);
+            }
             result.add(points);
         }
         return result;
@@ -64,13 +65,14 @@ class ExportTest {
         Map<String, Integer> undirected = new HashMap<>();
         for (var world : triangles) {
             double[][] p = new double[3][3];
-            for (int c = 0; c < 3; c++)
+            for (int c = 0; c < 3; c++) {
                 for (int a = 0; a < 3; a++) {
                     assertThat(Double.isFinite(world[c][a])).isTrue();
                     p[c][a] = world[c][a] - new double[] {dx, dy, dz}[a];
                     min[a] = Math.min(min[a], p[c][a]);
                     max[a] = Math.max(max[a], p[c][a]);
                 }
+            }
             double[] cross = cross(p);
             assertThat(dot(cross, cross) > 1e-20).isTrue();
             volume += dot(p[0], new double[] {
@@ -165,7 +167,11 @@ class ExportTest {
             for (int i = 0; i < count; i++) {
                 double[] normal = {buffer.getFloat(), buffer.getFloat(), buffer.getFloat()};
                 var points = new double[3][3];
-                for (var point : points) for (int axis = 0; axis < 3; axis++) point[axis] = buffer.getFloat();
+                for (var point : points) {
+                    for (int axis = 0; axis < 3; axis++) {
+                        point[axis] = buffer.getFloat();
+                    }
+                }
                 assertThat(buffer.getShort()).isZero();
                 var cross = cross(points);
                 assertThat(dot(normal, cross) > 0)
@@ -233,9 +239,10 @@ class ExportTest {
                 verifyTriangles(triangles, 0, 0, 0);
                 var items = model.getElementsByTagNameNS("*", "item");
                 assertThat(items.getLength()).isEqualTo(2);
-                for (int i = 0; i < items.getLength(); i++)
+                for (int i = 0; i < items.getLength(); i++) {
                     assertThat(((Element) items.item(i)).getAttribute("objectid"))
                             .isEqualTo("1");
+                }
                 double[] m = Arrays.stream(((Element) items.item(1))
                                 .getAttribute("transform")
                                 .split(" "))
@@ -244,12 +251,13 @@ class ExportTest {
                 assertThat(m.length).isEqualTo(12);
                 double[] min = {Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY},
                         max = {-1e99, -1e99, -1e99};
-                for (var p : points)
+                for (var p : points) {
                     for (int axis = 0; axis < 3; axis++) {
                         double value = p[0] * m[axis] + p[1] * m[3 + axis] + p[2] * m[6 + axis] + m[9 + axis];
                         min[axis] = Math.min(min[axis], value);
                         max[axis] = Math.max(max[axis], value);
                     }
+                }
                 assertThat(min).usingComparatorWithPrecision(0.001).containsExactly(new double[] {60, 20, 3});
                 assertThat(max).usingComparatorWithPrecision(0.001).containsExactly(new double[] {100, 80, 11});
             }

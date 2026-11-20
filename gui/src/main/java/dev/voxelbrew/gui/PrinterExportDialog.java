@@ -19,9 +19,11 @@ final class PrinterExportDialog {
             List<PrinterProfileCatalog.Entry> entries,
             Set<String> hidden) {
         var visible = new HashSet<String>();
-        for (var entry : entries)
-            if (entry.bundled() && !hidden.contains(entry.definition().printer().id()))
+        for (var entry : entries) {
+            if (entry.bundled() && !hidden.contains(entry.definition().printer().id())) {
                 visible.add(entry.definition().printer().id());
+            }
+        }
         return choose(owner, translations, entries, visible, true);
     }
 
@@ -72,7 +74,9 @@ final class PrinterExportDialog {
             choice.getStyleClass().add("printer-choice-row");
             choice.selectedProperty().addListener((o, a, checked) -> {
                 if (checked) selected.add(id);
-                else selected.remove(id);
+                else {
+                    selected.remove(id);
+                }
                 exportButton.setDisable(!visibility && selected.isEmpty());
                 count.setText(translations
                         .translate("print.printerSelectionCount", selected.size(), total)

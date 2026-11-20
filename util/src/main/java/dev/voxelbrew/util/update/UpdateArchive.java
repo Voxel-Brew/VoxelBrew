@@ -14,17 +14,22 @@ class UpdateArchive {
     private static final long MAX_EXPANDED_BYTES = 4L * 1024 * 1024 * 1024;
 
     static void verify(Path archive, Path checksums, String name, UpdateCancellation cancellation) throws IOException {
-        if (Files.size(archive) == 0 || Files.size(archive) > MAX_ARCHIVE_BYTES || Files.size(checksums) > 1024 * 1024)
+        if (Files.size(archive) == 0
+                || Files.size(archive) > MAX_ARCHIVE_BYTES
+                || Files.size(checksums) > 1024 * 1024) {
             throw new IOException("Invalid release download size");
+        }
         var entries = new HashMap<String, String>();
         for (String line : Files.readAllLines(checksums)) {
             var match = java.util.regex.Pattern.compile("([a-fA-F0-9]{64})  ([A-Za-z0-9._-]+)")
                     .matcher(line);
-            if (!match.matches() || entries.put(match.group(2), match.group(1)) != null)
+            if (!match.matches() || entries.put(match.group(2), match.group(1)) != null) {
                 throw new IOException("Invalid or duplicate SHA256SUMS entry");
+            }
         }
-        if (!entries.containsKey(name) || !entries.get(name).equalsIgnoreCase(sha256(archive, cancellation)))
+        if (!entries.containsKey(name) || !entries.get(name).equalsIgnoreCase(sha256(archive, cancellation))) {
             throw new IOException("Release archive SHA-256 checksum does not match SHA256SUMS");
+        }
     }
 
     static String sha256(Path file, UpdateCancellation cancellation) throws IOException {
@@ -43,6 +48,44 @@ class UpdateArchive {
         }
     }
 
+    private static void validateEntryName(String name, String imageName, Set<String> names) throws IOException {
+        if (!name.startsWith(imageName + "/")
+                || name.contains("\\")
+                || name.contains(":")
+                || name.indexOf('\0') >= 0
+                || name.startsWith("/")) {
+            throw new IOException("Unsafe or wrong application archive path: " + name);
+        }
+        String key = name.endsWith("/") ? name.substring(0, name.length() - 1) : name;
+        if (!names.add(key.toLowerCase(Locale.ROOT))) {
+            throw new IOException("Duplicate release archive path: " + name);
+        }
+        for (String part : key.split("/", -1)) {
+            if (part.isEmpty()
+                    || part.equals(".")
+                    || part.equals("..")
+                    || part.endsWith(".")
+                    || part.endsWith(" ")
+                    || part.matches("(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\\..*)?")) {
+                throw new IOException("Unsafe release archive path: " + name);
+            }
+        }
+    }
+
+    private static void applyPermissions(Path target, int unixMode) throws IOException {
+        if (Files.getFileStore(target).supportsFileAttributeView("posix")) {
+            var permissions = EnumSet.of(
+                    PosixFilePermission.OWNER_READ,
+                    PosixFilePermission.OWNER_WRITE,
+                    PosixFilePermission.GROUP_READ,
+                    PosixFilePermission.OTHERS_READ);
+            if ((unixMode & 0100) != 0) permissions.add(PosixFilePermission.OWNER_EXECUTE);
+            if ((unixMode & 0010) != 0) permissions.add(PosixFilePermission.GROUP_EXECUTE);
+            if ((unixMode & 0001) != 0) permissions.add(PosixFilePermission.OTHERS_EXECUTE);
+            Files.setPosixFilePermissions(target, permissions);
+        }
+    }
+
     static Path extract(Path archive, Path destination, String imageName, UpdateCancellation cancellation)
             throws IOException {
         Files.createDirectory(destination);
@@ -58,26 +101,10 @@ class UpdateArchive {
                 if (++count > 100000
                         || entry.isUnixSymlink()
                         || !zip.canReadEntryData(entry)
-                        || (entry.getMethod() != 0 && entry.getMethod() != 8))
+                        || (entry.getMethod() != 0 && entry.getMethod() != 8)) {
                     throw new IOException("Unsupported release archive entry");
-                if (!name.startsWith(imageName + "/")
-                        || name.contains("\\")
-                        || name.contains(":")
-                        || name.indexOf('\0') >= 0
-                        || name.startsWith("/"))
-                    throw new IOException("Unsafe or wrong application archive path: " + name);
-                String key = name.endsWith("/") ? name.substring(0, name.length() - 1) : name;
-                if (!names.add(key.toLowerCase(Locale.ROOT)))
-                    throw new IOException("Duplicate release archive path: " + name);
-                for (String part : key.split("/", -1)) {
-                    if (part.isEmpty()
-                            || part.equals(".")
-                            || part.equals("..")
-                            || part.endsWith(".")
-                            || part.endsWith(" ")
-                            || part.matches("(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\\..*)?"))
-                        throw new IOException("Unsafe release archive path: " + name);
                 }
+                validateEntryName(name, imageName, names);
                 Path target = destination.resolve(name).normalize();
                 if (!target.startsWith(destination)) throw new IOException("Archive path escapes staging directory");
                 if (entry.isDirectory()) {
@@ -85,8 +112,9 @@ class UpdateArchive {
                     continue;
                 }
                 Path parent = target.getParent();
-                if (parent == null)
+                if (parent == null) {
                     throw new IOException("Archive entry requires a parent directory: " + entry.getName());
+                }
                 Files.createDirectories(parent);
                 var crc = new CRC32();
                 long size = 0;
@@ -97,25 +125,17 @@ class UpdateArchive {
                         cancellation.check();
                         size += read;
                         total += read;
-                        if (total > MAX_EXPANDED_BYTES)
+                        if (total > MAX_EXPANDED_BYTES) {
                             throw new IOException("Expanded release archive exceeds size limit");
+                        }
                         output.write(buffer, 0, read);
                         crc.update(buffer, 0, read);
                     }
                 }
-                if (size != entry.getSize() || crc.getValue() != entry.getCrc())
+                if (size != entry.getSize() || crc.getValue() != entry.getCrc()) {
                     throw new IOException("Damaged release archive entry: " + name);
-                if (Files.getFileStore(target).supportsFileAttributeView("posix")) {
-                    var permissions = EnumSet.of(
-                            PosixFilePermission.OWNER_READ,
-                            PosixFilePermission.OWNER_WRITE,
-                            PosixFilePermission.GROUP_READ,
-                            PosixFilePermission.OTHERS_READ);
-                    if ((entry.getUnixMode() & 0100) != 0) permissions.add(PosixFilePermission.OWNER_EXECUTE);
-                    if ((entry.getUnixMode() & 0010) != 0) permissions.add(PosixFilePermission.GROUP_EXECUTE);
-                    if ((entry.getUnixMode() & 0001) != 0) permissions.add(PosixFilePermission.OTHERS_EXECUTE);
-                    Files.setPosixFilePermissions(target, permissions);
                 }
+                applyPermissions(target, entry.getUnixMode());
             }
         }
         return destination.resolve(imageName);

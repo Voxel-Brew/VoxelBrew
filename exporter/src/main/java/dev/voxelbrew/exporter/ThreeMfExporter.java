@@ -109,8 +109,9 @@ public final class ThreeMfExporter extends MeshExporter {
                 xml.writeStartElement("triangles");
                 for (int t = 0; t < mesh.triangleCount(); t++) {
                     xml.writeEmptyElement("triangle");
-                    for (int c = 0; c < 3; c++)
+                    for (int c = 0; c < 3; c++) {
                         xml.writeAttribute("v" + (c + 1), Integer.toString(mesh.vertexIndex(t, c)));
+                    }
                 }
                 xml.writeEndElement();
                 xml.writeEndElement();

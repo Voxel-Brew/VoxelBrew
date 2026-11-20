@@ -42,9 +42,10 @@ public final class WorkbenchApplication extends Application {
     public void start(Stage stage) throws java.io.IOException {
         var application = ApplicationModule.system(ApplicationImage.Component.GUI);
         var translations = application.translations();
-        if (!Platform.isSupported(ConditionalFeature.SCENE3D))
+        if (!Platform.isSupported(ConditionalFeature.SCENE3D)) {
             throw new IllegalStateException(
                     translations.translate("graphics.unavailable").orElseThrow());
+        }
         var args = getParameters().getRaw();
         Path
                 plugins =
@@ -54,14 +55,18 @@ public final class WorkbenchApplication extends Application {
         Path smokeOutput = Path.of(System.getProperty("voxelbrew.smoke.output", "build/gui-smoke.png"));
         for (int i = 0; i < args.size(); i++) {
             if (args.get(i).equals("--plugin-dir") && i + 1 < args.size()) plugins = Path.of(args.get(++i));
-            else if (args.get(i).equals("--open") && i + 1 < args.size()) open = Path.of(args.get(++i));
-            else if (args.get(i).equals("--smoke-output") && i + 1 < args.size()) smokeOutput = Path.of(args.get(++i));
-            else if (!args.get(i).equals("--smoke-test"))
+            else if (args.get(i).equals("--open") && i + 1 < args.size()) {
+                open = Path.of(args.get(++i));
+            } else if (args.get(i).equals("--smoke-output") && i + 1 < args.size()) {
+                smokeOutput = Path.of(args.get(++i));
+            } else if (!args.get(i).equals("--smoke-test")) {
                 throw new IllegalArgumentException(
                         "Usage: gui [--open design.vxb] [--plugin-dir directory] [--smoke-test] [--smoke-output screenshot.png]");
+            }
         }
-        if (open != null && args.contains("--smoke-test"))
+        if (open != null && args.contains("--smoke-test")) {
             throw new IllegalArgumentException("--smoke-test creates an unsaved fixture; omit --open");
+        }
         workbench = openWindow(stage, plugins, open, application);
         workbench.startMcpIfConfigured();
         checkForUpdates(stage, translations);
@@ -92,8 +97,9 @@ public final class WorkbenchApplication extends Application {
                     prompt.setTitle(translations.translate("update.title").orElseThrow());
                     prompt.setHeaderText(
                             translations.translate("update.heading").orElseThrow());
-                    if (prompt.showAndWait().filter(download::equals).isPresent() && stage.isShowing())
+                    if (prompt.showAndWait().filter(download::equals).isPresent() && stage.isShowing()) {
                         workbench.openUpdates();
+                    }
                 });
             } catch (Exception failure) {
                 log.warn("Startup update check failed", failure);

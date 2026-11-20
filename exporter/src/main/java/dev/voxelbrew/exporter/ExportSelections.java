@@ -9,13 +9,15 @@ public class ExportSelections {
 
     public static ModelView view(
             ExportSelection selection, CadDocument document, Evaluation evaluation, MeshOptions options) {
-        if (selection.body() != null && selection.instance() != null)
+        if (selection.body() != null && selection.instance() != null) {
             throw new IllegalArgumentException("Select a body or an instance, not both");
+        }
         ModelView view;
         if (selection.space() == ExportSelection.Space.DESIGN) {
-            if (selection.contents() != ExportSelection.Contents.MODEL || selection.instance() != null)
+            if (selection.contents() != ExportSelection.Contents.MODEL || selection.instance() != null) {
                 throw new IllegalArgumentException(
                         "Support solids and build instances require BUILD_PLATE coordinate space");
+            }
             view = ModelViews.from(evaluation);
         } else {
             view = ModelViews.from(

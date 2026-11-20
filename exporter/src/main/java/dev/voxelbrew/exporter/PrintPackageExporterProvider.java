@@ -35,9 +35,10 @@ public final class PrintPackageExporterProvider implements ExporterProvider<File
                 (document, path, overwrite, window) -> {
                     var artifact =
                             document.printArtifacts().get(document.printSetup().activePlateId());
-                    if (artifact == null || !artifact.format().equals("gcode.3mf"))
+                    if (artifact == null || !artifact.format().equals("gcode.3mf")) {
                         throw new java.io.IOException(
                                 translations.translate("export.package.missing").orElseThrow());
+                    }
                     AtomicExport.write(
                             new FileExportDialog.Destination(path, overwrite),
                             output -> output.write(artifact.bytes()));

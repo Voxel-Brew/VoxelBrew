@@ -13,8 +13,9 @@ class UpdateFiles {
         Files.walkFileTree(source, EnumSet.of(FileVisitOption.FOLLOW_LINKS), 100, new SimpleFileVisitor<>() {
             private Path destination(Path path) throws IOException {
                 cancellation.check();
-                if (!path.toRealPath().startsWith(realSource))
+                if (!path.toRealPath().startsWith(realSource)) {
                     throw new IOException("Runtime contains an external link: " + path);
+                }
                 return target.resolve(source.relativize(path));
             }
 
@@ -36,7 +37,9 @@ class UpdateFiles {
     static void deleteStage(Path stage) throws IOException {
         Path root = stage.toAbsolutePath().normalize();
         if (!java.util.Objects.toString(root.getFileName(), "").startsWith(".VoxelBrew-update-")
-                || Files.isSymbolicLink(root)) throw new IOException("Refusing to remove an unknown staging directory");
+                || Files.isSymbolicLink(root)) {
+            throw new IOException("Refusing to remove an unknown staging directory");
+        }
         if (!Files.exists(root)) return;
         Files.walkFileTree(root, new SimpleFileVisitor<>() {
             @Override

@@ -139,8 +139,9 @@ class WorkbenchUiTest {
     }
 
     private static boolean treeVisible(Node node) {
-        for (Node current = node; current != null; current = current.getParent())
+        for (Node current = node; current != null; current = current.getParent()) {
             if (!current.isVisible()) return false;
+        }
         return true;
     }
 
@@ -214,8 +215,10 @@ class WorkbenchUiTest {
         while (fx(() -> node("#print-slice").isDisabled()) && System.nanoTime() < deadline) Thread.sleep(25);
         click("print-slice");
         deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(45);
-        while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().running()) && System.nanoTime() < deadline)
+        while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().running())
+                && System.nanoTime() < deadline) {
             Thread.sleep(25);
+        }
         assertThat(fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()))
                 .isEqualTo(PrintController.State.SUCCEEDED);
         assertThat(document().activeGcode().isEmpty()).isFalse();
@@ -482,7 +485,9 @@ class WorkbenchUiTest {
                 .isEqualTo("KLIPPER-123");
         deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         while (fx(() -> stage.getScene().getRoot().lookup("#device-config-content")) != null
-                && System.nanoTime() < deadline) Thread.sleep(25);
+                && System.nanoTime() < deadline) {
+            Thread.sleep(25);
+        }
         assertThat(fx(() -> stage.getScene().getRoot().lookup("#device-config-content")))
                 .as("The save completion callback should close the device dialog")
                 .isNull();
@@ -572,7 +577,9 @@ class WorkbenchUiTest {
         });
         deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (System.nanoTime() < deadline
-                && store.load().devices().getFirst().profile().usableHeight() != 300) Thread.sleep(25);
+                && store.load().devices().getFirst().profile().usableHeight() != 300) {
+            Thread.sleep(25);
+        }
         ready();
         assertThat(store.load().devices().getFirst().profile().usableHeight()).isEqualTo(300);
         assertThat(document().printSetup().printerSnapshot().printer().usableHeight())
@@ -787,8 +794,9 @@ class WorkbenchUiTest {
             });
             try {
                 long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-                while (fx(() -> pane.lookup("#printer-print").isDisabled()) && System.nanoTime() < deadline)
+                while (fx(() -> pane.lookup("#printer-print").isDisabled()) && System.nanoTime() < deadline) {
                     Thread.sleep(25);
+                }
                 fx(() -> {
                     var button = (Button) pane.lookup("#printer-print");
                     assertThat(button.isDisabled()).isFalse();
@@ -936,7 +944,9 @@ class WorkbenchUiTest {
                             .isEqualTo(value);
                     field.deselect();
                     if (outside) assertThat(text.getFill()).isEqualTo(javafx.scene.paint.Color.web("#d65c46"));
-                    else assertThat(text.getFill()).isNotEqualTo(javafx.scene.paint.Color.web("#d65c46"));
+                    else {
+                        assertThat(text.getFill()).isNotEqualTo(javafx.scene.paint.Color.web("#d65c46"));
+                    }
                     assertThat(minimum.getTextFill())
                             .isEqualTo(javafx.scene.paint.Color.web(palette.equals("light") ? "#777777" : "#aaaaaa"));
                     assertThat(minimum.localToScene(minimum.getBoundsInLocal()).getMaxX()
@@ -1082,8 +1092,10 @@ class WorkbenchUiTest {
         while (fx(() -> node("#print-slice").isDisabled()) && System.nanoTime() < deadline) Thread.sleep(25);
         click("print-slice");
         deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
-        while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().running()) && System.nanoTime() < deadline)
+        while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().running())
+                && System.nanoTime() < deadline) {
             Thread.sleep(25);
+        }
         assertThat(fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()))
                 .isEqualTo(PrintController.State.SUCCEEDED);
         var lines = document().activeGcode();
@@ -1102,7 +1114,9 @@ class WorkbenchUiTest {
         click("workspace-print");
         deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
         while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().result()) == null
-                && System.nanoTime() < deadline) Thread.sleep(25);
+                && System.nanoTime() < deadline) {
+            Thread.sleep(25);
+        }
         assertThat(fx(() -> ((PrintingPane) node("#printing-workspace"))
                         .jobs()
                         .result()
@@ -1224,11 +1238,13 @@ class WorkbenchUiTest {
         var after = fx(() -> node("#print-canvas").snapshot(null, null));
         assertThat(after.getWidth()).isEqualTo(before.getWidth());
         assertThat(after.getHeight()).isEqualTo(before.getHeight());
-        for (int y = 0; y < (int) before.getHeight(); y++)
-            for (int x = 0; x < (int) before.getWidth(); x++)
+        for (int y = 0; y < (int) before.getHeight(); y++) {
+            for (int x = 0; x < (int) before.getWidth(); x++) {
                 assertThat(after.getPixelReader().getArgb(x, y))
                         .as("Object list order must not change visibility at " + x + "," + y)
                         .isEqualTo(before.getPixelReader().getArgb(x, y));
+            }
+        }
         fx(() -> {
             Screenshot.save(
                     stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "slicer-depth-3d.png"));
@@ -1703,7 +1719,9 @@ class WorkbenchUiTest {
                             .anyMatch(window -> window instanceof Tooltip tip
                                     && tip.isShowing()
                                     && tip.getText().equals("Body 1 (1)")))
-                    && System.nanoTime() < deadline) Thread.sleep(40);
+                    && System.nanoTime() < deadline) {
+                Thread.sleep(40);
+            }
             assertThat(fx(() -> Window.getWindows().stream()
                             .anyMatch(window -> window instanceof Tooltip tip
                                     && tip.isShowing()
@@ -1711,12 +1729,14 @@ class WorkbenchUiTest {
                     .as(id + " shows the selected object name")
                     .isTrue();
             fx(() -> {
-                for (var window : List.copyOf(Window.getWindows()))
-                    if (window instanceof Tooltip && window.isShowing())
+                for (var window : List.copyOf(Window.getWindows())) {
+                    if (window instanceof Tooltip && window.isShowing()) {
                         Screenshot.save(
                                 window.getScene(),
                                 Path.of(System.getProperty("voxelbrew.ui.artifacts"))
                                         .resolve(view + "-object-tooltip.png"));
+                    }
+                }
                 robot.mouseMove(centerOf("print-add"));
                 return null;
             });
@@ -1771,8 +1791,10 @@ class WorkbenchUiTest {
         click("print-tab-job");
         click("print-slice-all");
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
-        while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().running()) && System.nanoTime() < deadline)
+        while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().running())
+                && System.nanoTime() < deadline) {
             Thread.sleep(25);
+        }
         assertThat(fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()))
                 .isEqualTo(PrintController.State.SUCCEEDED);
         fx(() -> {
@@ -1867,14 +1889,17 @@ class WorkbenchUiTest {
                 var canvas = (javafx.scene.canvas.Canvas) node("#print-canvas");
                 var image = canvas.snapshot(null, null);
                 Point2D best = null;
-                for (int y = 0; y < image.getHeight(); y++)
+                for (int y = 0; y < image.getHeight(); y++) {
                     for (int x = 0; x < image.getWidth(); x++) {
                         var color = image.getPixelReader().getColor(x, y);
                         if (Math.abs(color.getRed() - 114 / 255.0) < .025
                                 && Math.abs(color.getGreen() - 142 / 255.0) < .025
                                 && color.getBlue() > .94
-                                && (best == null || x - y > best.getX() - best.getY())) best = new Point2D(x, y);
+                                && (best == null || x - y > best.getX() - best.getY())) {
+                            best = new Point2D(x, y);
+                        }
                     }
+                }
                 assertThat(best).as("Z ring is rendered").isNotNull();
                 return canvas.localToScreen(best);
             });
@@ -2033,13 +2058,16 @@ class WorkbenchUiTest {
         return fx(() -> {
             var expected = javafx.scene.paint.Color.web(hex);
             var image = node("#print-canvas").snapshot(null, null);
-            for (int y = 0; y < image.getHeight(); y++)
+            for (int y = 0; y < image.getHeight(); y++) {
                 for (int x = 0; x < image.getWidth(); x++) {
                     var color = image.getPixelReader().getColor(x, y);
                     if (Math.abs(color.getRed() - expected.getRed()) < .01
                             && Math.abs(color.getGreen() - expected.getGreen()) < .01
-                            && Math.abs(color.getBlue() - expected.getBlue()) < .01) return true;
+                            && Math.abs(color.getBlue() - expected.getBlue()) < .01) {
+                        return true;
+                    }
                 }
+            }
             return false;
         });
     }
@@ -2137,7 +2165,7 @@ class WorkbenchUiTest {
                 var image = canvas.snapshot(null, null);
                 double x = 0, y = 0;
                 int count = 0;
-                for (int row = 0; row < image.getHeight(); row++)
+                for (int row = 0; row < image.getHeight(); row++) {
                     for (int col = 0; col < image.getWidth(); col++) {
                         var color = image.getPixelReader().getColor(col, row);
                         if (color.getBlue() > .5 && color.getGreen() > .4 && color.getRed() < .4) {
@@ -2146,6 +2174,7 @@ class WorkbenchUiTest {
                             count++;
                         }
                     }
+                }
                 assertThat(count > 10)
                         .as("Object is visible after camera navigation")
                         .isTrue();
@@ -2209,9 +2238,11 @@ class WorkbenchUiTest {
         return fx(() -> {
             var image = node("#print-canvas").snapshot(null, null);
             long hash = 1;
-            for (int y = 0; y < image.getHeight(); y += 2)
-                for (int x = 0; x < image.getWidth(); x += 2)
+            for (int y = 0; y < image.getHeight(); y += 2) {
+                for (int x = 0; x < image.getWidth(); x += 2) {
                     hash = 31 * hash + image.getPixelReader().getArgb(x, y);
+                }
+            }
             return hash;
         });
     }
@@ -2307,8 +2338,10 @@ class WorkbenchUiTest {
         while (fx(() -> node("#print-slice").isDisabled()) && System.nanoTime() < deadline) Thread.sleep(25);
         click("print-slice");
         deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(45);
-        while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().running()) && System.nanoTime() < deadline)
+        while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().running())
+                && System.nanoTime() < deadline) {
             Thread.sleep(25);
+        }
         assertThat(fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()))
                 .isEqualTo(PrintController.State.SUCCEEDED);
         assertThat(document().activeGcode().isEmpty()).isFalse();
@@ -2375,8 +2408,9 @@ class WorkbenchUiTest {
         String executable = PrusaSlicerBackend.defaultExecutable().toString();
         click("slicer-input-executable-discover");
         long discoveryDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-        while (fx(() -> node("#slicer-use-executable").isDisabled()) && System.nanoTime() < discoveryDeadline)
+        while (fx(() -> node("#slicer-use-executable").isDisabled()) && System.nanoTime() < discoveryDeadline) {
             Thread.sleep(25);
+        }
         assertThat(fx(() -> node("#slicer-use-executable").isDisabled())).isFalse();
         String candidate = fx(() -> ((ListView<?>) node("#slicer-discovered-executables"))
                 .getSelectionModel()
@@ -2390,7 +2424,9 @@ class WorkbenchUiTest {
         click("export-check");
         long checkDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
         while (!fx(() -> stage.getScene().lookup("#export-check-status") instanceof Label label && label.isVisible())
-                && System.nanoTime() < checkDeadline) Thread.sleep(25);
+                && System.nanoTime() < checkDeadline) {
+            Thread.sleep(25);
+        }
         assertThat(fx(() -> ((Label) node("#export-check-status")).getText())).contains("Configuration works.");
         assertThat(store.load()).allMatch(dev.voxelbrew.slicer.SlicerInstallation::bundled);
         fx(() -> {
@@ -2464,8 +2500,10 @@ class WorkbenchUiTest {
         while (fx(() -> node("#print-slice").isDisabled()) && System.nanoTime() < deadline) Thread.sleep(25);
         click("print-slice");
         deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
-        while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().running()) && System.nanoTime() < deadline)
+        while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().running())
+                && System.nanoTime() < deadline) {
             Thread.sleep(25);
+        }
         assertThat(fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()))
                 .isEqualTo(PrintController.State.SUCCEEDED);
         assertThat(document().printArtifacts().get("plate-1").metadata()).containsEntry("backend", "prusa-slicer");
@@ -2583,7 +2621,9 @@ class WorkbenchUiTest {
         while (!fx(() -> stage.getScene().lookup("#export-error") instanceof Label label
                         && label.isVisible()
                         && label.getText().contains(message))
-                && System.nanoTime() < deadline) Thread.sleep(25);
+                && System.nanoTime() < deadline) {
+            Thread.sleep(25);
+        }
         assertThat(fx(() -> ((Label) node("#export-error")).getText())).contains(message);
     }
 
@@ -2591,8 +2631,9 @@ class WorkbenchUiTest {
         click("export-confirm");
         var store = new dev.voxelbrew.slicer.SlicerInstallationStore(configuration);
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
-        while (store.load().stream().noneMatch(entry -> entry.name().equals(name)) && System.nanoTime() < deadline)
+        while (store.load().stream().noneMatch(entry -> entry.name().equals(name)) && System.nanoTime() < deadline) {
             Thread.sleep(25);
+        }
         assertThat(store.load())
                 .extracting(dev.voxelbrew.slicer.SlicerInstallation::name)
                 .contains(name);
@@ -2737,8 +2778,9 @@ class WorkbenchUiTest {
                 dev.voxelbrew.engine.sketch.SketchConstraints.create(
                         g, "horizontal", SketchGeometry.Type.HORIZONTAL, List.of(a.ref()), 0),
                 dev.voxelbrew.engine.sketch.SketchConstraints.create(
-                        g, "partial-anchor", SketchGeometry.Type.FIX, List.of(c.ref(SketchGeometry.Part.START)), 0)))
+                        g, "partial-anchor", SketchGeometry.Type.FIX, List.of(c.ref(SketchGeometry.Part.START)), 0))) {
             g = g.add(constraint);
+        }
         var session = new ModelSession(CadDocument.empty());
         session.add(new Feature.Sketch("sketch", "profile", Feature.Plane.origin("XY"), new Feature.Constrained(g)));
         Path file = directory.resolve("constraint-colors.vxb");
@@ -2779,13 +2821,16 @@ class WorkbenchUiTest {
             var pixel = canvas.screenToLocal(
                     ((SketchEditor) node("#sketch-editor")).modelToScreen(new SketchGeometry.Vec(x, y)));
             var image = canvas.snapshot(null, null);
-            for (int dx = -2; dx <= 2; dx++)
+            for (int dx = -2; dx <= 2; dx++) {
                 for (int dy = -2; dy <= 2; dy++) {
                     var color = image.getPixelReader().getColor((int) pixel.getX() + dx, (int) pixel.getY() + dy);
                     if (black
                             ? color.getBrightness() < .4 && Math.abs(color.getRed() - color.getBlue()) < .04
-                            : color.getBlue() > color.getRed() + .2 && color.getBlue() > .4) return true;
+                            : color.getBlue() > color.getRed() + .2 && color.getBlue() > .4) {
+                        return true;
+                    }
                 }
+            }
             return false;
         });
         assertThat(matches)
@@ -2837,12 +2882,16 @@ class WorkbenchUiTest {
             var editor = (SketchEditor) node("#sketch-editor");
             var pixel = canvas.screenToLocal(editor.modelToScreen(new SketchGeometry.Vec(x, y)));
             var image = canvas.snapshot(null, null);
-            for (int dx = -2; dx <= 2; dx++)
-                for (int dy = -2; dy <= 2; dy++)
+            for (int dx = -2; dx <= 2; dx++) {
+                for (int dy = -2; dy <= 2; dy++) {
                     if (image.getPixelReader()
                                     .getColor((int) pixel.getX() + dx, (int) pixel.getY() + dy)
                                     .getBrightness()
-                            < .65) return true;
+                            < .65) {
+                        return true;
+                    }
+                }
+            }
             return false;
         });
         assertThat(ink).as("Dimension line at " + x + ", " + y).isEqualTo(expected);
@@ -3000,11 +3049,12 @@ class WorkbenchUiTest {
                 var screen = ((SketchEditor) node("#sketch-editor")).modelToScreen(new SketchGeometry.Vec(x, y));
                 var pixel = canvas.screenToLocal(screen);
                 var image = canvas.snapshot(null, null);
-                for (int ox = -2; ox <= 2; ox++)
+                for (int ox = -2; ox <= 2; ox++) {
                     for (int oy = -2; oy <= 2; oy++) {
                         var color = image.getPixelReader().getColor((int) pixel.getX() + ox, (int) pixel.getY() + oy);
                         if (color.getBlue() > .8 && color.getRed() < .3 && color.getGreen() > .4) return true;
                     }
+                }
                 return false;
             });
         } while (!highlighted && System.nanoTime() < deadline);
@@ -3177,12 +3227,14 @@ class WorkbenchUiTest {
             for (int step = 1; step < 20; step++) {
                 var pixel = start.add(end.subtract(start).multiply(step / 20.0));
                 boolean ink = false;
-                for (int dx = -1; dx <= 1; dx++)
-                    for (int dy = -1; dy <= 1; dy++)
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dy = -1; dy <= 1; dy++) {
                         ink |= image.getPixelReader()
                                         .getColor((int) pixel.getX() + dx, (int) pixel.getY() + dy)
                                         .getBrightness()
                                 < .6;
+                    }
+                }
                 assertThat(ink)
                         .as("Visible outline is continuous at sample " + step)
                         .isTrue();
@@ -3405,7 +3457,9 @@ class WorkbenchUiTest {
             if (document().cursor() == 4
                     && fx(() -> !node("#timeline-play")
                             .getPseudoClassStates()
-                            .contains(javafx.css.PseudoClass.getPseudoClass("playing")))) break;
+                            .contains(javafx.css.PseudoClass.getPseudoClass("playing")))) {
+                break;
+            }
             Thread.sleep(40);
         }
         ready();
@@ -3419,9 +3473,10 @@ class WorkbenchUiTest {
         ready();
         click("menu-fit");
         var session = new ModelSession(CadDocument.empty());
-        for (int i = 0; i < 26; i++)
+        for (int i = 0; i < 26; i++) {
             session.add(new Feature.Sketch(
                     "s" + i, "p" + i, Feature.Plane.origin("XY"), new Feature.Rectangle(0, 0, 20, 10)));
+        }
         session.add(new Feature.Extrude("broken", new Feature.ProfileRef("missing", "missing"), 5));
         Path file = directory.resolve("long history.vxb");
         DocumentWriter.save(session.document(), file, false);
@@ -3660,16 +3715,17 @@ class WorkbenchUiTest {
     void close(TestInfo info) throws Exception {
         try {
             fx(() -> {
-                if (stage != null && stage.isShowing())
+                if (stage != null && stage.isShowing()) {
                     Screenshot.save(
                             stage.getScene(),
                             Path.of(
                                     System.getProperty("voxelbrew.ui.artifacts"),
                                     info.getTestMethod().orElseThrow().getName() + "-last.png"));
+                }
                 int index = 0;
-                for (var window : new ArrayList<>(Window.getWindows()))
+                for (var window : new ArrayList<>(Window.getWindows())) {
                     if (window != stage) {
-                        if (window.getScene() != null)
+                        if (window.getScene() != null) {
                             Screenshot.save(
                                     window.getScene(),
                                     Path.of(
@@ -3678,8 +3734,10 @@ class WorkbenchUiTest {
                                                     + "-dialog-"
                                                     + (index++)
                                                     + ".png"));
+                        }
                         window.hide();
                     }
+                }
                 if (workbench != null) workbench.close();
                 if (stage != null) stage.hide();
                 return null;
@@ -4510,7 +4568,9 @@ class WorkbenchUiTest {
                         .anyMatch(window -> window instanceof Tooltip tip
                                 && tip.isShowing()
                                 && tip.getText().contains("features and parameters")))
-                && System.nanoTime() < deadline) Thread.sleep(40);
+                && System.nanoTime() < deadline) {
+            Thread.sleep(40);
+        }
         assertThat(fx(() -> Window.getWindows().stream()
                         .anyMatch(window -> window instanceof Tooltip tip
                                 && tip.isShowing()
@@ -4519,9 +4579,11 @@ class WorkbenchUiTest {
                 .isTrue();
         fx(() -> {
             Screenshot.save(stage.getScene(), artifacts.resolve("workbench-menu-light.png"));
-            for (var window : Window.getWindows())
-                if (window instanceof Tooltip && window.isShowing())
+            for (var window : Window.getWindows()) {
+                if (window instanceof Tooltip && window.isShowing()) {
                     Screenshot.save(window.getScene(), artifacts.resolve("save-tooltip.png"));
+                }
+            }
             return null;
         });
         key(KeyCode.ESCAPE);
@@ -4610,7 +4672,9 @@ class WorkbenchUiTest {
                 stage.getScene().getRoot().applyCss();
                 stage.getScene().getRoot().layout();
                 return stage.getScene().getRoot().lookup(selector) != null;
-            })) return;
+            })) {
+                return;
+            }
             Thread.sleep(25);
         }
         throw new AssertionError("Missing printer control " + selector);
@@ -4619,10 +4683,15 @@ class WorkbenchUiTest {
     private Node node(String selector) {
         var windows = new ArrayList<>(Window.getWindows());
         Collections.reverse(windows);
-        for (var window : windows)
+        for (var window : windows) {
             if (window.isShowing() && window.getScene() != null) {
-                for (var node : window.getScene().getRoot().lookupAll(selector)) if (treeVisible(node)) return node;
+                for (var node : window.getScene().getRoot().lookupAll(selector)) {
+                    if (treeVisible(node)) {
+                        return node;
+                    }
+                }
             }
+        }
         // Save As uses the exporter dialog; Open still uses the editable-design dialog.
         if (selector.equals("#file-path")) return node("#export-path");
         if (selector.equals("#file-confirm")) return node("#export-confirm");
@@ -4637,7 +4706,9 @@ class WorkbenchUiTest {
             } catch (AssertionError missing) {
                 return false;
             }
-        })) click("project-window-current");
+        })) {
+            click("project-window-current");
+        }
     }
 
     private void click(String id) throws Exception {
@@ -4663,7 +4734,9 @@ class WorkbenchUiTest {
                         return false;
                     }
                 })
-                && System.nanoTime() < deadline) Thread.sleep(40);
+                && System.nanoTime() < deadline) {
+            Thread.sleep(40);
+        }
         var window = fx(() -> node("#" + id).getScene().getWindow());
         if (window instanceof ContextMenu) {
             // Native popup coordinates can belong to a different DPI monitor in Windows Robot.
@@ -4747,7 +4820,9 @@ class WorkbenchUiTest {
                     menuButton.show();
                     return null;
                 });
-            } else fail("Mouse press reached " + id);
+            } else {
+                fail("Mouse press reached " + id);
+            }
         }
         Thread.sleep(180);
         if (id.equals("file-confirm") || id.equals("new")) chooseCurrentProjectWindow();
@@ -4831,10 +4906,13 @@ class WorkbenchUiTest {
     private void openShortcutHelp() throws Exception {
         focus(stage);
         if (fx(() -> stage.getScene().lookup("#sketch-editor") == null)) click("keyboard-shortcuts");
-        else key(KeyCode.F1);
+        else {
+            key(KeyCode.F1);
+        }
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
-        while (!fx(() -> node("#keyboard-shortcuts-close").isFocused()) && System.nanoTime() < deadline)
+        while (!fx(() -> node("#keyboard-shortcuts-close").isFocused()) && System.nanoTime() < deadline) {
             Thread.sleep(20);
+        }
         assertThat(fx(() -> node("#keyboard-shortcuts-close").isFocused()))
                 .as("The shortcut reference gives its Close button keyboard focus")
                 .isTrue();
@@ -4843,8 +4921,9 @@ class WorkbenchUiTest {
     private void closeShortcutHelp() throws Exception {
         key(KeyCode.ESCAPE);
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
-        while (fx(() -> stage.getScene().lookup("#keyboard-shortcuts-list") != null) && System.nanoTime() < deadline)
+        while (fx(() -> stage.getScene().lookup("#keyboard-shortcuts-list") != null) && System.nanoTime() < deadline) {
             Thread.sleep(20);
+        }
         assertThat(fx(() -> stage.getScene().lookup("#keyboard-shortcuts-list")))
                 .as("One Escape closes the shortcut reference")
                 .isNull();
@@ -4911,8 +4990,9 @@ class WorkbenchUiTest {
                 boolean shift = Character.isUpperCase(c) || ":_~+$\"()*^".indexOf(c) >= 0;
                 KeyCode code;
                 if (Character.isLetter(c)) code = KeyCode.valueOf(Character.toString(Character.toUpperCase(c)));
-                else if (Character.isDigit(c)) code = KeyCode.valueOf("DIGIT" + c);
-                else
+                else if (Character.isDigit(c)) {
+                    code = KeyCode.valueOf("DIGIT" + c);
+                } else {
                     code = switch (c) {
                         case '.' -> KeyCode.PERIOD;
                         case '-', '_' -> KeyCode.MINUS;
@@ -4931,6 +5011,7 @@ class WorkbenchUiTest {
                         case ',' -> KeyCode.COMMA;
                         default -> throw new IllegalArgumentException("Unsupported test character " + c);
                     };
+                }
                 if (shift) robot.keyPress(KeyCode.SHIFT);
                 robot.keyType(code);
                 if (shift) robot.keyRelease(KeyCode.SHIFT);
@@ -4996,10 +5077,11 @@ class WorkbenchUiTest {
                                     .isTrue();
                         }
                     }
-                    if (!scrollable)
+                    if (!scrollable) {
                         assertThat(panel.localToScene(panel.getLayoutBounds()).contains(textBounds))
                                 .as("Button label must stay visible inside the dialog: " + button.getId())
                                 .isTrue();
+                    }
                 }
             }
             Screenshot.save(
@@ -5027,7 +5109,9 @@ class WorkbenchUiTest {
             var choices = ((ComboBox<?>) node("#export-format")).getItems();
             for (int i = 0; i < choices.size(); i++) {
                 if (choices.get(i) instanceof dev.voxelbrew.api.exporter.ExporterDescriptor choice
-                        && choice.id().equals(id)) return i;
+                        && choice.id().equals(id)) {
+                    return i;
+                }
             }
             throw new AssertionError("Missing exporter " + id);
         });
@@ -5088,7 +5172,9 @@ class WorkbenchUiTest {
             });
             long submenuDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
             while (!fx(() -> ((Menu) command(workbench, "menu-appearance")).isShowing())
-                    && System.nanoTime() < submenuDeadline) Thread.sleep(25);
+                    && System.nanoTime() < submenuDeadline) {
+                Thread.sleep(25);
+            }
             assertThat(fx(() -> ((Menu) command(workbench, "menu-appearance")).isShowing()))
                     .as("Appearance submenu opens on native hover")
                     .isTrue();
@@ -5096,7 +5182,9 @@ class WorkbenchUiTest {
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
             while (fx(() -> ((MenuBar) workbench.getScene().lookup("#main-menu"))
                             .getMenus().stream().anyMatch(Menu::isShowing))
-                    && System.nanoTime() < deadline) Thread.sleep(25);
+                    && System.nanoTime() < deadline) {
+                Thread.sleep(25);
+            }
             assertThat(fx(() -> ((MenuBar) workbench.getScene().lookup("#main-menu"))
                             .getMenus().stream().anyMatch(Menu::isShowing)))
                     .as("Appearance menus closed after selection")
@@ -5219,8 +5307,9 @@ class WorkbenchUiTest {
 
     private void waitForAbout(String message) throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
-        while (!fx(() -> ((Label) node("#about-status")).getText().contains(message)) && System.nanoTime() < deadline)
+        while (!fx(() -> ((Label) node("#about-status")).getText().contains(message)) && System.nanoTime() < deadline) {
             Thread.sleep(50);
+        }
         assertThat(fx(() -> ((Label) node("#about-status")).getText().contains(message)))
                 .as(message)
                 .isTrue();
@@ -5483,8 +5572,9 @@ class WorkbenchUiTest {
 
     private void sketchReady() throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
-        while (fx(() -> ((SketchEditor) node("#sketch-editor")).controller().busy()) && System.nanoTime() < deadline)
+        while (fx(() -> ((SketchEditor) node("#sketch-editor")).controller().busy()) && System.nanoTime() < deadline) {
             Thread.sleep(25);
+        }
         assertThat(fx(() -> ((SketchEditor) node("#sketch-editor")).controller().busy()))
                 .isFalse();
         Thread.sleep(100);
@@ -6515,9 +6605,12 @@ class WorkbenchUiTest {
                     .controller()
                     .definition()
                     .constraints();
-            for (int i = 0; i < values.size(); i++)
+            for (int i = 0; i < values.size(); i++) {
                 if (values.get(i).type() == SketchGeometry.Type.LENGTH
-                        && values.get(i).refs().getFirst().entityId().endsWith("bottom")) return i;
+                        && values.get(i).refs().getFirst().entityId().endsWith("bottom")) {
+                    return i;
+                }
+            }
             throw new AssertionError("Missing width dimension");
         });
         click("sketch-constraints");
@@ -6564,7 +6657,11 @@ class WorkbenchUiTest {
     private void sketchReference(String ref) throws Exception {
         int index = fx(() -> {
             var items = ((ComboBox<?>) node("#sketch-reference")).getItems();
-            for (int i = 0; i < items.size(); i++) if (items.get(i).toString().equals(ref)) return i;
+            for (int i = 0; i < items.size(); i++) {
+                if (items.get(i).toString().equals(ref)) {
+                    return i;
+                }
+            }
             throw new AssertionError("Missing sketch reference " + ref);
         });
         choice("sketch-reference", index);
@@ -7901,8 +7998,10 @@ class WorkbenchUiTest {
         while (fx(() -> node("#print-slice").isDisabled()) && System.nanoTime() < deadline) Thread.sleep(25);
         click("print-slice");
         deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(45);
-        while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().running()) && System.nanoTime() < deadline)
+        while (fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().running())
+                && System.nanoTime() < deadline) {
             Thread.sleep(25);
+        }
         assertThat(fx(() -> ((PrintingPane) node("#printing-workspace")).jobs().state()))
                 .as(fx(() -> ((Label) node("#print-status")).getText()))
                 .isEqualTo(PrintController.State.SUCCEEDED);

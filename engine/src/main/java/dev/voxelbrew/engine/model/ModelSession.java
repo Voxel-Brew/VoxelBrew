@@ -40,6 +40,54 @@ public final class ModelSession {
 
     public record Snapshot(CadDocument document, long revision, boolean canUndo, boolean canRedo) {}
 
+    private static Feature.Sketch editSketchDimension(Feature.Sketch s, String field, double value) {
+        Feature.Profile profile = s.profile();
+        Feature.Plane plane = s.plane();
+        if (profile instanceof Feature.Rectangle r) {
+            profile = switch (field) {
+                case "x" -> new Feature.Rectangle(value, r.y(), r.width(), r.height());
+                case "y" -> new Feature.Rectangle(r.x(), value, r.width(), r.height());
+                case "width" -> new Feature.Rectangle(r.x(), r.y(), value, r.height());
+                case "height" -> new Feature.Rectangle(r.x(), r.y(), r.width(), value);
+                default -> throw new ModelException(s.id(), "unknown rectangle dimension '" + field + "'");
+            };
+        } else if (profile instanceof Feature.Circle c) {
+            profile = switch (field) {
+                case "centerX" -> new Feature.Circle(value, c.centerY(), c.diameter());
+                case "centerY" -> new Feature.Circle(c.centerX(), value, c.diameter());
+                case "diameter" -> new Feature.Circle(c.centerX(), c.centerY(), value);
+                default -> throw new ModelException(s.id(), "unknown circle dimension '" + field + "'");
+            };
+        } else if (profile instanceof Feature.Constrained c) {
+            String constraintId = field.startsWith("constraint:") ? field.substring(11) : field;
+            profile = new Feature.Constrained(
+                    dev.voxelbrew.engine.sketch.Sketches.editDimension(c.geometry(), constraintId, value));
+        } else {
+            throw new ModelException(s.id(), "unsupported profile");
+        }
+        return new Feature.Sketch(s.id(), s.profileId(), plane, profile);
+    }
+
+    private static Feature withDimension(Feature feature, String field, double value) {
+        if (feature instanceof ConstructionFeature c && field.equals("value")) {
+            return new ConstructionFeature(c.id(), c.tool(), c.inputs(), value, c.alternate());
+        } else if (feature instanceof Feature.Extrude e && field.equals("distance")) {
+            return new Feature.Extrude(e.id(), e.profile(), value);
+        } else if (feature instanceof Feature.EdgeFinish f && field.equals("size")) {
+            return new Feature.EdgeFinish(f.id(), f.body(), f.kind(), value, f.edges());
+        } else if (feature instanceof Feature.Shell s && field.equals("thickness")) {
+            return new Feature.Shell(s.id(), s.body(), value, s.removedFace());
+        } else if (feature instanceof Feature.SplitBody s && field.equals("offset")) {
+            var p = s.plane();
+            return new Feature.SplitBody(
+                    s.id(), s.body(), new Feature.SplitPlane(p.normalX(), p.normalY(), p.normalZ(), value));
+        } else if (feature instanceof Feature.Sketch s) {
+            return editSketchDimension(s, field, value);
+        } else {
+            throw new ModelException(feature.id(), "unknown dimension '" + field + "'");
+        }
+    }
+
     public ModelSession(CadDocument document) {
         id = document.id();
         uuidGenerator = document.uuidGenerator();
@@ -185,79 +233,45 @@ public final class ModelSession {
             try (var registry = new dev.voxelbrew.engine.feature.FeatureRegistry(pluginDirectory)) {
                 replace(registry.edit(custom, java.util.Map.of(field, value)));
             } catch (java.io.IOException failure) {
-                throw new ModelException(featureId, "Cannot load feature plugins: " + failure.getMessage());
+                throw new ModelException(featureId, "Cannot load feature plugins: " + failure.getMessage(), failure);
             }
             return;
         }
         if (feature instanceof Feature.Sketch selected && field.equals("offsetZ")) {
-            var next = new ArrayList<>(features);
-            for (int i = 0; i < next.size(); i++) {
-                if (next.get(i) instanceof Feature.Sketch sketch
-                        && sketch.plane().id().equals(selected.plane().id())) {
-                    var changed = new Feature.Sketch(
-                            sketch.id(), sketch.profileId(), sketch.plane().withOffset(value), sketch.profile());
-                    FeatureValidation.validate(changed);
-                    next.set(i, changed);
-                }
-            }
-            var unbound = parameters;
-            for (var candidate : next)
-                if (candidate instanceof Feature.Sketch s
-                        && s.plane().id().equals(selected.plane().id()))
-                    unbound =
-                            unbound.bind(new dev.voxelbrew.api.model.parameters.ParameterSet.Target(s.id(), field), "");
-            commit(next, printSetup, unbound);
+            editSharedPlaneOffset(selected, value);
             return;
         }
-        Feature replacement;
-        if (feature instanceof ConstructionFeature c && field.equals("value")) {
-            replacement = new ConstructionFeature(c.id(), c.tool(), c.inputs(), value, c.alternate());
-        } else if (feature instanceof Feature.Extrude e && field.equals("distance")) {
-            replacement = new Feature.Extrude(e.id(), e.profile(), value);
-        } else if (feature instanceof Feature.EdgeFinish f && field.equals("size")) {
-            replacement = new Feature.EdgeFinish(f.id(), f.body(), f.kind(), value, f.edges());
-        } else if (feature instanceof Feature.Shell s && field.equals("thickness")) {
-            replacement = new Feature.Shell(s.id(), s.body(), value, s.removedFace());
-        } else if (feature instanceof Feature.SplitBody s && field.equals("offset")) {
-            var p = s.plane();
-            replacement = new Feature.SplitBody(
-                    s.id(), s.body(), new Feature.SplitPlane(p.normalX(), p.normalY(), p.normalZ(), value));
-        } else if (feature instanceof Feature.Sketch s) {
-            Feature.Profile profile = s.profile();
-            Feature.Plane plane = s.plane();
-            if (profile instanceof Feature.Rectangle r) {
-                profile = switch (field) {
-                    case "x" -> new Feature.Rectangle(value, r.y(), r.width(), r.height());
-                    case "y" -> new Feature.Rectangle(r.x(), value, r.width(), r.height());
-                    case "width" -> new Feature.Rectangle(r.x(), r.y(), value, r.height());
-                    case "height" -> new Feature.Rectangle(r.x(), r.y(), r.width(), value);
-                    default -> throw new ModelException(featureId, "unknown rectangle dimension '" + field + "'");
-                };
-            } else if (profile instanceof Feature.Circle c) {
-                profile = switch (field) {
-                    case "centerX" -> new Feature.Circle(value, c.centerY(), c.diameter());
-                    case "centerY" -> new Feature.Circle(c.centerX(), value, c.diameter());
-                    case "diameter" -> new Feature.Circle(c.centerX(), c.centerY(), value);
-                    default -> throw new ModelException(featureId, "unknown circle dimension '" + field + "'");
-                };
-            } else if (profile instanceof Feature.Constrained c) {
-                String constraintId = field.startsWith("constraint:") ? field.substring(11) : field;
-                profile = new Feature.Constrained(
-                        dev.voxelbrew.engine.sketch.Sketches.editDimension(c.geometry(), constraintId, value));
-            } else {
-                throw new ModelException(featureId, "unsupported profile");
-            }
-            replacement = new Feature.Sketch(s.id(), s.profileId(), plane, profile);
-        } else {
-            throw new ModelException(featureId, "unknown dimension '" + field + "'");
-        }
+        Feature replacement = withDimension(feature, field, value);
         var unbound = parameters.bind(new dev.voxelbrew.api.model.parameters.ParameterSet.Target(featureId, field), "");
         if (feature instanceof Feature.Sketch s
                 && s.profile() instanceof Feature.Constrained
-                && !field.startsWith("constraint:"))
+                && !field.startsWith("constraint:")) {
             unbound = unbound.bind(
                     new dev.voxelbrew.api.model.parameters.ParameterSet.Target(featureId, "constraint:" + field), "");
+        }
         replace(replacement, unbound);
+    }
+
+    private void editSharedPlaneOffset(Feature.Sketch selected, double value) {
+        var next = new ArrayList<>(features);
+        for (int i = 0; i < next.size(); i++) {
+            if (next.get(i) instanceof Feature.Sketch sketch
+                    && sketch.plane().id().equals(selected.plane().id())) {
+                var changed = new Feature.Sketch(
+                        sketch.id(), sketch.profileId(), sketch.plane().withOffset(value), sketch.profile());
+                FeatureValidation.validate(changed);
+                next.set(i, changed);
+            }
+        }
+        var unbound = parameters;
+        for (var candidate : next) {
+            if (candidate instanceof Feature.Sketch s
+                    && s.plane().id().equals(selected.plane().id())) {
+                unbound =
+                        unbound.bind(new dev.voxelbrew.api.model.parameters.ParameterSet.Target(s.id(), "offsetZ"), "");
+            }
+        }
+        commit(next, printSetup, unbound);
     }
 
     public synchronized void setCursor(int newCursor) {
@@ -354,7 +368,9 @@ public final class ModelSession {
         BodyStyle.requireBodyId(bodyId);
         var next = new java.util.HashMap<>(bodyStyles);
         if (style == null) next.remove(bodyId);
-        else next.put(bodyId, style);
+        else {
+            next.put(bodyId, style);
+        }
         commit(features, printSetup, parameters, next);
         log.debug("Updated material and color for body {} in document {}", bodyId, id);
     }
@@ -376,21 +392,26 @@ public final class ModelSession {
         }
         var next = new java.util.HashMap<>(bodyNames);
         if (name == null) next.remove(bodyId);
-        else next.put(bodyId, name);
+        else {
+            next.put(bodyId, name);
+        }
         commit(features, printSetup, parameters, bodyStyles, next);
         log.debug("Updated display name for body {} in document {}", bodyId, id);
     }
 
     public synchronized void renameFeature(String featureId, String name) {
-        if (features.stream().noneMatch(feature -> feature.id().equals(featureId)))
+        if (features.stream().noneMatch(feature -> feature.id().equals(featureId))) {
             throw new IllegalArgumentException("Unknown feature: " + featureId);
+        }
         if (name != null) {
             CadDocument.requireBodyName(name);
             name = name.strip();
         }
         var next = new java.util.HashMap<>(featureNames);
         if (name == null) next.remove(featureId);
-        else next.put(featureId, name);
+        else {
+            next.put(featureId, name);
+        }
         if (next.equals(featureNames)) return;
         undo.push(new State(features, printSetup, parameters, bodyStyles, bodyNames, featureNames));
         redo.clear();

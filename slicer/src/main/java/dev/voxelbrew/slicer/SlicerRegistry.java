@@ -39,9 +39,11 @@ public final class SlicerRegistry implements SlicerProviderRegistry {
 
     private static void register(Map<String, Entry> entries, SlicerProvider provider) {
         var descriptor = Objects.requireNonNull(provider.descriptor(), "descriptor");
-        if (entries.putIfAbsent(descriptor.id(), new Entry(descriptor, provider)) != null)
+        if (entries.putIfAbsent(descriptor.id(), new Entry(descriptor, provider)) != null) {
             log.warn("Duplicate slicer ID: {}", descriptor.id());
-        else log.info("Loaded slicer {} ({}) version {}", descriptor.name(), descriptor.id(), descriptor.version());
+        } else {
+            log.info("Loaded slicer {} ({}) version {}", descriptor.name(), descriptor.id(), descriptor.version());
+        }
     }
 
     public SlicerRegistry() {
@@ -101,9 +103,10 @@ public final class SlicerRegistry implements SlicerProviderRegistry {
     public synchronized SlicerProvider require(String id) {
         requireOpen();
         var entry = entries.get(id);
-        if (entry == null)
+        if (entry == null) {
             throw new IllegalArgumentException(
                     "Unknown slicer '" + id + "'. Available: " + new TreeSet<>(entries.keySet()));
+        }
         return entry.provider();
     }
 
@@ -121,7 +124,9 @@ public final class SlicerRegistry implements SlicerProviderRegistry {
                 loader.close();
             } catch (IOException error) {
                 if (failure == null) failure = error;
-                else failure.addSuppressed(error);
+                else {
+                    failure.addSuppressed(error);
+                }
             }
         }
         loaders.clear();

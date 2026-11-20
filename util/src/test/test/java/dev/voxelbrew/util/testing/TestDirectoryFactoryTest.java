@@ -28,8 +28,9 @@ class TestDirectoryFactoryTest {
 
         @Override
         protected void delete(Path path) throws IOException {
-            if (deny && path.getFileName().toString().equals("locked.txt"))
+            if (deny && path.getFileName().toString().equals("locked.txt")) {
                 throw new IOException("Simulated locked test file");
+            }
             super.delete(path);
         }
     }
@@ -45,8 +46,9 @@ class TestDirectoryFactoryTest {
                 .testEvents()
                 .assertStatistics(stats -> stats.succeeded(1).failed(1));
         assertThat(paths.size()).isEqualTo(2);
-        for (Path path : paths)
+        for (Path path : paths) {
             assertThat(Files.exists(path)).as(path.toString()).isFalse();
+        }
     }
 
     @Test
@@ -89,7 +91,8 @@ class TestDirectoryFactoryTest {
             DeniedFactory.instances.clear();
             logger.removeHandler(handler);
         }
-        for (Path path : paths)
+        for (Path path : paths) {
             assertThat(Files.exists(path)).as(path.toString()).isFalse();
+        }
     }
 }

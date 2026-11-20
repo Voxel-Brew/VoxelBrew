@@ -2,6 +2,7 @@ package dev.voxelbrew.gui;
 
 import dev.voxelbrew.api.i18n.TranslationService;
 import java.util.Locale;
+import java.util.Set;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.scene.Node;
@@ -17,32 +18,39 @@ final class UiHelp {
 
     static String baseDescription(TranslationService translations, String id) {
         String key = id;
-        if (id.startsWith("print-remove-plate-"))
+        if (id.startsWith("print-remove-plate-")) {
             return translations.translate("help.print-remove-plate").orElseThrow();
-        if (id.startsWith("choose-plane-"))
+        }
+        if (id.startsWith("choose-plane-")) {
             return translations.translate("help.choose-plane").orElseThrow();
-        if (id.startsWith("view-") && !id.startsWith("view-cube-"))
+        }
+        if (id.startsWith("view-") && !id.startsWith("view-cube-")) {
             return translations.translate("help.standard-view").orElseThrow();
-        if (id.equals("menu-undo") || id.equals("menu-redo") || id.equals("menu-parameters") || id.equals("menu-fit"))
+        }
+        if (Set.of("menu-undo", "menu-redo", "menu-parameters", "menu-fit").contains(id)) {
             key = id.substring(5);
+        }
         if (id.startsWith("history-") && !id.equals("history-cursor")) key = "history-feature";
-        else if (id.startsWith("apply-")) key = "apply-dimension";
-        else if (id.startsWith("print-role-")) key = "print-role";
-        else if (id.startsWith("constraint-menu-"))
+        else if (id.startsWith("apply-")) {
+            key = "apply-dimension";
+        } else if (id.startsWith("print-role-")) {
+            key = "print-role";
+        } else if (id.startsWith("constraint-menu-")) {
             return translations
                     .translate("constraint.hint." + id.substring(16).toUpperCase(Locale.ROOT))
                     .orElseThrow();
-        else if (id.startsWith("constraint-") && !id.equals("constraint-finish") && !id.equals("constraint-cancel"))
+        } else if (id.startsWith("constraint-") && !id.equals("constraint-finish") && !id.equals("constraint-cancel")) {
             return translations
                     .translate("constraint.hint." + id.substring(11).toUpperCase(Locale.ROOT))
                     .orElseThrow();
+        }
         return translations.translate("help." + key).orElseThrow();
     }
 
     static void dialogButton(ButtonBase button, ButtonType type, TranslationService translations) {
         String key = button.getId() == null ? null : "help." + button.getId();
         String description = key == null ? null : translations.translate(key).orElse(null);
-        if (description == null)
+        if (description == null) {
             description = translations
                     .translate(
                             switch (type.getButtonData()) {
@@ -52,8 +60,10 @@ final class UiHelp {
                                 default -> "help.dialog-close";
                             })
                     .orElseThrow();
-        if (type == ButtonType.CLOSE)
+        }
+        if (type == ButtonType.CLOSE) {
             description = translations.translate("help.dialog-close").orElseThrow();
+        }
         describe(button, description);
     }
 
@@ -64,7 +74,9 @@ final class UiHelp {
 
     static void describe(Control control, String description) {
         if (control.getTooltip() != null
-                && description.equals(control.getTooltip().getText())) return;
+                && description.equals(control.getTooltip().getText())) {
+            return;
+        }
         control.setTooltip(tooltip(description));
         control.setAccessibleHelp(description);
     }
@@ -121,8 +133,9 @@ final class UiHelp {
         for (var node : bar.lookupAll(".menu-button")) {
             if (!(node instanceof MenuButton button)) continue;
             for (var menu : bar.getMenus()) {
-                if (java.util.Objects.equals(menu.getId(), button.getId()))
+                if (java.util.Objects.equals(menu.getId(), button.getId())) {
                     describe(button, (String) menu.getProperties().get(UiHelp.class));
+                }
             }
             observeMenu(button);
         }
@@ -137,8 +150,9 @@ final class UiHelp {
                 var owner = popup.getOwnerWindow().getScene().getRoot();
                 var root = popup.getScene().getRoot();
                 String stylesheet = UiHelp.class.getResource("workbench.css").toExternalForm();
-                if (!popup.getScene().getStylesheets().contains(stylesheet))
+                if (!popup.getScene().getStylesheets().contains(stylesheet)) {
                     popup.getScene().getStylesheets().add(stylesheet);
+                }
                 boolean dark = owner.getStyleClass().contains("dark") || owner.lookup(".dark") != null;
                 root.getStyleClass().removeAll("light", "dark");
                 root.getStyleClass().add(dark ? "dark" : "light");

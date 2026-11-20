@@ -17,7 +17,9 @@ final class TessellationCleanup {
             if (coincident(mesh, a, b)
                     || coincident(mesh, b, c)
                     || coincident(mesh, c, a)
-                    || Math.hypot(Math.hypot(normal[0], normal[1]), normal[2]) < 1e-15) continue;
+                    || Math.hypot(Math.hypot(normal[0], normal[1]), normal[2]) < 1e-15) {
+                continue;
+            }
             triangles[3 * kept] = a;
             triangles[3 * kept + 1] = b;
             triangles[3 * kept + 2] = c;
@@ -33,7 +35,9 @@ final class TessellationCleanup {
     private static boolean coincident(MeshData mesh, int a, int b) {
         for (int axis = 0; axis < 3; axis++) {
             if (Math.round(mesh.coordinate(a, axis) / MeshValidation.WELD_MM)
-                    != Math.round(mesh.coordinate(b, axis) / MeshValidation.WELD_MM)) return false;
+                    != Math.round(mesh.coordinate(b, axis) / MeshValidation.WELD_MM)) {
+                return false;
+            }
         }
         return true;
     }

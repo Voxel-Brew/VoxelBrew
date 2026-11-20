@@ -138,30 +138,39 @@ public final class VoxelBrew implements Runnable {
         @Spec
         CommandSpec spec;
 
+        private java.util.Map<String, String> suppliedOptions(CommandLine.ParseResult matched) {
+            var supplied = new java.util.LinkedHashMap<String, String>();
+            if (matched.hasMatchedOption("--output")) supplied.put("destination", output.toString());
+            if (matched.hasMatchedOption("--overwrite")) supplied.put("overwrite", Boolean.toString(overwrite));
+            if (matched.hasMatchedOption("--space")) supplied.put("space", space);
+            if (matched.hasMatchedOption("--selection")) supplied.put("selection", contents);
+            if (matched.hasMatchedOption("--body")) supplied.put("body", body);
+            if (matched.hasMatchedOption("--instance")) supplied.put("instance", instance);
+            if (matched.hasMatchedOption("--chord-tolerance")) {
+                supplied.put("chord-tolerance", Double.toString(chord));
+            }
+            if (matched.hasMatchedOption("--angular-tolerance")) {
+                supplied.put("angular-tolerance", Double.toString(angle));
+            }
+            options.forEach((key, value) -> supplied.put("option." + key, value));
+            return supplied;
+        }
+
         @Override
         public Integer call() throws Exception {
-            if (!java.util.List.of("DESIGN", "BUILD_PLATE").contains(space))
+            if (!java.util.List.of("DESIGN", "BUILD_PLATE").contains(space)) {
                 throw new IllegalArgumentException("Invalid --space: " + space);
-            if (!java.util.List.of("MODEL", "SUPPORTS", "ALL").contains(contents))
+            }
+            if (!java.util.List.of("MODEL", "SUPPORTS", "ALL").contains(contents)) {
                 throw new IllegalArgumentException("Invalid --selection: " + contents);
+            }
             var document = documents.load(file);
             if (plate != null) document = WorkspaceCommands.selectPlate(document, plate);
             final var selectedDocument = document;
             try (var registry = exporters.get().withDirectory(pluginDirectory)) {
                 var provider = registry.require(format);
                 var matched = spec.commandLine().getParseResult();
-                var supplied = new java.util.LinkedHashMap<String, String>();
-                if (matched.hasMatchedOption("--output")) supplied.put("destination", output.toString());
-                if (matched.hasMatchedOption("--overwrite")) supplied.put("overwrite", Boolean.toString(overwrite));
-                if (matched.hasMatchedOption("--space")) supplied.put("space", space);
-                if (matched.hasMatchedOption("--selection")) supplied.put("selection", contents);
-                if (matched.hasMatchedOption("--body")) supplied.put("body", body);
-                if (matched.hasMatchedOption("--instance")) supplied.put("instance", instance);
-                if (matched.hasMatchedOption("--chord-tolerance"))
-                    supplied.put("chord-tolerance", Double.toString(chord));
-                if (matched.hasMatchedOption("--angular-tolerance"))
-                    supplied.put("angular-tolerance", Double.toString(angle));
-                options.forEach((key, value) -> supplied.put("option." + key, value));
+                var supplied = suppliedOptions(matched);
                 boolean meshFlagsProvided = matched.hasMatchedOption("--body")
                         || matched.hasMatchedOption("--instance")
                         || matched.hasMatchedOption("--space")
@@ -227,8 +236,9 @@ public final class VoxelBrew implements Runnable {
         ModelSession session() throws java.io.IOException {
             var document = documents.load(file);
             if (expectedRevision != null
-                    && !expectedRevision.equals(dev.voxelbrew.engine.persistence.DocumentCodec.fingerprint(document)))
+                    && !expectedRevision.equals(dev.voxelbrew.engine.persistence.DocumentCodec.fingerprint(document))) {
                 throw new IllegalArgumentException("Document changed; inspect and select topology again");
+            }
             return new ModelSession(document);
         }
 
@@ -269,8 +279,9 @@ public final class VoxelBrew implements Runnable {
         @Override
         ModelSession session() throws java.io.IOException {
             var session = super.session();
-            if (id == null)
+            if (id == null) {
                 id = Long.toString(session.document().uuidGenerator().next());
+            }
             return session;
         }
     }
@@ -304,23 +315,28 @@ public final class VoxelBrew implements Runnable {
             super(documents, documentWriter);
         }
 
+        private String sketchPlaneId() {
+            if (planeId != null) return planeId;
+            return z == 0 ? "origin-" + orientation.toLowerCase(Locale.ROOT) : id + ".plane";
+        }
+
         int sketch(Feature.Profile profile) throws java.io.IOException {
             var session = session();
             var plane = new Feature.Plane(
-                    planeId == null
-                            ? (z == 0 ? "origin-" + orientation.toLowerCase(Locale.ROOT) : id + ".plane")
-                            : planeId,
+                    sketchPlaneId(),
                     z,
                     Feature.Plane.origin(orientation.toUpperCase(Locale.ROOT)).frame(),
                     null);
             if (constructionPlane != null) {
-                if (faceBody != null || face != null)
+                if (faceBody != null || face != null) {
                     throw new IllegalArgumentException("Choose a face or a construction plane");
+                }
                 plane = new Feature.Plane(id + ".plane", z, Transform.IDENTITY, null, constructionPlane);
             }
             if (faceBody != null || face != null) {
-                if (faceBody == null || face == null || expectedRevision == null)
+                if (faceBody == null || face == null || expectedRevision == null) {
                     throw new IllegalArgumentException("Face attachment requires --face-body, --face and --revision");
+                }
                 try (var evaluation = session.evaluate(pluginDirectory)) {
                     var body = evaluation.requireCompleteDocument().stream()
                             .filter(b -> b.id().equals(faceBody))
@@ -498,10 +514,13 @@ public final class VoxelBrew implements Runnable {
         @Override
         public Integer call() throws Exception {
             var session = session();
-            if ((value == null) == (expression == null))
+            if ((value == null) == (expression == null)) {
                 throw new IllegalArgumentException("Choose exactly one of --value or --expression");
+            }
             if (expression != null) session.bindExpression(feature, field, expression);
-            else session.editDimension(feature, field, value, pluginDirectory);
+            else {
+                session.editDimension(feature, field, value, pluginDirectory);
+            }
             return save(session);
         }
     }
@@ -552,6 +571,12 @@ public final class VoxelBrew implements Runnable {
             super(documents, documentWriter);
         }
 
+        private Feature.BodyRef repairBody(Feature.BodyRef previous) {
+            return new Feature.BodyRef(
+                    body == null ? previous.featureId() : body,
+                    bodyOutput == null ? previous.outputName() : bodyOutput);
+        }
+
         @Override
         public Integer call() throws Exception {
             var session = session();
@@ -564,18 +589,9 @@ public final class VoxelBrew implements Runnable {
             } else if (original instanceof Feature.ThroughCut c
                     && (sketch != null || body != null || bodyOutput != null)) {
                 session.replace(new Feature.ThroughCut(
-                        c.id(),
-                        sketch == null ? c.profile() : profileRef(session, sketch),
-                        new Feature.BodyRef(
-                                body == null ? c.body().featureId() : body,
-                                bodyOutput == null ? c.body().outputName() : bodyOutput)));
+                        c.id(), sketch == null ? c.profile() : profileRef(session, sketch), repairBody(c.body())));
             } else if (original instanceof Feature.SplitBody s && (body != null || bodyOutput != null)) {
-                session.replace(new Feature.SplitBody(
-                        s.id(),
-                        new Feature.BodyRef(
-                                body == null ? s.body().featureId() : body,
-                                bodyOutput == null ? s.body().outputName() : bodyOutput),
-                        s.plane()));
+                session.replace(new Feature.SplitBody(s.id(), repairBody(s.body()), s.plane()));
             } else {
                 throw new ModelException(feature, "specify a supported --sketch or --body-feature repair");
             }
@@ -738,9 +754,11 @@ public final class VoxelBrew implements Runnable {
                 .addSubcommand("exporters", Exporters.class)
                 .addSubcommand("export", Export.class)
                 .setExecutionExceptionHandler((failure, command, parsed) -> {
-                    if (failure instanceof IllegalArgumentException)
+                    if (failure instanceof IllegalArgumentException) {
                         log.warn("Command {} rejected: {}", command.getCommandName(), failure.getMessage());
-                    else log.error("Command {} failed", command.getCommandName(), failure);
+                    } else {
+                        log.error("Command {} failed", command.getCommandName(), failure);
+                    }
                     command.getErr().println("ERROR: " + failure.getMessage());
                     return 1;
                 });

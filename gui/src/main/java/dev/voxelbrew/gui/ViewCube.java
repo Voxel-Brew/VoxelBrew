@@ -52,6 +52,40 @@ final class ViewCube extends Pane {
         }
     }
 
+    private static List<Point3D> patchVertices(
+            int x, int y, int z, int[] signs, List<Integer> fixed, List<Integer> free) {
+        var vertices = new ArrayList<Point3D>();
+        if (fixed.size() == 1) {
+            for (int[] corner : new int[][] {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}}) {
+                double[] v = {0, 0, 0};
+                v[fixed.getFirst()] = signs[fixed.getFirst()] * OUTER;
+                for (int i = 0; i < 2; i++) v[free.get(i)] = corner[i] * INNER;
+                vertices.add(new Point3D(v[0], v[1], v[2]));
+            }
+        } else if (fixed.size() == 2) {
+            for (int[] corner : new int[][] {{0, -1}, {1, -1}, {1, 1}, {0, 1}}) {
+                double[] v = {0, 0, 0};
+                for (int i = 0; i < 2; i++) v[fixed.get(i)] = signs[fixed.get(i)] * (i == corner[0] ? OUTER : INNER);
+                v[free.getFirst()] = corner[1] * INNER;
+                vertices.add(new Point3D(v[0], v[1], v[2]));
+            }
+        } else {
+            for (int i = 0; i < 3; i++) {
+                vertices.add(new Point3D(
+                        x * (i == 0 ? OUTER : INNER), y * (i == 1 ? OUTER : INNER), z * (i == 2 ? OUTER : INNER)));
+            }
+        }
+        return vertices;
+    }
+
+    private static String patchName(int x, int y, int z) {
+        var names = new ArrayList<String>();
+        if (z != 0) names.add(z > 0 ? "Top" : "Bottom");
+        if (y != 0) names.add(y < 0 ? "Front" : "Back");
+        if (x != 0) names.add(x > 0 ? "Right" : "Left");
+        return String.join(" ", names);
+    }
+
     ViewCube(
             Consumer<ViewOrientation> navigate,
             BiConsumer<Double, Double> orbit,
@@ -75,9 +109,15 @@ final class ViewCube extends Pane {
         axes.setMouseTransparent(true);
         labels.setMouseTransparent(true);
         getChildren().addAll(panel, axes, surface, labels);
-        for (int z = -1; z <= 1; z++)
-            for (int y = -1; y <= 1; y++)
-                for (int x = -1; x <= 1; x++) if (x != 0 || y != 0 || z != 0) addPatch(x, y, z);
+        for (int z = -1; z <= 1; z++) {
+            for (int y = -1; y <= 1; y++) {
+                for (int x = -1; x <= 1; x++) {
+                    if (x != 0 || y != 0 || z != 0) {
+                        addPatch(x, y, z);
+                    }
+                }
+            }
+        }
 
         surface.setOnMousePressed(e -> {
             if (e.getButton() != MouseButton.PRIMARY) return;
@@ -142,31 +182,8 @@ final class ViewCube extends Pane {
         var fixed = new ArrayList<Integer>();
         var free = new ArrayList<Integer>();
         for (int i = 0; i < 3; i++) (signs[i] == 0 ? free : fixed).add(i);
-        var vertices = new ArrayList<Point3D>();
-        if (fixed.size() == 1) {
-            for (int[] corner : new int[][] {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}}) {
-                double[] v = {0, 0, 0};
-                v[fixed.getFirst()] = signs[fixed.getFirst()] * OUTER;
-                for (int i = 0; i < 2; i++) v[free.get(i)] = corner[i] * INNER;
-                vertices.add(new Point3D(v[0], v[1], v[2]));
-            }
-        } else if (fixed.size() == 2) {
-            for (int[] corner : new int[][] {{0, -1}, {1, -1}, {1, 1}, {0, 1}}) {
-                double[] v = {0, 0, 0};
-                for (int i = 0; i < 2; i++) v[fixed.get(i)] = signs[fixed.get(i)] * (i == corner[0] ? OUTER : INNER);
-                v[free.getFirst()] = corner[1] * INNER;
-                vertices.add(new Point3D(v[0], v[1], v[2]));
-            }
-        } else {
-            for (int i = 0; i < 3; i++)
-                vertices.add(new Point3D(
-                        x * (i == 0 ? OUTER : INNER), y * (i == 1 ? OUTER : INNER), z * (i == 2 ? OUTER : INNER)));
-        }
-        var names = new ArrayList<String>();
-        if (z != 0) names.add(z > 0 ? "Top" : "Bottom");
-        if (y != 0) names.add(y < 0 ? "Front" : "Back");
-        if (x != 0) names.add(x > 0 ? "Right" : "Left");
-        String name = String.join(" ", names);
+        var vertices = patchVertices(x, y, z, signs, fixed, free);
+        String name = patchName(x, y, z);
         var polygon = new Polygon();
         polygon.setId("view-cube-" + name.toLowerCase(Locale.ROOT).replace(' ', '-'));
         polygon.setCursor(Cursor.HAND);
@@ -241,7 +258,8 @@ final class ViewCube extends Pane {
                 var label = patch.label();
                 label.setVisible(visible);
                 label.setFill(Color.web(dark ? "#edf2fa" : "#35445b"));
-                Point3D u = patch.x() != 0 ? new Point3D(0, patch.x(), 0) : new Point3D(patch.y() > 0 ? -1 : 1, 0, 0);
+                int horizontalDirection = patch.y() > 0 ? -1 : 1;
+                Point3D u = patch.x() != 0 ? new Point3D(0, patch.x(), 0) : new Point3D(horizontalDirection, 0, 0);
                 Point3D v = patch.z() != 0 ? new Point3D(0, -patch.z(), 0) : new Point3D(0, 0, -1);
                 var a = orientation.project(u);
                 var b = orientation.project(v);
@@ -269,6 +287,10 @@ final class ViewCube extends Pane {
         for (int i = 0; i < order.size(); i++) order.get(i).shape().setViewOrder(-i);
     }
 
+    private Color themeColor(String darkValue, String lightValue) {
+        return Color.web(dark ? darkValue : lightValue);
+    }
+
     private void paint(Patch patch) {
         double light =
                 Math.max(0, orientation.project(patch.normal()).dotProduct(new Point3D(-0.3, -0.6, -1).normalize()));
@@ -276,10 +298,10 @@ final class ViewCube extends Pane {
         patch.shape()
                 .setFill(
                         highlighted
-                                ? Color.web(dark ? "#456b9b" : "#c8ddfa")
-                                : Color.web(dark ? "#353e4d" : "#d4dce7")
-                                        .interpolate(Color.web(dark ? "#57667a" : "#f8faff"), light));
-        patch.shape().setStroke(Color.web(highlighted ? "#6498e8" : dark ? "#78889e" : "#9eacbf"));
+                                ? themeColor("#456b9b", "#c8ddfa")
+                                : themeColor("#353e4d", "#d4dce7")
+                                        .interpolate(themeColor("#57667a", "#f8faff"), light));
+        patch.shape().setStroke(highlighted ? Color.web("#6498e8") : themeColor("#78889e", "#9eacbf"));
         patch.shape().setStrokeWidth(highlighted ? 1.2 : 0.6);
         patch.shape().setStrokeLineJoin(StrokeLineJoin.ROUND);
     }

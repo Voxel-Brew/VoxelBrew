@@ -69,13 +69,18 @@ class ConstructionIntegrationTest {
         try (var result = Evaluator.evaluate(session.document())) {
             var solid = result.bodies().getFirst().solid();
             int faces = (int) solid.constructionInput(0, -1, .5)[0];
-            for (int i = 0; i < faces; i++) if (solid.constructionInput(0, i, .5)[0] == 2) side = i;
+            for (int i = 0; i < faces; i++) {
+                if (solid.constructionInput(0, i, .5)[0] == 2) {
+                    side = i;
+                }
+            }
             int edges = (int) solid.constructionInput(1, -1, .5)[0];
-            for (int i = 0; i < edges; i++)
+            for (int i = 0; i < edges; i++) {
                 if (solid.constructionInput(1, i, .5)[0] == 7) {
                     circle = i;
                     break;
                 }
+            }
         }
         assertThat(side >= 0).isTrue();
         assertThat(circle >= 0).isTrue();
@@ -119,20 +124,22 @@ class ConstructionIntegrationTest {
     void filletAndChamferExposeRealTorusAndConeConstructionAxes() {
         try (var cylinder = Solid.circlePrism(10, 20, 0, 12, 10)) {
             int edge = -1;
-            for (int i = 0; i < cylinder.constructionInput(1, -1, .5)[0]; i++)
+            for (int i = 0; i < cylinder.constructionInput(1, -1, .5)[0]; i++) {
                 if (cylinder.constructionInput(1, i, .5)[0] == 7) {
                     edge = i + 1;
                     break;
                 }
+            }
             assertThat(edge > 0).isTrue();
             for (boolean fillet : List.of(false, true)) {
                 try (var finished = cylinder.edgeFinish(fillet, 1, new int[] {edge})) {
                     int face = -1;
-                    for (int i = 0; i < finished.constructionInput(0, -1, .5)[0]; i++)
+                    for (int i = 0; i < finished.constructionInput(0, -1, .5)[0]; i++) {
                         if (finished.constructionInput(0, i, .5)[0] == (fillet ? 5 : 3)) {
                             face = i;
                             break;
                         }
+                    }
                     assertThat(face >= 0)
                             .as("Expected analytic " + (fillet ? "torus" : "cone"))
                             .isTrue();

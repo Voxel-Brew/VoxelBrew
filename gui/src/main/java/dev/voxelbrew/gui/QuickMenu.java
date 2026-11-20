@@ -44,10 +44,11 @@ final class QuickMenu implements AutoCloseable {
     private final EventHandler<MouseEvent> mouse = this::mouse;
 
     private final javafx.beans.value.ChangeListener<Boolean> focusChanged = (o, a, focused) -> {
-        if (!focused)
+        if (!focused) {
             javafx.application.Platform.runLater(() -> {
                 if (this.owner != null && !this.owner.isFocused() && !popup.isFocused()) hide();
             });
+        }
     };
 
     private final javafx.beans.value.ChangeListener<javafx.stage.Window> windowChanged = (o, a, b) -> observeWindow(b);
@@ -71,9 +72,11 @@ final class QuickMenu implements AutoCloseable {
             ObservableBooleanValue selected,
             Runnable invoke) {
         static Action button(ButtonBase source, String icon) {
-            ObservableBooleanValue selected = source instanceof ToggleButton toggle
-                    ? toggle.selectedProperty()
-                    : source instanceof CheckBox check ? check.selectedProperty() : null;
+            ObservableBooleanValue selected = switch (source) {
+                case ToggleButton toggle -> toggle.selectedProperty();
+                case CheckBox check -> check.selectedProperty();
+                default -> null;
+            };
             return new Action(
                     source.getId(), source.getText(), icon, source.disabledProperty(), selected, source::fire);
         }
@@ -94,7 +97,9 @@ final class QuickMenu implements AutoCloseable {
         for (String id : ids) {
             var button = commands.apply(id);
             if (button != null) result.add(Action.button(button, icon(id)));
-            else throw new IllegalStateException("Missing quick-menu command: " + id);
+            else {
+                throw new IllegalStateException("Missing quick-menu command: " + id);
+            }
         }
         return result;
     }
@@ -187,7 +192,9 @@ final class QuickMenu implements AutoCloseable {
             if (event.isPrimaryButtonDown()
                     || event.isSecondaryButtonDown()
                     || !(event.getTarget() instanceof Node target)
-                    || !accepts.test(target)) return;
+                    || !accepts.test(target)) {
+                return;
+            }
             hide();
             active = true;
             gesture.press(event.getScreenX(), event.getScreenY());
@@ -214,8 +221,9 @@ final class QuickMenu implements AutoCloseable {
     private Button actionButton(Action action) {
         var button = new Button();
         button.setId("quick-" + action.id());
-        if (Set.of("extrude", "cut", "fillet", "chamfer", "shell", "split-body").contains(action.id()))
+        if (Set.of("extrude", "cut", "fillet", "chamfer", "shell", "split-body").contains(action.id())) {
             button.setGraphic(OperationIcons.icon(action.id()));
+        }
         button.setAccessibleText(action.label());
         button.textProperty()
                 .bind(
@@ -249,19 +257,7 @@ final class QuickMenu implements AutoCloseable {
         var heading = new Label(text.translate("quick.actions").orElseThrow());
         heading.getStyleClass().add("quick-menu-heading");
         root.getChildren().add(heading);
-        var ring = new GridPane();
-        ring.getStyleClass().add("quick-menu-ring");
-        ring.setHgap(6);
-        ring.setVgap(6);
-        int[][] slots = {{1, 0}, {2, 0}, {2, 1}, {2, 2}, {1, 2}, {0, 2}, {0, 1}, {0, 0}};
-        for (int index = 0; index < Math.min(8, commands.radial().size()); index++) {
-            var button = actionButton(commands.radial().get(index));
-            button.getStyleClass().add("quick-menu-command");
-            button.setPrefWidth(slots[index][0] == 1 ? 152 : 136);
-            button.setMinHeight(36);
-            button.setWrapText(true);
-            ring.add(button, slots[index][0], slots[index][1]);
-        }
+        var ring = radialButtons(commands);
         var workspaceButton = new MenuButton(text.translate("quick.workspace").orElseThrow());
         workspaceButton.setId("quick-workspaces");
         workspaceButton.getStyleClass().add("quick-menu-workspace");
@@ -271,11 +267,12 @@ final class QuickMenu implements AutoCloseable {
             var item = new MenuItem(action.label());
             item.setId("quick-" + action.id());
             item.disableProperty().bind(action.disabled());
-            if (action.selected() != null)
+            if (action.selected() != null) {
                 item.textProperty()
                         .bind(Bindings.when(action.selected())
                                 .then("✓ " + action.label())
                                 .otherwise(action.label()));
+            }
             item.setOnAction(e -> {
                 if (action.disabled().get()) return;
                 hide();
@@ -335,7 +332,9 @@ final class QuickMenu implements AutoCloseable {
             } else if (event.getCode() == KeyCode.ENTER) {
                 var focused = root.getScene().getFocusOwner();
                 if (focused instanceof MenuButton menu) menu.show();
-                else if (focused instanceof ButtonBase button && !button.isDisabled()) button.fire();
+                else if (focused instanceof ButtonBase button && !button.isDisabled()) {
+                    button.fire();
+                }
                 event.consume();
             }
         });
@@ -356,5 +355,22 @@ final class QuickMenu implements AutoCloseable {
         surface.sceneProperty().removeListener(sceneChanged);
         if (surface.getScene() != null) surface.getScene().windowProperty().removeListener(windowChanged);
         observeWindow(null);
+    }
+
+    private GridPane radialButtons(Content commands) {
+        var ring = new GridPane();
+        ring.getStyleClass().add("quick-menu-ring");
+        ring.setHgap(6);
+        ring.setVgap(6);
+        int[][] slots = {{1, 0}, {2, 0}, {2, 1}, {2, 2}, {1, 2}, {0, 2}, {0, 1}, {0, 0}};
+        for (int index = 0; index < Math.min(8, commands.radial().size()); index++) {
+            var button = actionButton(commands.radial().get(index));
+            button.getStyleClass().add("quick-menu-command");
+            button.setPrefWidth(slots[index][0] == 1 ? 152 : 136);
+            button.setMinHeight(36);
+            button.setWrapText(true);
+            ring.add(button, slots[index][0], slots[index][1]);
+        }
+        return ring;
     }
 }

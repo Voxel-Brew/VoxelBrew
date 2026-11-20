@@ -44,18 +44,21 @@ public final class PrusaConfiguration {
                 "infill_extrusion_width",
                 "perimeter_extrusion_width",
                 "solid_infill_extrusion_width",
-                "top_infill_extrusion_width"))
+                "top_infill_extrusion_width")) {
             result.put(key, Double.toString(profile.printer().nozzleMm() * 1.125));
+        }
         result.put(
                 "support_material_extrusion_width",
                 Double.toString(profile.printer().nozzleMm()));
         result.put("filament_type", material.id());
         result.put("filament_diameter", amount(material.filamentDiameterQuantity(), MILLIMETRE));
         result.put("filament_density", material.id().equals("PETG") ? "1.27" : "1.24");
-        for (var key : List.of("temperature", "first_layer_temperature"))
+        for (var key : List.of("temperature", "first_layer_temperature")) {
             result.put(key, amount(material.nozzleTemperatureQuantity(), CELSIUS));
-        for (var key : List.of("bed_temperature", "first_layer_bed_temperature"))
+        }
+        for (var key : List.of("bed_temperature", "first_layer_bed_temperature")) {
             result.put(key, amount(material.bedTemperatureQuantity(), CELSIUS));
+        }
         result.put("layer_height", amount(p.layerHeightQuantity(), MILLIMETRE));
         result.put("first_layer_height", amount(p.layerHeightQuantity(), MILLIMETRE));
         result.put("perimeters", Integer.toString(p.walls()));
@@ -79,8 +82,9 @@ public final class PrusaConfiguration {
 
     public static String ini(ManufacturingModel model) throws IOException {
         var out = new StringBuilder("# VoxelBrew / PrusaSlicer 2.7.2 / millimeters\n");
-        for (var entry : settings(model).entrySet())
+        for (var entry : settings(model).entrySet()) {
             out.append(entry.getKey()).append(" = ").append(entry.getValue()).append('\n');
+        }
         return out.toString();
     }
 

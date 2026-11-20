@@ -35,8 +35,9 @@ public final class PrintValidation {
         var reports = new LinkedHashMap<String, MeshValidation.Report>();
         var footprints = new LinkedHashMap<String, Area>();
         var bounds = new LinkedHashMap<String, Bounds>();
-        if (model.instances().isEmpty())
+        if (model.instances().isEmpty()) {
             diagnostics.add(new Diagnostic("print", "EMPTY", "Add at least one build instance"));
+        }
         var bed = MeshGeometry.polygon(model.profile().printer().bed());
         bed.add(new Area(new BasicStroke(0.002f).createStrokedShape(bed)));
         // Mesh topology belongs to a body, so repeated placements only need one inspection.
@@ -70,19 +71,7 @@ public final class PrintValidation {
             bounds.put(instance.id(), box);
             checkBed(instance.id(), footprint, box, bed, model.profile(), diagnostics);
         }
-        var ids = new ArrayList<>(footprints.keySet());
-        for (int i = 0; i < ids.size(); i++)
-            for (int j = i + 1; j < ids.size(); j++) {
-                var a = bounds.get(ids.get(i));
-                var b = bounds.get(ids.get(j));
-                if (Math.min(a.maxZ(), b.maxZ()) - Math.max(a.minZ(), b.minZ()) <= 0.001) continue;
-                var overlap = new Area(footprints.get(ids.get(i)));
-                overlap.intersect(footprints.get(ids.get(j)));
-                if (!overlap.isEmpty()) {
-                    diagnostics.add(new Diagnostic(ids.get(i), "OVERLAP", "Footprint overlaps " + ids.get(j)));
-                    diagnostics.add(new Diagnostic(ids.get(j), "OVERLAP", "Footprint overlaps " + ids.get(i)));
-                }
-            }
+        checkOverlap(footprints, bounds, diagnostics);
         for (var support : model.setup().supports()) {
             var owner = model.instances().stream()
                     .filter(i -> i.id().equals(support.instanceId()))
@@ -96,39 +85,61 @@ public final class PrintValidation {
                     MeshGeometry.box(support), owner.get().transform());
             var footprint = MeshGeometry.footprint(mesh);
             var box = MeshGeometry.bounds(mesh);
-            if (support.role() == SupportVolume.Role.SOLID_SUPPORT)
+            if (support.role() == SupportVolume.Role.SOLID_SUPPORT) {
                 checkBed(support.id(), footprint, box, bed, model.profile(), diagnostics);
-            else {
+            } else {
                 var overlap = new Area(footprint);
                 overlap.intersect(footprints.get(support.instanceId()));
                 var part = bounds.get(support.instanceId());
-                if (overlap.isEmpty() || box.maxZ() < part.minZ() - 0.001 || box.minZ() > part.maxZ() + 0.001)
+                if (overlap.isEmpty() || box.maxZ() < part.minZ() - 0.001 || box.minZ() > part.maxZ() + 0.001) {
                     diagnostics.add(new Diagnostic(
                             support.id(),
                             "DETACHED_MODIFIER",
                             "Support instruction no longer intersects its attached instance"));
+                }
             }
         }
         return new Result(diagnostics, reports);
+    }
+
+    private static void checkOverlap(
+            Map<String, Area> footprints, Map<String, Bounds> bounds, List<Diagnostic> diagnostics) {
+        var ids = new ArrayList<>(footprints.keySet());
+        for (int i = 0; i < ids.size(); i++) {
+            for (int j = i + 1; j < ids.size(); j++) {
+                var a = bounds.get(ids.get(i));
+                var b = bounds.get(ids.get(j));
+                if (Math.min(a.maxZ(), b.maxZ()) - Math.max(a.minZ(), b.minZ()) <= 0.001) continue;
+                var overlap = new Area(footprints.get(ids.get(i)));
+                overlap.intersect(footprints.get(ids.get(j)));
+                if (!overlap.isEmpty()) {
+                    diagnostics.add(new Diagnostic(ids.get(i), "OVERLAP", "Footprint overlaps " + ids.get(j)));
+                    diagnostics.add(new Diagnostic(ids.get(j), "OVERLAP", "Footprint overlaps " + ids.get(i)));
+                }
+            }
+        }
     }
 
     private static void checkBed(
             String id, Area footprint, Bounds box, Area bed, PrintProfile profile, List<Diagnostic> diagnostics) {
         var outside = new Area(footprint);
         outside.subtract(bed);
-        if (!outside.isEmpty())
+        if (!outside.isEmpty()) {
             diagnostics.add(new Diagnostic(id, "OUTSIDE_BED", "Footprint lies outside the bed polygon"));
+        }
         if (box.minZ() < -0.001) diagnostics.add(new Diagnostic(id, "BELOW_BED", "Material lies below Z=0"));
-        if (box.maxZ() > profile.printer().usableHeight() + 0.001)
+        if (box.maxZ() > profile.printer().usableHeight() + 0.001) {
             diagnostics.add(new Diagnostic(
                     id,
                     "OVER_HEIGHT",
                     "Exceeds usable height " + profile.printer().usableHeight() + " mm"));
+        }
         for (var zone : profile.printer().excludedZones()) {
             var intersection = new Area(footprint);
             intersection.intersect(MeshGeometry.polygon(zone));
-            if (!intersection.isEmpty())
+            if (!intersection.isEmpty()) {
                 diagnostics.add(new Diagnostic(id, "EXCLUDED_ZONE", "Footprint enters an excluded zone"));
+            }
         }
     }
 

@@ -82,13 +82,18 @@ class ConfigurationProcessTest {
             assertThat(config.readUserConfig().size()).isEqualTo(81);
             assertThat(config.readUserConfig("unrelated").orElse("")).isEqualTo("preserved");
             for (int process = 0; process < 4; process++) {
-                for (int index = 0; index < 20; index++)
+                for (int index = 0; index < 20; index++) {
                     assertThat(config.readUserConfig("process." + process + "." + index)
                                     .orElse(""))
                             .isEqualTo("value." + index);
+                }
             }
         } finally {
-            for (var process : processes) if (process.isAlive()) process.destroyForcibly();
+            for (var process : processes) {
+                if (process.isAlive()) {
+                    process.destroyForcibly();
+                }
+            }
         }
     }
 }

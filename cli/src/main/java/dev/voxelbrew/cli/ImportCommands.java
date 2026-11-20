@@ -70,8 +70,9 @@ final class ImportCommands {
                 if (source.toAbsolutePath()
                                 .normalize()
                                 .equals(output.toAbsolutePath().normalize())
-                        || java.nio.file.Files.exists(output) && java.nio.file.Files.isSameFile(source, output))
+                        || java.nio.file.Files.exists(output) && java.nio.file.Files.isSameFile(source, output)) {
                     throw new IllegalArgumentException("Import destination must differ from its source");
+                }
                 var imported = registry.require(format).create().importFrom(new CliImportWindow(source, options));
                 if (imported.isPresent()) {
                     var document = imported.orElseThrow();

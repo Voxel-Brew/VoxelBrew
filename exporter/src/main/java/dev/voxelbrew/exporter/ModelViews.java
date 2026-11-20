@@ -62,8 +62,9 @@ public class ModelViews {
     }
 
     public static ModelView select(ModelView source, String bodyId) {
-        if (source.bodies().stream().noneMatch(b -> b.id().equals(bodyId)))
+        if (source.bodies().stream().noneMatch(b -> b.id().equals(bodyId))) {
             throw new IllegalArgumentException("Unknown body " + bodyId);
+        }
         return new ModelView() {
             @Override
             public List<Body> bodies() {
@@ -154,7 +155,7 @@ public class ModelViews {
             bodies.addAll(from(model).bodies());
             instances.addAll(model.instances());
         }
-        for (var support : model.setup().supports())
+        for (var support : model.setup().supports()) {
             if (support.role() == SupportVolume.Role.SOLID_SUPPORT) {
                 var owner = model.setup().instances().stream()
                         .filter(i -> i.id().equals(support.instanceId()))
@@ -166,6 +167,7 @@ public class ModelViews {
                 bodies.add(new ModelView.Body(id, support.id(), ModelView.Role.SOLID_SUPPORT));
                 instances.add(new BodyInstance(id, id, owner.transform()));
             }
+        }
         return new ModelView() {
             @Override
             public List<ModelView.Body> bodies() {

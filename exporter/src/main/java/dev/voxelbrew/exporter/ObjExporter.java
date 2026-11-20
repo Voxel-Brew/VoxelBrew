@@ -37,8 +37,9 @@ public final class ObjExporter extends MeshExporter {
             for (int vertex = 0; vertex < mesh.vertexCount(); vertex++) {
                 var p = instance.transform()
                         .apply(mesh.coordinate(vertex, 0), mesh.coordinate(vertex, 1), mesh.coordinate(vertex, 2));
-                if (!Double.isFinite(p[0]) || !Double.isFinite(p[1]) || !Double.isFinite(p[2]))
+                if (!Double.isFinite(p[0]) || !Double.isFinite(p[1]) || !Double.isFinite(p[2])) {
                     throw new IllegalArgumentException("Nonfinite transformed vertex");
+                }
                 writer.write("v " + p[0] + " " + p[1] + " " + p[2] + "\n");
             }
             for (int triangle = 0; triangle < mesh.triangleCount(); triangle++) {

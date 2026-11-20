@@ -295,12 +295,14 @@ final class SketchCommands implements Runnable {
                     null);
             if (replace) {
                 var previous = g.entity(id);
-                if (previous.kind() != kind)
+                if (previous.kind() != kind) {
                     throw new IllegalArgumentException(
                             "Changing an entity's kind would invalidate references; remove it first");
-                if (entity.construction())
+                }
+                if (entity.construction()) {
                     g = g.withBoundary(
                             g.boundary().stream().filter(e -> !e.equals(id)).toList());
+                }
                 g = Sketches.reshape(g, entity).requireSolved();
             } else {
                 g = g.add(entity);
@@ -356,8 +358,9 @@ final class SketchCommands implements Runnable {
                         || constraint.refs().size() != 2
                         || constraint.refs().stream()
                                 .anyMatch(r -> r.part() != Part.OBJECT
-                                        || g.entity(r.entityId()).kind() != Kind.CIRCLE))
+                                        || g.entity(r.entityId()).kind() != Kind.CIRCLE)) {
                     throw new IllegalArgumentException("--tangency requires two whole circles and TANGENT");
+                }
                 constraint = constraint.withValue(tangency == Tangency.EXTERNAL ? 1 : -1);
             }
             return publish(session, g.add(constraint));
@@ -381,8 +384,9 @@ final class SketchCommands implements Runnable {
         public Integer call() throws Exception {
             var session = session();
             var g = geometry(session);
-            if (g.constraints().stream().noneMatch(c -> c.id().equals(id)))
+            if (g.constraints().stream().noneMatch(c -> c.id().equals(id))) {
                 throw new IllegalArgumentException("Missing constraint: " + id);
+            }
             return publish(
                     session,
                     g.withConstraints(g.constraints().stream()

@@ -50,8 +50,9 @@ public final class ProcessRunner {
             long deadline = System.nanoTime() + Duration.ofMinutes(10).toNanos();
             while (!process.waitFor(100, TimeUnit.MILLISECONDS)) {
                 cancellation.check();
-                if (System.nanoTime() > deadline)
+                if (System.nanoTime() > deadline) {
                     throw new SlicerException.Execution("Slicer exceeded the 10 minute limit");
+                }
             }
             reader.join(5000);
             cancellation.check();
@@ -60,8 +61,9 @@ public final class ProcessRunner {
                 output = transcript.toString();
             }
             log.debug("Slicer process {} exited with {}", process.pid(), process.exitValue());
-            if (process.exitValue() != 0)
+            if (process.exitValue() != 0) {
                 throw new SlicerException.Execution("Slicer exited with " + process.exitValue() + ":\n" + output);
+            }
             return output;
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();

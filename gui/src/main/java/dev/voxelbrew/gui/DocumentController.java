@@ -150,7 +150,11 @@ public final class DocumentController implements AutoCloseable {
 
         public List<Integer> edgesOnFace(int face) {
             var result = new java.util.TreeSet<Integer>();
-            for (int i = 0; i < faceEdges.length; i += 2) if (faceEdges[i] == face) result.add(faceEdges[i + 1]);
+            for (int i = 0; i < faceEdges.length; i += 2) {
+                if (faceEdges[i] == face) {
+                    result.add(faceEdges[i + 1]);
+                }
+            }
             return List.copyOf(result);
         }
     }
@@ -198,8 +202,9 @@ public final class DocumentController implements AutoCloseable {
 
     static Build evaluate(CadDocument document, Path pluginDirectory) {
         try (var evaluation = Evaluator.evaluate(document, pluginDirectory)) {
-            if (!evaluation.valid())
+            if (!evaluation.valid()) {
                 return new Build(List.of(), evaluation.diagnostics(), false, evaluation.resolvedFeatures());
+            }
             var bodies = dev.voxelbrew.util.concurrent.ParallelWork.map(
                     evaluation.bodies(),
                     b -> new Body(
@@ -220,13 +225,14 @@ public final class DocumentController implements AutoCloseable {
                         case 1 -> ConstructionFeature.Selection.EDGE;
                         default -> ConstructionFeature.Selection.VERTEX;
                     };
-                    for (int index = 0; index < count; index++)
+                    for (int index = 0; index < count; index++) {
                         inputs.add(new ConstructionFeature.Input(
                                 selection,
                                 body.output().featureId(),
                                 body.output().outputName(),
                                 index,
                                 zero));
+                    }
                 }
             }
             return new Build(
@@ -456,8 +462,9 @@ public final class DocumentController implements AutoCloseable {
     }
 
     public void renameBody(String bodyId, String name) {
-        if (!canExport() || build.bodies().stream().noneMatch(b -> b.id().equals(bodyId)))
+        if (!canExport() || build.bodies().stream().noneMatch(b -> b.id().equals(bodyId))) {
             throw new IllegalStateException("Select a current body at the end of a successful rebuild");
+        }
         long before = session.revision();
         session.renameBody(bodyId, name);
         if (session.revision() != before) {
@@ -515,8 +522,9 @@ public final class DocumentController implements AutoCloseable {
         double value =
                 session.document().parameters().value(expression, dev.voxelbrew.api.model.parameters.ParameterUnit.MM);
         previewExtrusion(sketch, profileId, value);
-        if (!expression.matches("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?"))
+        if (!expression.matches("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?")) {
             previewExpression = expression;
+        }
     }
 
     public void commitPreview() {
@@ -651,13 +659,16 @@ public final class DocumentController implements AutoCloseable {
                 dispatch.accept(() -> {
                     try {
                         var value = parent.show(dialog);
-                        if (savesDocument)
+                        if (savesDocument) {
                             value.ifPresent(settings -> {
                                 if (settings
-                                        instanceof dev.voxelbrew.api.exporter.FileExportDialog.Destination destination)
+                                        instanceof
+                                        dev.voxelbrew.api.exporter.FileExportDialog.Destination destination) {
                                     selectedPath.set(
                                             destination.path().toAbsolutePath().normalize());
+                                }
                             });
+                        }
                         selection.complete(value);
                     } catch (RuntimeException | LinkageError failure) {
                         selection.completeExceptionally(failure);
@@ -737,8 +748,9 @@ public final class DocumentController implements AutoCloseable {
                     @Override
                     public <R> java.util.Optional<R> show(dev.voxelbrew.api.importer.ImportDialog<R> dialog) {
                         if (dialog instanceof dev.voxelbrew.api.importer.FileImportDialog file) {
-                            if (!options.isEmpty())
+                            if (!options.isEmpty()) {
                                 throw new IllegalArgumentException("Unknown import options: " + options.keySet());
+                            }
                             @SuppressWarnings("unchecked")
                             R settings = (R)
                                     file.buildSettings(Map.of(file.sourceInput().id(), source.toString()));
@@ -904,11 +916,12 @@ public final class DocumentController implements AutoCloseable {
                     log.debug("Discarding obsolete rebuild {}", request.sequence());
                     return;
                 }
-                if (!complete.valid() && !request.preview())
+                if (!complete.valid() && !request.preview()) {
                     log.warn(
                             "Document {} revision {} has rebuild diagnostics; geometry is unavailable",
                             request.document().id(),
                             request.revision());
+                }
                 log.debug(
                         "Published rebuild {} with {} bodies",
                         request.sequence(),
@@ -928,16 +941,19 @@ public final class DocumentController implements AutoCloseable {
         return CompletableFuture.supplyAsync(
                 () -> {
                     var temporary = new ModelSession(captured);
-                    if (captured.features().stream().anyMatch(f -> f.id().equals(feature.id())))
+                    if (captured.features().stream().anyMatch(f -> f.id().equals(feature.id()))) {
                         temporary.replace(feature);
-                    else temporary.add(feature);
+                    } else {
+                        temporary.add(feature);
+                    }
                     try (var evaluation = Evaluator.evaluate(temporary.document(), pluginDirectory)) {
-                        if (!evaluation.valid())
+                        if (!evaluation.valid()) {
                             throw new IllegalArgumentException(evaluation.diagnostics().stream()
                                     .filter(d -> d.state() == Evaluation.State.FAILED
                                             || d.state() == Evaluation.State.BLOCKED)
                                     .map(Evaluation.Diagnostic::message)
                                     .collect(java.util.stream.Collectors.joining("; ")));
+                        }
                         return evaluation.construction().get(feature.id());
                     }
                 },

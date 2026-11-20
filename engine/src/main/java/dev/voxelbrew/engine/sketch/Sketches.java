@@ -15,8 +15,9 @@ public final class Sketches {
 
     public static SketchGeometry rectangle(
             String prefix, double x, double y, double width, double height, boolean dimensioned) {
-        if (width < 1e-6 || height < 1e-6)
+        if (width < 1e-6 || height < 1e-6) {
             throw new IllegalArgumentException("Rectangle width and height must be positive");
+        }
         var edges = List.of(
                 entity(prefix + "-bottom", Kind.LINE, false, x, y, x + width, y),
                 entity(prefix + "-right", Kind.LINE, false, x + width, y, x + width, y + height),
@@ -50,8 +51,9 @@ public final class Sketches {
     }
 
     public static SketchGeometry fromProfile(Feature.Profile profile) {
-        if (profile instanceof Feature.Rectangle r)
+        if (profile instanceof Feature.Rectangle r) {
             return rectangle("rectangle", r.x(), r.y(), r.width(), r.height(), true);
+        }
         if (profile instanceof Feature.Circle c) {
             var circle = entity("circle", Kind.CIRCLE, false, c.centerX(), c.centerY(), c.diameter() / 2);
             var g = new SketchGeometry(List.of(circle), List.of(), List.of(circle.id()));
@@ -63,8 +65,9 @@ public final class Sketches {
     }
 
     public static SketchGeometry polygon(String prefix, double cx, double cy, double radius, int sides) {
-        if (sides < 3 || sides > 32 || radius < 1e-6)
+        if (sides < 3 || sides > 32 || radius < 1e-6) {
             throw new IllegalArgumentException("A regular polygon needs 3–32 sides and a positive radius");
+        }
         var lines = new ArrayList<Entity>();
         for (int i = 0; i < sides; i++) {
             double a = Math.TAU * i / sides, b = Math.TAU * (i + 1) / sides;
@@ -103,8 +106,9 @@ public final class Sketches {
                 .filter(c -> c.id().equals(id))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Missing driving dimension: " + id));
-        if (!constraint.type().dimension())
+        if (!constraint.type().dimension()) {
             throw new IllegalArgumentException("Constraint is not a driving dimension: " + id);
+        }
         return SketchSolver.solve(g.withConstraints(g.constraints().stream()
                         .map(c -> c.id().equals(id) ? c.withValue(value) : c)
                         .toList()))
@@ -136,7 +140,11 @@ public final class Sketches {
 
     private static String temporaryId(SketchGeometry g, String prefix) {
         var ids = g.constraints().stream().map(Constraint::id).collect(java.util.stream.Collectors.toSet());
-        for (int i = 0; ; i++) if (!ids.contains(prefix + "-" + i)) return prefix + "-" + i;
+        for (int i = 0; ; i++) {
+            if (!ids.contains(prefix + "-" + i)) {
+                return prefix + "-" + i;
+            }
+        }
     }
 
     private Sketches() {}

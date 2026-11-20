@@ -5,6 +5,7 @@ plugins {
     `java-base`
     id("com.diffplug.spotless") version "8.11.0"
     id("dev.voxelbrew.spotbugs") apply false
+    id("dev.voxelbrew.checkstyle") apply false
 }
 
 // Root-owned targets include the independent consumer build without making it a subproject.
@@ -163,6 +164,7 @@ configure(libraryProjects) {
     apply(plugin = "java-library")
     extensions.configure<BasePluginExtension> { archivesName.set(projectDir.name) }
     apply(plugin = "dev.voxelbrew.spotbugs")
+    apply(plugin = "dev.voxelbrew.checkstyle")
     extensions.configure<JavaPluginExtension> {
         toolchain.languageVersion.set(JavaLanguageVersion.of(21))
     }
@@ -316,6 +318,12 @@ val checkJavaMemberOrder by
     }
 
 tasks.named("check") { dependsOn(checkJavaMemberOrder) }
+
+tasks.register("checkstyleAll") {
+    group = "verification"
+    description = "Check handwritten Java in all application source sets."
+    dependsOn(libraryProjects.map { it.tasks.withType<Checkstyle>() })
+}
 
 tasks.register("basicChecks") {
     group = "verification"

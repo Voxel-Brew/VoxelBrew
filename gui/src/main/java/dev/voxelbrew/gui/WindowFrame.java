@@ -64,6 +64,16 @@ final class WindowFrame extends BorderPane {
         };
     }
 
+    private static int edge(double position, double length, int leading, int trailing) {
+        if (position < 6) return leading;
+        return position > length - 6 ? trailing : 0;
+    }
+
+    private static double resizeDelta(int edges, int leading, int trailing, double delta) {
+        if ((edges & leading) != 0) return -delta;
+        return (edges & trailing) != 0 ? delta : 0;
+    }
+
     static Rectangle2D resize(
             Rectangle2D start,
             int edges,
@@ -73,10 +83,8 @@ final class WindowFrame extends BorderPane {
             double minHeight,
             double maxWidth,
             double maxHeight) {
-        double width = Math.clamp(
-                start.getWidth() + ((edges & LEFT) != 0 ? -dx : (edges & RIGHT) != 0 ? dx : 0), minWidth, maxWidth);
-        double height = Math.clamp(
-                start.getHeight() + ((edges & TOP) != 0 ? -dy : (edges & BOTTOM) != 0 ? dy : 0), minHeight, maxHeight);
+        double width = Math.clamp(start.getWidth() + resizeDelta(edges, LEFT, RIGHT, dx), minWidth, maxWidth);
+        double height = Math.clamp(start.getHeight() + resizeDelta(edges, TOP, BOTTOM, dy), minHeight, maxHeight);
         return new Rectangle2D(
                 (edges & LEFT) != 0 ? start.getMaxX() - width : start.getMinX(),
                 (edges & TOP) != 0 ? start.getMaxY() - height : start.getMinY(),
@@ -90,7 +98,9 @@ final class WindowFrame extends BorderPane {
 
     static void content(Scene scene, Parent content) {
         if (scene.getRoot() instanceof WindowFrame frame) frame.setCenter(content);
-        else scene.setRoot(content);
+        else {
+            scene.setRoot(content);
+        }
     }
 
     WindowFrame(Stage stage, HBox header, Parent content, TranslationService translations) {
@@ -231,8 +241,9 @@ final class WindowFrame extends BorderPane {
 
     private boolean dragTarget(Object target) {
         if (!(target instanceof Node node)) return false;
-        for (; node != null && node != getTop(); node = node.getParent())
+        for (; node != null && node != getTop(); node = node.getParent()) {
             if (node instanceof ButtonBase || node instanceof MenuBar) return false;
+        }
         return node == getTop();
     }
 
@@ -273,7 +284,7 @@ final class WindowFrame extends BorderPane {
     private int edges(MouseEvent event) {
         if (maximized() || stage.isFullScreen() || !stage.isResizable()) return 0;
         double x = event.getSceneX(), y = event.getSceneY();
-        return (x < 6 ? LEFT : x > getWidth() - 6 ? RIGHT : 0) | (y < 6 ? TOP : y > getHeight() - 6 ? BOTTOM : 0);
+        return edge(x, getWidth(), LEFT, RIGHT) | edge(y, getHeight(), TOP, BOTTOM);
     }
 
     void close() {

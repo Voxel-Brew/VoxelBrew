@@ -13,9 +13,10 @@ public final class FileImportWindows {
         return new ImportWindow() {
             @Override
             public <R> Optional<R> show(ImportDialog<R> dialog) {
-                if (!(dialog instanceof FileImportDialog file))
+                if (!(dialog instanceof FileImportDialog file)) {
                     throw new UnsupportedOperationException(
                             "Unsupported import dialog: " + dialog.getClass().getName());
+                }
                 return Optional.of(
                         dialog.buildSettings(Map.of(file.sourceInput().id(), path.toString())));
             }

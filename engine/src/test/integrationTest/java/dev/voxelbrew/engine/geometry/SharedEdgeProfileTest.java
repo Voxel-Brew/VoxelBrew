@@ -31,9 +31,10 @@ class SharedEdgeProfileTest {
         for (int seed = 0; seed < 12; seed++) {
             var entities = new ArrayList<>(house());
             Collections.shuffle(entities, new Random(seed));
-            if (seed % 2 == 0)
+            if (seed % 2 == 0) {
                 entities.replaceAll(
                         e -> Sketches.entity(e.id(), Kind.LINE, false, e.value(2), e.value(3), e.value(0), e.value(1)));
+            }
             var sketch = new dev.voxelbrew.api.model.Feature.Sketch(
                     "sketch",
                     "profile",
@@ -86,9 +87,10 @@ class SharedEdgeProfileTest {
         for (int seed = 0; seed < 12; seed++) {
             var entities = new ArrayList<>(house());
             Collections.shuffle(entities, new Random(seed));
-            if (seed % 2 == 0)
+            if (seed % 2 == 0) {
                 entities.replaceAll(
                         e -> Sketches.entity(e.id(), Kind.LINE, false, e.value(2), e.value(3), e.value(0), e.value(1)));
+            }
             var g = geometry(entities);
             assertThat(SketchProfiles.hasProfile(g)).isTrue();
             assertThat(SketchProfiles.regions(g).size()).isEqualTo(1);

@@ -89,9 +89,10 @@ public final class BambuLabDriver implements Driver {
         var form = gui();
         var values = config.toInput();
         var errors = form.validate(values);
-        if (!errors.isEmpty())
+        if (!errors.isEmpty()) {
             throw new IllegalArgumentException(
                     translations.translate("printer.invalid", errors).orElseThrow());
+        }
     }
 
     @Override
@@ -125,19 +126,22 @@ public final class BambuLabDriver implements Driver {
         boolean submitted = false;
         try {
             validate(config);
-            if (!artifact.format().equals("gcode.3mf"))
+            if (!artifact.format().equals("gcode.3mf")) {
                 return new PrintResult.Failure(
                         Set.of(translations.translate("printer.bambulab.format").orElseThrow()));
+            }
             if (!"orca".equals(artifact.metadata().get("backend"))
-                    || !"0".equals(artifact.metadata().get("tool")))
+                    || !"0".equals(artifact.metadata().get("tool"))) {
                 return new PrintResult.Failure(
                         Set.of(translations.translate("printer.bambulab.tool").orElseThrow()));
+            }
             temporary = Files.createTempFile("voxelbrew-job-", ".gcode.3mf");
             Files.write(temporary, artifact.bytes());
             try (var session = transports.open(config)) {
-                if (!session.status().canStart())
+                if (!session.status().canStart()) {
                     return new PrintResult.Failure(Set.of(
                             translations.translate("printer.bambulab.busy").orElseThrow()));
+                }
                 var uploaded = session.upload(temporary, progress -> {});
                 submissionAttempted = true;
                 session.start(uploaded);

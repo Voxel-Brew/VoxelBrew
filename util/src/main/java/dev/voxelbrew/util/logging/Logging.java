@@ -59,8 +59,9 @@ public final class Logging {
             Level consoleLevel = level(options.getOrDefault("logging.console.level", "WARNING"));
             long bytes = Long.parseLong(options.getOrDefault("logging.file.limit", "20971520"));
             int count = Integer.parseInt(options.getOrDefault("logging.file.count", "10"));
-            if (bytes < 1024 || count < 1 || count > 20)
+            if (bytes < 1024 || count < 1 || count > 20) {
                 throw new IllegalArgumentException("Invalid log rotation limits");
+            }
             var file = new RollingAppLog(directory, bytes, count);
             file.setFormatter(new AppLogFormatter(component));
             file.setLevel(level);
@@ -105,8 +106,9 @@ public final class Logging {
     public static void close() {
         synchronized (LOCK) {
             if (initialized) log.info("Application logging stopped");
-            if (applicationUncaught != null && Thread.getDefaultUncaughtExceptionHandler() == applicationUncaught)
+            if (applicationUncaught != null && Thread.getDefaultUncaughtExceptionHandler() == applicationUncaught) {
                 Thread.setDefaultUncaughtExceptionHandler(previousUncaught);
+            }
             applicationUncaught = null;
             previousUncaught = null;
             for (Handler handler : APPLICATION.getHandlers()) {

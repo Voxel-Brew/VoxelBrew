@@ -17,6 +17,27 @@ import lombok.extern.slf4j.Slf4j;
 public final class BambuLabDriver implements Driver {
     private final TransportFactory transports;
 
+    private static boolean isConnectionFailure(Throwable failure) {
+        for (var cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof ConnectException
+                    || cause instanceof NoRouteToHostException
+                    || cause instanceof SocketTimeoutException) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static PrintResult.Failure failed(String context, Exception failure, boolean submissionUncertain) {
+        log.warn(context, failure);
+        return new PrintResult.Failure(Set.of(message(context, failure)), submissionUncertain);
+    }
+
+    private static String message(String context, Exception failure) {
+        String detail = failure.getLocalizedMessage();
+        return detail == null || detail.isBlank() ? context : context + ": " + detail;
+    }
+
     public BambuLabDriver() {
         transports = config -> new BambuSession(connection(config));
     }
@@ -72,17 +93,6 @@ public final class BambuLabDriver implements Driver {
         }
     }
 
-    private static boolean isConnectionFailure(Throwable failure) {
-        for (var cause = failure; cause != null; cause = cause.getCause()) {
-            if (cause instanceof ConnectException
-                    || cause instanceof NoRouteToHostException
-                    || cause instanceof SocketTimeoutException) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     @Override
     public PrintResult print(DriverConfiguration config, PrintArtifact artifact) {
         Path temporary = null;
@@ -128,15 +138,5 @@ public final class BambuLabDriver implements Driver {
                 }
             }
         }
-    }
-
-    private static PrintResult.Failure failed(String context, Exception failure, boolean submissionUncertain) {
-        log.warn(context, failure);
-        return new PrintResult.Failure(Set.of(message(context, failure)), submissionUncertain);
-    }
-
-    private static String message(String context, Exception failure) {
-        String detail = failure.getLocalizedMessage();
-        return detail == null || detail.isBlank() ? context : context + ": " + detail;
     }
 }

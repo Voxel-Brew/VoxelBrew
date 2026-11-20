@@ -14,6 +14,12 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class PrusaProjectExporterTest {
+    private static ManufacturingModel model(PrintSetup setup) {
+        var shape = new SupportVolume("shape", "part", SupportVolume.Role.SOLID_SUPPORT, 0, 0, 0, 5, 5, 5);
+        return new ManufacturingModel(
+                "doc", "revision", setup, PrintProfile.resolve(setup), Map.of("body", MeshGeometry.box(shape)));
+    }
+
     @Test
     void configurationEnablesExplicitEnforcersWithoutAutomaticSupports() throws Exception {
         var instance = new BodyInstance("part", "body", Transform.IDENTITY);
@@ -46,11 +52,5 @@ class PrusaProjectExporterTest {
                 .isEqualTo(List.of("part/body", "part/block", "part/enforce", "part/solid"));
         assertThat(volumes.stream().allMatch(volume -> volume.mesh().triangleCount() > 0))
                 .isTrue();
-    }
-
-    private static ManufacturingModel model(PrintSetup setup) {
-        var shape = new SupportVolume("shape", "part", SupportVolume.Role.SOLID_SUPPORT, 0, 0, 0, 5, 5, 5);
-        return new ManufacturingModel(
-                "doc", "revision", setup, PrintProfile.resolve(setup), Map.of("body", MeshGeometry.box(shape)));
     }
 }

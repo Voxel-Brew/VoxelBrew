@@ -19,13 +19,21 @@ final class UpdateFixture implements AutoCloseable {
     private final ReleaseSource.Release release;
     private final HttpServer server;
     private final ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor();
+    final AtomicInteger requests = new AtomicInteger();
+    final CountDownLatch requestReceived = new CountDownLatch(1);
     private volatile boolean credentialsSeen;
     volatile boolean slow;
     volatile boolean current, development;
     volatile int failureStatus;
-    final AtomicInteger requests = new AtomicInteger();
-    final CountDownLatch requestReceived = new CountDownLatch(1);
     volatile ReleaseVersion requested;
+
+    private static void jar(Path path, String name, String contents) throws IOException {
+        try (var jar = new JarOutputStream(Files.newOutputStream(path))) {
+            jar.putNextEntry(new JarEntry(name));
+            jar.write(contents.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            jar.closeEntry();
+        }
+    }
 
     UpdateFixture(Path directory) throws Exception {
         this.directory = directory;
@@ -158,13 +166,5 @@ final class UpdateFixture implements AutoCloseable {
         jar(image.appDirectory().resolve("engine.jar"), "voxelbrew-engine-version.properties", "version=" + version);
         jar(image.appDirectory().resolve("gui.jar"), "dev/voxelbrew/gui/Launcher.class", "class");
         return image;
-    }
-
-    private static void jar(Path path, String name, String contents) throws IOException {
-        try (var jar = new JarOutputStream(Files.newOutputStream(path))) {
-            jar.putNextEntry(new JarEntry(name));
-            jar.write(contents.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            jar.closeEntry();
-        }
     }
 }

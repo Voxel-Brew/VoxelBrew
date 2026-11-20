@@ -28,67 +28,14 @@ final class SessionCommand implements Callable<Integer> {
     @Spec
     CommandLine.Model.CommandSpec spec;
 
-    @Override
-    public Integer call() throws Exception {
-        Path document = spec.root().findOption("--document").getValue();
-        if (document == null) throw new IllegalArgumentException("session requires --document");
-        try (var state = new State(document, source.load(document))) {
-            var shutdown = new Thread(
-                    () -> {
-                        try {
-                            state.shutdown();
-                        } catch (IOException failure) {
-                            spec.commandLine().getErr().println("ERROR: " + failure.getMessage());
-                        }
-                    },
-                    "voxelbrew-session-cancel");
-            Runtime.getRuntime().addShutdownHook(shutdown);
-            try {
-                if (script != null) {
-                    try (var reader = Files.newBufferedReader(script)) {
-                        String[][] commands = new Gson().fromJson(reader, String[][].class);
-                        if (commands == null)
-                            throw new IllegalArgumentException("Expected an array of argument arrays");
-                        for (var args : commands) {
-                            if (args == null) throw new IllegalArgumentException("Null command");
-                            int result = state.execute(args);
-                            if (result != 0) return result;
-                        }
-                    }
-                } else {
-                    var reader = new BufferedReader(
-                            new InputStreamReader(System.in, java.nio.charset.StandardCharsets.UTF_8));
-                    String line;
-                    spec.commandLine()
-                            .getOut()
-                            .println(
-                                    "Session: enter a JSON argument array; document save publishes changes; quit discards unsaved edits.");
-                    while ((line = reader.readLine()) != null) {
-                        if (line.strip().equals("quit")) break;
-                        try {
-                            var args = new Gson().fromJson(line, String[].class);
-                            if (args == null || args.length == 0) continue;
-                            state.execute(args);
-                        } catch (RuntimeException failure) {
-                            spec.commandLine().getErr().println("ERROR: " + failure.getMessage());
-                        }
-                    }
-                }
-                return 0;
-            } finally {
-                try {
-                    Runtime.getRuntime().removeShutdownHook(shutdown);
-                } catch (IllegalStateException shuttingDown) {
-                    /* The cancellation hook owns cleanup. */
-                }
-            }
-        }
-    }
-
     private final class State implements AutoCloseable {
+        private final Deque<CadDocument> draftUndo = new ArrayDeque<>(), draftRedo = new ArrayDeque<>();
+        private final Deque<CadDocument> undo = new ArrayDeque<>(), redo = new ArrayDeque<>();
         private Path path;
         private CadDocument current;
+
         private CadDocument sketchDraft;
+
         private volatile Background background;
 
         private final class Background {
@@ -101,9 +48,6 @@ final class SessionCommand implements Callable<Integer> {
             String slicerInstallation;
             String state = "running";
         }
-
-        private final Deque<CadDocument> draftUndo = new ArrayDeque<>(), draftRedo = new ArrayDeque<>();
-        private final Deque<CadDocument> undo = new ArrayDeque<>(), redo = new ArrayDeque<>();
 
         State(Path path, CadDocument current) {
             this.path = path.toAbsolutePath().normalize();
@@ -367,6 +311,63 @@ final class SessionCommand implements Callable<Integer> {
                     previous.featureNames(),
                     Map.of(),
                     Map.of());
+        }
+    }
+
+    @Override
+    public Integer call() throws Exception {
+        Path document = spec.root().findOption("--document").getValue();
+        if (document == null) throw new IllegalArgumentException("session requires --document");
+        try (var state = new State(document, source.load(document))) {
+            var shutdown = new Thread(
+                    () -> {
+                        try {
+                            state.shutdown();
+                        } catch (IOException failure) {
+                            spec.commandLine().getErr().println("ERROR: " + failure.getMessage());
+                        }
+                    },
+                    "voxelbrew-session-cancel");
+            Runtime.getRuntime().addShutdownHook(shutdown);
+            try {
+                if (script != null) {
+                    try (var reader = Files.newBufferedReader(script)) {
+                        String[][] commands = new Gson().fromJson(reader, String[][].class);
+                        if (commands == null)
+                            throw new IllegalArgumentException("Expected an array of argument arrays");
+                        for (var args : commands) {
+                            if (args == null) throw new IllegalArgumentException("Null command");
+                            int result = state.execute(args);
+                            if (result != 0) return result;
+                        }
+                    }
+                } else {
+                    var reader = new BufferedReader(
+                            new InputStreamReader(System.in, java.nio.charset.StandardCharsets.UTF_8));
+                    String line;
+                    spec.commandLine()
+                            .getOut()
+                            .println(
+                                    "Session: enter a JSON argument array; document save publishes changes; quit discards unsaved edits.");
+                    while ((line = reader.readLine()) != null) {
+                        if (line.strip().equals("quit")) break;
+                        try {
+                            var args = new Gson().fromJson(line, String[].class);
+                            if (args == null || args.length == 0) continue;
+                            state.execute(args);
+                        } catch (RuntimeException failure) {
+                            spec.commandLine().getErr().println("ERROR: " + failure.getMessage());
+                        }
+                    }
+                }
+                return 0;
+            } finally {
+                try {
+                    Runtime.getRuntime().removeShutdownHook(shutdown);
+                } catch (IllegalStateException shuttingDown) {
+                    /* The cancellation hook owns cleanup. */
+                }
+            }
         }
     }
 }

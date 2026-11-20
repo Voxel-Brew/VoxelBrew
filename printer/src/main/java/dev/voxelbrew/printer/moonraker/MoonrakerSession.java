@@ -18,6 +18,50 @@ final class MoonrakerSession implements DeviceTransport {
             HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     private final String base;
 
+    static OptionalDouble number(JsonObject object, String key) {
+        if (object == null || !object.has(key) || object.get(key).isJsonNull()) return OptionalDouble.empty();
+        double value = object.get(key).getAsDouble();
+        return Double.isFinite(value) ? OptionalDouble.of(value) : OptionalDouble.empty();
+    }
+
+    private static HttpRequest.BodyPublisher progress(HttpRequest.BodyPublisher source, DoubleConsumer progress) {
+        return new HttpRequest.BodyPublisher() {
+            @Override
+            public long contentLength() {
+                return source.contentLength();
+            }
+
+            @Override
+            public void subscribe(java.util.concurrent.Flow.Subscriber<? super java.nio.ByteBuffer> subscriber) {
+                source.subscribe(new java.util.concurrent.Flow.Subscriber<java.nio.ByteBuffer>() {
+                    private long sent;
+
+                    @Override
+                    public void onSubscribe(java.util.concurrent.Flow.Subscription subscription) {
+                        subscriber.onSubscribe(subscription);
+                    }
+
+                    @Override
+                    public void onNext(java.nio.ByteBuffer buffer) {
+                        sent += buffer.remaining();
+                        subscriber.onNext(buffer);
+                        if (contentLength() > 0) progress.accept(Math.min(1, (double) sent / contentLength()));
+                    }
+
+                    @Override
+                    public void onError(Throwable error) {
+                        subscriber.onError(error);
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        subscriber.onComplete();
+                    }
+                });
+            }
+        };
+    }
+
     MoonrakerSession(Connection device) {
         this.device = device;
         base = device.address().replaceAll("/+$", "");
@@ -75,12 +119,6 @@ final class MoonrakerSession implements DeviceTransport {
                 state);
     }
 
-    static OptionalDouble number(JsonObject object, String key) {
-        if (object == null || !object.has(key) || object.get(key).isJsonNull()) return OptionalDouble.empty();
-        double value = object.get(key).getAsDouble();
-        return Double.isFinite(value) ? OptionalDouble.of(value) : OptionalDouble.empty();
-    }
-
     @Override
     public Upload upload(Path artifact, DoubleConsumer progress) throws IOException {
         if (!artifact.toString().endsWith(".gcode")) throw new IOException("Moonraker requires text G-code");
@@ -116,43 +154,5 @@ final class MoonrakerSession implements DeviceTransport {
     @Override
     public void close() {
         client.shutdownNow();
-    }
-
-    private static HttpRequest.BodyPublisher progress(HttpRequest.BodyPublisher source, DoubleConsumer progress) {
-        return new HttpRequest.BodyPublisher() {
-            @Override
-            public long contentLength() {
-                return source.contentLength();
-            }
-
-            @Override
-            public void subscribe(java.util.concurrent.Flow.Subscriber<? super java.nio.ByteBuffer> subscriber) {
-                source.subscribe(new java.util.concurrent.Flow.Subscriber<java.nio.ByteBuffer>() {
-                    private long sent;
-
-                    @Override
-                    public void onSubscribe(java.util.concurrent.Flow.Subscription subscription) {
-                        subscriber.onSubscribe(subscription);
-                    }
-
-                    @Override
-                    public void onNext(java.nio.ByteBuffer buffer) {
-                        sent += buffer.remaining();
-                        subscriber.onNext(buffer);
-                        if (contentLength() > 0) progress.accept(Math.min(1, (double) sent / contentLength()));
-                    }
-
-                    @Override
-                    public void onError(Throwable error) {
-                        subscriber.onError(error);
-                    }
-
-                    @Override
-                    public void onComplete() {
-                        subscriber.onComplete();
-                    }
-                });
-            }
-        };
     }
 }

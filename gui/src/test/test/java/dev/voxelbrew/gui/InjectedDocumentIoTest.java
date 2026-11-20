@@ -13,10 +13,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class InjectedDocumentIoTest {
+    private final Queue<Runnable> callbacks = new ConcurrentLinkedQueue<>();
+
     @TempDir
     Path directory;
-
-    private final Queue<Runnable> callbacks = new ConcurrentLinkedQueue<>();
 
     @Test
     void importRunsOnFileWorkerShowsDialogOnOwnerThreadAndKeepsDocumentOnCancelOrFailure() throws Exception {

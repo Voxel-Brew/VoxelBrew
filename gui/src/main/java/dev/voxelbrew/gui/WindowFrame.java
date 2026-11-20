@@ -37,6 +37,54 @@ final class WindowFrame extends BorderPane {
     private int resizeEdges;
     private boolean moving, expanded;
 
+    private static double intersection(Rectangle2D a, Rectangle2D b) {
+        return Math.max(0, Math.min(a.getMaxX(), b.getMaxX()) - Math.max(a.getMinX(), b.getMinX()))
+                * Math.max(0, Math.min(a.getMaxY(), b.getMaxY()) - Math.max(a.getMinY(), b.getMinY()));
+    }
+
+    private static Cursor resizeCursor(int edges) {
+        return switch (edges) {
+            case LEFT -> Cursor.W_RESIZE;
+            case RIGHT -> Cursor.E_RESIZE;
+            case TOP -> Cursor.N_RESIZE;
+            case BOTTOM -> Cursor.S_RESIZE;
+            case TOP | LEFT -> Cursor.NW_RESIZE;
+            case TOP | RIGHT -> Cursor.NE_RESIZE;
+            case BOTTOM | LEFT -> Cursor.SW_RESIZE;
+            case BOTTOM | RIGHT -> Cursor.SE_RESIZE;
+            default -> Cursor.DEFAULT;
+        };
+    }
+
+    static Rectangle2D resize(
+            Rectangle2D start,
+            int edges,
+            double dx,
+            double dy,
+            double minWidth,
+            double minHeight,
+            double maxWidth,
+            double maxHeight) {
+        double width = Math.clamp(
+                start.getWidth() + ((edges & LEFT) != 0 ? -dx : (edges & RIGHT) != 0 ? dx : 0), minWidth, maxWidth);
+        double height = Math.clamp(
+                start.getHeight() + ((edges & TOP) != 0 ? -dy : (edges & BOTTOM) != 0 ? dy : 0), minHeight, maxHeight);
+        return new Rectangle2D(
+                (edges & LEFT) != 0 ? start.getMaxX() - width : start.getMinX(),
+                (edges & TOP) != 0 ? start.getMaxY() - height : start.getMinY(),
+                width,
+                height);
+    }
+
+    static Parent content(Scene scene) {
+        return scene.getRoot() instanceof WindowFrame frame ? (Parent) frame.getCenter() : scene.getRoot();
+    }
+
+    static void content(Scene scene, Parent content) {
+        if (scene.getRoot() instanceof WindowFrame frame) frame.setCenter(content);
+        else scene.setRoot(content);
+    }
+
     WindowFrame(Stage stage, HBox header, Parent content, Translations translations) {
         this.stage = stage;
         this.translations = translations;
@@ -154,11 +202,6 @@ final class WindowFrame extends BorderPane {
         updateMaximize();
     }
 
-    private static double intersection(Rectangle2D a, Rectangle2D b) {
-        return Math.max(0, Math.min(a.getMaxX(), b.getMaxX()) - Math.max(a.getMinX(), b.getMinX()))
-                * Math.max(0, Math.min(a.getMaxY(), b.getMaxY()) - Math.max(a.getMinY(), b.getMinY()));
-    }
-
     private void restore() {
         expanded = false;
         stage.setMaximized(false);
@@ -223,53 +266,10 @@ final class WindowFrame extends BorderPane {
         return (x < 6 ? LEFT : x > getWidth() - 6 ? RIGHT : 0) | (y < 6 ? TOP : y > getHeight() - 6 ? BOTTOM : 0);
     }
 
-    private static Cursor resizeCursor(int edges) {
-        return switch (edges) {
-            case LEFT -> Cursor.W_RESIZE;
-            case RIGHT -> Cursor.E_RESIZE;
-            case TOP -> Cursor.N_RESIZE;
-            case BOTTOM -> Cursor.S_RESIZE;
-            case TOP | LEFT -> Cursor.NW_RESIZE;
-            case TOP | RIGHT -> Cursor.NE_RESIZE;
-            case BOTTOM | LEFT -> Cursor.SW_RESIZE;
-            case BOTTOM | RIGHT -> Cursor.SE_RESIZE;
-            default -> Cursor.DEFAULT;
-        };
-    }
-
-    static Rectangle2D resize(
-            Rectangle2D start,
-            int edges,
-            double dx,
-            double dy,
-            double minWidth,
-            double minHeight,
-            double maxWidth,
-            double maxHeight) {
-        double width = Math.clamp(
-                start.getWidth() + ((edges & LEFT) != 0 ? -dx : (edges & RIGHT) != 0 ? dx : 0), minWidth, maxWidth);
-        double height = Math.clamp(
-                start.getHeight() + ((edges & TOP) != 0 ? -dy : (edges & BOTTOM) != 0 ? dy : 0), minHeight, maxHeight);
-        return new Rectangle2D(
-                (edges & LEFT) != 0 ? start.getMaxX() - width : start.getMinX(),
-                (edges & TOP) != 0 ? start.getMaxY() - height : start.getMinY(),
-                width,
-                height);
-    }
-
-    static Parent content(Scene scene) {
-        return scene.getRoot() instanceof WindowFrame frame ? (Parent) frame.getCenter() : scene.getRoot();
-    }
-
     void close() {
         stage.maximizedProperty().removeListener(windowState);
         stage.fullScreenProperty().removeListener(windowState);
         stage.resizableProperty().removeListener(windowState);
         stage.focusedProperty().removeListener(windowFocus);
-    }
-
-    static void content(Scene scene, Parent content) {
-        if (scene.getRoot() instanceof WindowFrame frame) frame.setCenter(content);
-        else scene.setRoot(content);
     }
 }

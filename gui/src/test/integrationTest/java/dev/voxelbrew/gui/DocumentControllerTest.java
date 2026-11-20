@@ -18,10 +18,30 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class DocumentControllerTest {
+    private final ConcurrentLinkedQueue<Runnable> callbacks = new ConcurrentLinkedQueue<>();
+
     @TempDir
     Path directory;
 
-    private final ConcurrentLinkedQueue<Runnable> callbacks = new ConcurrentLinkedQueue<>();
+    private static byte[] versionedDocument(
+            dev.voxelbrew.engine.persistence.proto.DocumentProto.Document document, String version) throws Exception {
+        byte[] payload =
+                document.toBuilder().setApplicationVersion(version).build().toByteArray();
+        return java.nio.ByteBuffer.allocate(44 + payload.length)
+                .put(new byte[] {'J', 'C', 'A', 'D', 13, 37, 13, 37})
+                .putInt(payload.length)
+                .put(java.security.MessageDigest.getInstance("SHA-256").digest(payload))
+                .put(payload)
+                .array();
+    }
+
+    private static Feature.Sketch sketch(String id, double z) {
+        return new Feature.Sketch(
+                id,
+                id + ".profile",
+                new Feature.Plane(z == 0 ? "origin-xy" : "offset", z),
+                new Feature.Rectangle(0, 0, 60, 40));
+    }
 
     @Test
     void selectedRegionPreviewCommitsAndReopensWithoutChangingSketch() throws Exception {
@@ -127,18 +147,6 @@ class DocumentControllerTest {
         }
     }
 
-    private static byte[] versionedDocument(
-            dev.voxelbrew.engine.persistence.proto.DocumentProto.Document document, String version) throws Exception {
-        byte[] payload =
-                document.toBuilder().setApplicationVersion(version).build().toByteArray();
-        return java.nio.ByteBuffer.allocate(44 + payload.length)
-                .put(new byte[] {'J', 'C', 'A', 'D', 13, 37, 13, 37})
-                .putInt(payload.length)
-                .put(java.security.MessageDigest.getInstance("SHA-256").digest(payload))
-                .put(payload)
-                .array();
-    }
-
     @Test
     void bodyStylesDirtySaveUndoAndRejectStaleOrInactiveSelections() throws Exception {
         try (var controller = new DocumentController(callbacks::add)) {
@@ -213,14 +221,6 @@ class DocumentControllerTest {
                     .isTrue();
             assertThat(Files.readString(source)).isEqualTo("60,40,4");
         }
-    }
-
-    private static Feature.Sketch sketch(String id, double z) {
-        return new Feature.Sketch(
-                id,
-                id + ".profile",
-                new Feature.Plane(z == 0 ? "origin-xy" : "offset", z),
-                new Feature.Rectangle(0, 0, 60, 40));
     }
 
     private void await(BooleanSupplier condition) throws Exception {

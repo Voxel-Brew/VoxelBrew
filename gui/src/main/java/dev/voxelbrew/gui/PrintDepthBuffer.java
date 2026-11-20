@@ -4,13 +4,33 @@ import java.util.Arrays;
 
 /** Orthographic placement raster with shared surface visibility for faces, edges and picking. */
 final class PrintDepthBuffer {
-    record Point(double x, double y, double depth) {}
-
     private final int width, height;
+
     private final double strokeScale;
     private final int[] pixels, owners, surfaces, edgeColors;
     private final double[] depths, tolerances, edgeDepths;
     private final double[] edgeCoverage;
+
+    record Point(double x, double y, double depth) {}
+
+    private static int blend(int foreground, int background, double coverage) {
+        double foregroundAlpha = (foreground >>> 24) / 255.0 * coverage;
+        double backgroundAlpha = (background >>> 24) / 255.0 * (1 - foregroundAlpha);
+        double alpha = foregroundAlpha + backgroundAlpha;
+        if (alpha == 0) return 0;
+        int result = (int) Math.round(alpha * 255) << 24;
+        for (int shift : new int[] {16, 8, 0}) {
+            int channel = (int) Math.round((((foreground >>> shift) & 255) * foregroundAlpha
+                            + ((background >>> shift) & 255) * backgroundAlpha)
+                    / alpha);
+            result |= channel << shift;
+        }
+        return result;
+    }
+
+    private static double cross(Point a, Point b, double x, double y) {
+        return (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
+    }
 
     PrintDepthBuffer(int width, int height) {
         this(width, height, 1);
@@ -98,24 +118,5 @@ final class PrintDepthBuffer {
                 }
             }
         }
-    }
-
-    private static int blend(int foreground, int background, double coverage) {
-        double foregroundAlpha = (foreground >>> 24) / 255.0 * coverage;
-        double backgroundAlpha = (background >>> 24) / 255.0 * (1 - foregroundAlpha);
-        double alpha = foregroundAlpha + backgroundAlpha;
-        if (alpha == 0) return 0;
-        int result = (int) Math.round(alpha * 255) << 24;
-        for (int shift : new int[] {16, 8, 0}) {
-            int channel = (int) Math.round((((foreground >>> shift) & 255) * foregroundAlpha
-                            + ((background >>> shift) & 255) * backgroundAlpha)
-                    / alpha);
-            result |= channel << shift;
-        }
-        return result;
-    }
-
-    private static double cross(Point a, Point b, double x, double y) {
-        return (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
     }
 }

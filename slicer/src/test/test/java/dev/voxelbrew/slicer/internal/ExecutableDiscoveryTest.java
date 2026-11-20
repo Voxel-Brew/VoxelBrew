@@ -16,6 +16,14 @@ class ExecutableDiscoveryTest {
     @TempDir
     Path directory;
 
+    private static Path executable(Path path) throws IOException {
+        Files.createDirectories(path.getParent());
+        Files.writeString(path, "This is not a runnable program");
+        if (Files.getFileStore(path).supportsFileAttributeView("posix"))
+            Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rwx------"));
+        return path;
+    }
+
     @Test
     void findsMultipleVersionsAndDeduplicatesPathsWithoutExecuting() throws IOException {
         var bin = Files.createDirectory(directory.resolve("bin"));
@@ -51,13 +59,5 @@ class ExecutableDiscoveryTest {
                         List.of(),
                         cancellation))
                 .isInstanceOf(CancellationException.class);
-    }
-
-    private static Path executable(Path path) throws IOException {
-        Files.createDirectories(path.getParent());
-        Files.writeString(path, "This is not a runnable program");
-        if (Files.getFileStore(path).supportsFileAttributeView("posix"))
-            Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rwx------"));
-        return path;
     }
 }

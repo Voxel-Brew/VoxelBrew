@@ -12,13 +12,37 @@ import lombok.extern.slf4j.Slf4j;
 /** Discovers classpath and installed slicers and owns their plugin class loaders. */
 @Slf4j
 public final class SlicerRegistry implements SlicerProviderRegistry {
-    private record Entry(SlicerDescriptor descriptor, SlicerProvider provider) {}
-
     private final ClassLoader parent = SlicerRegistry.class.getClassLoader();
+
     private final Map<String, Entry> builtIns = new LinkedHashMap<>();
     private final List<URLClassLoader> loaders = new ArrayList<>();
     private Map<String, Entry> entries;
     private boolean closed;
+
+    private record Entry(SlicerDescriptor descriptor, SlicerProvider provider) {}
+
+    private static void discover(Map<String, Entry> entries, ClassLoader loader, boolean installedOnly) {
+        var iterator = ServiceLoader.load(SlicerProvider.class, loader).stream().iterator();
+        int failures = 0;
+        while (true) {
+            try {
+                if (!iterator.hasNext()) return;
+                var candidate = iterator.next();
+                if (!installedOnly || candidate.type().getClassLoader() == loader) register(entries, candidate.get());
+                failures = 0;
+            } catch (ServiceConfigurationError | LinkageError | RuntimeException | AssertionError failure) {
+                log.warn("Slicer provider failed to load", failure);
+                if (++failures >= 100) return;
+            }
+        }
+    }
+
+    private static void register(Map<String, Entry> entries, SlicerProvider provider) {
+        var descriptor = Objects.requireNonNull(provider.descriptor(), "descriptor");
+        if (entries.putIfAbsent(descriptor.id(), new Entry(descriptor, provider)) != null)
+            log.warn("Duplicate slicer ID: {}", descriptor.id());
+        else log.info("Loaded slicer {} ({}) version {}", descriptor.name(), descriptor.id(), descriptor.version());
+    }
 
     public SlicerRegistry() {
         this(List.of());
@@ -62,29 +86,6 @@ public final class SlicerRegistry implements SlicerProviderRegistry {
         }
         entries = Map.copyOf(discovered);
         return this;
-    }
-
-    private static void discover(Map<String, Entry> entries, ClassLoader loader, boolean installedOnly) {
-        var iterator = ServiceLoader.load(SlicerProvider.class, loader).stream().iterator();
-        int failures = 0;
-        while (true) {
-            try {
-                if (!iterator.hasNext()) return;
-                var candidate = iterator.next();
-                if (!installedOnly || candidate.type().getClassLoader() == loader) register(entries, candidate.get());
-                failures = 0;
-            } catch (ServiceConfigurationError | LinkageError | RuntimeException | AssertionError failure) {
-                log.warn("Slicer provider failed to load", failure);
-                if (++failures >= 100) return;
-            }
-        }
-    }
-
-    private static void register(Map<String, Entry> entries, SlicerProvider provider) {
-        var descriptor = Objects.requireNonNull(provider.descriptor(), "descriptor");
-        if (entries.putIfAbsent(descriptor.id(), new Entry(descriptor, provider)) != null)
-            log.warn("Duplicate slicer ID: {}", descriptor.id());
-        else log.info("Loaded slicer {} ({}) version {}", descriptor.name(), descriptor.id(), descriptor.version());
     }
 
     @Override

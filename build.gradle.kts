@@ -2,7 +2,7 @@ import com.diffplug.spotless.LineEnding
 import com.github.spotbugs.snom.SpotBugsTask
 
 plugins {
-    base
+    `java-base`
     id("com.diffplug.spotless") version "8.11.0"
     id("dev.voxelbrew.spotbugs") apply false
 }
@@ -60,7 +60,7 @@ spotless {
     java {
         target(
             sourceProjects.map { "$it/src/**/java/**/*.java" } +
-                listOf("fixtures/updater/*.java", "scripts/*.java")
+                listOf("fixtures/updater/*.java", "scripts/*.java", "gradle/JavaMemberOrder.java")
         )
         palantirJavaFormat("2.103.0")
         trimTrailingWhitespace()
@@ -282,9 +282,26 @@ configure(libraryProjects) {
     }
 }
 
+val javaMemberOrderLauncher =
+    extensions.getByType<JavaToolchainService>().launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+
+val checkJavaMemberOrder by
+    tasks.registering(JavaExec::class) {
+        group = "verification"
+        description = "Check Java member declaration order."
+        javaLauncher.set(javaMemberOrderLauncher)
+        mainClass.set(layout.projectDirectory.file("gradle/JavaMemberOrder.java").asFile.path)
+        args(sourceProjects.map { "$it/src" } + listOf("fixtures/updater", "scripts", "gradle"))
+    }
+
+tasks.named("check") { dependsOn(checkJavaMemberOrder) }
+
 tasks.register("basicChecks") {
     group = "verification"
-    description = "Run SpotBugs on application production code."
+    description = "Check Java member order and run SpotBugs on production code."
+    dependsOn(checkJavaMemberOrder)
     dependsOn(libraryProjects.map { "${it.path}:spotbugsMain" })
 }
 
@@ -306,7 +323,11 @@ val workflowTest by
 val testCleanupTest by
     tasks.registering(Exec::class) {
         group = "verification"
-        description = "Verify test workspace cleanup and updater status polling."
+        description = "Run tests for the Python build and verification scripts."
+        environment(
+            "VOXELBREW_MEMBER_ORDER_JAVA",
+            javaMemberOrderLauncher.get().executablePath.asFile.path,
+        )
         commandLine(
             if (formatterWindows) "python" else "python3",
             "-m",

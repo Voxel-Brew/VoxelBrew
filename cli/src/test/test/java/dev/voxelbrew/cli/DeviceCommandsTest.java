@@ -15,10 +15,11 @@ import org.junit.jupiter.api.io.TempDir;
 import picocli.CommandLine;
 
 class DeviceCommandsTest {
+    final List<Printer> saved = new ArrayList<>();
+
     @TempDir
     Path directory;
 
-    final List<Printer> saved = new ArrayList<>();
     String output;
     int statusCalls;
     DriverStatus printerStatus = DriverStatus.unknown("offline");

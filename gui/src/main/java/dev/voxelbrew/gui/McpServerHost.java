@@ -19,13 +19,19 @@ final class McpServerHost implements AutoCloseable {
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final McpAutomation automation;
+    private final Deque<Map<String, Object>> activity = new ArrayDeque<>();
     private Server http;
     private McpSyncServer mcp;
     private volatile String token = token();
     private java.nio.file.Path credentialFile;
     private volatile int port;
     private volatile int historyLimit = 100;
-    private final Deque<Map<String, Object>> activity = new ArrayDeque<>();
+
+    private static String token() {
+        var bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
 
     McpServerHost(McpAutomation automation) {
         this.automation = automation;
@@ -221,12 +227,6 @@ final class McpServerHost implements AutoCloseable {
         }
         token = replacement;
         close();
-    }
-
-    private static String token() {
-        var bytes = new byte[32];
-        RANDOM.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     @Override

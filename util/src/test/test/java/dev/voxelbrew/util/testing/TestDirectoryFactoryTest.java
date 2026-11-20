@@ -18,6 +18,22 @@ import org.junit.platform.testkit.engine.EngineTestKit;
 class TestDirectoryFactoryTest {
     private static final List<Path> paths = CleanupExample.paths;
 
+    public static class DeniedFactory extends TestDirectoryFactory {
+        static final List<DeniedFactory> instances = new ArrayList<>();
+        static boolean deny;
+
+        public DeniedFactory() {
+            instances.add(this);
+        }
+
+        @Override
+        protected void delete(Path path) throws IOException {
+            if (deny && path.getFileName().toString().equals("locked.txt"))
+                throw new IOException("Simulated locked test file");
+            super.delete(path);
+        }
+    }
+
     @Test
     void junitCleansBothSuccessfulAndFailedTestsWithoutChangingTheirResults() {
         paths.clear();
@@ -75,21 +91,5 @@ class TestDirectoryFactoryTest {
         }
         for (Path path : paths)
             assertThat(Files.exists(path)).as(path.toString()).isFalse();
-    }
-
-    public static class DeniedFactory extends TestDirectoryFactory {
-        static boolean deny;
-        static final List<DeniedFactory> instances = new ArrayList<>();
-
-        public DeniedFactory() {
-            instances.add(this);
-        }
-
-        @Override
-        protected void delete(Path path) throws IOException {
-            if (deny && path.getFileName().toString().equals("locked.txt"))
-                throw new IOException("Simulated locked test file");
-            super.delete(path);
-        }
     }
 }

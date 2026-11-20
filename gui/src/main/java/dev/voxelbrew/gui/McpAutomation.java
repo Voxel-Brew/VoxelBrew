@@ -11,16 +11,32 @@ import javafx.application.Platform;
 /** All access to the live window is confined to its JavaFX owner thread. */
 final class McpAutomation {
     private final DocumentController document;
-    private BooleanSupplier busy;
     private final Gson json = new Gson();
     private final java.util.function.Consumer<Runnable> dispatch;
+    private BooleanSupplier busy;
+
+    private static String text(Map<String, Object> args, String key) {
+        if (!(args.get(key) instanceof String value) || value.isBlank())
+            throw new IllegalArgumentException("Missing " + key);
+        return value;
+    }
+
+    private static Number number(Map<String, Object> args, String key) {
+        if (!(args.get(key) instanceof Number value) || !Double.isFinite(value.doubleValue()))
+            throw new IllegalArgumentException("Invalid " + key);
+        return value;
+    }
+
+    private static long integer(Map<String, Object> args, String key) {
+        try {
+            return new java.math.BigDecimal(number(args, key).toString()).longValueExact();
+        } catch (ArithmeticException failure) {
+            throw new IllegalArgumentException("Invalid integer " + key, failure);
+        }
+    }
 
     McpAutomation(DocumentController document, java.util.function.Consumer<Runnable> dispatch) {
         this(document, () -> true, dispatch);
-    }
-
-    void busy(BooleanSupplier value) {
-        busy = value;
     }
 
     McpAutomation(DocumentController document, BooleanSupplier busy) {
@@ -31,6 +47,10 @@ final class McpAutomation {
         this.document = document;
         this.busy = busy;
         this.dispatch = dispatch;
+    }
+
+    void busy(BooleanSupplier value) {
+        busy = value;
     }
 
     CompletableFuture<Map<String, Object>> call(String name, Map<String, Object> args) {
@@ -143,25 +163,5 @@ final class McpAutomation {
         state.put("diagnostics", document.build().diagnostics());
         state.put("error", document.error());
         return state;
-    }
-
-    private static String text(Map<String, Object> args, String key) {
-        if (!(args.get(key) instanceof String value) || value.isBlank())
-            throw new IllegalArgumentException("Missing " + key);
-        return value;
-    }
-
-    private static Number number(Map<String, Object> args, String key) {
-        if (!(args.get(key) instanceof Number value) || !Double.isFinite(value.doubleValue()))
-            throw new IllegalArgumentException("Invalid " + key);
-        return value;
-    }
-
-    private static long integer(Map<String, Object> args, String key) {
-        try {
-            return new java.math.BigDecimal(number(args, key).toString()).longValueExact();
-        } catch (ArithmeticException failure) {
-            throw new IllegalArgumentException("Invalid integer " + key, failure);
-        }
     }
 }

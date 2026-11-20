@@ -20,34 +20,6 @@ public class BundledSlicers {
             new Bundle("35c9a5d1-6c00-44cc-9e4b-2caa6b02ff8b", "prusa-slicer", "PrusaSlicer", "2.7.2"),
             new Bundle("f5893e13-b7d8-45bc-92c4-73ff47be535f", "orca", "OrcaSlicer", "2.5.0"));
 
-    public static boolean reserved(UUID id) {
-        return BUNDLES.stream().anyMatch(bundle -> bundle.id().equals(id));
-    }
-
-    public static List<SlicerInstallation> installations() {
-        if (PLATFORM.isEmpty()) return List.of();
-        return BUNDLES.stream()
-                .filter(bundle -> BundledSlicers.class.getResource(bundle.descriptor()) != null)
-                .map(bundle -> new SlicerInstallation(
-                        bundle.id(), bundle.provider(), bundle.name(), bundle.version(), "", Map.of()))
-                .toList();
-    }
-
-    static String platform(String os, String architecture) {
-        boolean x64 = Set.of("amd64", "x86_64").contains(architecture);
-        if (os.startsWith("Mac") && (x64 || Set.of("arm64", "aarch64").contains(architecture))) return "macos";
-        if (x64 && os.startsWith("Windows")) return "windows";
-        if (x64 && os.equals("Linux")) return "linux";
-        return "";
-    }
-
-    public static SlicerWindow window(UUID id) {
-        return new Window(BUNDLES.stream()
-                .filter(bundle -> bundle.id().equals(id))
-                .findFirst()
-                .orElseThrow());
-    }
-
     public static final class Window implements SlicerWindow {
         private final Bundle bundle;
 
@@ -101,6 +73,44 @@ public class BundledSlicers {
         }
     }
 
+    private record Bundle(UUID id, String provider, String name, String version) {
+        private Bundle(String id, String provider, String name, String version) {
+            this(UUID.fromString(id), provider, name, version);
+        }
+
+        private String descriptor() {
+            return RESOURCES + provider + ".properties";
+        }
+    }
+
+    public static boolean reserved(UUID id) {
+        return BUNDLES.stream().anyMatch(bundle -> bundle.id().equals(id));
+    }
+
+    public static List<SlicerInstallation> installations() {
+        if (PLATFORM.isEmpty()) return List.of();
+        return BUNDLES.stream()
+                .filter(bundle -> BundledSlicers.class.getResource(bundle.descriptor()) != null)
+                .map(bundle -> new SlicerInstallation(
+                        bundle.id(), bundle.provider(), bundle.name(), bundle.version(), "", Map.of()))
+                .toList();
+    }
+
+    static String platform(String os, String architecture) {
+        boolean x64 = Set.of("amd64", "x86_64").contains(architecture);
+        if (os.startsWith("Mac") && (x64 || Set.of("arm64", "aarch64").contains(architecture))) return "macos";
+        if (x64 && os.startsWith("Windows")) return "windows";
+        if (x64 && os.equals("Linux")) return "linux";
+        return "";
+    }
+
+    public static SlicerWindow window(UUID id) {
+        return new Window(BUNDLES.stream()
+                .filter(bundle -> bundle.id().equals(id))
+                .findFirst()
+                .orElseThrow());
+    }
+
     private static void unzip(InputStream payload, Path destination, Cancellation cancellation)
             throws IOException, SlicerException.Configuration {
         try (var zip = new ZipInputStream(new BufferedInputStream(payload))) {
@@ -135,15 +145,5 @@ public class BundledSlicers {
             }
         }
         return target;
-    }
-
-    private record Bundle(UUID id, String provider, String name, String version) {
-        private Bundle(String id, String provider, String name, String version) {
-            this(UUID.fromString(id), provider, name, version);
-        }
-
-        private String descriptor() {
-            return RESOURCES + provider + ".properties";
-        }
     }
 }

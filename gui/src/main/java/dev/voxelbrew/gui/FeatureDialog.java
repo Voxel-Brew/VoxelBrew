@@ -13,8 +13,6 @@ import javafx.stage.Window;
 
 /** The installed provider's descriptor defines the entire creation form. */
 final class FeatureDialog {
-    private FeatureDialog() {}
-
     static Optional<Feature.Custom> show(
             Window owner,
             Path directory,
@@ -106,4 +104,6 @@ final class FeatureDialog {
             return Dialogs.show(dialog, owner, translations);
         }
     }
+
+    private FeatureDialog() {}
 }

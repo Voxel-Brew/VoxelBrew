@@ -64,8 +64,6 @@ final class NativeKernel {
         }
     }
 
-    private NativeKernel() {}
-
     static native String version();
 
     static native byte[] step(long[] bodies);
@@ -108,4 +106,6 @@ final class NativeKernel {
     static native int liveHandles();
 
     static native dev.voxelbrew.api.model.mesh.MeshData tessellate(long body, double chord, double angleRadians);
+
+    private NativeKernel() {}
 }

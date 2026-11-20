@@ -19,14 +19,14 @@ class FeatureProviderTest {
     @TempDir
     Path directory;
 
+    private static double expected(double height) {
+        return Math.PI * (100 - 4) * height;
+    }
+
     private Path plugins() throws Exception {
         var plugins = Files.createDirectory(directory.resolve("feature plugins with spaces"));
         Files.copy(Path.of(System.getProperty("voxelbrew.test.plugin")), plugins.resolve("external features.jar"));
         return plugins;
-    }
-
-    private static double expected(double height) {
-        return Math.PI * (100 - 4) * height;
     }
 
     private Path providers(String... names) throws Exception {

@@ -9,8 +9,6 @@ import java.util.List;
 
 /** Shared construction and editing operations; frontends never implement constraint equations. */
 public final class Sketches {
-    private Sketches() {}
-
     public static Entity entity(String id, Kind kind, boolean construction, double... values) {
         return new Entity(id, kind, java.util.Arrays.stream(values).boxed().toList(), construction);
     }
@@ -140,4 +138,6 @@ public final class Sketches {
         var ids = g.constraints().stream().map(Constraint::id).collect(java.util.stream.Collectors.toSet());
         for (int i = 0; ; i++) if (!ids.contains(prefix + "-" + i)) return prefix + "-" + i;
     }
+
+    private Sketches() {}
 }

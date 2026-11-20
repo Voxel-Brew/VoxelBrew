@@ -11,8 +11,6 @@ import javax.measure.Quantity;
 
 /** Persistent text formulas share the existing parameter binding schema and stable entity IDs. */
 public final class FeatureText {
-    private FeatureText() {}
-
     public record Field(ParameterSet.Target target, String value) {}
 
     public static String key(String entityId, String property) {
@@ -126,4 +124,6 @@ public final class FeatureText {
                         expression,
                         name -> name.startsWith("vb.") ? parameters.builtins().value(name) : values.get(name));
     }
+
+    private FeatureText() {}
 }

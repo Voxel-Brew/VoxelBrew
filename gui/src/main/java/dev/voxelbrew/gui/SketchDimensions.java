@@ -7,8 +7,6 @@ import java.util.List;
 
 /** Infers a driving measurement from the selected references and annotation placement. */
 final class SketchDimensions {
-    private SketchDimensions() {}
-
     record Measurement(Type type, double value) {}
 
     static List<Ref> references(SketchGeometry g, List<Ref> refs) {
@@ -57,4 +55,6 @@ final class SketchDimensions {
         }
         throw new IllegalArgumentException("Unsupported dimension selection");
     }
+
+    private SketchDimensions() {}
 }

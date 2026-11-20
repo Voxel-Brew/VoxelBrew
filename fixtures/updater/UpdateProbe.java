@@ -3,8 +3,6 @@ import java.nio.file.*;
 
 /** Fresh-process package acceptance: uses installed utilities and the bundled JVM. */
 public final class UpdateProbe {
-    private UpdateProbe() {}
-
     @SuppressWarnings("try")
     public static void main(String[] args) throws Exception {
         var component = ApplicationImage.Component.valueOf(args[0]);
@@ -83,4 +81,6 @@ public final class UpdateProbe {
             throw new IllegalStateException("Packaged document did not round-trip");
         System.out.println("DOCUMENT_VERSION_PASS " + expectedVersion);
     }
+
+    private UpdateProbe() {}
 }

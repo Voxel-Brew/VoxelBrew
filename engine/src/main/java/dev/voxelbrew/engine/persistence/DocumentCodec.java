@@ -30,8 +30,6 @@ public final class DocumentCodec {
 
     public static final int MAX_ENCODED_BYTES = MAX_PAYLOAD + HEADER;
 
-    private DocumentCodec() {}
-
     public static CadDocument decode(byte[] bytes) throws IOException {
         int size = bytes.length;
         if (size < HEADER || size > MAX_PAYLOAD + HEADER) {
@@ -711,4 +709,6 @@ public final class DocumentCodec {
             throw new AssertionError(impossible);
         }
     }
+
+    private DocumentCodec() {}
 }

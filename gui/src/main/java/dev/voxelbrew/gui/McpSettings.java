@@ -7,16 +7,6 @@ import java.util.Set;
 
 /** Persistent, CAD-independent preferences for the embedded listener. */
 record McpSettings(boolean autoStart, int port, int maxConnections, int idleTimeoutMinutes, int activityHistorySize) {
-    McpSettings {
-        if (port != 0 && (port < 1024 || port > 65535))
-            throw new IllegalArgumentException("Port must be 0 or 1024–65535");
-        if (maxConnections < 1 || maxConnections > 16) throw new IllegalArgumentException("Connections must be 1–16");
-        if (idleTimeoutMinutes < 1 || idleTimeoutMinutes > 120)
-            throw new IllegalArgumentException("Idle timeout must be 1–120 minutes");
-        if (activityHistorySize < 10 || activityHistorySize > 1000)
-            throw new IllegalArgumentException("History size must be 10–1000");
-    }
-
     static McpSettings load(UserConfiguration store) throws IOException {
         var values = store.read();
         String auto = values.getOrDefault("mcp.autoStart", "false");
@@ -31,6 +21,16 @@ record McpSettings(boolean autoStart, int port, int maxConnections, int idleTime
 
     private static int number(Map<String, String> values, String key, int fallback) {
         return Integer.parseInt(values.getOrDefault("mcp." + key, Integer.toString(fallback)));
+    }
+
+    McpSettings {
+        if (port != 0 && (port < 1024 || port > 65535))
+            throw new IllegalArgumentException("Port must be 0 or 1024–65535");
+        if (maxConnections < 1 || maxConnections > 16) throw new IllegalArgumentException("Connections must be 1–16");
+        if (idleTimeoutMinutes < 1 || idleTimeoutMinutes > 120)
+            throw new IllegalArgumentException("Idle timeout must be 1–120 minutes");
+        if (activityHistorySize < 10 || activityHistorySize > 1000)
+            throw new IllegalArgumentException("History size must be 10–1000");
     }
 
     void save(UserConfiguration store) throws IOException {

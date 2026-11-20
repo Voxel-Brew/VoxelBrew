@@ -9,8 +9,6 @@ import javafx.scene.image.PixelFormat;
 import javax.imageio.ImageIO;
 
 final class Screenshot {
-    private Screenshot() {}
-
     static void save(Scene scene, Path path) throws IOException {
         var snapshot = scene.snapshot(null);
         int width = (int) snapshot.getWidth(), height = (int) snapshot.getHeight();
@@ -23,4 +21,6 @@ final class Screenshot {
         Files.createDirectories(parent);
         ImageIO.write(image, "png", path.toFile());
     }
+
+    private Screenshot() {}
 }

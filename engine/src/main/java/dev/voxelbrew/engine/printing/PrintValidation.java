@@ -28,8 +28,6 @@ public final class PrintValidation {
         }
     }
 
-    private PrintValidation() {}
-
     private record Placement(Area footprint, Bounds bounds) {}
 
     public static Result validate(ManufacturingModel model) {
@@ -133,4 +131,6 @@ public final class PrintValidation {
                 diagnostics.add(new Diagnostic(id, "EXCLUDED_ZONE", "Footprint enters an excluded zone"));
         }
     }
+
+    private PrintValidation() {}
 }

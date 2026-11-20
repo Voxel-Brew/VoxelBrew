@@ -14,9 +14,8 @@ import javafx.stage.Popup;
 
 /** Non-modal completion: typing remains in the field; accepting a name never applies its value. */
 final class ParameterSuggestions {
-    record Reference(int start, int end, String prefix) {}
-
     private final FormulaField field;
+
     private final Supplier<ParameterSet> parameters;
     private final Supplier<Translations> translations;
     private Popup popup;
@@ -24,6 +23,47 @@ final class ParameterSuggestions {
     private VBox content;
     private Label heading, hint, empty;
     private boolean queued, changing, dismissed;
+
+    record Reference(int start, int end, String prefix) {}
+
+    static List<String> matches(ParameterSet parameters, String prefix) {
+        return matches(parameters, prefix, FormulaField.ExpressionType.STRING);
+    }
+
+    static List<String> matches(ParameterSet parameters, String prefix, FormulaField.ExpressionType type) {
+        return parameters.allParameters().stream()
+                .map(ParameterSet.Parameter::name)
+                .filter(name -> type == FormulaField.ExpressionType.STRING || !BuiltinParameters.isString(name))
+                .filter(name -> name.startsWith(prefix))
+                .sorted()
+                .toList();
+    }
+
+    static Reference reference(String text, int caret) {
+        if (caret < 0 || caret > text.length()) return null;
+        int start = caret;
+        while (start > 0 && identifier(text.charAt(start - 1))) start--;
+        if (start == 0 || text.charAt(start - 1) != '$') return null;
+        if (start < caret && !asciiLetter(text.charAt(start))) return null;
+        boolean quoted = false;
+        for (int i = 0; i < start - 1; i++) {
+            if (text.charAt(i) != '"') continue;
+            if (quoted && i + 1 < start - 1 && text.charAt(i + 1) == '"') i++;
+            else quoted = !quoted;
+        }
+        if (quoted) return null;
+        int end = caret;
+        while (end < text.length() && identifier(text.charAt(end))) end++;
+        return new Reference(start - 1, end, text.substring(start, caret));
+    }
+
+    private static boolean asciiLetter(char c) {
+        return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z';
+    }
+
+    private static boolean identifier(char c) {
+        return asciiLetter(c) || c >= '0' && c <= '9' || c == '_' || c == '.';
+    }
 
     ParameterSuggestions(FormulaField field, Supplier<ParameterSet> parameters, Supplier<Translations> translations) {
         this.field = field;
@@ -190,44 +230,5 @@ final class ParameterSuggestions {
 
     private void hide() {
         if (popup != null) popup.hide();
-    }
-
-    static List<String> matches(ParameterSet parameters, String prefix) {
-        return matches(parameters, prefix, FormulaField.ExpressionType.STRING);
-    }
-
-    static List<String> matches(ParameterSet parameters, String prefix, FormulaField.ExpressionType type) {
-        return parameters.allParameters().stream()
-                .map(ParameterSet.Parameter::name)
-                .filter(name -> type == FormulaField.ExpressionType.STRING || !BuiltinParameters.isString(name))
-                .filter(name -> name.startsWith(prefix))
-                .sorted()
-                .toList();
-    }
-
-    static Reference reference(String text, int caret) {
-        if (caret < 0 || caret > text.length()) return null;
-        int start = caret;
-        while (start > 0 && identifier(text.charAt(start - 1))) start--;
-        if (start == 0 || text.charAt(start - 1) != '$') return null;
-        if (start < caret && !asciiLetter(text.charAt(start))) return null;
-        boolean quoted = false;
-        for (int i = 0; i < start - 1; i++) {
-            if (text.charAt(i) != '"') continue;
-            if (quoted && i + 1 < start - 1 && text.charAt(i + 1) == '"') i++;
-            else quoted = !quoted;
-        }
-        if (quoted) return null;
-        int end = caret;
-        while (end < text.length() && identifier(text.charAt(end))) end++;
-        return new Reference(start - 1, end, text.substring(start, caret));
-    }
-
-    private static boolean asciiLetter(char c) {
-        return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z';
-    }
-
-    private static boolean identifier(char c) {
-        return asciiLetter(c) || c >= '0' && c <= '9' || c == '_' || c == '.';
     }
 }

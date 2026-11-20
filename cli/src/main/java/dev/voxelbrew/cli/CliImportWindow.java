@@ -13,6 +13,17 @@ final class CliImportWindow implements ImportWindow {
     private final Path source;
     private final Map<String, String> options;
 
+    private static void collect(Component component, Map<String, Input> inputs) {
+        if (component instanceof Input input) {
+            if (inputs.putIfAbsent(input.id(), input) != null)
+                throw new IllegalArgumentException("Duplicate import input: " + input.id());
+        } else if (component instanceof HorizontalLayout layout) {
+            layout.children().forEach(child -> collect(child, inputs));
+        } else if (component instanceof VerticalLayout layout) {
+            layout.children().forEach(child -> collect(child, inputs));
+        }
+    }
+
     CliImportWindow(Path source, Map<String, String> options) {
         this.source = java.util.Objects.requireNonNull(source, "source");
         this.options = Map.copyOf(options);
@@ -40,16 +51,5 @@ final class CliImportWindow implements ImportWindow {
         var errors = dialog.validate(values);
         if (!errors.isEmpty()) throw new IllegalArgumentException("Invalid import inputs: " + errors);
         return Optional.of(dialog.buildSettings(values));
-    }
-
-    private static void collect(Component component, Map<String, Input> inputs) {
-        if (component instanceof Input input) {
-            if (inputs.putIfAbsent(input.id(), input) != null)
-                throw new IllegalArgumentException("Duplicate import input: " + input.id());
-        } else if (component instanceof HorizontalLayout layout) {
-            layout.children().forEach(child -> collect(child, inputs));
-        } else if (component instanceof VerticalLayout layout) {
-            layout.children().forEach(child -> collect(child, inputs));
-        }
     }
 }

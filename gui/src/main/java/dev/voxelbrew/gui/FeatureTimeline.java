@@ -48,6 +48,35 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
     private double dragStartX;
     private int dragStartPosition;
 
+    private static SVGPath path(String content, String style) {
+        var path = new SVGPath();
+        path.setContent(content);
+        path.getStyleClass().add(style);
+        path.setMouseTransparent(true);
+        return path;
+    }
+
+    private static Node featureIcon(Feature feature) {
+        if (feature instanceof dev.voxelbrew.api.model.ConstructionFeature construction)
+            return ConstructionIcons.icon(construction.tool());
+        if (feature instanceof Feature.Sketch)
+            return new Group(
+                    path("M2 4H15V17H2Z", "timeline-sketch-icon"),
+                    path("M7 18L8 14L17 5L20 8L11 17Z", "timeline-pencil-icon"));
+        var cube = new Group(
+                path("M2 6L10 2L18 6L10 10Z", "timeline-cube-top"),
+                path("M2 6L10 10V20L2 16Z", "timeline-cube-left"),
+                path("M10 10L18 6V16L10 20Z", "timeline-cube-right"));
+        if (feature instanceof Feature.Extrude)
+            cube.getChildren().add(path("M17 5L20 1L23 5H21V14H19V5Z", "timeline-extrude-icon"));
+        else if (feature instanceof Feature.ThroughCut)
+            cube.getChildren().add(path("M8 5L10 4L13 5L13 8L11 9L8 8Z M10 9V16", "timeline-cut-icon"));
+        else if (feature instanceof Feature.SplitBody)
+            cube.getChildren().add(path("M6 1L14 21", "timeline-split-icon"));
+        else cube.getChildren().add(path("M17 2V10 M13 6H21", "timeline-plugin-icon"));
+        return cube;
+    }
+
     FeatureTimeline(
             Translations translations,
             IntConsumer moveCursor,
@@ -353,35 +382,6 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
         double left = scroll.getHvalue() * overflow, x = INSET + position * STEP;
         if (x < left + 12) scroll.setHvalue(Math.max(0, (x - 12) / overflow));
         else if (x > left + viewport - 12) scroll.setHvalue(Math.min(1, (x - viewport + 12) / overflow));
-    }
-
-    private static SVGPath path(String content, String style) {
-        var path = new SVGPath();
-        path.setContent(content);
-        path.getStyleClass().add(style);
-        path.setMouseTransparent(true);
-        return path;
-    }
-
-    private static Node featureIcon(Feature feature) {
-        if (feature instanceof dev.voxelbrew.api.model.ConstructionFeature construction)
-            return ConstructionIcons.icon(construction.tool());
-        if (feature instanceof Feature.Sketch)
-            return new Group(
-                    path("M2 4H15V17H2Z", "timeline-sketch-icon"),
-                    path("M7 18L8 14L17 5L20 8L11 17Z", "timeline-pencil-icon"));
-        var cube = new Group(
-                path("M2 6L10 2L18 6L10 10Z", "timeline-cube-top"),
-                path("M2 6L10 10V20L2 16Z", "timeline-cube-left"),
-                path("M10 10L18 6V16L10 20Z", "timeline-cube-right"));
-        if (feature instanceof Feature.Extrude)
-            cube.getChildren().add(path("M17 5L20 1L23 5H21V14H19V5Z", "timeline-extrude-icon"));
-        else if (feature instanceof Feature.ThroughCut)
-            cube.getChildren().add(path("M8 5L10 4L13 5L13 8L11 9L8 8Z M10 9V16", "timeline-cut-icon"));
-        else if (feature instanceof Feature.SplitBody)
-            cube.getChildren().add(path("M6 1L14 21", "timeline-split-icon"));
-        else cube.getChildren().add(path("M17 2V10 M13 6H21", "timeline-plugin-icon"));
-        return cube;
     }
 
     @Override

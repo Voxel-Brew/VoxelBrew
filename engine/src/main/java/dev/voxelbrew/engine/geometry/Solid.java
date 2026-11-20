@@ -18,11 +18,12 @@ public final class Solid implements AutoCloseable {
     private final Object lock = new Object();
     private long token;
 
-    private Solid(long token) {
-        if (token == 0) {
-            throw new GeometryException("Kernel returned an empty solid handle");
+    public record Split(Solid negative, Solid positive) implements AutoCloseable {
+        @Override
+        public void close() {
+            negative.close();
+            positive.close();
         }
-        this.token = token;
     }
 
     public static String kernelVersion() {
@@ -80,22 +81,6 @@ public final class Solid implements AutoCloseable {
                 value(distance, MILLIMETRE));
     }
 
-    public Solid cutThroughCircle(Quantity<Length> x, Quantity<Length> y, Quantity<Length> diameter) {
-        return cutThroughCircle(value(x, MILLIMETRE), value(y, MILLIMETRE), value(diameter, MILLIMETRE));
-    }
-
-    public Quantity<Volume> volumeQuantity() {
-        return quantity(volume(), CUBIC_MILLIMETRE);
-    }
-
-    public Split split(double nx, double ny, double nz, Quantity<Length> offset) {
-        return split(nx, ny, nz, value(offset, MILLIMETRE));
-    }
-
-    public boolean contains(Quantity<Length> x, Quantity<Length> y, Quantity<Length> z) {
-        return contains(value(x, MILLIMETRE), value(y, MILLIMETRE), value(z, MILLIMETRE));
-    }
-
     /** Extrudes exact line, circle, arc, and cubic Bezier boundaries, with optional holes. */
     public static Solid profilePrism(PlanarProfile profile, double z, double distance) {
         finite("offsetZ", z);
@@ -103,14 +88,6 @@ public final class Solid implements AutoCloseable {
         positive("absolute distance", Math.abs(distance));
         return new Solid(NativeKernel.profilePrism(
                 profile.types(), profile.sizes(), profile.parameterSizes(), profile.parameters(), z, distance));
-    }
-
-    public Solid cutThroughProfile(PlanarProfile profile) {
-        synchronized (lock) {
-            requireOpen();
-            return new Solid(NativeKernel.cutThroughProfile(
-                    token, profile.types(), profile.sizes(), profile.parameterSizes(), profile.parameters()));
-        }
     }
 
     public static Solid circlePrism(double x, double y, double z, double diameter, double distance) {
@@ -137,6 +114,50 @@ public final class Solid implements AutoCloseable {
             throw new IllegalArgumentException("distance must have magnitude >= 0.000001 mm");
         }
         return new Solid(NativeKernel.rectanglePrism(x, y, z, width, height, distance));
+    }
+
+    private static void finite(String field, double value) {
+        if (!Double.isFinite(value)) {
+            throw new IllegalArgumentException(field + " must be finite");
+        }
+    }
+
+    private static void positive(String field, double value) {
+        finite(field, value);
+        if (value < 1e-6) {
+            throw new IllegalArgumentException(field + " must be >= 0.000001 mm");
+        }
+    }
+
+    private Solid(long token) {
+        if (token == 0) {
+            throw new GeometryException("Kernel returned an empty solid handle");
+        }
+        this.token = token;
+    }
+
+    public Solid cutThroughCircle(Quantity<Length> x, Quantity<Length> y, Quantity<Length> diameter) {
+        return cutThroughCircle(value(x, MILLIMETRE), value(y, MILLIMETRE), value(diameter, MILLIMETRE));
+    }
+
+    public Quantity<Volume> volumeQuantity() {
+        return quantity(volume(), CUBIC_MILLIMETRE);
+    }
+
+    public Split split(double nx, double ny, double nz, Quantity<Length> offset) {
+        return split(nx, ny, nz, value(offset, MILLIMETRE));
+    }
+
+    public boolean contains(Quantity<Length> x, Quantity<Length> y, Quantity<Length> z) {
+        return contains(value(x, MILLIMETRE), value(y, MILLIMETRE), value(z, MILLIMETRE));
+    }
+
+    public Solid cutThroughProfile(PlanarProfile profile) {
+        synchronized (lock) {
+            requireOpen();
+            return new Solid(NativeKernel.cutThroughProfile(
+                    token, profile.types(), profile.sizes(), profile.parameterSizes(), profile.parameters()));
+        }
     }
 
     /**
@@ -221,14 +242,6 @@ public final class Solid implements AutoCloseable {
         }
     }
 
-    public record Split(Solid negative, Solid positive) implements AutoCloseable {
-        @Override
-        public void close() {
-            negative.close();
-            positive.close();
-        }
-    }
-
     /** Splits into independently owned solids on the negative and positive sides of a plane. */
     public Split split(double nx, double ny, double nz, double offset) {
         synchronized (lock) {
@@ -287,19 +300,6 @@ public final class Solid implements AutoCloseable {
     private void requireOpen() {
         if (token == 0) {
             throw new IllegalStateException("Solid has been closed");
-        }
-    }
-
-    private static void finite(String field, double value) {
-        if (!Double.isFinite(value)) {
-            throw new IllegalArgumentException(field + " must be finite");
-        }
-    }
-
-    private static void positive(String field, double value) {
-        finite(field, value);
-        if (value < 1e-6) {
-            throw new IllegalArgumentException(field + " must be >= 0.000001 mm");
         }
     }
 }

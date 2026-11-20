@@ -8,8 +8,6 @@ import java.util.*;
 import java.util.function.Consumer;
 
 final class SlicerTestSupport {
-    private SlicerTestSupport() {}
-
     static SlicerWindow window(Map<String, String> overrides) {
         return new SlicerWindow() {
             @Override
@@ -41,4 +39,6 @@ final class SlicerTestSupport {
         cancellation.publish(() -> SliceService.save(result.artifact(), output, overwrite));
         return result;
     }
+
+    private SlicerTestSupport() {}
 }

@@ -10,8 +10,6 @@ import java.nio.file.*;
 
 /** Publishes validated exact geometry atomically without changing the editable project. */
 public final class StepDocumentWriter {
-    private StepDocumentWriter() {}
-
     public static void save(CadDocument document, Path destination, boolean overwrite, Path pluginDirectory)
             throws IOException {
         Path target = destination.toAbsolutePath().normalize();
@@ -36,4 +34,6 @@ public final class StepDocumentWriter {
             Files.deleteIfExists(temporary);
         }
     }
+
+    private StepDocumentWriter() {}
 }

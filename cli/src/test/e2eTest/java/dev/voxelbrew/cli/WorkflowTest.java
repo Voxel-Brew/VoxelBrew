@@ -22,6 +22,17 @@ class WorkflowTest {
     @TempDir
     Path directory;
 
+    private static byte[] versioned(DocumentProto.Document document, String version) throws Exception {
+        byte[] payload =
+                document.toBuilder().setApplicationVersion(version).build().toByteArray();
+        return ByteBuffer.allocate(44 + payload.length)
+                .put(new byte[] {'J', 'C', 'A', 'D', 13, 37, 13, 37})
+                .putInt(payload.length)
+                .put(MessageDigest.getInstance("SHA-256").digest(payload))
+                .put(payload)
+                .array();
+    }
+
     @Test
     void workspaceSessionCommitsSketchDraftAndPersistsFormulaBodyNameAndPlateUndo() throws Exception {
         Path file = directory.resolve("workspace session.vxb");
@@ -282,17 +293,6 @@ class WorkflowTest {
         assertThat(run(1, "document", "new", file.toString(), "--overwrite").contains("Update VoxelBrew"))
                 .isTrue();
         assertThat(Files.readAllBytes(file)).containsExactly(future);
-    }
-
-    private static byte[] versioned(DocumentProto.Document document, String version) throws Exception {
-        byte[] payload =
-                document.toBuilder().setApplicationVersion(version).build().toByteArray();
-        return ByteBuffer.allocate(44 + payload.length)
-                .put(new byte[] {'J', 'C', 'A', 'D', 13, 37, 13, 37})
-                .putInt(payload.length)
-                .put(MessageDigest.getInstance("SHA-256").digest(payload))
-                .put(payload)
-                .array();
     }
 
     private void assertVolume(double expected, String output) {

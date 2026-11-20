@@ -23,6 +23,39 @@ import org.junit.jupiter.api.io.TempDir;
 
 @SuppressWarnings("deprecation")
 class EditableEngineTest {
+    private static final Feature.Plane XY = new Feature.Plane("origin-xy", 0);
+
+    @TempDir
+    Path directory;
+
+    static ModelSession reference() {
+        var session = new ModelSession(CadDocument.empty());
+        session.add(new Feature.Sketch("plate", "plate.profile", XY, new Feature.Rectangle(0, 0, 60, 40)));
+        session.add(new Feature.Extrude("thickness", new Feature.ProfileRef("plate", "plate.profile"), 5));
+        session.add(new Feature.Sketch("hole", "hole.profile", XY, new Feature.Circle(10, 10, 4)));
+        session.add(new Feature.ThroughCut(
+                "cut", new Feature.ProfileRef("hole", "hole.profile"), new Feature.BodyRef("thickness", "body")));
+        return session;
+    }
+
+    private static void assertReference(ModelSession session, double thickness, double diameter) {
+        try (var result = session.evaluate()) {
+            assertThat(result.valid()).as(result.diagnostics().toString()).isTrue();
+            assertThat(result.requireCompleteDocument().size()).isEqualTo(1);
+            var body = result.bodies().getFirst();
+            assertThat(body.id()).isEqualTo("thickness.body");
+            assertThat(body.solid().volume())
+                    .isCloseTo(
+                            (2400 - Math.PI * diameter * diameter / 4) * thickness,
+                            org.assertj.core.data.Offset.offset(0.01));
+            assertThat(body.solid().contains(10, 10, thickness / 2)).isFalse();
+            assertThat(body.solid().contains(15, 10, thickness / 2)).isTrue();
+            assertThat(body.solid().bounds().maxX()).isCloseTo(60, org.assertj.core.data.Offset.offset(0.001));
+            assertThat(body.solid().bounds().maxY()).isCloseTo(40, org.assertj.core.data.Offset.offset(0.001));
+            assertThat(body.solid().bounds().maxZ()).isCloseTo(thickness, org.assertj.core.data.Offset.offset(0.001));
+        }
+    }
+
     @Test
     void solidModificationsSurviveDocumentRoundTrip() throws Exception {
         var session = new ModelSession(CadDocument.empty());
@@ -42,21 +75,6 @@ class EditableEngineTest {
         try (var evaluation = new ModelSession(document).evaluate()) {
             evaluation.requireCompleteDocument();
         }
-    }
-
-    @TempDir
-    Path directory;
-
-    private static final Feature.Plane XY = new Feature.Plane("origin-xy", 0);
-
-    static ModelSession reference() {
-        var session = new ModelSession(CadDocument.empty());
-        session.add(new Feature.Sketch("plate", "plate.profile", XY, new Feature.Rectangle(0, 0, 60, 40)));
-        session.add(new Feature.Extrude("thickness", new Feature.ProfileRef("plate", "plate.profile"), 5));
-        session.add(new Feature.Sketch("hole", "hole.profile", XY, new Feature.Circle(10, 10, 4)));
-        session.add(new Feature.ThroughCut(
-                "cut", new Feature.ProfileRef("hole", "hole.profile"), new Feature.BodyRef("thickness", "body")));
-        return session;
     }
 
     @Test
@@ -377,23 +395,5 @@ class EditableEngineTest {
         assertThat(session.redo()).isTrue();
         assertThat(session.document().cursor()).isEqualTo(4);
         assertReference(session, 5, 4);
-    }
-
-    private static void assertReference(ModelSession session, double thickness, double diameter) {
-        try (var result = session.evaluate()) {
-            assertThat(result.valid()).as(result.diagnostics().toString()).isTrue();
-            assertThat(result.requireCompleteDocument().size()).isEqualTo(1);
-            var body = result.bodies().getFirst();
-            assertThat(body.id()).isEqualTo("thickness.body");
-            assertThat(body.solid().volume())
-                    .isCloseTo(
-                            (2400 - Math.PI * diameter * diameter / 4) * thickness,
-                            org.assertj.core.data.Offset.offset(0.01));
-            assertThat(body.solid().contains(10, 10, thickness / 2)).isFalse();
-            assertThat(body.solid().contains(15, 10, thickness / 2)).isTrue();
-            assertThat(body.solid().bounds().maxX()).isCloseTo(60, org.assertj.core.data.Offset.offset(0.001));
-            assertThat(body.solid().bounds().maxY()).isCloseTo(40, org.assertj.core.data.Offset.offset(0.001));
-            assertThat(body.solid().bounds().maxZ()).isCloseTo(thickness, org.assertj.core.data.Offset.offset(0.001));
-        }
     }
 }

@@ -21,6 +21,15 @@ final class DeviceCommands {
         Arrays.setAll(OPERATION_LOCKS, index -> new Object());
     }
 
+    private final PrinterStore runtime;
+
+    private final java.util.function.Supplier<DriverRegistry> driverRegistries;
+
+    private final DocumentSource documents;
+
+    private final DocumentSave writer;
+    private final dev.voxelbrew.api.printer.PrinterProfileCatalog printers;
+
     private static Object operationLock(Printer printer) {
         var endpoints = printer.driverConfiguration().properties().values().stream()
                 .filter(java.net.URI.class::isInstance)
@@ -47,11 +56,21 @@ final class DeviceCommands {
         }
     }
 
-    private final PrinterStore runtime;
-    private final java.util.function.Supplier<DriverRegistry> driverRegistries;
-    private final DocumentSource documents;
-    private final DocumentSave writer;
-    private final dev.voxelbrew.api.printer.PrinterProfileCatalog printers;
+    private static void applySettings(Map<String, String> settings, String[] entries, boolean files)
+            throws java.io.IOException {
+        if (entries == null) return;
+        for (var entry : entries) {
+            int equal = entry.indexOf('=');
+            if (equal <= 0) throw new IllegalArgumentException("Settings must use key=value");
+            String key = entry.substring(0, equal), value = entry.substring(equal + 1);
+            settings.put(key, files ? Files.readString(Path.of(value)).stripTrailing() : value);
+        }
+    }
+
+    private static <T> T fallback(CommandSpec s, String name, T fallback) {
+        T value = value(s, name);
+        return value == null ? fallback : value;
+    }
 
     void install(CommandLine root) {
         for (String action : List.of("show", "set", "clear")) {
@@ -209,17 +228,6 @@ final class DeviceCommands {
         }
     }
 
-    private static void applySettings(Map<String, String> settings, String[] entries, boolean files)
-            throws java.io.IOException {
-        if (entries == null) return;
-        for (var entry : entries) {
-            int equal = entry.indexOf('=');
-            if (equal <= 0) throw new IllegalArgumentException("Settings must use key=value");
-            String key = entry.substring(0, equal), value = entry.substring(equal + 1);
-            settings.put(key, files ? Files.readString(Path.of(value)).stripTrailing() : value);
-        }
-    }
-
     private int control(CommandSpec s, String action) throws Exception {
         var device = find(value(s, "--device"));
         try (var registry = registry()) {
@@ -254,10 +262,5 @@ final class DeviceCommands {
             }
         }
         return 0;
-    }
-
-    private static <T> T fallback(CommandSpec s, String name, T fallback) {
-        T value = value(s, name);
-        return value == null ? fallback : value;
     }
 }

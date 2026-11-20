@@ -23,34 +23,11 @@ import picocli.CommandLine;
 import picocli.CommandLine.*;
 
 final class PrintingCommands {
-    private PrintingCommands() {}
-
-    static void register(CommandLine cli) {
-        cli.addSubcommand("split", Split.class);
-        cli.addSubcommand("place", Place.class);
-        cli.addSubcommand("duplicate", Duplicate.class);
-        cli.addSubcommand("lay-on-face", LayOnFace.class);
-        cli.addSubcommand("print-settings", Settings.class);
-        cli.addSubcommand("support", Support.class);
-        cli.addSubcommand("remove-instance", RemoveInstance.class);
-        cli.addSubcommand("remove-support", RemoveSupport.class);
-        cli.addSubcommand("print-setup", Setup.class);
-        cli.addSubcommand("validate", Validate.class);
-        cli.addSubcommand("slicers", Slicers.class);
-        cli.addSubcommand("printer-profiles", Printers.class);
-        cli.addSubcommand("slice", Slice.class);
-        cli.addSubcommand("inspect-job", InspectJob.class);
-    }
-
     @Command(
             name = "split",
             mixinStandardHelpOptions = true,
             description = "Split an earlier body with a plane; outputs are negative and positive.")
     static final class Split extends VoxelBrew.AddFeature {
-
-        Split(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
 
         @Option(names = "--body-feature", required = true)
         String body;
@@ -68,6 +45,10 @@ final class PrintingCommands {
             X,
             Y,
             Z
+        }
+
+        Split(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
         }
 
         @Override
@@ -88,10 +69,6 @@ final class PrintingCommands {
             description =
                     "Add or replace a build instance; rigid placement is separate from design coordinates. Units: mm/degrees.")
     static final class Place extends VoxelBrew.FileCommand {
-
-        Place(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
 
         @Option(names = "--instance", required = true)
         String id;
@@ -117,6 +94,10 @@ final class PrintingCommands {
         @Option(names = "--rotate-z", defaultValue = "0")
         double rz;
 
+        Place(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
+
         @Override
         public Integer call() throws Exception {
             var session = session();
@@ -136,10 +117,6 @@ final class PrintingCommands {
             description = "Duplicate a build instance and its attached support instructions.")
     static final class Duplicate extends VoxelBrew.FileCommand {
 
-        Duplicate(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(names = "--instance", required = true)
         String source;
 
@@ -154,6 +131,10 @@ final class PrintingCommands {
 
         @Option(names = "--offset-z", defaultValue = "0")
         double z;
+
+        Duplicate(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
 
         @Override
         public Integer call() throws Exception {
@@ -187,15 +168,15 @@ final class PrintingCommands {
             description = "Lay an evaluated planar face on bed Z=0. Face IDs belong only to the current revision.")
     static final class LayOnFace extends VoxelBrew.FileCommand {
 
-        LayOnFace(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(names = "--instance", required = true)
         String id;
 
         @Option(names = "--face", required = true)
         int face;
+
+        LayOnFace(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
 
         @Override
         public Integer call() throws Exception {
@@ -217,11 +198,6 @@ final class PrintingCommands {
             mixinStandardHelpOptions = true,
             description = "Edit the persisted printer, material and process. Unspecified values are retained.")
     static final class Settings extends VoxelBrew.FileCommand {
-
-        Settings(DocumentSource documents, DocumentSave documentWriter, PrinterProfileCatalog printers) {
-            super(documents, documentWriter);
-            this.printers = printers;
-        }
 
         private final PrinterProfileCatalog printers;
 
@@ -263,6 +239,11 @@ final class PrintingCommands {
 
         @Option(names = "--raft-layers")
         Integer raft;
+
+        Settings(DocumentSource documents, DocumentSave documentWriter, PrinterProfileCatalog printers) {
+            super(documents, documentWriter);
+            this.printers = printers;
+        }
 
         @Override
         public Integer call() throws Exception {
@@ -310,10 +291,6 @@ final class PrintingCommands {
                     "Add or replace a body-coordinate blocker, enforcer or explicit support pillar attached to a build instance.")
     static final class Support extends VoxelBrew.FileCommand {
 
-        Support(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(names = "--id", required = true)
         String id;
 
@@ -341,6 +318,10 @@ final class PrintingCommands {
         @Option(names = "--height", required = true)
         double height;
 
+        Support(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
+
         @Override
         public Integer call() throws Exception {
             var session = session();
@@ -359,12 +340,12 @@ final class PrintingCommands {
             description = "Remove a build instance; keep attached instructions available for repair.")
     static final class RemoveInstance extends VoxelBrew.FileCommand {
 
+        @Option(names = "--instance", required = true)
+        String id;
+
         RemoveInstance(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
-
-        @Option(names = "--instance", required = true)
-        String id;
 
         @Override
         public Integer call() throws Exception {
@@ -383,12 +364,12 @@ final class PrintingCommands {
             description = "Remove a support instruction or explicit pillar.")
     static final class RemoveSupport extends VoxelBrew.FileCommand {
 
+        @Option(names = "--id", required = true)
+        String id;
+
         RemoveSupport(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
-
-        @Option(names = "--id", required = true)
-        String id;
 
         @Override
         public Integer call() throws Exception {
@@ -518,18 +499,6 @@ final class PrintingCommands {
         private final dev.voxelbrew.api.printer.PrinterStore printerStore;
         private final UserConfiguration configuration;
 
-        Slice(
-                DocumentSource documents,
-                DocumentSave documentWriter,
-                Supplier<SlicerProviderRegistry> slicers,
-                dev.voxelbrew.api.printer.PrinterStore printerStore,
-                UserConfiguration configuration) {
-            super(documents, documentWriter);
-            this.slicers = slicers;
-            this.printerStore = printerStore;
-            this.configuration = configuration;
-        }
-
         @Option(names = "--output", description = "Optional output file; directory with --all")
         Path output;
 
@@ -553,6 +522,32 @@ final class PrintingCommands {
 
         @Option(names = "--overwrite")
         boolean overwrite;
+
+        private static CadDocument withSetup(CadDocument document, PrintSetup setup) {
+            return new CadDocument(
+                    document.id(),
+                    document.features(),
+                    document.cursor(),
+                    setup,
+                    document.parameters(),
+                    document.bodyStyles(),
+                    document.bodyNames(),
+                    document.featureNames(),
+                    document.gcode(),
+                    document.printArtifacts());
+        }
+
+        Slice(
+                DocumentSource documents,
+                DocumentSave documentWriter,
+                Supplier<SlicerProviderRegistry> slicers,
+                dev.voxelbrew.api.printer.PrinterStore printerStore,
+                UserConfiguration configuration) {
+            super(documents, documentWriter);
+            this.slicers = slicers;
+            this.printerStore = printerStore;
+            this.configuration = configuration;
+        }
 
         @Override
         public Integer call() throws Exception {
@@ -694,20 +689,6 @@ final class PrintingCommands {
                 }
             }
         }
-
-        private static CadDocument withSetup(CadDocument document, PrintSetup setup) {
-            return new CadDocument(
-                    document.id(),
-                    document.features(),
-                    document.cursor(),
-                    setup,
-                    document.parameters(),
-                    document.bodyStyles(),
-                    document.bodyNames(),
-                    document.featureNames(),
-                    document.gcode(),
-                    document.printArtifacts());
-        }
     }
 
     @Command(
@@ -777,6 +758,23 @@ final class PrintingCommands {
         }
     }
 
+    static void register(CommandLine cli) {
+        cli.addSubcommand("split", Split.class);
+        cli.addSubcommand("place", Place.class);
+        cli.addSubcommand("duplicate", Duplicate.class);
+        cli.addSubcommand("lay-on-face", LayOnFace.class);
+        cli.addSubcommand("print-settings", Settings.class);
+        cli.addSubcommand("support", Support.class);
+        cli.addSubcommand("remove-instance", RemoveInstance.class);
+        cli.addSubcommand("remove-support", RemoveSupport.class);
+        cli.addSubcommand("print-setup", Setup.class);
+        cli.addSubcommand("validate", Validate.class);
+        cli.addSubcommand("slicers", Slicers.class);
+        cli.addSubcommand("printer-profiles", Printers.class);
+        cli.addSubcommand("slice", Slice.class);
+        cli.addSubcommand("inspect-job", InspectJob.class);
+    }
+
     private static BodyInstance instance(PrintSetup setup, String id) {
         return setup.instances().stream()
                 .filter(i -> i.id().equals(id))
@@ -805,4 +803,6 @@ final class PrintingCommands {
                 .sorted(Map.Entry.comparingByKey())
                 .forEach(e -> out.println(e.getKey() + "=" + e.getValue()));
     }
+
+    private PrintingCommands() {}
 }

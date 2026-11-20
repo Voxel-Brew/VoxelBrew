@@ -7,19 +7,6 @@ import java.util.ServiceConfigurationError;
 
 /** Independent consumers loaded only by the feature-failure compatibility fixtures. */
 public final class BrokenFeatureProviders {
-    private BrokenFeatureProviders() {}
-
-    private static FeatureDescriptor descriptor(String provider) {
-        var original = new SpacerProvider().descriptor();
-        return new FeatureDescriptor(
-                provider,
-                original.type(),
-                "Broken spacer",
-                original.apiVersion(),
-                original.payloadVersion(),
-                original.parameters());
-    }
-
     public static final class Descriptor extends SpacerProvider {
         @Override
         public FeatureDescriptor descriptor() {
@@ -76,4 +63,17 @@ public final class BrokenFeatureProviders {
             throw new ServiceConfigurationError("Missing nested provider dependency");
         }
     }
+
+    private static FeatureDescriptor descriptor(String provider) {
+        var original = new SpacerProvider().descriptor();
+        return new FeatureDescriptor(
+                provider,
+                original.type(),
+                "Broken spacer",
+                original.apiVersion(),
+                original.payloadVersion(),
+                original.parameters());
+    }
+
+    private BrokenFeatureProviders() {}
 }

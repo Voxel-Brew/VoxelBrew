@@ -15,6 +15,8 @@ import java.util.List;
 public final class ModelSession {
     private final String id;
     private final dev.voxelbrew.api.model.UuidGenerator uuidGenerator;
+    private final Deque<State> undo = new ArrayDeque<>();
+    private final Deque<State> redo = new ArrayDeque<>();
     private List<Feature> features;
     private dev.voxelbrew.api.model.printing.PrintSetup printSetup;
     private dev.voxelbrew.api.model.parameters.ParameterSet parameters;
@@ -23,7 +25,9 @@ public final class ModelSession {
     private java.util.Map<String, String> featureNames;
     private int cursor;
     private long revision;
+
     private java.util.Map<String, List<String>> gcode;
+
     private java.util.Map<String, dev.voxelbrew.api.model.printing.PrintArtifact> printArtifacts;
 
     private record State(
@@ -34,8 +38,7 @@ public final class ModelSession {
             java.util.Map<String, String> bodyNames,
             java.util.Map<String, String> featureNames) {}
 
-    private final Deque<State> undo = new ArrayDeque<>();
-    private final Deque<State> redo = new ArrayDeque<>();
+    public record Snapshot(CadDocument document, long revision, boolean canUndo, boolean canRedo) {}
 
     public ModelSession(CadDocument document) {
         id = document.id();
@@ -83,8 +86,6 @@ public final class ModelSession {
     public synchronized long revision() {
         return revision;
     }
-
-    public record Snapshot(CadDocument document, long revision, boolean canUndo, boolean canRedo) {}
 
     public synchronized Snapshot snapshot() {
         return new Snapshot(document(), revision, !undo.isEmpty(), !redo.isEmpty());

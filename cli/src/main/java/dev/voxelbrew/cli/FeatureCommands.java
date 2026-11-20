@@ -11,13 +11,6 @@ import picocli.CommandLine;
 import picocli.CommandLine.*;
 
 final class FeatureCommands {
-    private FeatureCommands() {}
-
-    static void register(CommandLine cli) {
-        cli.addSubcommand("feature-types", Types.class);
-        cli.addSubcommand("custom", Custom.class);
-    }
-
     @Command(
             name = "feature-types",
             mixinStandardHelpOptions = true,
@@ -58,11 +51,6 @@ final class FeatureCommands {
     static final class Custom extends VoxelBrew.AddFeature {
         private final FeatureRegistry.Factory features;
 
-        Custom(DocumentSource documents, DocumentSave documentWriter, FeatureRegistry.Factory features) {
-            super(documents, documentWriter);
-            this.features = features;
-        }
-
         @Option(names = "--provider", required = true)
         String provider;
 
@@ -74,6 +62,11 @@ final class FeatureCommands {
                 description = "Numeric KEY=VALUE; repeatable. Omitted fields use provider defaults.")
         Map<String, Double> parameters = new LinkedHashMap<>();
 
+        Custom(DocumentSource documents, DocumentSave documentWriter, FeatureRegistry.Factory features) {
+            super(documents, documentWriter);
+            this.features = features;
+        }
+
         @Override
         public Integer call() throws Exception {
             var session = session();
@@ -84,4 +77,11 @@ final class FeatureCommands {
             return save(session);
         }
     }
+
+    static void register(CommandLine cli) {
+        cli.addSubcommand("feature-types", Types.class);
+        cli.addSubcommand("custom", Custom.class);
+    }
+
+    private FeatureCommands() {}
 }

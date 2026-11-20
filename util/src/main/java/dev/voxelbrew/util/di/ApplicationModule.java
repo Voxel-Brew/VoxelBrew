@@ -18,12 +18,12 @@ public final class ApplicationModule {
     @NonNull
     private final ApplicationPaths paths;
 
-    public ApplicationModule(UserConfiguration configuration, UpdateServiceFactory updates) {
-        this(configuration, updates, dev.voxelbrew.util.services.Services.load(ApplicationPaths.class));
-    }
-
     public static ApplicationModule system(ApplicationImage.Component component) {
         return new ApplicationModule(UserConfiguration.user(), () -> UpdateService.system(component));
+    }
+
+    public ApplicationModule(UserConfiguration configuration, UpdateServiceFactory updates) {
+        this(configuration, updates, dev.voxelbrew.util.services.Services.load(ApplicationPaths.class));
     }
 
     public UserConfiguration configuration() {

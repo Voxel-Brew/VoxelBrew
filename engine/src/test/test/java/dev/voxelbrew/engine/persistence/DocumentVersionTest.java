@@ -14,6 +14,20 @@ import org.junit.jupiter.api.Test;
 
 @SuppressWarnings("deprecation")
 class DocumentVersionTest {
+    private static DocumentProto.Document message(byte[] bytes) throws Exception {
+        return DocumentProto.Document.parseFrom(Arrays.copyOfRange(bytes, 44, bytes.length));
+    }
+
+    private static byte[] envelope(DocumentProto.Document message) throws Exception {
+        byte[] payload = message.toByteArray();
+        return ByteBuffer.allocate(44 + payload.length)
+                .put(new byte[] {'J', 'C', 'A', 'D', 13, 37, 13, 37})
+                .putInt(payload.length)
+                .put(MessageDigest.getInstance("SHA-256").digest(payload))
+                .put(payload)
+                .array();
+    }
+
     @Test
     void usesTheCurrentMagicAndRejectsThePreviousSignature() throws Exception {
         var document = CadDocument.empty();
@@ -110,19 +124,5 @@ class DocumentVersionTest {
                     .as(() -> "Unexpected diagnostic for writer version '" + version + "': " + error.getMessage())
                     .isTrue();
         }
-    }
-
-    private static DocumentProto.Document message(byte[] bytes) throws Exception {
-        return DocumentProto.Document.parseFrom(Arrays.copyOfRange(bytes, 44, bytes.length));
-    }
-
-    private static byte[] envelope(DocumentProto.Document message) throws Exception {
-        byte[] payload = message.toByteArray();
-        return ByteBuffer.allocate(44 + payload.length)
-                .put(new byte[] {'J', 'C', 'A', 'D', 13, 37, 13, 37})
-                .putInt(payload.length)
-                .put(MessageDigest.getInstance("SHA-256").digest(payload))
-                .put(payload)
-                .array();
     }
 }

@@ -18,27 +18,6 @@ class MeshExporterTest {
     @TempDir
     Path directory;
 
-    @Test
-    void rejectsEmptyMultipleAndUnknownOptionBeforeCreatingOutput() {
-        var exporter = new BinaryStlExporter();
-        var target = directory.resolve("invalid.stl");
-        var base = new MeshExportDialog.Settings(
-                ExportSelection.design(null),
-                MeshOptions.DEFAULT,
-                Map.of(),
-                new FileExportDialog.Destination(target, false));
-
-        assertThatThrownBy(() -> exporter.writeFile(view(List.of()), base))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> exporter.writeFile(view(List.of(instance("one"), instance("two"))), base))
-                .isInstanceOf(IllegalArgumentException.class);
-        var unknownOption = new MeshExportDialog.Settings(
-                base.selection(), base.mesh(), Map.of("missing", "value"), base.destination());
-        assertThatThrownBy(() -> exporter.writeFile(view(List.of(instance("one"))), unknownOption))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThat(Files.exists(target)).isFalse();
-    }
-
     private static BodyInstance instance(String id) {
         return new BodyInstance(id, "body", Transform.IDENTITY);
     }
@@ -60,5 +39,26 @@ class MeshExporterTest {
                 throw new AssertionError("Invalid settings must fail before tessellation");
             }
         };
+    }
+
+    @Test
+    void rejectsEmptyMultipleAndUnknownOptionBeforeCreatingOutput() {
+        var exporter = new BinaryStlExporter();
+        var target = directory.resolve("invalid.stl");
+        var base = new MeshExportDialog.Settings(
+                ExportSelection.design(null),
+                MeshOptions.DEFAULT,
+                Map.of(),
+                new FileExportDialog.Destination(target, false));
+
+        assertThatThrownBy(() -> exporter.writeFile(view(List.of()), base))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> exporter.writeFile(view(List.of(instance("one"), instance("two"))), base))
+                .isInstanceOf(IllegalArgumentException.class);
+        var unknownOption = new MeshExportDialog.Settings(
+                base.selection(), base.mesh(), Map.of("missing", "value"), base.destination());
+        assertThatThrownBy(() -> exporter.writeFile(view(List.of(instance("one"))), unknownOption))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(Files.exists(target)).isFalse();
     }
 }

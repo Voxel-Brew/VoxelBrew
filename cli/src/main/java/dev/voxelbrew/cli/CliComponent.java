@@ -5,6 +5,10 @@ import dev.voxelbrew.util.i18n.Translations;
 import picocli.CommandLine;
 
 public interface CliComponent {
+    interface Factory {
+        CliComponent create(ApplicationModule application, FileIoModule files);
+    }
+
     static Factory factory() {
         return dev.voxelbrew.util.services.Services.load(Factory.class);
     }
@@ -15,9 +19,5 @@ public interface CliComponent {
 
     default CommandLine commandLine() {
         return VoxelBrew.commandLine(commands(), translations());
-    }
-
-    interface Factory {
-        CliComponent create(ApplicationModule application, FileIoModule files);
     }
 }

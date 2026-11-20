@@ -17,6 +17,10 @@ class DependencyInjectionTest {
     @TempDir
     Path directory;
 
+    private static CommandLine quiet(CommandLine command) {
+        return command.setOut(new PrintWriter(new StringWriter())).setErr(new PrintWriter(new StringWriter()));
+    }
+
     @Test
     void printerCommandsListAndEmbedHardwareWithoutNativeEvaluation() throws Exception {
         var document = new AtomicReference<>(CadDocument.empty());
@@ -131,9 +135,5 @@ class DependencyInjectionTest {
         var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve(language + ".properties"));
         config.set("language", language);
         return CliComponent.factory().create(new ApplicationModule(config, updates), files);
-    }
-
-    private static CommandLine quiet(CommandLine command) {
-        return command.setOut(new PrintWriter(new StringWriter())).setErr(new PrintWriter(new StringWriter()));
     }
 }

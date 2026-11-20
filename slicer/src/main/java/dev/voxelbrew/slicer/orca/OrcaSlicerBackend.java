@@ -17,6 +17,10 @@ public final class OrcaSlicerBackend implements ProcessSlicer {
             Set.of(Capability.AUTOMATIC_SUPPORTS, Capability.BUILD_PLATE_SUPPORTS, Capability.BRIM, Capability.RAFT);
     private final Map<String, String> options;
 
+    static String normalize(String name) {
+        return name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+    }
+
     public OrcaSlicerBackend() {
         this(Map.of());
     }
@@ -217,9 +221,5 @@ public final class OrcaSlicerBackend implements ProcessSlicer {
                 "revision",
                 request.model().revision());
         return new RunResult(overrides, PrintArtifact.of("gcode.3mf", Files.readAllBytes(packageFile), metadata));
-    }
-
-    static String normalize(String name) {
-        return name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
     }
 }

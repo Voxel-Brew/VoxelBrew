@@ -12,18 +12,6 @@ class PrinterProviderRegistryTest {
     @TempDir
     Path directory;
 
-    @Test
-    void firstSuppliedDriverWinsAndClosedRegistryRejectsLookups() throws Exception {
-        Driver first = driver("same"), second = driver("same");
-        var registry = new ServiceLoaderDriverRegistry(directory, List.of(first, second));
-        assertThat(registry.find("same")).contains(first);
-        assertThat(registry.drivers()).contains(first).doesNotContain(second);
-        assertThat(registry.find("missing")).isEmpty();
-        registry.close();
-        registry.close();
-        assertThatThrownBy(() -> registry.find("same")).isInstanceOf(IllegalStateException.class);
-    }
-
     private static Driver driver(String id) {
         return new Driver() {
             @Override
@@ -51,5 +39,17 @@ class PrinterProviderRegistryTest {
                 throw new UnsupportedOperationException();
             }
         };
+    }
+
+    @Test
+    void firstSuppliedDriverWinsAndClosedRegistryRejectsLookups() throws Exception {
+        Driver first = driver("same"), second = driver("same");
+        var registry = new ServiceLoaderDriverRegistry(directory, List.of(first, second));
+        assertThat(registry.find("same")).contains(first);
+        assertThat(registry.drivers()).contains(first).doesNotContain(second);
+        assertThat(registry.find("missing")).isEmpty();
+        registry.close();
+        registry.close();
+        assertThatThrownBy(() -> registry.find("same")).isInstanceOf(IllegalStateException.class);
     }
 }

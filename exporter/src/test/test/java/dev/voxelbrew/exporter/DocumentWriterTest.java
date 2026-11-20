@@ -21,6 +21,20 @@ class DocumentWriterTest {
     @TempDir
     Path directory;
 
+    private static DocumentProto.Document message(byte[] bytes) throws Exception {
+        return DocumentProto.Document.parseFrom(Arrays.copyOfRange(bytes, 44, bytes.length));
+    }
+
+    private static byte[] envelope(DocumentProto.Document message) throws Exception {
+        byte[] payload = message.toByteArray();
+        return ByteBuffer.allocate(44 + payload.length)
+                .put(new byte[] {'J', 'C', 'A', 'D', 13, 37, 13, 37})
+                .putInt(payload.length)
+                .put(MessageDigest.getInstance("SHA-256").digest(payload))
+                .put(payload)
+                .array();
+    }
+
     @Test
     void saveCounterTracksPublicationAndSaveAsWithoutAffectingDesignIdentity() throws Exception {
         var document = CadDocument.empty();
@@ -179,19 +193,5 @@ class DocumentWriterTest {
         } finally {
             start.countDown();
         }
-    }
-
-    private static DocumentProto.Document message(byte[] bytes) throws Exception {
-        return DocumentProto.Document.parseFrom(Arrays.copyOfRange(bytes, 44, bytes.length));
-    }
-
-    private static byte[] envelope(DocumentProto.Document message) throws Exception {
-        byte[] payload = message.toByteArray();
-        return ByteBuffer.allocate(44 + payload.length)
-                .put(new byte[] {'J', 'C', 'A', 'D', 13, 37, 13, 37})
-                .putInt(payload.length)
-                .put(MessageDigest.getInstance("SHA-256").digest(payload))
-                .put(payload)
-                .array();
     }
 }

@@ -10,8 +10,6 @@ import java.util.regex.Pattern;
 
 /** Independent motion parser: layers come from deposition, not comment counts. */
 public final class GcodeReader {
-    private GcodeReader() {}
-
     private static final Pattern PARAMETER =
             Pattern.compile("(?:^|\\s)([XYZEFIJR])([-+]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][-+]?[0-9]+)?)");
 
@@ -174,4 +172,6 @@ public final class GcodeReader {
             default -> Role.UNKNOWN;
         };
     }
+
+    private GcodeReader() {}
 }

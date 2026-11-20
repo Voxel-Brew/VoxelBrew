@@ -8,12 +8,12 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @lombok.RequiredArgsConstructor
 final class Rendering {
+    private final UserConfiguration configuration;
+
     enum Style {
         SHADED,
         TECHNICAL
     }
-
-    private final UserConfiguration configuration;
 
     Style load() {
         try {

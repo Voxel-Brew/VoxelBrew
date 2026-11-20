@@ -9,8 +9,6 @@ import javafx.util.StringConverter;
  * Display adapters translate labels without changing model identifiers, enum values or commands.
  */
 final class UiText {
-    private UiText() {}
-
     static <T> void choices(ComboBox<T> control, Function<T, String> display) {
         control.setConverter(new StringConverter<>() {
             @Override
@@ -34,4 +32,6 @@ final class UiText {
                 .map(part -> translations.textOrDefault("view." + part, part))
                 .collect(java.util.stream.Collectors.joining(" "));
     }
+
+    private UiText() {}
 }

@@ -17,12 +17,79 @@ final class WorkspaceEdits {
     private final DocumentSource documents;
     private final DocumentSave writer;
 
+    @FunctionalInterface
+    interface Action {
+        int run(CommandSpec spec) throws Exception;
+    }
+
     static void register(CommandLine root) {
         try {
             root.getFactory().create(WorkspaceEdits.class).install(root);
         } catch (Exception e) {
             throw new IllegalStateException("Cannot compose workspace edits", e);
         }
+    }
+
+    static CommandSpec edit(CommandLine root, String route, Action action) {
+        return command(root, route, action, true);
+    }
+
+    static CommandSpec command(CommandLine root, String route, Action action, boolean document) {
+        var holder = new CommandSpec[1];
+        var command = new CommandLine(
+                CommandSpec.wrapWithoutInspection((Callable<Integer>) () -> action.run(holder[0])), root.getFactory());
+        var spec = command.getCommandSpec().mixinStandardHelpOptions(true);
+        spec.usageMessage().description(route);
+        if (document)
+            spec.addPositional(PositionalParamSpec.builder()
+                    .index("0")
+                    .arity("0..1")
+                    .type(Path.class)
+                    .paramLabel("FILE")
+                    .description("Editable document (or --document)")
+                    .build());
+        if (document) {
+            option(
+                    spec,
+                    "--plugin-dir",
+                    Path.class,
+                    false,
+                    dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
+                            .plugins()
+                            .toString(),
+                    "Trusted plugins directory");
+            option(
+                    spec,
+                    "--revision",
+                    String.class,
+                    false,
+                    null,
+                    "Expected document fingerprint from topology inspection");
+        }
+        holder[0] = spec;
+        WorkspaceCommands.mount(root, route, command);
+        return spec;
+    }
+
+    static OptionSpec option(
+            CommandSpec spec, String name, Class<?> type, boolean required, String fallback, String help) {
+        var option = OptionSpec.builder(name)
+                .type(type)
+                .required(required)
+                .defaultValue(fallback)
+                .description(help)
+                .build();
+        spec.addOption(option);
+        return option;
+    }
+
+    @SuppressWarnings("unchecked")
+    static <T> T value(CommandSpec spec, String name) {
+        return (T) spec.findOption(name).getValue();
+    }
+
+    private static double number(CommandSpec spec, String name) {
+        return ((Number) value(spec, name)).doubleValue();
     }
 
     private void install(CommandLine root) {
@@ -482,72 +549,5 @@ final class WorkspaceEdits {
             }
         }
         return 0;
-    }
-
-    @FunctionalInterface
-    interface Action {
-        int run(CommandSpec spec) throws Exception;
-    }
-
-    static CommandSpec edit(CommandLine root, String route, Action action) {
-        return command(root, route, action, true);
-    }
-
-    static CommandSpec command(CommandLine root, String route, Action action, boolean document) {
-        var holder = new CommandSpec[1];
-        var command = new CommandLine(
-                CommandSpec.wrapWithoutInspection((Callable<Integer>) () -> action.run(holder[0])), root.getFactory());
-        var spec = command.getCommandSpec().mixinStandardHelpOptions(true);
-        spec.usageMessage().description(route);
-        if (document)
-            spec.addPositional(PositionalParamSpec.builder()
-                    .index("0")
-                    .arity("0..1")
-                    .type(Path.class)
-                    .paramLabel("FILE")
-                    .description("Editable document (or --document)")
-                    .build());
-        if (document) {
-            option(
-                    spec,
-                    "--plugin-dir",
-                    Path.class,
-                    false,
-                    dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
-                            .plugins()
-                            .toString(),
-                    "Trusted plugins directory");
-            option(
-                    spec,
-                    "--revision",
-                    String.class,
-                    false,
-                    null,
-                    "Expected document fingerprint from topology inspection");
-        }
-        holder[0] = spec;
-        WorkspaceCommands.mount(root, route, command);
-        return spec;
-    }
-
-    static OptionSpec option(
-            CommandSpec spec, String name, Class<?> type, boolean required, String fallback, String help) {
-        var option = OptionSpec.builder(name)
-                .type(type)
-                .required(required)
-                .defaultValue(fallback)
-                .description(help)
-                .build();
-        spec.addOption(option);
-        return option;
-    }
-
-    @SuppressWarnings("unchecked")
-    static <T> T value(CommandSpec spec, String name) {
-        return (T) spec.findOption(name).getValue();
-    }
-
-    private static double number(CommandSpec spec, String name) {
-        return ((Number) value(spec, name)).doubleValue();
     }
 }

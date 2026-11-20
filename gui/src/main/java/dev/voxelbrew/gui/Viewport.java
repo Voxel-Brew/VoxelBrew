@@ -40,8 +40,6 @@ public final class Viewport extends StackPane {
     private final Map<String, TechnicalEdges> edgeData = new LinkedHashMap<>();
     private final AmbientLight light = new AmbientLight(Color.gray(0.45));
     private final PointLight key = new PointLight(Color.gray(0.7));
-    private Rendering.Style rendering = Rendering.Style.SHADED;
-    private boolean dark, edgesPending;
     private final SubScene scene;
     private final ReadOnlyObjectWrapper<ViewOrientation> orientation =
             new ReadOnlyObjectWrapper<>(ViewOrientation.HOME);
@@ -49,31 +47,91 @@ public final class Viewport extends StackPane {
     private final dev.voxelbrew.util.i18n.Translations translations;
     private final javafx.scene.layout.Pane planeLabels = new javafx.scene.layout.Pane();
     private final Map<javafx.scene.control.Label, Feature.Plane> originLabels = new LinkedHashMap<>();
+    private final java.util.ArrayList<SketchPick> sketchPicks = new java.util.ArrayList<>();
+    private final Group handle = new Group();
+    private final Group planeTargets = new Group(), faceHighlight = new Group(), selectedEdges = new Group();
+    private final Map<String, double[]> edgeSamples = new LinkedHashMap<>();
+    private final ConstructionView construction = new ConstructionView(), constructionPreview = new ConstructionView();
+    private Rendering.Style rendering = Rendering.Style.SHADED;
+    private boolean dark, edgesPending;
     private Map<String, MeshData> currentMeshes = Map.of();
     private double lastX, lastY;
     private boolean primaryOrbit;
     private double distance = 180;
     private BiConsumer<String, Integer> selection = (id, face) -> {};
+
     private BiConsumer<String, Integer> edgeSelection = (id, edge) -> {};
+
     private boolean edgePickEnabled;
     private String selected;
     private List<Feature> shownSketches = List.of();
     private String shownSketchSelection;
-
-    private record SketchPick(String featureId, Point3D a, Point3D b) {}
-
-    private final java.util.ArrayList<SketchPick> sketchPicks = new java.util.ArrayList<>();
     private String pressedSketch;
     private Consumer<Point3D> planeClick;
     private double planeZ;
-    private final Group handle = new Group();
     private double handleDistance;
     private Point3D handleAnchor, handleNormal;
-    private final Group planeTargets = new Group(), faceHighlight = new Group(), selectedEdges = new Group();
-    private final Map<String, double[]> edgeSamples = new LinkedHashMap<>();
     private BiConsumer<String, Integer> planeHover;
     private String highlightedBody;
     private int highlightedFace = -1;
+
+    private Map<String, dev.voxelbrew.api.model.BodyStyle> bodyStyles = Map.of();
+
+    private record SketchPick(String featureId, Point3D a, Point3D b) {}
+
+    public static Point3D toView(double x, double y, double z) {
+        return new Point3D(x, -z, y);
+    }
+
+    public static Point3D toModel(Point3D p) {
+        return new Point3D(p.getX(), p.getZ(), -p.getY());
+    }
+
+    /** Convert a CAD placement to FX axes without changing handedness or millimeter scale. */
+    static Affine viewTransform(dev.voxelbrew.api.model.Transform frame) {
+        var m = frame.matrix();
+        return new Affine(m[0], -m[2], m[1], m[3], -m[8], m[10], -m[9], -m[11], m[4], -m[6], m[5], m[7]);
+    }
+
+    private static Point3D sketchPoint(Feature.Plane plane, dev.voxelbrew.api.model.sketch.SketchGeometry.Vec point) {
+        var model = plane.frame().apply(point.x(), point.y(), plane.offsetZ() + .04);
+        return new Point3D(model[0], model[1], model[2]);
+    }
+
+    private static Cylinder line(Point3D a, Point3D b, double radius, Color color) {
+        Point3D delta = b.subtract(a), middle = a.midpoint(b);
+        var line = new Cylinder(radius, delta.magnitude(), 6);
+        line.setMaterial(new PhongMaterial(color));
+        line.setTranslateX(middle.getX());
+        line.setTranslateY(middle.getY());
+        line.setTranslateZ(middle.getZ());
+        Point3D axis = Rotate.Y_AXIS.crossProduct(delta);
+        double angle = Rotate.Y_AXIS.angle(delta);
+        if (axis.magnitude() > 1e-9) line.getTransforms().add(new Rotate(angle, axis));
+        return line;
+    }
+
+    private static MeshView meshView(MeshData data) {
+        var mesh = new TriangleMesh();
+        float[] points = new float[data.vertexCount() * 3];
+        for (int v = 0; v < data.vertexCount(); v++) {
+            var p = toView(data.coordinate(v, 0), data.coordinate(v, 1), data.coordinate(v, 2));
+            points[3 * v] = (float) p.getX();
+            points[3 * v + 1] = (float) p.getY();
+            points[3 * v + 2] = (float) p.getZ();
+        }
+        int[] faces = new int[data.triangleCount() * 6];
+        for (int t = 0; t < data.triangleCount(); t++)
+            for (int c = 0; c < 3; c++) faces[6 * t + 2 * c] = data.vertexIndex(t, c);
+        mesh.getPoints().setAll(points);
+        mesh.getTexCoords().setAll(0, 0);
+        mesh.getFaces().setAll(faces);
+        mesh.getFaceSmoothingGroups().setAll(new int[data.triangleCount()]);
+        var result = new MeshView(mesh);
+        result.setCullFace(CullFace.BACK);
+        result.setMaterial(new PhongMaterial(Color.web("#91a8b9")));
+        return result;
+    }
 
     public Viewport() {
         this(new dev.voxelbrew.util.i18n.Translations(java.util.Locale.ENGLISH));
@@ -219,10 +277,6 @@ public final class Viewport extends StackPane {
                 target -> true);
     }
 
-    public static Point3D toView(double x, double y, double z) {
-        return new Point3D(x, -z, y);
-    }
-
     private boolean isNavigationBackground(Node picked) {
         for (Node node = picked; node != null; node = node.getParent())
             if (node == bodies || node == sketches || node == handle || node == planeTargets) return false;
@@ -257,10 +311,6 @@ public final class Viewport extends StackPane {
     private boolean inFrontOfCamera(Point3D model) {
         var point = camera.sceneToLocal(world.localToScene(toView(model.getX(), model.getY(), model.getZ())));
         return point.getZ() >= camera.getNearClip() && point.getZ() <= camera.getFarClip();
-    }
-
-    public static Point3D toModel(Point3D p) {
-        return new Point3D(p.getX(), p.getZ(), -p.getY());
     }
 
     public void onSelection(BiConsumer<String, Integer> listener) {
@@ -308,8 +358,6 @@ public final class Viewport extends StackPane {
         return closest;
     }
 
-    private final ConstructionView construction = new ConstructionView(), constructionPreview = new ConstructionView();
-
     public void showConstruction(
             java.util.Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> values,
             Consumer<String> selected) {
@@ -327,12 +375,6 @@ public final class Viewport extends StackPane {
 
     public void stopDrawing() {
         planeClick = null;
-    }
-
-    /** Convert a CAD placement to FX axes without changing handedness or millimeter scale. */
-    static Affine viewTransform(dev.voxelbrew.api.model.Transform frame) {
-        var m = frame.matrix();
-        return new Affine(m[0], -m[2], m[1], m[3], -m[8], m[10], -m[9], -m[11], m[4], -m[6], m[5], m[7]);
     }
 
     public void pickSketchPlane(Consumer<Feature.Plane> choose, BiConsumer<String, Integer> hover) {
@@ -605,24 +647,6 @@ public final class Viewport extends StackPane {
         sketches.getChildren().add(group);
     }
 
-    private static Point3D sketchPoint(Feature.Plane plane, dev.voxelbrew.api.model.sketch.SketchGeometry.Vec point) {
-        var model = plane.frame().apply(point.x(), point.y(), plane.offsetZ() + .04);
-        return new Point3D(model[0], model[1], model[2]);
-    }
-
-    private static Cylinder line(Point3D a, Point3D b, double radius, Color color) {
-        Point3D delta = b.subtract(a), middle = a.midpoint(b);
-        var line = new Cylinder(radius, delta.magnitude(), 6);
-        line.setMaterial(new PhongMaterial(color));
-        line.setTranslateX(middle.getX());
-        line.setTranslateY(middle.getY());
-        line.setTranslateZ(middle.getZ());
-        Point3D axis = Rotate.Y_AXIS.crossProduct(delta);
-        double angle = Rotate.Y_AXIS.angle(delta);
-        if (axis.magnitude() > 1e-9) line.getTransforms().add(new Rotate(angle, axis));
-        return line;
-    }
-
     public void clearHandle() {
         handle.getChildren().clear();
     }
@@ -856,28 +880,6 @@ public final class Viewport extends StackPane {
         });
     }
 
-    private static MeshView meshView(MeshData data) {
-        var mesh = new TriangleMesh();
-        float[] points = new float[data.vertexCount() * 3];
-        for (int v = 0; v < data.vertexCount(); v++) {
-            var p = toView(data.coordinate(v, 0), data.coordinate(v, 1), data.coordinate(v, 2));
-            points[3 * v] = (float) p.getX();
-            points[3 * v + 1] = (float) p.getY();
-            points[3 * v + 2] = (float) p.getZ();
-        }
-        int[] faces = new int[data.triangleCount() * 6];
-        for (int t = 0; t < data.triangleCount(); t++)
-            for (int c = 0; c < 3; c++) faces[6 * t + 2 * c] = data.vertexIndex(t, c);
-        mesh.getPoints().setAll(points);
-        mesh.getTexCoords().setAll(0, 0);
-        mesh.getFaces().setAll(faces);
-        mesh.getFaceSmoothingGroups().setAll(new int[data.triangleCount()]);
-        var result = new MeshView(mesh);
-        result.setCullFace(CullFace.BACK);
-        result.setMaterial(new PhongMaterial(Color.web("#91a8b9")));
-        return result;
-    }
-
     public void select(String id) {
         selected = id;
         bodyViews.forEach((key, view) -> {
@@ -896,8 +898,6 @@ public final class Viewport extends StackPane {
         edgeViews.forEach((key, view) ->
                 view.setMaterial(new PhongMaterial(key.equals(id) ? Color.web("#a86600") : Color.web("#202124"))));
     }
-
-    private Map<String, dev.voxelbrew.api.model.BodyStyle> bodyStyles = Map.of();
 
     public void setBodyStyles(Map<String, dev.voxelbrew.api.model.BodyStyle> styles) {
         if (bodyStyles.equals(styles)) return;

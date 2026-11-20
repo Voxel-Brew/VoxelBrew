@@ -10,13 +10,6 @@ import picocli.CommandLine;
 import picocli.CommandLine.*;
 
 final class ImportCommands {
-    private ImportCommands() {}
-
-    static void register(CommandLine command) {
-        command.addSubcommand("importers", new CommandLine(Importers.class, command.getFactory()));
-        command.addSubcommand("import", new CommandLine(ImportFile.class, command.getFactory()));
-    }
-
     @Command(name = "importers", mixinStandardHelpOptions = true, description = "List built-in and external importers")
     @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     static final class Importers implements Callable<Integer> {
@@ -89,4 +82,11 @@ final class ImportCommands {
             return 0;
         }
     }
+
+    static void register(CommandLine command) {
+        command.addSubcommand("importers", new CommandLine(Importers.class, command.getFactory()));
+        command.addSubcommand("import", new CommandLine(ImportFile.class, command.getFactory()));
+    }
+
+    private ImportCommands() {}
 }

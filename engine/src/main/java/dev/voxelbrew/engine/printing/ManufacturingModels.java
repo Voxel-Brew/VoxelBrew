@@ -10,8 +10,6 @@ import java.util.*;
 
 /** Engine evaluation and tessellation adapters for detached manufacturing models. */
 public final class ManufacturingModels {
-    private ManufacturingModels() {}
-
     public static ManufacturingModel evaluate(CadDocument document, MeshOptions options) {
         return evaluate(document, options, dev.voxelbrew.engine.feature.FeatureRegistry.defaultDirectory());
     }
@@ -36,4 +34,6 @@ public final class ManufacturingModels {
                 PrintProfile.resolve(document.printSetup()),
                 meshes);
     }
+
+    private ManufacturingModels() {}
 }

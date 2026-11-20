@@ -10,8 +10,6 @@ import java.util.*;
 
 /** Conservative XY packing of placed object/support bounds; never changes rotation or height. */
 public final class PrintArrangement {
-    private PrintArrangement() {}
-
     private record Part(BodyInstance instance, Rectangle2D bounds) {}
 
     /** Empty means no layout was found; callers must retain the original setup in that case. */
@@ -103,4 +101,6 @@ public final class PrintArrangement {
         return Optional.of(
                 model.instances().stream().map(i -> placements.get(i.id())).toList());
     }
+
+    private PrintArrangement() {}
 }

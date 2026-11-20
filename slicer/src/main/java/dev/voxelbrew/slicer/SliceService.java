@@ -33,6 +33,62 @@ public class SliceService {
         }
     }
 
+    private record StagedFile(Path target, Path scratch, Path backup) {
+        static StagedFile prepare(Path target, PrintArtifact artifact, boolean overwrite) throws IOException {
+            Path filename = target.getFileName();
+            Path parent = target.getParent();
+            if (filename == null
+                    || parent == null
+                    || !filename.toString().toLowerCase(Locale.ROOT).endsWith("." + artifact.format()))
+                throw new IllegalArgumentException("Artifact requires a ." + artifact.format() + " destination");
+            boolean exists = Files.exists(target, LinkOption.NOFOLLOW_LINKS);
+            if (exists && (!overwrite || !Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)))
+                throw new FileAlreadyExistsException(
+                        target.toString(), null, overwrite ? "Expected a regular file" : "Explicit overwrite required");
+            Path scratch = Files.createTempFile(parent, ".voxelbrew-slice-", ".tmp");
+            Path backup = null;
+            try {
+                if (exists) {
+                    backup = Files.createTempFile(parent, ".voxelbrew-slice-backup-", ".tmp");
+                    Files.copy(target, backup, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+                }
+                Files.write(scratch, artifact.bytes());
+                try (var channel = FileChannel.open(scratch, StandardOpenOption.WRITE)) {
+                    channel.force(true);
+                }
+                return new StagedFile(target, scratch, backup);
+            } catch (IOException | RuntimeException failure) {
+                new StagedFile(target, scratch, backup).cleanup();
+                throw failure;
+            }
+        }
+
+        private static void delete(Path path) {
+            try {
+                Files.deleteIfExists(path);
+            } catch (IOException failure) {
+                log.warn("Could not remove temporary slicer output {}", path, failure);
+            }
+        }
+
+        void publish(boolean overwrite) throws IOException {
+            if (overwrite && backup != null)
+                Files.move(scratch, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            else Files.createLink(target, scratch);
+        }
+
+        void restore() throws IOException {
+            if (backup != null)
+                Files.move(backup, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            else Files.deleteIfExists(target);
+        }
+
+        void cleanup() {
+            delete(scratch);
+            if (backup != null) delete(backup);
+        }
+    }
+
     public static Optional<Result> slice(
             SlicerProvider provider,
             ManufacturingModel model,
@@ -189,61 +245,5 @@ public class SliceService {
 
     public static void save(PrintArtifact artifact, Path destination, boolean overwrite) throws IOException {
         publish(Map.of(destination, artifact), overwrite, () -> {});
-    }
-
-    private record StagedFile(Path target, Path scratch, Path backup) {
-        static StagedFile prepare(Path target, PrintArtifact artifact, boolean overwrite) throws IOException {
-            Path filename = target.getFileName();
-            Path parent = target.getParent();
-            if (filename == null
-                    || parent == null
-                    || !filename.toString().toLowerCase(Locale.ROOT).endsWith("." + artifact.format()))
-                throw new IllegalArgumentException("Artifact requires a ." + artifact.format() + " destination");
-            boolean exists = Files.exists(target, LinkOption.NOFOLLOW_LINKS);
-            if (exists && (!overwrite || !Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)))
-                throw new FileAlreadyExistsException(
-                        target.toString(), null, overwrite ? "Expected a regular file" : "Explicit overwrite required");
-            Path scratch = Files.createTempFile(parent, ".voxelbrew-slice-", ".tmp");
-            Path backup = null;
-            try {
-                if (exists) {
-                    backup = Files.createTempFile(parent, ".voxelbrew-slice-backup-", ".tmp");
-                    Files.copy(target, backup, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
-                }
-                Files.write(scratch, artifact.bytes());
-                try (var channel = FileChannel.open(scratch, StandardOpenOption.WRITE)) {
-                    channel.force(true);
-                }
-                return new StagedFile(target, scratch, backup);
-            } catch (IOException | RuntimeException failure) {
-                new StagedFile(target, scratch, backup).cleanup();
-                throw failure;
-            }
-        }
-
-        void publish(boolean overwrite) throws IOException {
-            if (overwrite && backup != null)
-                Files.move(scratch, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            else Files.createLink(target, scratch);
-        }
-
-        void restore() throws IOException {
-            if (backup != null)
-                Files.move(backup, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            else Files.deleteIfExists(target);
-        }
-
-        void cleanup() {
-            delete(scratch);
-            if (backup != null) delete(backup);
-        }
-
-        private static void delete(Path path) {
-            try {
-                Files.deleteIfExists(path);
-            } catch (IOException failure) {
-                log.warn("Could not remove temporary slicer output {}", path, failure);
-            }
-        }
     }
 }

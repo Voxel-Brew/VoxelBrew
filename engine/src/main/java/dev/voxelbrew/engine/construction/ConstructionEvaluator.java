@@ -11,8 +11,6 @@ import java.util.function.Function;
 
 /** Resolves earlier feature outputs before computing a construction result. */
 public final class ConstructionEvaluator {
-    private ConstructionEvaluator() {}
-
     private record Operand(Datum datum, double[] topology) {
         Vector vector(int offset) {
             return new Vector(topology[offset], topology[offset + 1], topology[offset + 2]);
@@ -205,4 +203,6 @@ public final class ConstructionEvaluator {
             default -> throw new IllegalArgumentException("Unknown origin direction");
         };
     }
+
+    private ConstructionEvaluator() {}
 }

@@ -6,8 +6,6 @@ import dev.voxelbrew.api.model.ModelException;
 
 /** Shared edit-time and replay-time validation. Broken references are diagnosed by replay. */
 final class FeatureValidation {
-    private FeatureValidation() {}
-
     static void validate(Feature feature) {
         if (feature instanceof Feature.Sketch sketch) {
             CadDocument.identifier(sketch.profileId(), "profile ID");
@@ -83,4 +81,6 @@ final class FeatureValidation {
             throw new ModelException(id, field + " must be >= 0.000001 mm");
         }
     }
+
+    private FeatureValidation() {}
 }

@@ -11,21 +11,6 @@ import java.util.*;
 
 /** Separate plugin compiled only against published import and model API artifacts. */
 public class ProbeImporter implements ImporterProvider {
-    @Override
-    public ImporterDescriptor descriptor() {
-        return new ImporterDescriptor("plate", "External plate", "1.0.0");
-    }
-
-    @Override
-    public Importer create() {
-        return window -> {
-            var accepted = window.show(new PlateDialog());
-            if (accepted.isEmpty()) return Optional.empty();
-            var settings = accepted.orElseThrow();
-            return Optional.of(read(settings.path(), settings.scale()));
-        };
-    }
-
     public record PlateSettings(Path path, double scale) {}
 
     public static final class PlateDialog implements ImportDialog<PlateSettings> {
@@ -74,25 +59,6 @@ public class ProbeImporter implements ImporterProvider {
         }
     }
 
-    public CadDocument read(Path source, double scale) throws IOException {
-        byte[] bytes;
-        try (var input = Files.newInputStream(source)) {
-            bytes = input.readNBytes(4097);
-        }
-        if (bytes.length > 4096) throw new IOException("Plate input exceeds 4 KiB");
-        String[] dimensions = new String(bytes, StandardCharsets.UTF_8).strip().split(",");
-        if (dimensions.length != 3) throw new IOException("Expected width,height,thickness");
-        var sketch = new Feature.Sketch(
-                "plate",
-                "profile",
-                new Feature.Plane("origin-xy", 0),
-                new Feature.Rectangle(
-                        0, 0, Double.parseDouble(dimensions[0]) * scale, Double.parseDouble(dimensions[1]) * scale));
-        var extrude = new Feature.Extrude(
-                "thickness", new Feature.ProfileRef("plate", "profile"), Double.parseDouble(dimensions[2]) * scale);
-        return new CadDocument("imported-plate", List.of(sketch, extrude), 2);
-    }
-
     public static final class Duplicate extends ProbeImporter {}
 
     public static final class Broken extends ProbeImporter {
@@ -112,5 +78,39 @@ public class ProbeImporter implements ImporterProvider {
         public CadDocument read(Path source, double scale) throws IOException {
             throw new IOException("Deliberate importer failure");
         }
+    }
+
+    @Override
+    public ImporterDescriptor descriptor() {
+        return new ImporterDescriptor("plate", "External plate", "1.0.0");
+    }
+
+    @Override
+    public Importer create() {
+        return window -> {
+            var accepted = window.show(new PlateDialog());
+            if (accepted.isEmpty()) return Optional.empty();
+            var settings = accepted.orElseThrow();
+            return Optional.of(read(settings.path(), settings.scale()));
+        };
+    }
+
+    public CadDocument read(Path source, double scale) throws IOException {
+        byte[] bytes;
+        try (var input = Files.newInputStream(source)) {
+            bytes = input.readNBytes(4097);
+        }
+        if (bytes.length > 4096) throw new IOException("Plate input exceeds 4 KiB");
+        String[] dimensions = new String(bytes, StandardCharsets.UTF_8).strip().split(",");
+        if (dimensions.length != 3) throw new IOException("Expected width,height,thickness");
+        var sketch = new Feature.Sketch(
+                "plate",
+                "profile",
+                new Feature.Plane("origin-xy", 0),
+                new Feature.Rectangle(
+                        0, 0, Double.parseDouble(dimensions[0]) * scale, Double.parseDouble(dimensions[1]) * scale));
+        var extrude = new Feature.Extrude(
+                "thickness", new Feature.ProfileRef("plate", "profile"), Double.parseDouble(dimensions[2]) * scale);
+        return new CadDocument("imported-plate", List.of(sketch, extrude), 2);
     }
 }

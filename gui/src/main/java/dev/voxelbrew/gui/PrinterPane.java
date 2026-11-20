@@ -27,6 +27,43 @@ final class PrinterPane extends VBox implements AutoCloseable {
         Arrays.setAll(OPERATION_LOCKS, index -> new Object());
     }
 
+    private final PrinterStore runtime;
+
+    private final dev.voxelbrew.api.printer.PrinterProfileCatalog profiles;
+
+    private final PrinterVisibility printerVisibility;
+
+    private final Translations text;
+
+    private final ExecutorService worker;
+    private final ComboBox<Plate> plates = new ComboBox<>();
+    private final Label deviceName = new Label();
+    private final Label status = new Label(), details = new Label(), message = new Label();
+    private final Label connectionDetail = new Label();
+    private final Label progressValue = new Label(),
+            nozzleValue = new Label(),
+            bedValue = new Label(),
+            remainingValue = new Label();
+    private final ProgressBar transfer = new ProgressBar(0);
+    private final VBox monitor = new VBox(16);
+    private final Button print, exportGcode;
+    private final DriverRegistry providers;
+    private final Timeline polling;
+    private final AtomicLong generation = new AtomicLong();
+    private final AtomicLong jobGeneration = new AtomicLong();
+    private List<Printer> availableDevices = List.of();
+    private Printer selectedDevice;
+    private CadDocument document;
+    private Driver session;
+    // Accessed only by the serialized device worker, including final cleanup.
+
+    private DriverStatus current = DriverStatus.unknown("");
+    private volatile boolean busy;
+    private volatile boolean closed;
+    private volatile boolean startPending;
+
+    private record Plate(String id, String name) {}
+
     private static Object operationLock(Printer printer) {
         var endpoints = printer.driverConfiguration().properties().values().stream()
                 .filter(java.net.URI.class::isInstance)
@@ -53,38 +90,23 @@ final class PrinterPane extends VBox implements AutoCloseable {
         }
     }
 
-    private record Plate(String id, String name) {}
+    static Printer deviceForJob(PrintArtifact artifact, List<Printer> available) {
+        if (artifact == null || !"printer".equals(artifact.metadata().get("target_kind"))) return null;
+        String target = artifact.metadata().get("target_id");
+        return available.stream()
+                .filter(device -> device.id().equals(target))
+                .findFirst()
+                .orElse(null);
+    }
 
-    private final PrinterStore runtime;
-    private final dev.voxelbrew.api.printer.PrinterProfileCatalog profiles;
-    private final PrinterVisibility printerVisibility;
-    private final Translations text;
-    private final ExecutorService worker;
-    private final ComboBox<Plate> plates = new ComboBox<>();
-    private final Label deviceName = new Label();
-    private List<Printer> availableDevices = List.of();
-    private Printer selectedDevice;
-    private final Label status = new Label(), details = new Label(), message = new Label();
-    private final Label connectionDetail = new Label();
-    private final Label progressValue = new Label(),
-            nozzleValue = new Label(),
-            bedValue = new Label(),
-            remainingValue = new Label();
-    private final ProgressBar transfer = new ProgressBar(0);
-    private final VBox monitor = new VBox(16);
-    private final Button print, exportGcode;
-    private final DriverRegistry providers;
-    private final Timeline polling;
-    private CadDocument document;
-    private Driver session;
-    // Accessed only by the serialized device worker, including final cleanup.
-
-    private DriverStatus current = DriverStatus.unknown("");
-    private final AtomicLong generation = new AtomicLong();
-    private volatile boolean busy;
-    private volatile boolean closed;
-    private volatile boolean startPending;
-    private final AtomicLong jobGeneration = new AtomicLong();
+    private static VBox deviceField(Label label, Control input) {
+        label.getStyleClass().add("device-config-label");
+        input.setMaxWidth(Double.MAX_VALUE);
+        var field = new VBox(6, label, input);
+        field.getStyleClass().add("device-config-field");
+        field.setMaxWidth(Double.MAX_VALUE);
+        return field;
+    }
 
     PrinterPane(
             PrinterStore runtime,
@@ -307,15 +329,6 @@ final class PrinterPane extends VBox implements AutoCloseable {
             selectedDevice = resolved;
             connect();
         } else update();
-    }
-
-    static Printer deviceForJob(PrintArtifact artifact, List<Printer> available) {
-        if (artifact == null || !"printer".equals(artifact.metadata().get("target_kind"))) return null;
-        String target = artifact.metadata().get("target_id");
-        return available.stream()
-                .filter(device -> device.id().equals(target))
-                .findFirst()
-                .orElse(null);
     }
 
     private void update() {
@@ -722,15 +735,6 @@ final class PrinterPane extends VBox implements AutoCloseable {
         });
         validate.run();
         Dialogs.show(dialog, getScene().getWindow(), text);
-    }
-
-    private static VBox deviceField(Label label, Control input) {
-        label.getStyleClass().add("device-config-label");
-        input.setMaxWidth(Double.MAX_VALUE);
-        var field = new VBox(6, label, input);
-        field.getStyleClass().add("device-config-field");
-        field.setMaxWidth(Double.MAX_VALUE);
-        return field;
     }
 
     @Override

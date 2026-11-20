@@ -32,11 +32,89 @@ final class SlicerSettings {
     private static final Pattern VERSION = Pattern.compile("(?<![\\w.])v?(\\d+(?:\\.\\d+)+)(?![\\d.])");
     private static final int INSTALLATION_ROW_HEIGHT = 54;
 
-    private record Check(String version, String failure) {}
-
     private final UserConfiguration configuration;
+
     private final SlicerInstallationStore store;
     private final ExecutorService worker;
+
+    private record Check(String version, String failure) {}
+
+    private static ListCell<SlicerInstallation> installationCell(
+            Map<String, SlicerDescriptor> providers, String appVersion, Translations text) {
+        var name = new Label();
+        name.getStyleClass().add("slicer-installation-name");
+        var version = new Label();
+        version.getStyleClass().add("slicer-installation-version");
+        var state = new Label();
+        state.setMinWidth(Region.USE_PREF_SIZE);
+        var identity = new VBox(2, name, version);
+        identity.setMinWidth(0);
+        identity.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(identity, Priority.ALWAYS);
+        var row = new HBox(12, identity, state);
+        row.setAlignment(Pos.CENTER_LEFT);
+        return new ListCell<>() {
+            {
+                setPrefWidth(0);
+                row.prefWidthProperty()
+                        .bind(Bindings.createDoubleBinding(
+                                () -> Math.max(
+                                        0,
+                                        getWidth()
+                                                - getInsets().getLeft()
+                                                - getInsets().getRight()),
+                                widthProperty(),
+                                insetsProperty()));
+            }
+
+            @Override
+            protected void updateItem(SlicerInstallation item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setGraphic(null);
+                    setTooltip(null);
+                    setAccessibleText(null);
+                    return;
+                }
+                var descriptor = providers.get(item.providerId());
+                String provider = descriptor == null ? item.providerId() : descriptor.name();
+                String displayName = descriptor == null || descriptor.version().equals(appVersion)
+                        ? item.name()
+                        : item.name() + " (" + descriptor.version() + ")";
+                var match = VERSION.matcher(item.version());
+                String release = match.find() ? match.group(1) : item.version();
+                String subtitle = item.name().equalsIgnoreCase(provider)
+                        ? release
+                        : release.isBlank() ? provider : provider + " · " + release;
+                name.setText(displayName);
+                version.setText(subtitle);
+                String status = item.bundled() ? "bundled" : item.operational() ? "ready" : "unavailable";
+                state.setText(text.text("slicer.installation.state." + status));
+                state.getStyleClass().setAll("label", "slicer-installation-state", "slicer-state-" + status);
+                setTooltip(item.version().isBlank() ? null : new Tooltip(item.version()));
+                setAccessibleText(displayName + " · " + subtitle + " · " + state.getText());
+                setGraphic(row);
+            }
+        };
+    }
+
+    private static void showInstallationDetail(Label status, SlicerInstallation selected, Translations text) {
+        String detail = selected == null
+                ? ""
+                : selected.bundled()
+                        ? text.text("slicer.installation.bundled")
+                        : selected.operational()
+                                ? selected.settings().getOrDefault("executable", selected.version())
+                                : text.text("slicer.installation.failed", selected.failure());
+        status.setText(detail);
+        status.setTooltip(detail.isBlank() ? null : new Tooltip(detail));
+    }
+
+    private static Map<String, String> providerValues(Map<String, String> values) {
+        var result = new LinkedHashMap<>(values);
+        result.remove(NAME);
+        return result;
+    }
 
     SlicerSettings(UserConfiguration configuration, ExecutorService worker) {
         this.configuration = configuration;
@@ -153,77 +231,6 @@ final class SlicerSettings {
         var content = new VBox(12, installations, actions, creation);
         manager.getDialogPane().setContent(content);
         Dialogs.show(manager, owner, text);
-    }
-
-    private static ListCell<SlicerInstallation> installationCell(
-            Map<String, SlicerDescriptor> providers, String appVersion, Translations text) {
-        var name = new Label();
-        name.getStyleClass().add("slicer-installation-name");
-        var version = new Label();
-        version.getStyleClass().add("slicer-installation-version");
-        var state = new Label();
-        state.setMinWidth(Region.USE_PREF_SIZE);
-        var identity = new VBox(2, name, version);
-        identity.setMinWidth(0);
-        identity.setAlignment(Pos.CENTER_LEFT);
-        HBox.setHgrow(identity, Priority.ALWAYS);
-        var row = new HBox(12, identity, state);
-        row.setAlignment(Pos.CENTER_LEFT);
-        return new ListCell<>() {
-            {
-                setPrefWidth(0);
-                row.prefWidthProperty()
-                        .bind(Bindings.createDoubleBinding(
-                                () -> Math.max(
-                                        0,
-                                        getWidth()
-                                                - getInsets().getLeft()
-                                                - getInsets().getRight()),
-                                widthProperty(),
-                                insetsProperty()));
-            }
-
-            @Override
-            protected void updateItem(SlicerInstallation item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setGraphic(null);
-                    setTooltip(null);
-                    setAccessibleText(null);
-                    return;
-                }
-                var descriptor = providers.get(item.providerId());
-                String provider = descriptor == null ? item.providerId() : descriptor.name();
-                String displayName = descriptor == null || descriptor.version().equals(appVersion)
-                        ? item.name()
-                        : item.name() + " (" + descriptor.version() + ")";
-                var match = VERSION.matcher(item.version());
-                String release = match.find() ? match.group(1) : item.version();
-                String subtitle = item.name().equalsIgnoreCase(provider)
-                        ? release
-                        : release.isBlank() ? provider : provider + " · " + release;
-                name.setText(displayName);
-                version.setText(subtitle);
-                String status = item.bundled() ? "bundled" : item.operational() ? "ready" : "unavailable";
-                state.setText(text.text("slicer.installation.state." + status));
-                state.getStyleClass().setAll("label", "slicer-installation-state", "slicer-state-" + status);
-                setTooltip(item.version().isBlank() ? null : new Tooltip(item.version()));
-                setAccessibleText(displayName + " · " + subtitle + " · " + state.getText());
-                setGraphic(row);
-            }
-        };
-    }
-
-    private static void showInstallationDetail(Label status, SlicerInstallation selected, Translations text) {
-        String detail = selected == null
-                ? ""
-                : selected.bundled()
-                        ? text.text("slicer.installation.bundled")
-                        : selected.operational()
-                                ? selected.settings().getOrDefault("executable", selected.version())
-                                : text.text("slicer.installation.failed", selected.failure());
-        status.setText(detail);
-        status.setTooltip(detail.isBlank() ? null : new Tooltip(detail));
     }
 
     private void removeSafely(SlicerInstallation installation, Window owner, Translations text, Runnable update) {
@@ -428,11 +435,5 @@ final class SlicerSettings {
         } finally {
             cancellation.cancel();
         }
-    }
-
-    private static Map<String, String> providerValues(Map<String, String> values) {
-        var result = new LinkedHashMap<>(values);
-        result.remove(NAME);
-        return result;
     }
 }

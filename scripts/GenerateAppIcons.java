@@ -14,8 +14,6 @@ import javax.imageio.ImageIO;
 
 /** Run from the repository root with Java 21; only resizes and packages the original artwork. */
 public final class GenerateAppIcons {
-    private GenerateAppIcons() {}
-
     public static void main(String[] args) throws IOException {
         var original =
                 ImageIO.read(Path.of("gui/src/main/branding/voxelbrew.png").toFile());
@@ -94,4 +92,6 @@ public final class GenerateAppIcons {
         body.writeTo(output);
         return output.toByteArray();
     }
+
+    private GenerateAppIcons() {}
 }

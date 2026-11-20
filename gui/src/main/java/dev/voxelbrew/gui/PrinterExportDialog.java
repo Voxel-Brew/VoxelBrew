@@ -8,8 +8,6 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
 final class PrinterExportDialog {
-    private PrinterExportDialog() {}
-
     static Set<String> choose(Window owner, Translations translations, List<PrinterProfileCatalog.Entry> entries) {
         return choose(owner, translations, entries, Set.of(), false).orElse(Set.of());
     }
@@ -116,4 +114,6 @@ final class PrinterExportDialog {
         dialog.setResultConverter(button -> button == export ? Set.copyOf(selected) : null);
         return Dialogs.show(dialog, owner, translations);
     }
+
+    private PrinterExportDialog() {}
 }

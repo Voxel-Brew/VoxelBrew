@@ -14,6 +14,21 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class GcodePersistenceTest {
+    private static final List<String> LINES = List.of(
+            "; UTF-8: żółć",
+            "",
+            "G21",
+            "G90",
+            "M82",
+            "G1 Z0.2",
+            ";TYPE:Perimeter",
+            "G1 X10 Y10 E1 F1200",
+            "M104 S0",
+            "");
+
+    @TempDir
+    Path directory;
+
     @Test
     void packagedJobRoundTripsAndExportsExactBytes() throws Exception {
         byte[] bytes = {0x50, 0x4b, 1, 2, 3};
@@ -42,21 +57,6 @@ class GcodePersistenceTest {
             }
         }
     }
-
-    @TempDir
-    Path directory;
-
-    private static final List<String> LINES = List.of(
-            "; UTF-8: żółć",
-            "",
-            "G21",
-            "G90",
-            "M82",
-            "G1 Z0.2",
-            ";TYPE:Perimeter",
-            "G1 X10 Y10 E1 F1200",
-            "M104 S0",
-            "");
 
     @Test
     void providersRoundTripEveryLineAndExportTheActivePlate() throws Exception {

@@ -34,6 +34,11 @@ final class RollingAppLog extends Handler {
     private final Object monitor;
     private boolean closed;
 
+    @FunctionalInterface
+    private interface IoOperation {
+        void run() throws IOException;
+    }
+
     RollingAppLog(Path directory, long limit, int archives) throws IOException {
         Files.createDirectories(directory);
         this.directory = directory.toRealPath();
@@ -120,10 +125,5 @@ final class RollingAppLog extends Handler {
         synchronized (monitor) {
             closed = true;
         }
-    }
-
-    @FunctionalInterface
-    private interface IoOperation {
-        void run() throws IOException;
     }
 }

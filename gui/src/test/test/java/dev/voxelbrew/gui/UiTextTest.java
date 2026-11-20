@@ -14,6 +14,11 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 class UiTextTest {
+    private static void choices(Translations t, String prefix, Enum<?>[] values) {
+        for (var value : values)
+            assertThat(t.text(prefix + value.name()).isBlank()).isFalse();
+    }
+
     @Test
     void aboutMessagesFormatVersionsAndPolishLegalHelpWithoutAWindow() {
         var en = new Translations(Locale.ENGLISH);
@@ -79,11 +84,6 @@ class UiTextTest {
         assertThat(UiText.view(pl, "Top Front Right")).isEqualTo("Góra Przód Prawo");
         assertThat(UiText.view(new Translations(Locale.ENGLISH), "Top Front Right"))
                 .isEqualTo("Top Front Right");
-    }
-
-    private static void choices(Translations t, String prefix, Enum<?>[] values) {
-        for (var value : values)
-            assertThat(t.text(prefix + value.name()).isBlank()).isFalse();
     }
 
     @Test

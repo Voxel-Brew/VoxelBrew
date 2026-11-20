@@ -7,8 +7,6 @@ import java.util.stream.Collectors;
 
 /** User-facing preflight explanations shared by the placement status and job controls. */
 final class PrintValidationMessages {
-    private PrintValidationMessages() {}
-
     static String format(
             PrintValidation.Result result, Translations translations, Function<String, String> objectName) {
         return result.diagnostics().stream()
@@ -28,4 +26,6 @@ final class PrintValidationMessages {
                 })
                 .collect(Collectors.joining("\n"));
     }
+
+    private PrintValidationMessages() {}
 }

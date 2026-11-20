@@ -10,8 +10,6 @@ import java.nio.file.StandardCopyOption;
 
 /** Atomic UTF-8 JSON publication; does not change the active project or save version. */
 public final class JsonDocumentWriter {
-    private JsonDocumentWriter() {}
-
     public static void save(CadDocument document, Path destination, boolean overwrite) throws IOException {
         String json = DocumentCodec.encodeJson(document);
         Path target = destination.toAbsolutePath().normalize();
@@ -28,4 +26,6 @@ public final class JsonDocumentWriter {
             Files.deleteIfExists(temporary);
         }
     }
+
+    private JsonDocumentWriter() {}
 }

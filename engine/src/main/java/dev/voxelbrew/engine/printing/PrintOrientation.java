@@ -5,8 +5,6 @@ import dev.voxelbrew.api.model.printing.MeshGeometry;
 
 /** Shared automatic bed orientation for desktop and headless preparation. */
 public final class PrintOrientation {
-    private PrintOrientation() {}
-
     /** Rank feasible planar bed faces by unsupported area, bed contact, then height. */
     public static Transform autoOrient(dev.voxelbrew.api.model.mesh.MeshData mesh, Transform current) {
         Transform best = null;
@@ -44,6 +42,7 @@ public final class PrintOrientation {
         if (best == null) throw new IllegalArgumentException("No planar face can support this object on the bed");
         return best;
     }
+
     /** Rotate about the placed center in world/local axes, preserving bed clearance. */
     public static dev.voxelbrew.api.model.BodyInstance rotate(
             dev.voxelbrew.api.model.BodyInstance source,
@@ -72,4 +71,6 @@ public final class PrintOrientation {
                 source.bodyId(),
                 Transform.translation(0, 0, before.minZ() - after.minZ()).compose(placed));
     }
+
+    private PrintOrientation() {}
 }

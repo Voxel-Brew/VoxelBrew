@@ -11,8 +11,6 @@ import javafx.stage.*;
 
 /** Edits custom hardware definitions; bundled definitions can only be copied. */
 final class ProfileEditor {
-    private ProfileEditor() {}
-
     static Optional<Profile> show(Window owner, Translations text, PrinterProfileCatalog catalog, Profile source) {
         var dialog = new Dialog<Profile>();
         dialog.setTitle(source == null ? "New printer profile" : "Edit / copy printer profile");
@@ -163,4 +161,6 @@ final class ProfileEditor {
                 })
                 .toList();
     }
+
+    private ProfileEditor() {}
 }

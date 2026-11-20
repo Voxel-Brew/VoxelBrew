@@ -12,6 +12,13 @@ class ConfigurationProcessTest {
     @TempDir
     Path directory;
 
+    public static final class Writer {
+        public static void main(String[] args) throws Exception {
+            var config = new dev.voxelbrew.util.config.FileUserConfiguration(Path.of(args[0]));
+            for (int index = 0; index < 20; index++) config.set(args[1] + "." + index, "value." + index);
+        }
+    }
+
     @Test
     void independentApplicationsMergeEditsInTheSameConfiguration() throws Exception {
         Path file = directory.resolve("shared settings/config.properties");
@@ -72,13 +79,6 @@ class ConfigurationProcessTest {
             }
         } finally {
             for (var process : processes) if (process.isAlive()) process.destroyForcibly();
-        }
-    }
-
-    public static final class Writer {
-        public static void main(String[] args) throws Exception {
-            var config = new dev.voxelbrew.util.config.FileUserConfiguration(Path.of(args[0]));
-            for (int index = 0; index < 20; index++) config.set(args[1] + "." + index, "value." + index);
         }
     }
 }

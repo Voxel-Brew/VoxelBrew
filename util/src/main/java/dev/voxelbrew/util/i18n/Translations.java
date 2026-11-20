@@ -22,6 +22,37 @@ public final class Translations {
     private final ResourceBundle messages;
     private final Map<String, String> languages;
 
+    private record Language(Locale locale, String source) {}
+
+    private static final class Current {
+        static final Translations INSTANCE = dev.voxelbrew.util.services.Services.load(Translations.class);
+    }
+
+    private static Language language(UserConfiguration configuration) {
+        try {
+            String language = configuration.get("language", "system").strip();
+            boolean system = language.isEmpty() || language.equalsIgnoreCase("system");
+            Locale selected = system
+                    ? Locale.getDefault(Locale.Category.DISPLAY)
+                    : new Locale.Builder().setLanguageTag(language).build();
+            return new Language(selected, system ? "system display locale" : "saved language preference");
+        } catch (IOException | IllformedLocaleException failure) {
+            log.warn("Cannot read language preference; using English", failure);
+            log.info(
+                    "Selected application language en: English fallback for unreadable or invalid language preference");
+            return new Language(Locale.ENGLISH, null);
+        }
+    }
+
+    public static Translations configured(UserConfiguration configuration) {
+        return new Translations(configuration, dev.voxelbrew.util.services.Services.load(ApplicationPaths.class));
+    }
+
+    /** Reads the language preference once per application process; restart after changing it. */
+    public static Translations current() {
+        return Current.INSTANCE;
+    }
+
     public Translations(@NonNull Locale locale) {
         this(
                 locale,
@@ -107,24 +138,6 @@ public final class Translations {
         };
     }
 
-    public ResourceBundle bundle() {
-        return messages;
-    }
-
-    public Map<String, String> languages() {
-        return languages;
-    }
-
-    public String text(String key, Object... arguments) {
-        String pattern = messages.getString(key);
-        return arguments.length == 0 ? pattern : new MessageFormat(pattern, locale).format(arguments);
-    }
-
-    /** Provider descriptions without a bundled translation retain their original text. */
-    public String textOrDefault(String key, String fallback) {
-        return messages.containsKey(key) ? text(key) : fallback;
-    }
-
     public Translations() {
         this(
                 dev.voxelbrew.util.services.Services.load(UserConfiguration.class),
@@ -134,8 +147,6 @@ public final class Translations {
     public Translations(@NonNull UserConfiguration configuration, @NonNull ApplicationPaths paths) {
         this(language(configuration), paths.home().resolve("i18n"));
     }
-
-    private record Language(Locale locale, String source) {}
 
     private Translations(Language language, Path directory) {
         this(language.locale(), directory);
@@ -153,32 +164,21 @@ public final class Translations {
                     language.locale().toLanguageTag());
     }
 
-    private static Language language(UserConfiguration configuration) {
-        try {
-            String language = configuration.get("language", "system").strip();
-            boolean system = language.isEmpty() || language.equalsIgnoreCase("system");
-            Locale selected = system
-                    ? Locale.getDefault(Locale.Category.DISPLAY)
-                    : new Locale.Builder().setLanguageTag(language).build();
-            return new Language(selected, system ? "system display locale" : "saved language preference");
-        } catch (IOException | IllformedLocaleException failure) {
-            log.warn("Cannot read language preference; using English", failure);
-            log.info(
-                    "Selected application language en: English fallback for unreadable or invalid language preference");
-            return new Language(Locale.ENGLISH, null);
-        }
+    public ResourceBundle bundle() {
+        return messages;
     }
 
-    public static Translations configured(UserConfiguration configuration) {
-        return new Translations(configuration, dev.voxelbrew.util.services.Services.load(ApplicationPaths.class));
+    public Map<String, String> languages() {
+        return languages;
     }
 
-    private static final class Current {
-        static final Translations INSTANCE = dev.voxelbrew.util.services.Services.load(Translations.class);
+    public String text(String key, Object... arguments) {
+        String pattern = messages.getString(key);
+        return arguments.length == 0 ? pattern : new MessageFormat(pattern, locale).format(arguments);
     }
 
-    /** Reads the language preference once per application process; restart after changing it. */
-    public static Translations current() {
-        return Current.INSTANCE;
+    /** Provider descriptions without a bundled translation retain their original text. */
+    public String textOrDefault(String key, String fallback) {
+        return messages.containsKey(key) ? text(key) : fallback;
     }
 }

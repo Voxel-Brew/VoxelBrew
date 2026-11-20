@@ -29,6 +29,13 @@ import lombok.RequiredArgsConstructor;
 /** Renders importer-owned component trees on the JavaFX application thread. */
 @RequiredArgsConstructor
 public final class DesktopImportWindow implements ImportWindow {
+    private final Window owner;
+
+    private final Path current;
+    private final Translations translations;
+    private Path suggestedSource;
+    private String importerVersion;
+
     private record InputBinding(Supplier<String> value, Node control, Label caption, Label message) {
         void display(String error) {
             if (error == null) {
@@ -47,11 +54,50 @@ public final class DesktopImportWindow implements ImportWindow {
         }
     }
 
-    private final Window owner;
-    private final Path current;
-    private final Translations translations;
-    private Path suggestedSource;
-    private String importerVersion;
+    private static VBox field(String label, Node input) {
+        var caption = new Label(label);
+        caption.getStyleClass().add("import-dialog-field-label");
+        var column = new VBox(6, caption, input);
+        column.setMaxWidth(Double.MAX_VALUE);
+        return column;
+    }
+
+    private static VBox bind(
+            Map<String, InputBinding> inputs,
+            String id,
+            Supplier<String> value,
+            Node control,
+            VBox container,
+            ObservableValue<?> changed,
+            Runnable onChange) {
+        var message = new Label();
+        message.getStyleClass().add("import-dialog-inline-error");
+        message.setWrapText(true);
+        message.setVisible(false);
+        message.managedProperty().bind(message.visibleProperty());
+        container.getChildren().add(message);
+        Label caption = container.getChildren().getFirst() instanceof Label label ? label : null;
+        if (inputs.putIfAbsent(id, new InputBinding(value, control, caption, message)) != null)
+            throw new IllegalArgumentException("Duplicate import input: " + id);
+        changed.addListener((observable, before, after) -> onChange.run());
+        return container;
+    }
+
+    private static Map<String, String> readValues(Map<String, InputBinding> inputs) {
+        var values = new LinkedHashMap<String, String>();
+        inputs.forEach((id, input) -> values.put(id, input.value().get()));
+        return values;
+    }
+
+    private static void displayErrors(Map<String, InputBinding> inputs, Map<String, String> errors, Label general) {
+        inputs.forEach((id, input) -> input.display(errors.get(id)));
+        var unbound = new java.util.ArrayList<String>();
+        errors.forEach((id, message) -> {
+            if (!inputs.containsKey(id)) unbound.add(message);
+        });
+        general.setText(String.join("\n", unbound));
+        general.setVisible(!unbound.isEmpty());
+    }
 
     public DesktopImportWindow importerVersion(String version) {
         importerVersion =
@@ -289,50 +335,5 @@ public final class DesktopImportWindow implements ImportWindow {
         }
         throw new UnsupportedOperationException(
                 "Unsupported import component: " + component.getClass().getName());
-    }
-
-    private static VBox field(String label, Node input) {
-        var caption = new Label(label);
-        caption.getStyleClass().add("import-dialog-field-label");
-        var column = new VBox(6, caption, input);
-        column.setMaxWidth(Double.MAX_VALUE);
-        return column;
-    }
-
-    private static VBox bind(
-            Map<String, InputBinding> inputs,
-            String id,
-            Supplier<String> value,
-            Node control,
-            VBox container,
-            ObservableValue<?> changed,
-            Runnable onChange) {
-        var message = new Label();
-        message.getStyleClass().add("import-dialog-inline-error");
-        message.setWrapText(true);
-        message.setVisible(false);
-        message.managedProperty().bind(message.visibleProperty());
-        container.getChildren().add(message);
-        Label caption = container.getChildren().getFirst() instanceof Label label ? label : null;
-        if (inputs.putIfAbsent(id, new InputBinding(value, control, caption, message)) != null)
-            throw new IllegalArgumentException("Duplicate import input: " + id);
-        changed.addListener((observable, before, after) -> onChange.run());
-        return container;
-    }
-
-    private static Map<String, String> readValues(Map<String, InputBinding> inputs) {
-        var values = new LinkedHashMap<String, String>();
-        inputs.forEach((id, input) -> values.put(id, input.value().get()));
-        return values;
-    }
-
-    private static void displayErrors(Map<String, InputBinding> inputs, Map<String, String> errors, Label general) {
-        inputs.forEach((id, input) -> input.display(errors.get(id)));
-        var unbound = new java.util.ArrayList<String>();
-        errors.forEach((id, message) -> {
-            if (!inputs.containsKey(id)) unbound.add(message);
-        });
-        general.setText(String.join("\n", unbound));
-        general.setVisible(!unbound.isEmpty());
     }
 }

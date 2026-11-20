@@ -15,8 +15,6 @@ import javafx.util.Duration;
 /** Explicit opt-in acceptance command, exercised through the packaged native launcher. */
 @lombok.extern.slf4j.Slf4j
 final class PackageSmoke {
-    private PackageSmoke() {}
-
     static void verify(Workbench workbench, Stage stage, Path screenshot) {
         long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(30);
         awaitBuild(workbench, stage, screenshot, deadline);
@@ -94,4 +92,6 @@ final class PackageSmoke {
             });
         });
     }
+
+    private PackageSmoke() {}
 }

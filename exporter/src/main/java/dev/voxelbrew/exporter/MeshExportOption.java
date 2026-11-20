@@ -19,22 +19,6 @@ public record MeshExportOption(
         CHOICE
     }
 
-    public MeshExportOption {
-        if (key == null || !key.matches("[a-z][a-z0-9.-]*")) throw new IllegalArgumentException("Invalid option key");
-
-        choices = List.copyOf(choices);
-        validate(type, defaultValue, choices);
-    }
-
-    public void validate(String value) {
-        try {
-            validate(type, value, choices);
-        } catch (IllegalArgumentException failure) {
-            log.debug("Rejected exporter option {} of type {}", key, type);
-            throw new IllegalArgumentException("Invalid option '" + key + "': " + failure.getMessage(), failure);
-        }
-    }
-
     private static void validate(Type type, @NonNull String value, List<String> choices) {
 
         switch (type) {
@@ -51,6 +35,22 @@ public record MeshExportOption(
                 if (!choices.contains(value)) throw new IllegalArgumentException("expected one of " + choices);
             }
             case STRING -> {}
+        }
+    }
+
+    public MeshExportOption {
+        if (key == null || !key.matches("[a-z][a-z0-9.-]*")) throw new IllegalArgumentException("Invalid option key");
+
+        choices = List.copyOf(choices);
+        validate(type, defaultValue, choices);
+    }
+
+    public void validate(String value) {
+        try {
+            validate(type, value, choices);
+        } catch (IllegalArgumentException failure) {
+            log.debug("Rejected exporter option {} of type {}", key, type);
+            throw new IllegalArgumentException("Invalid option '" + key + "': " + failure.getMessage(), failure);
         }
     }
 }

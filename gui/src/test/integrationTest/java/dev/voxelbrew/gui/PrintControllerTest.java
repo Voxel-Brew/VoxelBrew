@@ -16,23 +16,13 @@ import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.Test;
 
 class PrintControllerTest {
-    private final Queue<Runnable> callbacks = new ConcurrentLinkedQueue<>();
     private static final SlicerWindow DEFAULTS = new SlicerWindow() {
         @Override
         public <T> Optional<T> show(SlicerDialog<T> dialog) {
             return Optional.of(dialog.buildSettings(Map.of()));
         }
     };
-
-    private void await(BooleanSupplier done) throws Exception {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
-        while (System.nanoTime() < deadline) {
-            for (Runnable r; (r = callbacks.poll()) != null; ) r.run();
-            if (done.getAsBoolean()) return;
-            Thread.sleep(10);
-        }
-        fail("Controller timed out");
-    }
+    private final Queue<Runnable> callbacks = new ConcurrentLinkedQueue<>();
 
     private static ModelSession document() {
         var session = new ModelSession(CadDocument.empty());
@@ -69,6 +59,16 @@ class PrintControllerTest {
         metadata.put("backend_version", "fixture");
         String gcode = ";TYPE:Perimeter\nG90\nM82\nG1 Z0.2\nG1 X10 E1\n";
         return Optional.of(PrintArtifact.of("gcode", gcode.getBytes(StandardCharsets.UTF_8), metadata));
+    }
+
+    private void await(BooleanSupplier done) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+        while (System.nanoTime() < deadline) {
+            for (Runnable r; (r = callbacks.poll()) != null; ) r.run();
+            if (done.getAsBoolean()) return;
+            Thread.sleep(10);
+        }
+        fail("Controller timed out");
     }
 
     @Test

@@ -18,26 +18,14 @@ import lombok.experimental.Accessors;
 /** One isolated sketch-edit transaction. Solves are coalesced and never run on the FX thread. */
 @lombok.extern.slf4j.Slf4j
 final class SketchController implements AutoCloseable {
-    interface Factory {
-        SketchController create(SketchGeometry geometry, ParameterSet parameters, String featureId);
-    }
-
-    private record Request(
-            long sequence,
-            SketchGeometry geometry,
-            ParameterSet parameters,
-            SketchGeometry.Ref point,
-            SketchGeometry.Vec target,
-            boolean commitDrag) {}
-
     private final ExecutorService worker;
+
     private final Consumer<Runnable> dispatch;
+
     private final Function<SketchGeometry, SketchSolver.Result> solver;
     private final Object lock = new Object();
-
-    private record State(SketchGeometry geometry, ParameterSet parameters) {}
-
     private final Deque<State> undo = new ArrayDeque<>(), redo = new ArrayDeque<>();
+    private final AtomicLong sequence = new AtomicLong();
 
     @Getter(AccessLevel.PACKAGE)
     @Accessors(fluent = true)
@@ -62,7 +50,9 @@ final class SketchController implements AutoCloseable {
     private Runnable onChanged = () -> {};
 
     private Request pending;
+
     private boolean running;
+
     private volatile boolean dragging;
 
     @Getter(AccessLevel.PACKAGE)
@@ -74,7 +64,20 @@ final class SketchController implements AutoCloseable {
     private String interactionError = "";
 
     private volatile boolean closed;
-    private final AtomicLong sequence = new AtomicLong();
+
+    interface Factory {
+        SketchController create(SketchGeometry geometry, ParameterSet parameters, String featureId);
+    }
+
+    private record Request(
+            long sequence,
+            SketchGeometry geometry,
+            ParameterSet parameters,
+            SketchGeometry.Ref point,
+            SketchGeometry.Vec target,
+            boolean commitDrag) {}
+
+    private record State(SketchGeometry geometry, ParameterSet parameters) {}
 
     SketchController(SketchGeometry geometry, Consumer<Runnable> dispatch) {
         this(geometry, dispatch, SketchSolver::solve);

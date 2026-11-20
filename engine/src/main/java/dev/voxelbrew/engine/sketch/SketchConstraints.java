@@ -9,8 +9,6 @@ import java.util.List;
 
 /** Geometric equations shared by the solver, persistence validation, CLI, and desktop editor. */
 public final class SketchConstraints {
-    private SketchConstraints() {}
-
     public static Constraint create(SketchGeometry g, String id, Type type, List<Ref> refs, double value) {
         List<Double> values = List.of();
         if (type.dimension()) values = List.of(value);
@@ -452,4 +450,6 @@ public final class SketchConstraints {
         }
         return (lo + hi) / 2;
     }
+
+    private SketchConstraints() {}
 }

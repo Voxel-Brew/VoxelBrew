@@ -18,6 +18,22 @@ import lombok.RequiredArgsConstructor;
 
 /** A normal editable TextField with explicit formula affordance and non-destructive previews. */
 final class FormulaField extends TextField {
+    private static final PseudoClass FORMULA = PseudoClass.getPseudoClass("formula");
+
+    private static final PseudoClass INVALID = PseudoClass.getPseudoClass("formula-invalid");
+    private final ExpressionType expressionType;
+    private final Supplier<ParameterSet> parameters;
+    private final Supplier<ParameterUnit> unit;
+    private final ObjectProperty<NumericFieldBounds> bounds = new SimpleObjectProperty<>(NumericFieldBounds.UNBOUNDED);
+    private final StringProperty unitSuffix = new SimpleStringProperty("");
+    private final Tooltip preview = UiHelp.tooltip("");
+    private final Tooltip syntax = UiHelp.tooltip("");
+    private java.util.function.DoubleConsumer validation = value -> {};
+    private String displayUnit;
+    private Double dragStep;
+    private dev.voxelbrew.util.i18n.Translations translations =
+            new dev.voxelbrew.util.i18n.Translations(java.util.Locale.ENGLISH);
+
     @RequiredArgsConstructor
     enum ExpressionType {
         NUMBER("ƒx", "number-expression"),
@@ -27,20 +43,25 @@ final class FormulaField extends TextField {
         private final String styleClass;
     }
 
-    private final ExpressionType expressionType;
-    private static final PseudoClass FORMULA = PseudoClass.getPseudoClass("formula");
-    private static final PseudoClass INVALID = PseudoClass.getPseudoClass("formula-invalid");
-    private final Supplier<ParameterSet> parameters;
-    private final Supplier<ParameterUnit> unit;
-    private java.util.function.DoubleConsumer validation = value -> {};
-    private final ObjectProperty<NumericFieldBounds> bounds = new SimpleObjectProperty<>(NumericFieldBounds.UNBOUNDED);
-    private final StringProperty unitSuffix = new SimpleStringProperty("");
-    private String displayUnit;
-    private Double dragStep;
-    private final Tooltip preview = UiHelp.tooltip("");
-    private final Tooltip syntax = UiHelp.tooltip("");
-    private dev.voxelbrew.util.i18n.Translations translations =
-            new dev.voxelbrew.util.i18n.Translations(java.util.Locale.ENGLISH);
+    static FormulaField number(String text, Supplier<ParameterSet> parameters, ParameterUnit unit) {
+        return number(text, parameters, () -> unit);
+    }
+
+    static FormulaField number(String text, Supplier<ParameterSet> parameters, @NonNull Supplier<ParameterUnit> unit) {
+        return new FormulaField(text, parameters, unit);
+    }
+
+    static FormulaField text(String text, Supplier<ParameterSet> parameters) {
+        return new FormulaField(text, parameters, null);
+    }
+
+    static ParameterUnit unit(String label) {
+        try {
+            return ParameterUnit.parse(label);
+        } catch (IllegalArgumentException unsupported) {
+            return ParameterUnit.NUMBER;
+        }
+    }
 
     private FormulaField(String text, @NonNull Supplier<ParameterSet> parameters, Supplier<ParameterUnit> unit) {
         super(text);
@@ -63,18 +84,6 @@ final class FormulaField extends TextField {
         if (expressionType == ExpressionType.NUMBER) new NumericFieldDrag(this);
     }
 
-    static FormulaField number(String text, Supplier<ParameterSet> parameters, ParameterUnit unit) {
-        return number(text, parameters, () -> unit);
-    }
-
-    static FormulaField number(String text, Supplier<ParameterSet> parameters, @NonNull Supplier<ParameterUnit> unit) {
-        return new FormulaField(text, parameters, unit);
-    }
-
-    static FormulaField text(String text, Supplier<ParameterSet> parameters) {
-        return new FormulaField(text, parameters, null);
-    }
-
     ExpressionType expressionType() {
         return expressionType;
     }
@@ -90,14 +99,6 @@ final class FormulaField extends TextField {
         setPromptText(translations.text(unit == null ? "formula.textPrompt" : "formula.numberPrompt"));
         syntax.setText(translations.text(unit == null ? "formula.textSyntax" : "formula.numberSyntax"));
         setAccessibleHelp(syntax.getText());
-    }
-
-    static ParameterUnit unit(String label) {
-        try {
-            return ParameterUnit.parse(label);
-        } catch (IllegalArgumentException unsupported) {
-            return ParameterUnit.NUMBER;
-        }
     }
 
     double value() {

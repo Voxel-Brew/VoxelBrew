@@ -12,8 +12,6 @@ import javafx.stage.*;
 
 /** Descriptor-driven inputs; provider code runs later on the document controller's file worker. */
 final class ImportDialog {
-    private ImportDialog() {}
-
     static Optional<ImporterDescriptor> choose(
             Window owner, ImporterProviderRegistry registry, Translations translations) {
         var dialog = new Dialog<ImporterDescriptor>();
@@ -32,4 +30,6 @@ final class ImportDialog {
         dialog.setResultConverter(selected -> selected == confirm ? format.getValue() : null);
         return Dialogs.show(dialog, owner, translations);
     }
+
+    private ImportDialog() {}
 }

@@ -10,8 +10,6 @@ import java.util.Map;
 
 /** Exercise serializers against selected synthetic views without inventing CAD history. */
 public final class FormatTestSupport {
-    private FormatTestSupport() {}
-
     public static void write(
             ExporterProviderRegistry registry,
             String format,
@@ -30,4 +28,6 @@ public final class FormatTestSupport {
                         options,
                         new FileExportDialog.Destination(target, overwrite)));
     }
+
+    private FormatTestSupport() {}
 }

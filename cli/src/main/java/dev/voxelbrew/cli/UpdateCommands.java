@@ -12,12 +12,6 @@ import picocli.CommandLine.Spec;
 
 /** Explicit public app-image updates, shared with the desktop frontend. */
 final class UpdateCommands {
-    private UpdateCommands() {}
-
-    static void register(CommandLine root) {
-        root.addSubcommand("update", Update.class);
-    }
-
     @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     abstract static class Options implements Callable<Integer> {
         final UpdateServiceFactory updates;
@@ -86,4 +80,10 @@ final class UpdateCommands {
             return execute(true);
         }
     }
+
+    static void register(CommandLine root) {
+        root.addSubcommand("update", Update.class);
+    }
+
+    private UpdateCommands() {}
 }

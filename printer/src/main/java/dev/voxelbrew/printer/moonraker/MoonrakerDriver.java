@@ -17,6 +17,16 @@ import lombok.extern.slf4j.Slf4j;
 public final class MoonrakerDriver implements Driver {
     private final TransportFactory transports;
 
+    private static PrintResult.Failure failed(String context, Exception failure, boolean submissionUncertain) {
+        log.warn(context, failure);
+        return new PrintResult.Failure(Set.of(message(context, failure)), submissionUncertain);
+    }
+
+    private static String message(String context, Exception failure) {
+        String detail = failure.getLocalizedMessage();
+        return detail == null || detail.isBlank() ? context : context + ": " + detail;
+    }
+
     public MoonrakerDriver() {
         transports = config -> new MoonrakerSession(connection(config));
     }
@@ -116,15 +126,5 @@ public final class MoonrakerDriver implements Driver {
                 }
             }
         }
-    }
-
-    private static PrintResult.Failure failed(String context, Exception failure, boolean submissionUncertain) {
-        log.warn(context, failure);
-        return new PrintResult.Failure(Set.of(message(context, failure)), submissionUncertain);
-    }
-
-    private static String message(String context, Exception failure) {
-        String detail = failure.getLocalizedMessage();
-        return detail == null || detail.isBlank() ? context : context + ": " + detail;
     }
 }

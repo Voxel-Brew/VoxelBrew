@@ -5,13 +5,14 @@ import java.util.function.*;
 
 /** Captures editable tab state separately from the applied manufacturing definition. */
 final class SlicerWorkspace {
-    private record Value(Supplier<String> read, Consumer<String> write) {}
-
     private final Map<String, Value> values = new LinkedHashMap<>();
+
     private Map<String, String> defaults = Map.of();
     private Map<String, String> baseline = Map.of();
     private Map<String, String> saved = Map.of();
     private Object documentIdentity;
+
+    private record Value(Supplier<String> read, Consumer<String> write) {}
 
     void add(String key, Supplier<String> read, Consumer<String> write) {
         values.put(key, new Value(read, write));

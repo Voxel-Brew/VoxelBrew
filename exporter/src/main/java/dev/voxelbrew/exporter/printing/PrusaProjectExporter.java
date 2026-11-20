@@ -17,48 +17,7 @@ import javax.xml.stream.*;
 
 /** PrusaSlicer 2.7.2 project dialect, deliberately distinct from portable 3MF Core. */
 public final class PrusaProjectExporter extends MeshExporter {
-    public PrusaProjectExporter() {
-        super();
-    }
-
-    public PrusaProjectExporter(java.nio.file.Path plugins) {
-        super(plugins);
-    }
-
     public record Volume(String name, String type, MeshData mesh) {}
-
-    @Override
-    public MeshFormat format() {
-        return new MeshFormat(
-                "prusa-project",
-                "PrusaSlicer 2.7.2 project",
-                List.of("3mf"),
-                true,
-                List.of(new MeshExportOption(
-                        "include-support-solids",
-                        "Include explicit support solids",
-                        MeshExportOption.Type.BOOLEAN,
-                        "false",
-                        List.of())));
-    }
-
-    @Override
-    public void write(ModelView view, MeshOptions options, Map<String, String> supplied, OutputStream output)
-            throws IOException {
-        if (!(view instanceof ManufacturingView manufacturing))
-            throw new IOException(
-                    "Prusa project export requires the complete build-plate setup, with profiles and support instructions");
-        var model = manufacturing.manufacturingModel();
-        PrintValidation.validate(model).requireValid();
-        var setup = model.setup();
-        if (!Boolean.parseBoolean(supplied.getOrDefault("include-support-solids", "false")))
-            setup = setup.withSupports(setup.supports().stream()
-                    .filter(s -> s.role() != SupportVolume.Role.SOLID_SUPPORT)
-                    .toList());
-        writeProject(
-                new ManufacturingModel(model.documentId(), model.revision(), setup, model.profile(), model.meshes()),
-                output);
-    }
 
     public static List<Volume> volumes(ManufacturingModel model, BodyInstance instance) {
         var result = new ArrayList<Volume>();
@@ -189,5 +148,46 @@ public final class PrusaProjectExporter extends MeshExporter {
         zip.putNextEntry(new ZipEntry(path));
         zip.write(content.getBytes(StandardCharsets.UTF_8));
         zip.closeEntry();
+    }
+
+    public PrusaProjectExporter() {
+        super();
+    }
+
+    public PrusaProjectExporter(java.nio.file.Path plugins) {
+        super(plugins);
+    }
+
+    @Override
+    public MeshFormat format() {
+        return new MeshFormat(
+                "prusa-project",
+                "PrusaSlicer 2.7.2 project",
+                List.of("3mf"),
+                true,
+                List.of(new MeshExportOption(
+                        "include-support-solids",
+                        "Include explicit support solids",
+                        MeshExportOption.Type.BOOLEAN,
+                        "false",
+                        List.of())));
+    }
+
+    @Override
+    public void write(ModelView view, MeshOptions options, Map<String, String> supplied, OutputStream output)
+            throws IOException {
+        if (!(view instanceof ManufacturingView manufacturing))
+            throw new IOException(
+                    "Prusa project export requires the complete build-plate setup, with profiles and support instructions");
+        var model = manufacturing.manufacturingModel();
+        PrintValidation.validate(model).requireValid();
+        var setup = model.setup();
+        if (!Boolean.parseBoolean(supplied.getOrDefault("include-support-solids", "false")))
+            setup = setup.withSupports(setup.supports().stream()
+                    .filter(s -> s.role() != SupportVolume.Role.SOLID_SUPPORT)
+                    .toList());
+        writeProject(
+                new ManufacturingModel(model.documentId(), model.revision(), setup, model.profile(), model.meshes()),
+                output);
     }
 }

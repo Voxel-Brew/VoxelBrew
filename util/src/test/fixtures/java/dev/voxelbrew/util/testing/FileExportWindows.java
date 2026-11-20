@@ -10,8 +10,6 @@ import java.util.Optional;
 
 /** Headless file destination for exporter and frontend tests. */
 public final class FileExportWindows {
-    private FileExportWindows() {}
-
     public static ExportWindow destination(Path path, boolean overwrite) {
         Objects.requireNonNull(path);
         return new ExportWindow() {
@@ -27,4 +25,6 @@ public final class FileExportWindows {
             }
         };
     }
+
+    private FileExportWindows() {}
 }

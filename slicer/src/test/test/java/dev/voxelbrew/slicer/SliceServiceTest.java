@@ -18,6 +18,18 @@ class SliceServiceTest {
     @TempDir
     Path directory;
 
+    private static PrintArtifact artifact(ManufacturingModel model) {
+        var values = new HashMap<>(SliceService.provenance(model, "prusa-slicer"));
+        values.put("backend_version", "process-double");
+        var gcode = ";TYPE:Perimeter\nG90\nM82\nG1 Z0.2\nG1 X10 E1\n";
+        return PrintArtifact.of("gcode", gcode.getBytes(StandardCharsets.UTF_8), values);
+    }
+
+    private static ManufacturingModel model() {
+        var setup = dev.voxelbrew.api.model.CadDocument.empty().printSetup();
+        return new ManufacturingModel("doc", "revision", setup, PrintProfile.resolve(setup), Map.of());
+    }
+
     @Test
     void physicalBambuTargetRequiresAPackageWithInspectableGcode() throws Exception {
         var original = model();
@@ -59,18 +71,6 @@ class SliceServiceTest {
         var result = SliceService.inspect(model, "orca", artifact);
         assertThat(result.job().modelLayers()).containsExactly(0.2);
         assertThat(result.artifact()).isSameAs(artifact);
-    }
-
-    private static PrintArtifact artifact(ManufacturingModel model) {
-        var values = new HashMap<>(SliceService.provenance(model, "prusa-slicer"));
-        values.put("backend_version", "process-double");
-        var gcode = ";TYPE:Perimeter\nG90\nM82\nG1 Z0.2\nG1 X10 E1\n";
-        return PrintArtifact.of("gcode", gcode.getBytes(StandardCharsets.UTF_8), values);
-    }
-
-    private static ManufacturingModel model() {
-        var setup = dev.voxelbrew.api.model.CadDocument.empty().printSetup();
-        return new ManufacturingModel("doc", "revision", setup, PrintProfile.resolve(setup), Map.of());
     }
 
     @Test

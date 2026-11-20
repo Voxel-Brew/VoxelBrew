@@ -11,9 +11,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class CliSlicerWindowTest {
-    @TempDir
-    Path directory;
-
     private static final SlicerDialog<Map<String, String>> DIALOG = new SlicerDialog<>() {
         @Override
         public String title() {
@@ -39,6 +36,9 @@ class CliSlicerWindowTest {
             return Map.copyOf(values);
         }
     };
+
+    @TempDir
+    Path directory;
 
     @Test
     void resolvesInvocationThenSavedThenDeclaredDefaultsAndPersistsPerProvider() throws Exception {

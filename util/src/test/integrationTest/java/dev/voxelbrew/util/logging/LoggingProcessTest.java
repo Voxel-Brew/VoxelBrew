@@ -13,6 +13,29 @@ class LoggingProcessTest {
     @TempDir
     Path directory;
 
+    @lombok.extern.slf4j.Slf4j
+    public static final class Writer {
+        public static void main(String[] args) throws Exception {
+            Logging.initialize(args[0]);
+            Logging.initialize(args[0]);
+            try {
+                Files.writeString(
+                        dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
+                                .home()
+                                .resolve(args[0] + ".ready"),
+                        "ready");
+                if (System.in.read() < 0) throw new IllegalStateException("Missing start signal");
+                for (int i = 0; i < 100; i++) log.debug("event-{}-{}; Zażółć ☕", args[0], i);
+                var failed = Thread.ofPlatform().start(() -> {
+                    throw new IllegalStateException("uncaught-worker-" + args[0] + " Zażółć ☕");
+                });
+                failed.join();
+            } finally {
+                Logging.close();
+            }
+        }
+    }
+
     @Test
     @Timeout(60)
     void liveApplicationsShareTheActiveFileAcrossStartupAndSizeRotation() throws Exception {
@@ -148,29 +171,6 @@ class LoggingProcessTest {
                     .as("Logging process did not initialize")
                     .isTrue();
             Thread.sleep(20);
-        }
-    }
-
-    @lombok.extern.slf4j.Slf4j
-    public static final class Writer {
-        public static void main(String[] args) throws Exception {
-            Logging.initialize(args[0]);
-            Logging.initialize(args[0]);
-            try {
-                Files.writeString(
-                        dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
-                                .home()
-                                .resolve(args[0] + ".ready"),
-                        "ready");
-                if (System.in.read() < 0) throw new IllegalStateException("Missing start signal");
-                for (int i = 0; i < 100; i++) log.debug("event-{}-{}; Zażółć ☕", args[0], i);
-                var failed = Thread.ofPlatform().start(() -> {
-                    throw new IllegalStateException("uncaught-worker-" + args[0] + " Zażółć ☕");
-                });
-                failed.join();
-            } finally {
-                Logging.close();
-            }
         }
     }
 }

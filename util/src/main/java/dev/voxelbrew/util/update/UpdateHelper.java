@@ -9,6 +9,11 @@ import java.util.Properties;
 @lombok.experimental.UtilityClass
 public class UpdateHelper {
 
+    @FunctionalInterface
+    interface Move {
+        void move(Path from, Path to) throws IOException;
+    }
+
     public static void main(String[] args) {
         if (args.length != 1) {
             System.err.println("Expected an update job file");
@@ -92,11 +97,6 @@ public class UpdateHelper {
                 Thread.sleep(100);
             }
         }
-    }
-
-    @FunctionalInterface
-    interface Move {
-        void move(Path from, Path to) throws IOException;
     }
 
     static void replace(Path target, Path source, Path backup, Move move) throws IOException {

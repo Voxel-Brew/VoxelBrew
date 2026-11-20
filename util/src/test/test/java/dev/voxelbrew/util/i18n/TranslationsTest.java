@@ -12,6 +12,15 @@ class TranslationsTest {
     @TempDir
     Path directory;
 
+    private Locale previousDefault, previousDisplay, previousFormat;
+
+    private static Set<String> placeholders(String pattern) {
+        var result = new TreeSet<String>();
+        var matcher = java.util.regex.Pattern.compile("\\{(\\d+)(?:[,}])").matcher(pattern);
+        while (matcher.find()) result.add(matcher.group(1));
+        return result;
+    }
+
     @Test
     void loadsUserCatalogAndFallsBackToEnglishForMissingKeys() throws Exception {
         var catalogs = Files.createDirectory(directory.resolve("i18n"));
@@ -25,8 +34,6 @@ class TranslationsTest {
         assertThat(german.languages().get("en-EN")).isEqualTo("English");
         assertThat(german.languages().get("pl-PL")).isEqualTo("Polski");
     }
-
-    private Locale previousDefault, previousDisplay, previousFormat;
 
     @BeforeEach
     void rememberLocales() {
@@ -190,13 +197,6 @@ class TranslationsTest {
                     .as(key)
                     .isEqualTo(placeholders(keys.getProperty(key)));
         }
-    }
-
-    private static Set<String> placeholders(String pattern) {
-        var result = new TreeSet<String>();
-        var matcher = java.util.regex.Pattern.compile("\\{(\\d+)(?:[,}])").matcher(pattern);
-        while (matcher.find()) result.add(matcher.group(1));
-        return result;
     }
 
     @Test

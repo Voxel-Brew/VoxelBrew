@@ -13,35 +13,6 @@ import javafx.stage.Window;
 
 /** One catalog for keyboard dispatch, menu accelerators and translated shortcut help. */
 final class KeyboardShortcuts {
-    enum Scope {
-        DOCUMENT,
-        DESIGN,
-        SKETCH
-    }
-
-    record Binding(Scope scope, String id, boolean inText, List<KeyCombination> keys) {
-        boolean matches(KeyEvent event, boolean editingText) {
-            boolean typing = !event.isShortcutDown()
-                    && (event.getCode().isLetterKey() || event.getCode().isDigitKey());
-            return (!editingText || (inText && !typing)) && keys.stream().anyMatch(key -> key.match(event));
-        }
-
-        String display() {
-            if (id.equals("workspace-number")) return keys.getFirst().getDisplayText() + "–9";
-            return keys.stream().map(KeyCombination::getDisplayText).collect(Collectors.joining(" / "));
-        }
-    }
-
-    private static Binding binding(Scope scope, String id, boolean inText, String... keys) {
-        return new Binding(
-                scope,
-                id,
-                inText,
-                java.util.Arrays.stream(keys)
-                        .map(KeyCombination::keyCombination)
-                        .toList());
-    }
-
     static final List<Binding> BINDINGS = List.of(
             binding(Scope.DOCUMENT, "new", true, "Shortcut+N"),
             binding(Scope.DOCUMENT, "open", true, "Shortcut+O"),
@@ -94,7 +65,34 @@ final class KeyboardShortcuts {
             binding(Scope.SKETCH, "sketch-remove-constraint", false, "Delete"),
             binding(Scope.SKETCH, "keyboard-shortcuts", true, "F1"));
 
-    private KeyboardShortcuts() {}
+    enum Scope {
+        DOCUMENT,
+        DESIGN,
+        SKETCH
+    }
+
+    record Binding(Scope scope, String id, boolean inText, List<KeyCombination> keys) {
+        boolean matches(KeyEvent event, boolean editingText) {
+            boolean typing = !event.isShortcutDown()
+                    && (event.getCode().isLetterKey() || event.getCode().isDigitKey());
+            return (!editingText || (inText && !typing)) && keys.stream().anyMatch(key -> key.match(event));
+        }
+
+        String display() {
+            if (id.equals("workspace-number")) return keys.getFirst().getDisplayText() + "–9";
+            return keys.stream().map(KeyCombination::getDisplayText).collect(Collectors.joining(" / "));
+        }
+    }
+
+    private static Binding binding(Scope scope, String id, boolean inText, String... keys) {
+        return new Binding(
+                scope,
+                id,
+                inText,
+                java.util.Arrays.stream(keys)
+                        .map(KeyCombination::keyCombination)
+                        .toList());
+    }
 
     /** Bare letter keys can be shown in captions without implying a new Alt mnemonic. */
     static java.util.Optional<String> letter(String id) {
@@ -233,4 +231,6 @@ final class KeyboardShortcuts {
         dialog.getDialogPane().lookupButton(ButtonType.CLOSE).setId("keyboard-shortcuts-close");
         Dialogs.show(dialog, owner, translations);
     }
+
+    private KeyboardShortcuts() {}
 }

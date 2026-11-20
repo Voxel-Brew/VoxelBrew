@@ -7,8 +7,6 @@ import java.util.*;
 
 /** Credentials are separate from ordinary preferences and restricted before writing. */
 final class McpTokenStore {
-    private McpTokenStore() {}
-
     static String load(Path file, java.util.function.Supplier<String> generate) throws IOException {
         if (Files.isSymbolicLink(file)) throw new IOException("MCP credential file must not be a symbolic link");
         if (Files.exists(file)) {
@@ -49,4 +47,6 @@ final class McpTokenStore {
                     .build()));
         }
     }
+
+    private McpTokenStore() {}
 }

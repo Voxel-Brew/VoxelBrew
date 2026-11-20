@@ -23,6 +23,35 @@ import lombok.NonNull;
 @lombok.Getter
 @lombok.experimental.Accessors(fluent = true)
 public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Settings> {
+    @lombok.NonNull
+    private final MeshFormat format;
+
+    public record Settings(
+            ExportSelection selection,
+            MeshOptions mesh,
+            Map<String, String> options,
+            FileExportDialog.Destination destination,
+            ManufacturingModel snapshot) {
+        public Settings {
+            Objects.requireNonNull(selection);
+            Objects.requireNonNull(mesh);
+            Objects.requireNonNull(destination);
+            options = Map.copyOf(options);
+        }
+
+        public Settings(
+                ExportSelection selection,
+                MeshOptions mesh,
+                Map<String, String> options,
+                FileExportDialog.Destination destination) {
+            this(selection, mesh, options, destination, null);
+        }
+    }
+
+    private static String emptyToNull(String value) {
+        return value == null || value.isEmpty() ? null : value;
+    }
+
     public MeshExportDialog(@NonNull MeshFormat format) {
         this.format = format;
     }
@@ -134,37 +163,8 @@ public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Set
                 new FileExportDialog.Destination(Path.of(destination), Boolean.parseBoolean(overwrite)));
     }
 
-    private static String emptyToNull(String value) {
-        return value == null || value.isEmpty() ? null : value;
-    }
-
-    @lombok.NonNull
-    private final MeshFormat format;
-
     @Override
     public String title() {
         return format.name();
-    }
-
-    public record Settings(
-            ExportSelection selection,
-            MeshOptions mesh,
-            Map<String, String> options,
-            FileExportDialog.Destination destination,
-            ManufacturingModel snapshot) {
-        public Settings {
-            Objects.requireNonNull(selection);
-            Objects.requireNonNull(mesh);
-            Objects.requireNonNull(destination);
-            options = Map.copyOf(options);
-        }
-
-        public Settings(
-                ExportSelection selection,
-                MeshOptions mesh,
-                Map<String, String> options,
-                FileExportDialog.Destination destination) {
-            this(selection, mesh, options, destination, null);
-        }
     }
 }

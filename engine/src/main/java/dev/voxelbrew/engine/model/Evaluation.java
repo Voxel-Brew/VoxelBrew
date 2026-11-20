@@ -7,6 +7,18 @@ import java.util.List;
 
 /** Owns all native replay results. Callers must close the evaluation, not its borrowed solids. */
 public final class Evaluation implements AutoCloseable {
+    private final CadDocument document;
+
+    private final List<Diagnostic> diagnostics;
+
+    private final List<Body> bodies;
+
+    private final List<Solid> owned;
+    private final List<Feature> resolvedFeatures;
+    private boolean closed;
+    private java.util.Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction =
+            java.util.Map.of();
+
     public enum State {
         OK,
         FAILED,
@@ -17,25 +29,6 @@ public final class Evaluation implements AutoCloseable {
     public record Diagnostic(String featureId, State state, String message) {}
 
     public record Body(String id, Feature.BodyRef output, Solid solid) {}
-
-    private final CadDocument document;
-    private final List<Diagnostic> diagnostics;
-    private final List<Body> bodies;
-    private final List<Solid> owned;
-    private final List<Feature> resolvedFeatures;
-    private boolean closed;
-    private java.util.Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction =
-            java.util.Map.of();
-
-    void construction(java.util.Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> values) {
-        construction = java.util.Map.copyOf(values);
-    }
-
-    public java.util.Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction() {
-        requireOpen();
-        if (!valid()) throw new IllegalStateException("Construction geometry unavailable after failed rebuild");
-        return construction;
-    }
 
     Evaluation(CadDocument document, List<Diagnostic> diagnostics, List<Body> bodies, List<Solid> owned) {
         this(document, diagnostics, bodies, owned, document.features());
@@ -52,6 +45,16 @@ public final class Evaluation implements AutoCloseable {
         this.bodies = List.copyOf(bodies);
         this.owned = List.copyOf(owned);
         this.resolvedFeatures = List.copyOf(resolvedFeatures);
+    }
+
+    void construction(java.util.Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> values) {
+        construction = java.util.Map.copyOf(values);
+    }
+
+    public java.util.Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction() {
+        requireOpen();
+        if (!valid()) throw new IllegalStateException("Construction geometry unavailable after failed rebuild");
+        return construction;
     }
 
     /**

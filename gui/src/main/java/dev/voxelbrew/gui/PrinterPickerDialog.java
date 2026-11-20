@@ -10,8 +10,6 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
 final class PrinterPickerDialog {
-    private PrinterPickerDialog() {}
-
     static Optional<PrinterProfileCatalog.Entry> choose(
             Window owner, Translations translations, List<PrinterProfileCatalog.Entry> entries, String currentId) {
         var search = new TextField();
@@ -83,4 +81,6 @@ final class PrinterPickerDialog {
         Platform.runLater(() -> Platform.runLater(search::requestFocus));
         return Dialogs.show(dialog, owner, translations);
     }
+
+    private PrinterPickerDialog() {}
 }

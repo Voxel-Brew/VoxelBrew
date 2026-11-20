@@ -19,6 +19,22 @@ class FormulaIntegrationTest {
     @TempDir
     Path directory;
 
+    private static void verify(ModelSession session, double width, String label) {
+        try (var evaluation = session.evaluate()) {
+            var bodies = evaluation.requireCompleteDocument();
+            assertThat(bodies.size()).isEqualTo(1);
+            assertThat(bodies.getFirst().solid().volume())
+                    .isCloseTo(width * 40 * (1 + 2.0 / 3), org.assertj.core.data.Offset.offset(.001));
+            assertThat(bodies.getFirst().solid().bounds().maxX())
+                    .isCloseTo(width, org.assertj.core.data.Offset.offset(.001));
+            var sketch = (Feature.Sketch) evaluation.resolvedFeatures().get(2);
+            var entity = ((Feature.Constrained) sketch.profile()).geometry().entity("label");
+            assertThat(entity.text().content()).isEqualTo(label);
+            assertThat(entity.text().font()).isEqualTo("SansSerif");
+            assertThat(entity.id()).isEqualTo("label");
+        }
+    }
+
     @Test
     void numericAndTextFormulasPersistAndFollowConfigurationsHistoryAndRename() throws Exception {
         var session = new ModelSession(CadDocument.empty());
@@ -62,21 +78,5 @@ class FormulaIntegrationTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> reopened.bindExpression("annotation", "text:missing:content", "=\"invalid\""))
                 .isInstanceOf(IllegalArgumentException.class);
-    }
-
-    private static void verify(ModelSession session, double width, String label) {
-        try (var evaluation = session.evaluate()) {
-            var bodies = evaluation.requireCompleteDocument();
-            assertThat(bodies.size()).isEqualTo(1);
-            assertThat(bodies.getFirst().solid().volume())
-                    .isCloseTo(width * 40 * (1 + 2.0 / 3), org.assertj.core.data.Offset.offset(.001));
-            assertThat(bodies.getFirst().solid().bounds().maxX())
-                    .isCloseTo(width, org.assertj.core.data.Offset.offset(.001));
-            var sketch = (Feature.Sketch) evaluation.resolvedFeatures().get(2);
-            var entity = ((Feature.Constrained) sketch.profile()).geometry().entity("label");
-            assertThat(entity.text().content()).isEqualTo(label);
-            assertThat(entity.text().font()).isEqualTo("SansSerif");
-            assertThat(entity.id()).isEqualTo("label");
-        }
     }
 }

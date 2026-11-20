@@ -4408,7 +4408,12 @@ class WorkbenchUiTest {
             });
         }
         click("language");
-        choice("language-choice", 1);
+        int englishIndex =
+                fx(() -> ((ComboBox<?>) node("#language-choice")).getItems().indexOf("en-EN"));
+        assertThat(englishIndex)
+                .as("English is available in the language selector")
+                .isNotNegative();
+        choice("language-choice", englishIndex);
         click("language-save");
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         while (!fx(() -> ((Label) node("#language-status")).getText().startsWith("Zapisano"))) {

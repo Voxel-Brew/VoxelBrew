@@ -3,6 +3,9 @@ package dev.voxelbrew.slicer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import dev.voxelbrew.util.preferences.UserConfigServiceImpl;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.UUID;
@@ -14,11 +17,45 @@ class SlicerInstallationStoreTest {
     Path directory;
 
     @Test
+    void providerDefaultsPreserveOlderSettingsAndPreferCurrentValues() throws IOException {
+        var configuration = directory.resolve("settings.properties");
+        var previous = directory.resolve("config-slicer-cura.properties");
+        String preferences =
+                "slicer.cura.executable=old\nslicer.cura.profile=machine.ini\nslicer.prusa-slicer.executable=prusa\n";
+        String previousDefaults = "executable=previous\ndefinition=machine.json\n";
+        Files.writeString(configuration, preferences);
+        Files.writeString(previous, previousDefaults);
+        var store = new SlicerInstallationStore(new UserConfigServiceImpl(directory, "settings.properties"));
+
+        assertThat(store.providerDefaults("cura"))
+                .containsExactlyInAnyOrderEntriesOf(
+                        Map.of("executable", "previous", "profile", "machine.ini", "definition", "machine.json"));
+        assertThat(directory.resolve("slicers")).doesNotExist();
+
+        store.saveProviderDefaults("cura", Map.of("executable", "current"));
+        assertThat(store.providerDefaults("cura"))
+                .containsExactlyInAnyOrderEntriesOf(
+                        Map.of("executable", "current", "profile", "machine.ini", "definition", "machine.json"));
+        assertThat(store.providerDefaults("prusa-slicer")).containsExactlyEntriesOf(Map.of("executable", "prusa"));
+        assertThat(Files.readString(configuration)).isEqualTo(preferences);
+        assertThat(Files.readString(previous)).isEqualTo(previousDefaults);
+    }
+
+    @Test
+    void rejectsInvalidProviderIdsWithoutCreatingStorage() {
+        var store = new SlicerInstallationStore(new UserConfigServiceImpl(directory, "config.properties"));
+        assertThatThrownBy(() -> store.providerDefaults("../outside")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> store.saveProviderDefaults("../outside", Map.of("executable", "value")))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(directory.resolve("slicers")).doesNotExist();
+    }
+
+    @Test
     void reservesBundledIdentityEvenWhenItsFilesAreUnavailable() {
         var bundledId = UUID.fromString("35c9a5d1-6c00-44cc-9e4b-2caa6b02ff8b");
         var replacement = new SlicerInstallation(bundledId, "prusa-slicer", "Replacement", "1", "", Map.of());
         assertThat(replacement.bundled()).isTrue();
-        var store = new SlicerInstallationStore(directory.resolve("config.properties"));
+        var store = new SlicerInstallationStore(new UserConfigServiceImpl(directory, "config.properties"));
         assertThatThrownBy(() -> store.save(replacement))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("read-only");
@@ -32,7 +69,7 @@ class SlicerInstallationStoreTest {
 
     @Test
     void preservesIndependentVerifiedInstallationsWhenAReplacementFails() throws Exception {
-        var configuration = directory.resolve("config.properties");
+        var configuration = new UserConfigServiceImpl(directory, "config.properties");
         var store = new SlicerInstallationStore(configuration);
         var first = new SlicerInstallation(
                 UUID.randomUUID(),

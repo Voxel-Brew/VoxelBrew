@@ -5,7 +5,7 @@ import dev.voxelbrew.api.model.*;
 import dev.voxelbrew.api.model.mesh.MeshOptions;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
-import dev.voxelbrew.util.config.PluginDirectorySource;
+import dev.voxelbrew.util.preferences.PluginDirectorySource;
 import java.io.*;
 import java.nio.file.Path;
 import java.util.*;
@@ -16,8 +16,8 @@ public abstract class MeshExporter implements Exporter<MeshExportDialog.Settings
     private final Path plugins;
 
     protected MeshExporter() {
-        this(dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
-                .plugins());
+        this(dev.voxelbrew.util.services.Services.load(dev.voxelbrew.api.userconfig.UserConfigService.class)
+                .pluginsFolder());
     }
 
     protected MeshExporter(@NonNull Path plugins) {

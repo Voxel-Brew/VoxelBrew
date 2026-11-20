@@ -1,8 +1,8 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.util.config.UserConfiguration;
-import dev.voxelbrew.util.i18n.Translations;
-import java.io.IOException;
+import dev.voxelbrew.api.i18n.TranslationService;
+import dev.voxelbrew.api.userconfig.UserConfigException;
+import dev.voxelbrew.api.userconfig.UserConfigService;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import javafx.application.Platform;
@@ -12,9 +12,10 @@ import javafx.stage.Window;
 
 /** Persists display language independently of CAD documents; each window keeps its own catalog. */
 final class LanguageDialog {
-    static void show(Window owner, Translations translations, UserConfiguration configuration, ExecutorService worker) {
+    static void show(
+            Window owner, TranslationService translations, UserConfigService configuration, ExecutorService worker) {
         var dialog = new Dialog<Void>();
-        dialog.setTitle(translations.text("language.title"));
+        dialog.setTitle(translations.translate("language.title").orElseThrow());
         var choice = new ComboBox<String>();
         choice.setId("language-choice");
         choice.getItems().add("system");
@@ -22,13 +23,14 @@ final class LanguageDialog {
         UiText.choices(
                 choice,
                 value -> value.equals("system")
-                        ? translations.text("language.system")
+                        ? translations.translate("language.system").orElseThrow()
                         : translations.languages().get(value));
-        var message = new Label(translations.text("language.restart"));
+        var message = new Label(translations.translate("language.restart").orElseThrow());
         message.setWrapText(true);
         message.setId("language-status");
         try {
-            String saved = configuration.get("language", "system").strip();
+            String saved =
+                    configuration.readUserConfig("language").orElse("system").strip();
             String selected = translations.languages().keySet().stream()
                     .filter(tag -> tag.equalsIgnoreCase(saved)
                             || Locale.forLanguageTag(tag)
@@ -38,11 +40,13 @@ final class LanguageDialog {
                     .findFirst()
                     .orElse("system");
             choice.setValue(saved.isEmpty() || saved.equalsIgnoreCase("system") ? "system" : selected);
-        } catch (IOException failure) {
+        } catch (UserConfigException failure) {
             choice.setValue("system");
-            message.setText(translations.text("language.readFailed", failure.getMessage()));
+            message.setText(translations
+                    .translate("language.readFailed", failure.getCause().getMessage())
+                    .orElseThrow());
         }
-        var save = new Button(translations.text("action.save"));
+        var save = new Button(translations.translate("action.save").orElseThrow());
         save.setId("language-save");
         UiHelp.install(save, translations);
         save.setOnAction(event -> {
@@ -52,10 +56,12 @@ final class LanguageDialog {
             worker.execute(() -> {
                 String result;
                 try {
-                    configuration.set("language", language);
-                    result = translations.text("language.saved");
-                } catch (IOException failure) {
-                    result = translations.text("language.saveFailed", failure.getMessage());
+                    configuration.saveUserConfig("language", language);
+                    result = translations.translate("language.saved").orElseThrow();
+                } catch (UserConfigException failure) {
+                    result = translations
+                            .translate("language.saveFailed", failure.getCause().getMessage())
+                            .orElseThrow();
                 }
                 String status = result;
                 Platform.runLater(() -> {

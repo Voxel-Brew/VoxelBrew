@@ -4,14 +4,16 @@ import static dev.voxelbrew.cli.WorkspaceEdits.*;
 
 import dev.voxelbrew.api.printer.PrinterProfileCatalog;
 import dev.voxelbrew.api.slicer.*;
-import dev.voxelbrew.util.config.*;
+import dev.voxelbrew.api.userconfig.UserConfigService;
+import dev.voxelbrew.slicer.SlicerInstallationStore;
+import dev.voxelbrew.util.preferences.*;
 import java.nio.file.Path;
 import java.util.*;
 import picocli.CommandLine;
 
 @lombok.RequiredArgsConstructor
 final class PreferenceCommands {
-    private final UserConfiguration configuration;
+    private final UserConfigService configuration;
     private final PrinterProfileCatalog printers;
     private final java.util.function.Supplier<SlicerProviderRegistry> slicers;
 
@@ -22,8 +24,9 @@ final class PreferenceCommands {
                     "settings " + action,
                     s -> {
                         if (action.equals("show"))
-                            s.commandLine().getOut().println(new TreeMap<>(configuration.read()));
-                        else if (action.equals("set")) configuration.set(value(s, "--key"), value(s, "--value"));
+                            s.commandLine().getOut().println(new TreeMap<>(configuration.readUserConfig()));
+                        else if (action.equals("set"))
+                            configuration.saveUserConfig(value(s, "--key"), value(s, "--value"));
                         else configuration.remove(value(s, "--key"));
                         return 0;
                     },
@@ -35,7 +38,7 @@ final class PreferenceCommands {
                         String.class,
                         true,
                         null,
-                        "Preference key (language, save.folder, appearance, rendering.style)");
+                        "Preference key (language, appearance, rendering.style)");
             if (action.equals("set")) option(spec, "--value", String.class, true, null, "Preference value");
         }
         command(
@@ -77,8 +80,10 @@ final class PreferenceCommands {
                 "slicer profile visibility",
                 s -> {
                     String operation = value(s, "--operation");
-                    var hidden = new TreeSet<>(Arrays.asList(
-                            configuration.get("printers.hiddenDefaults", "").split(",")));
+                    var hidden = new TreeSet<>(Arrays.asList(configuration
+                            .readUserConfig("printers.hiddenDefaults")
+                            .orElse("")
+                            .split(",")));
                     hidden.remove("");
                     var defaults = printers.load().entries().stream()
                             .filter(PrinterProfileCatalog.Entry::bundled)
@@ -104,7 +109,7 @@ final class PreferenceCommands {
                         }
                         default -> throw new IllegalArgumentException("Unknown visibility operation");
                     }
-                    configuration.set("printers.hiddenDefaults", String.join(",", hidden));
+                    configuration.saveUserConfig("printers.hiddenDefaults", String.join(",", hidden));
                     return 0;
                 },
                 false);
@@ -130,7 +135,7 @@ final class PreferenceCommands {
                                         .forEach(s.commandLine().getOut()::println);
                                 return 0;
                             }
-                            var saved = configuration.section("slicer", id);
+                            var store = new SlicerInstallationStore(configuration);
                             if (action.equals("configure")) {
                                 var overrides = new LinkedHashMap<String, String>();
                                 for (String setting : (String[]) value(s, "--option")) {
@@ -142,10 +147,10 @@ final class PreferenceCommands {
                                 var dialog = backend.settingsDialog()
                                         .orElseThrow(() -> new IllegalArgumentException(
                                                 "Slicer has no persistent settings: " + id));
-                                new CliSlicerWindow(configuration, id, overrides).show(dialog);
+                                new CliSlicerWindow(store, id, overrides).show(dialog);
                             }
                             s.commandLine().getOut().println(backend.descriptor());
-                            saved.read()
+                            store.providerDefaults(id)
                                     .forEach((key, val) ->
                                             s.commandLine().getOut().println(key + "=" + val));
                         }
@@ -158,8 +163,8 @@ final class PreferenceCommands {
                     "--plugin-dir",
                     Path.class,
                     false,
-                    dev.voxelbrew.util.services.Services.load(ApplicationPaths.class)
-                            .plugins()
+                    dev.voxelbrew.util.services.Services.load(dev.voxelbrew.api.userconfig.UserConfigService.class)
+                            .pluginsFolder()
                             .toString(),
                     "Trusted plugins directory");
             if (action.equals("configure"))

@@ -1,18 +1,18 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.util.config.UserConfiguration;
-import dev.voxelbrew.util.i18n.Translations;
+import dev.voxelbrew.api.i18n.TranslationService;
+import dev.voxelbrew.api.userconfig.UserConfigService;
 import javafx.scene.control.*;
 import javafx.scene.input.*;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
 final class McpDialog {
-    static void show(Window owner, McpServerHost server, UserConfiguration store, Translations text) {
+    static void show(Window owner, McpServerHost server, UserConfigService store, TranslationService text) {
         var dialog = new Dialog<Void>();
         dialog.initOwner(owner);
-        dialog.setTitle(text.text("mcp.title"));
-        var auto = new CheckBox(text.text("mcp.autoStart"));
+        dialog.setTitle(text.translate("mcp.title").orElseThrow());
+        var auto = new CheckBox(text.translate("mcp.autoStart").orElseThrow());
         var port = new TextField("0");
         var connections = new TextField("4");
         var idle = new TextField("30");
@@ -36,7 +36,7 @@ final class McpDialog {
         } catch (Exception failure) {
             status.setText(failure.getMessage());
         }
-        var start = new Button(text.text("mcp.apply"));
+        var start = new Button(text.translate("mcp.apply").orElseThrow());
         start.setOnAction(event -> {
             try {
                 var settings = new McpSettings(
@@ -53,19 +53,19 @@ final class McpDialog {
                 status.setText(failure.getMessage());
             }
         });
-        var stop = new Button(text.text("mcp.stop"));
+        var stop = new Button(text.translate("mcp.stop").orElseThrow());
         stop.setOnAction(event -> {
             server.close();
             endpoint.clear();
         });
-        var copy = new Button(text.text("mcp.copy"));
+        var copy = new Button(text.translate("mcp.copy").orElseThrow());
         copy.setOnAction(event -> {
             var clipboard = new ClipboardContent();
             clipboard.putString("{\"url\":\"" + server.endpoint() + "\",\"headers\":{\"Authorization\":\"Bearer "
                     + server.credential() + "\"}}");
             Clipboard.getSystemClipboard().setContent(clipboard);
         });
-        var rotate = new Button(text.text("mcp.rotate"));
+        var rotate = new Button(text.translate("mcp.rotate").orElseThrow());
         rotate.setOnAction(event -> {
             server.regenerateToken();
             token.setText(server.credential());
@@ -75,13 +75,13 @@ final class McpDialog {
                 .setContent(new VBox(
                         8,
                         auto,
-                        new Label(text.text("mcp.port")),
+                        new Label(text.translate("mcp.port").orElseThrow()),
                         port,
-                        new Label(text.text("mcp.connections")),
+                        new Label(text.translate("mcp.connections").orElseThrow()),
                         connections,
-                        new Label(text.text("mcp.idle")),
+                        new Label(text.translate("mcp.idle").orElseThrow()),
                         idle,
-                        new Label(text.text("mcp.history")),
+                        new Label(text.translate("mcp.history").orElseThrow()),
                         history,
                         endpoint,
                         token,

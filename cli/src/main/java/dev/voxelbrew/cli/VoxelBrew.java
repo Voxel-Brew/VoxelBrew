@@ -1,5 +1,6 @@
 package dev.voxelbrew.cli;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.*;
 import dev.voxelbrew.engine.geometry.Solid;
 import dev.voxelbrew.engine.model.*;
@@ -50,8 +51,8 @@ public final class VoxelBrew implements Runnable {
 
         @Option(names = "--plugin-dir")
         Path pluginDirectory = dev.voxelbrew.util.services.Services.load(
-                        dev.voxelbrew.util.config.ApplicationPaths.class)
-                .plugins();
+                        dev.voxelbrew.api.userconfig.UserConfigService.class)
+                .pluginsFolder();
 
         @Spec
         CommandSpec spec;
@@ -113,8 +114,8 @@ public final class VoxelBrew implements Runnable {
 
         @Option(names = "--plugin-dir")
         Path pluginDirectory = dev.voxelbrew.util.services.Services.load(
-                        dev.voxelbrew.util.config.ApplicationPaths.class)
-                .plugins();
+                        dev.voxelbrew.api.userconfig.UserConfigService.class)
+                .pluginsFolder();
 
         @Option(names = "--chord-tolerance", defaultValue = "0.02", description = "Absolute chordal tolerance (mm)")
         double chord;
@@ -217,8 +218,8 @@ public final class VoxelBrew implements Runnable {
 
         @Option(names = "--plugin-dir", description = "Trusted feature and service JAR directory")
         Path pluginDirectory = dev.voxelbrew.util.services.Services.load(
-                        dev.voxelbrew.util.config.ApplicationPaths.class)
-                .plugins();
+                        dev.voxelbrew.api.userconfig.UserConfigService.class)
+                .pluginsFolder();
 
         @Spec
         CommandSpec spec;
@@ -732,7 +733,7 @@ public final class VoxelBrew implements Runnable {
                 .commandLine();
     }
 
-    static CommandLine commandLine(CommandLine.IFactory factory, dev.voxelbrew.util.i18n.Translations translations) {
+    static CommandLine commandLine(CommandLine.IFactory factory, TranslationService translations) {
         var cliCommand = new CommandLine(VoxelBrew.class, factory)
                 .addSubcommand("exporters", Exporters.class)
                 .addSubcommand("export", Export.class)
@@ -743,7 +744,10 @@ public final class VoxelBrew implements Runnable {
                     command.getErr().println("ERROR: " + failure.getMessage());
                     return 1;
                 });
-        cliCommand.getCommandSpec().usageMessage().description(translations.text("app.description"));
+        cliCommand
+                .getCommandSpec()
+                .usageMessage()
+                .description(translations.translate("app.description").orElseThrow());
         PrintingCommands.register(cliCommand);
         ImportCommands.register(cliCommand);
         FeatureCommands.register(cliCommand);

@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.util.i18n.Translations;
+import dev.voxelbrew.api.i18n.TranslationService;
 import java.util.List;
 import java.util.stream.Collectors;
 import javafx.scene.Node;
@@ -172,12 +172,13 @@ final class KeyboardShortcuts {
                 .findFirst();
     }
 
-    static String describe(Translations translations, String id, String description) {
+    static String describe(TranslationService translations, String id, String description) {
         String key = id.startsWith("menu-") ? id.substring(5) : id;
         return BINDINGS.stream()
                 .filter(b -> b.id().equals(key))
                 .findFirst()
-                .map(b -> description + "\n" + translations.text("shortcuts.hint", b.display()))
+                .map(b -> description + "\n"
+                        + translations.translate("shortcuts.hint", b.display()).orElseThrow())
                 .orElse(description);
     }
 
@@ -191,13 +192,14 @@ final class KeyboardShortcuts {
         return true;
     }
 
-    static void show(Window owner, Translations translations) {
+    static void show(Window owner, TranslationService translations) {
         var grid = new GridPane();
         grid.setHgap(20);
         grid.setVgap(10);
         int row = 0;
         for (var scope : Scope.values()) {
-            var heading = new Label(translations.text("shortcuts.section." + scope.name()));
+            var heading = new Label(
+                    translations.translate("shortcuts.section." + scope.name()).orElseThrow());
             heading.getStyleClass().add("eyebrow");
             grid.add(heading, 0, row++, 2, 1);
             for (var binding : BINDINGS) {
@@ -216,7 +218,7 @@ final class KeyboardShortcuts {
                 grid.addRow(row++, key, description);
             }
         }
-        var note = new Label(translations.text("shortcuts.note"));
+        var note = new Label(translations.translate("shortcuts.note").orElseThrow());
         note.setWrapText(true);
         note.setMaxWidth(540);
         grid.add(note, 0, row, 2, 1);
@@ -225,7 +227,7 @@ final class KeyboardShortcuts {
         scroll.setFitToWidth(true);
         scroll.setPrefViewportHeight(Math.min(380, owner.getHeight() - 220));
         var dialog = new Dialog<ButtonType>();
-        dialog.setTitle(translations.text("shortcuts.title"));
+        dialog.setTitle(translations.translate("shortcuts.title").orElseThrow());
         dialog.getDialogPane().setContent(scroll);
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
         dialog.getDialogPane().lookupButton(ButtonType.CLOSE).setId("keyboard-shortcuts-close");

@@ -1,7 +1,9 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.Feature;
 import dev.voxelbrew.api.model.mesh.MeshData;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,45 +36,80 @@ public final class Viewport extends StackPane {
             world = new Group();
     private final Rotate tilt = new Rotate(28, Rotate.X_AXIS), orbit = new Rotate(-35, Rotate.Y_AXIS);
     private final Translate center = new Translate(), pan = new Translate();
+
     private final PerspectiveCamera camera = new PerspectiveCamera(true);
+
     private final Map<String, MeshView> bodyViews = new LinkedHashMap<>();
+
     private final Map<String, MeshView> edgeViews = new LinkedHashMap<>();
+
     private final Map<String, TechnicalEdges> edgeData = new LinkedHashMap<>();
+
     private final AmbientLight light = new AmbientLight(Color.gray(0.45));
+
     private final PointLight key = new PointLight(Color.gray(0.7));
+
     private final SubScene scene;
+
     private final ReadOnlyObjectWrapper<ViewOrientation> orientation =
             new ReadOnlyObjectWrapper<>(ViewOrientation.HOME);
+
     private final ViewCube viewCube;
-    private final dev.voxelbrew.util.i18n.Translations translations;
+
+    private final TranslationService translations;
+
     private final javafx.scene.layout.Pane planeLabels = new javafx.scene.layout.Pane();
+
     private final Map<javafx.scene.control.Label, Feature.Plane> originLabels = new LinkedHashMap<>();
+
     private final java.util.ArrayList<SketchPick> sketchPicks = new java.util.ArrayList<>();
+
     private final Group handle = new Group();
+
     private final Group planeTargets = new Group(), faceHighlight = new Group(), selectedEdges = new Group();
+
     private final Map<String, double[]> edgeSamples = new LinkedHashMap<>();
+
     private final ConstructionView construction = new ConstructionView(), constructionPreview = new ConstructionView();
+
     private Rendering.Style rendering = Rendering.Style.SHADED;
+
     private boolean dark, edgesPending;
+
     private Map<String, MeshData> currentMeshes = Map.of();
+
     private double lastX, lastY;
+
     private boolean primaryOrbit;
+
     private double distance = 180;
+
     private BiConsumer<String, Integer> selection = (id, face) -> {};
 
     private BiConsumer<String, Integer> edgeSelection = (id, edge) -> {};
 
     private boolean edgePickEnabled;
+
     private String selected;
+
     private List<Feature> shownSketches = List.of();
+
     private String shownSketchSelection;
+
     private String pressedSketch;
+
     private Consumer<Point3D> planeClick;
+
     private double planeZ;
+
     private double handleDistance;
+
     private Point3D handleAnchor, handleNormal;
+
     private BiConsumer<String, Integer> planeHover;
+
     private String highlightedBody;
+
     private int highlightedFace = -1;
 
     private Map<String, dev.voxelbrew.api.model.BodyStyle> bodyStyles = Map.of();
@@ -133,11 +170,10 @@ public final class Viewport extends StackPane {
         return result;
     }
 
-    public Viewport() {
-        this(new dev.voxelbrew.util.i18n.Translations(java.util.Locale.ENGLISH));
-    }
-
-    public Viewport(dev.voxelbrew.util.i18n.Translations translations) {
+    @SuppressFBWarnings(
+            value = "EI_EXPOSE_REP2",
+            justification = "The viewport shares the window's translation service.")
+    public Viewport(TranslationService translations) {
         this.translations = translations;
         setId("viewport");
         setMinSize(300, 250);
@@ -411,7 +447,7 @@ public final class Viewport extends StackPane {
             label.setStyle("-fx-border-color: " + colors[i] + ";");
             label.setManaged(false);
             label.setCursor(Cursor.HAND);
-            UiHelp.describe(label, translations.text("help.choose-plane"));
+            UiHelp.describe(label, translations.translate("help.choose-plane").orElseThrow());
             label.setOnMouseClicked(e -> {
                 if (e.getButton() == MouseButton.PRIMARY && e.isStillSincePress()) {
                     choose.accept(plane);

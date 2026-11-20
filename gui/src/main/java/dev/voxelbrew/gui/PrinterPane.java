@@ -1,11 +1,11 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.CadDocument;
 import dev.voxelbrew.api.model.printing.PrintArtifact;
 import dev.voxelbrew.api.printer.*;
 import dev.voxelbrew.api.printer.driver.*;
 import dev.voxelbrew.slicer.SliceService;
-import dev.voxelbrew.util.i18n.Translations;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -33,33 +33,53 @@ final class PrinterPane extends VBox implements AutoCloseable {
 
     private final PrinterVisibility printerVisibility;
 
-    private final Translations text;
+    private final TranslationService text;
 
     private final ExecutorService worker;
+
     private final ComboBox<Plate> plates = new ComboBox<>();
+
     private final Label deviceName = new Label();
+
     private final Label status = new Label(), details = new Label(), message = new Label();
+
     private final Label connectionDetail = new Label();
+
     private final Label progressValue = new Label(),
             nozzleValue = new Label(),
             bedValue = new Label(),
             remainingValue = new Label();
+
     private final ProgressBar transfer = new ProgressBar(0);
+
     private final VBox monitor = new VBox(16);
+
     private final Button print, exportGcode;
+
     private final DriverRegistry providers;
+
     private final Timeline polling;
+
     private final AtomicLong generation = new AtomicLong();
+
     private final AtomicLong jobGeneration = new AtomicLong();
+
     private List<Printer> availableDevices = List.of();
+
     private Printer selectedDevice;
+
     private CadDocument document;
+
     private Driver session;
+
     // Accessed only by the serialized device worker, including final cleanup.
 
     private DriverStatus current = DriverStatus.unknown("");
+
     private volatile boolean busy;
+
     private volatile boolean closed;
+
     private volatile boolean startPending;
 
     private record Plate(String id, String name) {}
@@ -113,7 +133,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
             DriverRegistry providers,
             dev.voxelbrew.api.printer.PrinterProfileCatalog profiles,
             PrinterVisibility printerVisibility,
-            Translations text,
+            TranslationService text,
             ExecutorService worker) {
         this.runtime = runtime;
         this.providers = providers;
@@ -247,7 +267,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
     }
 
     private String t(String key) {
-        return text.text("device." + key);
+        return text.translate("device." + key).orElseThrow();
     }
 
     private Button button(String key, Runnable action) {
@@ -459,7 +479,10 @@ final class PrinterPane extends VBox implements AutoCloseable {
         boolean overwrite = Files.exists(path);
         if (overwrite) {
             var confirmation = new Alert(
-                    Alert.AlertType.CONFIRMATION, text.text("file.replace", path), ButtonType.YES, ButtonType.NO);
+                    Alert.AlertType.CONFIRMATION,
+                    text.translate("file.replace", path).orElseThrow(),
+                    ButtonType.YES,
+                    ButtonType.NO);
             if (Dialogs.show(confirmation, getScene().getWindow(), text).orElse(ButtonType.NO) != ButtonType.YES)
                 return;
         }

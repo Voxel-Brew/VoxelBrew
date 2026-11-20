@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.model.vui.*;
 import dev.voxelbrew.api.slicer.SlicerDialog;
-import dev.voxelbrew.util.config.FileUserConfiguration;
+import dev.voxelbrew.slicer.SlicerInstallationStore;
 import java.nio.file.Path;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -42,29 +42,29 @@ class CliSlicerWindowTest {
 
     @Test
     void resolvesInvocationThenSavedThenDeclaredDefaultsAndPersistsPerProvider() throws Exception {
-        var configuration = new FileUserConfiguration(directory.resolve("config.properties"));
-        var saved = configuration.section("slicer", "one");
-        saved.update(Map.of("executable", "saved", "ignored-input", "ignored"), Set.of());
-        assertThat(new CliSlicerWindow(configuration, "one", Map.of()).show(DIALOG))
+        var store = new SlicerInstallationStore(
+                new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties"));
+        store.saveProviderDefaults("one", Map.of("executable", "saved", "ignored-input", "ignored"));
+        assertThat(new CliSlicerWindow(store, "one", Map.of()).show(DIALOG))
                 .contains(Map.of("executable", "saved", "profile", "draft"));
-        assertThat(new CliSlicerWindow(configuration, "one", Map.of("executable", "invocation")).show(DIALOG))
+        assertThat(new CliSlicerWindow(store, "one", Map.of("executable", "invocation")).show(DIALOG))
                 .contains(Map.of("executable", "invocation", "profile", "draft"));
-        assertThat(saved.get("executable", "")).isEqualTo("invocation");
-        assertThat(new CliSlicerWindow(configuration, "two", Map.of()).show(DIALOG))
+        assertThat(store.providerDefaults("one")).containsEntry("executable", "invocation");
+        assertThat(new CliSlicerWindow(store, "two", Map.of()).show(DIALOG))
                 .contains(Map.of("executable", "dialog-default", "profile", "draft"));
     }
 
     @Test
     void rejectedInputsDoNotReplaceAcceptedDefaults() throws Exception {
-        var configuration = new FileUserConfiguration(directory.resolve("config.properties"));
-        var saved = configuration.section("slicer", "one");
-        saved.update(Map.of("executable", "saved"), Set.of());
-        assertThatThrownBy(() -> new CliSlicerWindow(configuration, "one", Map.of("executable", "")).show(DIALOG))
+        var store = new SlicerInstallationStore(
+                new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties"));
+        store.saveProviderDefaults("one", Map.of("executable", "saved"));
+        assertThatThrownBy(() -> new CliSlicerWindow(store, "one", Map.of("executable", "")).show(DIALOG))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Enter an executable");
-        assertThatThrownBy(() -> new CliSlicerWindow(configuration, "one", Map.of("typo", "value")).show(DIALOG))
+        assertThatThrownBy(() -> new CliSlicerWindow(store, "one", Map.of("typo", "value")).show(DIALOG))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("typo");
-        assertThat(saved.read()).containsExactlyEntriesOf(Map.of("executable", "saved"));
+        assertThat(store.providerDefaults("one")).containsExactlyEntriesOf(Map.of("executable", "saved"));
     }
 }

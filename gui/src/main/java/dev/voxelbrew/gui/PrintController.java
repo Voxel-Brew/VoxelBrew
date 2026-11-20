@@ -24,11 +24,17 @@ public final class PrintController implements AutoCloseable {
     private final ExecutorService worker;
 
     private final Consumer<Runnable> dispatch;
+
     private final Supplier<CadDocument> current;
+
     private final Path pluginDirectory;
+
     private final dev.voxelbrew.importer.GcodeSource gcodeReader;
+
     private final List<String> diagnostics = new ArrayList<>();
+
     private Map<String, List<String>> completedGcode = Map.of();
+
     private Map<String, dev.voxelbrew.api.model.printing.PrintArtifact> completedArtifacts = Map.of();
 
     private String restoredRevision = "";
@@ -83,7 +89,7 @@ public final class PrintController implements AutoCloseable {
                 dispatch,
                 current,
                 pluginDirectory,
-                WindowResources.worker("slicer"),
+                WindowResources.worker(),
                 dev.voxelbrew.importer.ImportRuntime.load().gcode());
     }
 

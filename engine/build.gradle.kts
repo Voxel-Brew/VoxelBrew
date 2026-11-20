@@ -266,10 +266,16 @@ tasks.register<JavaExec>("computeBenchmark") {
     mainClass.set("dev.voxelbrew.engine.performance.ComputeBenchmark")
     args(providers.gradleProperty("computeScenario").orElse("all").get())
     systemProperty("voxelbrew.native.path", runtime.absolutePath)
-    systemProperty(
-        "voxelbrew.compute.threads",
-        providers.gradleProperty("computeThreads").orElse("4").get(),
-    )
+    val threads = providers.gradleProperty("computeThreads").orElse("4")
+    val config = layout.buildDirectory.file("compute-benchmark/config.properties")
+    systemProperty("voxelbrew.home", config.get().asFile.parentFile.absolutePath)
+    systemProperty("voxelbrew.config", config.get().asFile.name)
+    doFirst {
+        config.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText("voxelbrew.compute.threads=${threads.get()}\n")
+        }
+    }
     maxHeapSize = "1g"
 }
 

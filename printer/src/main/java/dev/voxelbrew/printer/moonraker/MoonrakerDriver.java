@@ -1,9 +1,12 @@
 package dev.voxelbrew.printer.moonraker;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.printing.PrintArtifact;
 import dev.voxelbrew.api.printer.driver.*;
 import dev.voxelbrew.printer.internal.JobRejectedException;
 import dev.voxelbrew.printer.internal.TransportFactory;
+import dev.voxelbrew.util.services.Services;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.NoRouteToHostException;
@@ -15,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 /** Stateless integration; every operation closes its own connection. */
 @Slf4j
 public final class MoonrakerDriver implements Driver {
+    private final TranslationService translations;
     private final TransportFactory transports;
 
     private static PrintResult.Failure failed(String context, Exception failure, boolean submissionUncertain) {
@@ -27,11 +31,31 @@ public final class MoonrakerDriver implements Driver {
         return detail == null || detail.isBlank() ? context : context + ": " + detail;
     }
 
+    private static Connection connection(DriverConfiguration config) {
+        return new Connection(
+                config.requireUriProperty(MoonrakerDriverGui.MOONRAKER_URL_ID).toString(),
+                config.getStringProperty(MoonrakerDriverGui.MOONRAKER_SERIAL_ID).orElse(""),
+                new String(config.requirePasswordProperty(MoonrakerDriverGui.MOONRAKER_API_KEY_ID)));
+    }
+
     public MoonrakerDriver() {
-        transports = config -> new MoonrakerSession(connection(config));
+        this(Services.load(TranslationService.class));
+    }
+
+    public MoonrakerDriver(@lombok.NonNull TranslationService translations) {
+        this(translations, config -> new MoonrakerSession(connection(config)));
     }
 
     MoonrakerDriver(@lombok.NonNull TransportFactory transports) {
+        this(Services.load(TranslationService.class), transports);
+    }
+
+    @SuppressFBWarnings(
+            value = "EI_EXPOSE_REP2",
+            justification = "The injected translation service is intentionally shared.")
+    public MoonrakerDriver(
+            @lombok.NonNull TranslationService translations, @lombok.NonNull TransportFactory transports) {
+        this.translations = translations;
         this.transports = transports;
     }
 
@@ -42,29 +66,30 @@ public final class MoonrakerDriver implements Driver {
 
     @Override
     public String name() {
-        return "Moonraker Configuration";
+        return translations.translate("printer.moonraker.name").orElseThrow();
     }
 
     @Override
     public DriverGui gui() {
-        return new MoonrakerDriverGui();
+        return new MoonrakerDriverGui(translations);
     }
 
-    private Connection connection(DriverConfiguration config) {
+    private void validate(DriverConfiguration config) {
         var form = gui();
         var values = config.toInput();
         var errors = form.validate(values);
-        if (!errors.isEmpty()) throw new IllegalArgumentException("Invalid printer configuration: " + errors);
-        return new Connection(
-                config.requireUriProperty(MoonrakerDriverGui.MOONRAKER_URL_ID).toString(),
-                config.getStringProperty(MoonrakerDriverGui.MOONRAKER_SERIAL_ID).orElse(""),
-                new String(config.requirePasswordProperty(MoonrakerDriverGui.MOONRAKER_API_KEY_ID)));
+        if (!errors.isEmpty())
+            throw new IllegalArgumentException(
+                    translations.translate("printer.invalid", errors).orElseThrow());
     }
 
     @Override
     public DriverStatus readPrinterStatus(DriverConfiguration config) {
-        try (var session = transports.open(config)) {
-            return session.status();
+        try {
+            validate(config);
+            try (var session = transports.open(config)) {
+                return session.status();
+            }
         } catch (IOException | RuntimeException failure) {
             if (failure instanceof ConnectException
                     || failure instanceof NoRouteToHostException
@@ -80,7 +105,7 @@ public final class MoonrakerDriver implements Driver {
                     OptionalDouble.empty(),
                     OptionalDouble.empty(),
                     OptionalDouble.empty(),
-                    message("Cannot read Moonraker printer status", failure));
+                    message(translations.translate("printer.moonraker.status").orElseThrow(), failure));
         }
     }
 
@@ -90,14 +115,16 @@ public final class MoonrakerDriver implements Driver {
         boolean submissionAttempted = false;
         boolean submitted = false;
         try {
-            connection(config);
+            validate(config);
             if (!artifact.format().equals("gcode"))
-                return new PrintResult.Failure(Set.of("Moonraker requires text G-code"));
+                return new PrintResult.Failure(Set.of(
+                        translations.translate("printer.moonraker.format").orElseThrow()));
             temporary = Files.createTempFile("voxelbrew-job-", ".gcode");
             Files.write(temporary, artifact.bytes());
             try (var session = transports.open(config)) {
                 if (!session.status().canStart())
-                    return new PrintResult.Failure(Set.of("Printer is not idle; inspect its current job"));
+                    return new PrintResult.Failure(Set.of(
+                            translations.translate("printer.moonraker.busy").orElseThrow()));
                 var uploaded = session.upload(temporary, progress -> {});
                 submissionAttempted = true;
                 session.start(uploaded);
@@ -105,7 +132,7 @@ public final class MoonrakerDriver implements Driver {
                 return PrintResult.Success.SUCCESS;
             }
         } catch (JobRejectedException rejection) {
-            return failed("Moonraker rejected print operation", rejection, false);
+            return failed(translations.translate("printer.moonraker.rejected").orElseThrow(), rejection, false);
         } catch (IOException | RuntimeException failure) {
             if (submitted) {
                 log.warn("Moonraker accepted the submission but transport cleanup failed", failure);
@@ -113,8 +140,10 @@ public final class MoonrakerDriver implements Driver {
             }
             return failed(
                     submissionAttempted
-                            ? "Print submission is uncertain. Check the printer before manually submitting again"
-                            : "Moonraker print operation failed",
+                            ? translations
+                                    .translate("printer.moonraker.uncertain")
+                                    .orElseThrow()
+                            : translations.translate("printer.moonraker.failed").orElseThrow(),
                     failure,
                     submissionAttempted);
         } finally {

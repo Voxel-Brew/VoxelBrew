@@ -22,7 +22,8 @@ class BundledSlicerIntegrationTest {
     @CsvSource({"prusa-slicer, gcode", "orca, gcode.3mf"})
     void slicesUsingTheReadOnlyInstallationWithoutAnExecutableSetting(String providerId, String format)
             throws Exception {
-        var store = new SlicerInstallationStore(directory.resolve("config.properties"));
+        var store = new SlicerInstallationStore(
+                new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties"));
         var installed = store.load();
         assumeTrue(!installed.isEmpty(), "This is a thin build");
         assertThat(installed).hasSize(2).allMatch(SlicerInstallation::bundled);

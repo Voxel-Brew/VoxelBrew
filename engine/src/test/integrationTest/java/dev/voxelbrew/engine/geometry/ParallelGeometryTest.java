@@ -8,7 +8,7 @@ import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.performance.ComputeBenchmark;
 import dev.voxelbrew.engine.printing.*;
-import dev.voxelbrew.util.concurrent.CpuWork;
+import dev.voxelbrew.util.concurrent.ParallelWork;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 
@@ -29,7 +29,7 @@ class ParallelGeometryTest {
             assertThat(new ArrayList<>(detached.meshes().keySet()))
                     .isEqualTo(bodies.stream().map(Evaluation.Body::id).toList());
             for (int repeat = 0; repeat < 3; repeat++) {
-                var meshes = CpuWork.map(bodies, b -> b.solid().tessellate(MeshOptions.DEFAULT));
+                var meshes = ParallelWork.map(bodies, b -> b.solid().tessellate(MeshOptions.DEFAULT));
                 for (int i = 0; i < bodies.size(); i++) {
                     assertThat(meshes.get(i).vertices())
                             .containsExactly(serial.get(i).vertices());
@@ -41,7 +41,7 @@ class ParallelGeometryTest {
                     assertThat(MeshValidation.inspect(meshes.get(i)).closed()).isTrue();
                 }
             }
-            assertThatThrownBy(() -> CpuWork.map(bodies, body -> {
+            assertThatThrownBy(() -> ParallelWork.map(bodies, body -> {
                         var mesh = body.solid().tessellate(MeshOptions.DEFAULT);
                         if (body.id().equals(bodies.getFirst().id()))
                             throw new IllegalStateException("injected batch failure");

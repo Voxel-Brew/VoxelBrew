@@ -42,3 +42,12 @@ Use Lombok where it removes routine Java boilerplate without obscuring a public 
 - `@Slf4j`: Add a logger to classes that emit operational diagnostics. Use parameterized logging and keep credentials and other sensitive data out of logs.
 - `@Builder`: Use for objects with many optional or named construction inputs when it improves call-site clarity. Keep required-field validation and invariants explicit.
 - `@UtilityClass`: Use for stateless collections of static helpers that must not be instantiated. Do not use it for classes that may need instances, inheritance, or dependency injection.
+
+## Service injection
+
+Resolve services by their interfaces at the wiring point and pass them to consumers through
+constructors. Provider classes must not expose static service getters or downcast discovered
+services to their implementations.
+
+`TranslationServiceImpl` has a public no-argument constructor for service discovery and a
+package-private constructor that takes a locale and a catalog directory for isolated catalogs.

@@ -13,8 +13,8 @@ class RecentFilesTest {
 
     @Test
     void persistsMostRecentTenNormalizesAndMovesDuplicatesToFront() throws Exception {
-        var configuration = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
-        configuration.set("unrelated", "preserved");
+        var configuration = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties");
+        configuration.saveUserConfig("unrelated", "preserved");
         var recent = new RecentFiles(configuration);
         assertThat(recent.paths().isEmpty()).isTrue();
         for (int i = 0; i < 12; i++) {
@@ -29,13 +29,13 @@ class RecentFilesTest {
         assertThat(reopened.getFirst()).isEqualTo(directory.resolve("part 5.vxb"));
         assertThat(reopened.get(1)).isEqualTo(directory.resolve("part 11.vxb"));
         assertThat(reopened.contains(directory.resolve("part 0.vxb"))).isFalse();
-        assertThat(configuration.get("unrelated", "")).isEqualTo("preserved");
+        assertThat(configuration.readUserConfig("unrelated").orElse("")).isEqualTo("preserved");
         assertThatThrownBy(() -> reopened.clear()).isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
     void loadingSkipsDeletedFilesAndDirectories() throws Exception {
-        var configuration = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
+        var configuration = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties");
         Path existing = Files.createFile(directory.resolve("existing.vxb"));
         Path deleted = Files.createFile(directory.resolve("deleted.vxb"));
         Path folder = Files.createDirectory(directory.resolve("folder"));

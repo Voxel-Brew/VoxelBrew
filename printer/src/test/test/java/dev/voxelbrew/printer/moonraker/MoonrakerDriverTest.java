@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.*;
 import dev.voxelbrew.api.model.printing.PrintArtifact;
 import dev.voxelbrew.api.printer.driver.*;
 import dev.voxelbrew.printer.internal.*;
+import dev.voxelbrew.util.i18n.TranslationCatalogs;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.NoRouteToHostException;
@@ -13,8 +14,12 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.logging.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class MoonrakerDriverTest {
+    @TempDir
+    Path directory;
+
     private static final class Fixture implements DeviceTransport {
         final List<String> calls = new ArrayList<>();
         final IOException startFailure = new IOException("Disconnected");
@@ -60,6 +65,10 @@ class MoonrakerDriverTest {
         }
     }
 
+    private MoonrakerDriver driver(TransportFactory transports) {
+        return new MoonrakerDriver(TranslationCatalogs.forLocale(Locale.ENGLISH, directory), transports);
+    }
+
     private DriverConfiguration config() {
         return new MoonrakerDriverGui()
                 .buildConfiguration(Map.of(MoonrakerDriverGui.MOONRAKER_URL_ID, "http://localhost:7125"));
@@ -72,7 +81,7 @@ class MoonrakerDriverTest {
     @Test
     void submitsOnceAndClosesOperationResources() throws Exception {
         var transport = new Fixture();
-        var driver = new MoonrakerDriver(c -> transport);
+        var driver = driver(c -> transport);
         assertThat(driver.print(config(), artifact())).isEqualTo(Driver.PrintResult.Success.SUCCESS);
         assertThat(transport.calls).containsExactly("status", "upload", "start", "close");
         assertThat(transport.file).doesNotExist();
@@ -82,8 +91,7 @@ class MoonrakerDriverTest {
     void rejectsBusyJobsAndClosesResources() throws Exception {
         var transport = new Fixture();
         transport.busy = true;
-        assertThat(new MoonrakerDriver(c -> transport).print(config(), artifact()))
-                .isInstanceOf(Driver.PrintResult.Failure.class);
+        assertThat(driver(c -> transport).print(config(), artifact())).isInstanceOf(Driver.PrintResult.Failure.class);
         assertThat(transport.calls).containsExactly("status", "close");
     }
 
@@ -91,7 +99,7 @@ class MoonrakerDriverTest {
     void uncertainStartIsNeverRetriedAndCleansArtifact() {
         var transport = new Fixture();
         transport.failStart = true;
-        assertThat(new MoonrakerDriver(configuration -> transport).print(config(), artifact()))
+        assertThat(driver(configuration -> transport).print(config(), artifact()))
                 .isInstanceOfSatisfying(Driver.PrintResult.Failure.class, failure -> {
                     assertThat(failure.submissionUncertain()).isTrue();
                     assertThat(failure.messages())
@@ -105,7 +113,7 @@ class MoonrakerDriverTest {
     void monitoringFailureReturnsErrorAndClosesResources() {
         var transport = new Fixture();
         transport.failStatus = true;
-        var status = new MoonrakerDriver(configuration -> transport).readPrinterStatus(config());
+        var status = driver(configuration -> transport).readPrinterStatus(config());
         assertThat(status.state()).isEqualTo(DriverStatus.State.ERROR);
         assertThat(status.detail()).contains("Cannot read", "Monitoring unavailable");
         assertThat(status.canStart()).isFalse();
@@ -136,14 +144,14 @@ class MoonrakerDriverTest {
                     new ConnectException(),
                     new NoRouteToHostException(),
                     new HttpConnectTimeoutException("Timed out"))) {
-                var driver = new MoonrakerDriver(configuration -> {
+                var driver = driver(configuration -> {
                     throw failure;
                 });
                 var status = driver.readPrinterStatus(config());
                 assertThat(status.state()).isEqualTo(DriverStatus.State.ERROR);
                 assertThat(status.canStart()).isFalse();
             }
-            var driver = new MoonrakerDriver(configuration -> {
+            var driver = driver(configuration -> {
                 throw new IOException("Invalid Moonraker response");
             });
             assertThat(driver.readPrinterStatus(config()).state()).isEqualTo(DriverStatus.State.ERROR);
@@ -160,8 +168,7 @@ class MoonrakerDriverTest {
     void definiteRejectionIsReportedWithoutRetry() throws Exception {
         var transport = new Fixture();
         transport.reject = true;
-        assertThat(new MoonrakerDriver(c -> transport).print(config(), artifact()))
-                .isInstanceOf(Driver.PrintResult.Failure.class);
+        assertThat(driver(c -> transport).print(config(), artifact())).isInstanceOf(Driver.PrintResult.Failure.class);
         assertThat(transport.calls).containsExactly("status", "upload", "start", "close");
         assertThat(transport.file).doesNotExist();
     }
@@ -170,7 +177,7 @@ class MoonrakerDriverTest {
     void failedTransferReturnsFailureAndClosesResourcesAndCleansArtifact() {
         var transport = new Fixture();
         transport.failUpload = true;
-        assertThat(new MoonrakerDriver(configuration -> transport).print(config(), artifact()))
+        assertThat(driver(configuration -> transport).print(config(), artifact()))
                 .isInstanceOfSatisfying(Driver.PrintResult.Failure.class, failure -> {
                     assertThat(failure.submissionUncertain()).isFalse();
                     assertThat(failure.messages())
@@ -190,7 +197,7 @@ class MoonrakerDriverTest {
                 return "Localized transport failure";
             }
         };
-        var driver = new MoonrakerDriver(configuration -> {
+        var driver = driver(configuration -> {
             throw cause;
         });
         var status = driver.readPrinterStatus(config());
@@ -210,7 +217,7 @@ class MoonrakerDriverTest {
     void uncertainRuntimeSubmissionReturnsFailureAndDoesNotRetry() {
         var transport = new Fixture();
         transport.runtimeStartFailure = new IllegalStateException("Connection lost during submission");
-        assertThat(new MoonrakerDriver(configuration -> transport).print(config(), artifact()))
+        assertThat(driver(configuration -> transport).print(config(), artifact()))
                 .isInstanceOfSatisfying(Driver.PrintResult.Failure.class, failure -> {
                     assertThat(failure.submissionUncertain()).isTrue();
                     assertThat(failure.messages())
@@ -223,7 +230,7 @@ class MoonrakerDriverTest {
 
     @Test
     void invalidConfigurationReturnsFailureWithoutOpeningTransport() {
-        var driver = new MoonrakerDriver(configuration -> {
+        var driver = driver(configuration -> {
             throw new AssertionError("Must validate first");
         });
         assertThat(driver.print(new DriverConfiguration(Map.of()), artifact()))
@@ -236,7 +243,7 @@ class MoonrakerDriverTest {
 
     @Test
     void missingExceptionMessageHasMeaningfulFallback() {
-        var driver = new MoonrakerDriver(configuration -> {
+        var driver = driver(configuration -> {
             throw new IOException();
         });
         assertThat(driver.readPrinterStatus(config()).detail()).contains("Cannot read");
@@ -250,7 +257,7 @@ class MoonrakerDriverTest {
     void cleanupFailureAfterAcceptedSubmissionDoesNotTurnItIntoAFailedJob() {
         var transport = new Fixture();
         transport.runtimeCloseFailure = new IllegalStateException("Cleanup failed");
-        assertThat(new MoonrakerDriver(configuration -> transport).print(config(), artifact()))
+        assertThat(driver(configuration -> transport).print(config(), artifact()))
                 .isEqualTo(Driver.PrintResult.Success.SUCCESS);
         assertThat(transport.calls).containsExactly("status", "upload", "start", "close");
         assertThat(transport.file).doesNotExist();

@@ -4,7 +4,6 @@ import com.google.gson.*;
 import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.api.printer.PrinterProfileCatalog;
 import dev.voxelbrew.api.printer.Profile;
-import dev.voxelbrew.util.config.ApplicationPaths;
 import java.nio.file.Path;
 import java.util.*;
 import lombok.NonNull;
@@ -74,7 +73,8 @@ public final class DefaultPrinterProfileCatalog implements PrinterProfileCatalog
     }
 
     public DefaultPrinterProfileCatalog() {
-        this(dev.voxelbrew.util.services.Services.load(ApplicationPaths.class).profiles());
+        this(dev.voxelbrew.util.services.Services.load(dev.voxelbrew.api.userconfig.UserConfigService.class)
+                .profilesFolder());
     }
 
     public DefaultPrinterProfileCatalog(@NonNull Path directory) {

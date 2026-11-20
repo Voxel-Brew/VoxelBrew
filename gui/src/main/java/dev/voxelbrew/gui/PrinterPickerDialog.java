@@ -1,7 +1,7 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.printer.PrinterProfileCatalog;
-import dev.voxelbrew.util.i18n.Translations;
 import java.util.*;
 import javafx.application.Platform;
 import javafx.scene.control.*;
@@ -11,15 +11,19 @@ import javafx.stage.Window;
 
 final class PrinterPickerDialog {
     static Optional<PrinterProfileCatalog.Entry> choose(
-            Window owner, Translations translations, List<PrinterProfileCatalog.Entry> entries, String currentId) {
+            Window owner,
+            TranslationService translations,
+            List<PrinterProfileCatalog.Entry> entries,
+            String currentId) {
         var search = new TextField();
         search.setId("print-printer-search");
-        search.setPromptText(translations.text("print.searchPrinters"));
-        search.setAccessibleText(translations.text("print.searchPrinters"));
+        search.setPromptText(translations.translate("print.searchPrinters").orElseThrow());
+        search.setAccessibleText(translations.translate("print.searchPrinters").orElseThrow());
         var results = new ListView<PrinterProfileCatalog.Entry>();
         results.setId("print-printer-results");
         results.setPrefHeight(300);
-        results.setPlaceholder(new Label(translations.text("print.noPrinters")));
+        results.setPlaceholder(
+                new Label(translations.translate("print.noPrinters").orElseThrow()));
         results.setCellFactory(list -> new ListCell<>() {
             @Override
             protected void updateItem(PrinterProfileCatalog.Entry item, boolean empty) {
@@ -29,7 +33,10 @@ final class PrinterPickerDialog {
                                 ? null
                                 : item.name()
                                         + (item.bundled()
-                                                ? " (" + translations.text("print.builtInPrinter") + ")"
+                                                ? " ("
+                                                        + translations
+                                                                .translate("print.builtInPrinter")
+                                                                .orElseThrow() + ")"
                                                 : ""));
             }
         });
@@ -51,7 +58,7 @@ final class PrinterPickerDialog {
             results.scrollTo(0);
         });
         var dialog = new Dialog<PrinterProfileCatalog.Entry>();
-        dialog.setTitle(translations.text("print.printerSelector"));
+        dialog.setTitle(translations.translate("print.printerSelector").orElseThrow());
         var content = new VBox(8, search, results);
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);

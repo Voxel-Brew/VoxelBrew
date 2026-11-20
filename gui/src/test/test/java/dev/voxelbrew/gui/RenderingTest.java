@@ -12,14 +12,14 @@ class RenderingTest {
 
     @Test
     void remembersStyleWithoutChangingOtherPreferencesAndRecoversFromUnknownValues() throws Exception {
-        var configuration = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
-        configuration.set("language", "pl");
+        var configuration = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties");
+        configuration.saveUserConfig("language", "pl");
         var rendering = new Rendering(configuration);
         assertThat(rendering.load()).isEqualTo(Rendering.Style.SHADED);
         rendering.save(Rendering.Style.TECHNICAL);
         assertThat(new Rendering(configuration).load()).isEqualTo(Rendering.Style.TECHNICAL);
-        assertThat(configuration.get("language", "")).isEqualTo("pl");
-        configuration.set("rendering.style", "UNSUPPORTED");
+        assertThat(configuration.readUserConfig("language").orElse("")).isEqualTo("pl");
+        configuration.saveUserConfig("rendering.style", "UNSUPPORTED");
         assertThat(rendering.load()).isEqualTo(Rendering.Style.SHADED);
         rendering.save(Rendering.Style.TECHNICAL);
         assertThat(rendering.load()).isEqualTo(Rendering.Style.TECHNICAL);

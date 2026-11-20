@@ -26,6 +26,8 @@ jobs:
           repository: Voxel-Brew/BOM
           path: .tools/bom
           persist-credentials: false
+      - uses: ./.github/actions/shared-runtime-apis
+        if: github.event_name == 'pull_request' && github.head_ref == 'feat/shared-runtime-services' && github.event.pull_request.head.repo.full_name == github.repository
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -56,6 +58,8 @@ jobs:
           repository: Voxel-Brew/BOM
           path: .tools/bom
           persist-credentials: false
+      - uses: ./.github/actions/shared-runtime-apis
+        if: github.event_name == 'pull_request' && github.head_ref == 'feat/shared-runtime-services' && github.event.pull_request.head.repo.full_name == github.repository
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

@@ -1,8 +1,10 @@
 package dev.voxelbrew.util.logging;
 
-import dev.voxelbrew.util.config.ApplicationPaths;
-import dev.voxelbrew.util.config.UserConfiguration;
+import dev.voxelbrew.api.userconfig.UserConfigException;
+import dev.voxelbrew.api.userconfig.UserConfigService;
+import dev.voxelbrew.util.services.Services;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Map;
@@ -13,21 +15,22 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public final class Logging {
     private static final Logger APPLICATION = Logger.getLogger("dev.voxelbrew");
+
     private static final Object LOCK = new Object();
+
     private static boolean initialized;
+
     private static Thread.UncaughtExceptionHandler previousUncaught;
+
     private static Thread.UncaughtExceptionHandler applicationUncaught;
 
     public static void initialize(String component) {
         synchronized (LOCK) {
             if (initialized) return;
             try {
-                configure(
-                        UserConfiguration.user(),
-                        dev.voxelbrew.util.services.Services.load(ApplicationPaths.class)
-                                .logs(),
-                        component);
-            } catch (IOException | IllegalArgumentException failure) {
+                var configuration = Services.load(UserConfigService.class);
+                configure(configuration, configuration.logsFolder(), component);
+            } catch (IOException | UncheckedIOException | IllegalArgumentException | UserConfigException failure) {
                 install(Level.WARNING, console(Level.WARNING));
                 log.warn("Cannot configure file logging; using console diagnostics", failure);
             }
@@ -48,10 +51,10 @@ public final class Logging {
         }
     }
 
-    public static void configure(UserConfiguration configuration, Path directory, String component) throws IOException {
+    public static void configure(UserConfigService configuration, Path directory, String component) throws IOException {
         synchronized (LOCK) {
             if (!component.matches("[a-zA-Z0-9_-]+")) throw new IllegalArgumentException("Invalid logging component");
-            Map<String, String> options = configuration.read();
+            Map<String, String> options = configuration.readUserConfig();
             Level level = level(options.getOrDefault("logging.level", "INFO"));
             Level consoleLevel = level(options.getOrDefault("logging.console.level", "WARNING"));
             long bytes = Long.parseLong(options.getOrDefault("logging.file.limit", "20971520"));

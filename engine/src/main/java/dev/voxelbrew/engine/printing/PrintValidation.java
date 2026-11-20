@@ -45,11 +45,11 @@ public final class PrintValidation {
                 .distinct()
                 .filter(model.meshes()::containsKey)
                 .toList();
-        var bodyReports = dev.voxelbrew.util.concurrent.CpuWork.map(
+        var bodyReports = dev.voxelbrew.util.concurrent.ParallelWork.map(
                 bodyIds, id -> MeshValidation.inspect(model.meshes().get(id)));
         var reportsByBody = new HashMap<String, MeshValidation.Report>();
         for (int i = 0; i < bodyIds.size(); i++) reportsByBody.put(bodyIds.get(i), bodyReports.get(i));
-        var placements = dev.voxelbrew.util.concurrent.CpuWork.map(model.instances(), instance -> {
+        var placements = dev.voxelbrew.util.concurrent.ParallelWork.map(model.instances(), instance -> {
             if (!model.meshes().containsKey(instance.bodyId())) return new Placement(null, null);
             var placed = model.placedMesh(instance);
             return new Placement(MeshGeometry.footprint(placed), MeshGeometry.bounds(placed));

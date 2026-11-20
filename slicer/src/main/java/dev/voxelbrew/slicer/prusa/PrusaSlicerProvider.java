@@ -1,15 +1,21 @@
 package dev.voxelbrew.slicer.prusa;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.printing.Cancellation;
 import dev.voxelbrew.slicer.internal.ExecutableDiscovery;
 import dev.voxelbrew.slicer.internal.ProcessSlicerProvider;
+import dev.voxelbrew.util.services.Services;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 
 public final class PrusaSlicerProvider extends ProcessSlicerProvider {
     public PrusaSlicerProvider() {
-        super(PrusaSlicerBackend::new);
+        this(Services.load(TranslationService.class));
+    }
+
+    public PrusaSlicerProvider(@lombok.NonNull TranslationService translations) {
+        super(PrusaSlicerBackend::new, translations);
     }
 
     @Override

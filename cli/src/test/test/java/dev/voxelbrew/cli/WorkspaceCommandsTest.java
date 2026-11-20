@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.model.CadDocument;
 import dev.voxelbrew.util.di.ApplicationModule;
+import dev.voxelbrew.util.i18n.TranslationCatalogs;
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
@@ -164,14 +165,15 @@ class WorkspaceCommandsTest {
                 path -> {
                     throw new IOException("No job");
                 });
+        var configuration = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties");
         return CliComponent.factory()
                 .create(
                         new ApplicationModule(
-                                new dev.voxelbrew.util.config.FileUserConfiguration(
-                                        directory.resolve("config.properties")),
+                                configuration,
                                 () -> {
                                     throw new AssertionError("No update lookup");
-                                }),
+                                },
+                                TranslationCatalogs.forLocale(Locale.ENGLISH, directory)),
                         files)
                 .commandLine()
                 .setOut(new PrintWriter(new StringWriter()))

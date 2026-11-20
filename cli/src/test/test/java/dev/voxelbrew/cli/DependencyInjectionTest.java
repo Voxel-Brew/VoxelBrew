@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.model.CadDocument;
 import dev.voxelbrew.util.di.ApplicationModule;
+import dev.voxelbrew.util.i18n.TranslationCatalogs;
 import dev.voxelbrew.util.update.UpdateServiceFactory;
 import java.io.*;
 import java.nio.file.*;
@@ -116,8 +117,8 @@ class DependencyInjectionTest {
         var english = graph("en", new FileIoModule(), () -> {
             throw new AssertionError("Other graph's updater was called");
         });
-        assertThat(polish.translations().locale().getLanguage()).isEqualTo("pl");
-        assertThat(english.translations().locale().getLanguage()).isEqualTo("en");
+        assertThat(polish.translations().currentLocale().getLanguage()).isEqualTo("pl");
+        assertThat(english.translations().currentLocale().getLanguage()).isEqualTo("en");
         assertThat(polish.translations()).isSameAs(polish.translations());
         assertThat(english.translations()).isNotSameAs(polish.translations());
         assertThat(quiet(polish.commandLine()).execute("settings", "update", "--help"))
@@ -132,8 +133,14 @@ class DependencyInjectionTest {
     }
 
     private CliComponent graph(String language, FileIoModule files, UpdateServiceFactory updates) throws IOException {
-        var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve(language + ".properties"));
-        config.set("language", language);
-        return CliComponent.factory().create(new ApplicationModule(config, updates), files);
+        var config = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, language + ".properties");
+        config.saveUserConfig("language", language);
+        return CliComponent.factory()
+                .create(
+                        new ApplicationModule(
+                                config,
+                                updates,
+                                TranslationCatalogs.forLocale(Locale.forLanguageTag(language), directory)),
+                        files);
     }
 }

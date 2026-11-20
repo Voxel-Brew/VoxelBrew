@@ -1,8 +1,8 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.parameters.BuiltinParameters;
 import dev.voxelbrew.api.model.parameters.ParameterSet;
-import dev.voxelbrew.util.i18n.Translations;
 import java.util.List;
 import java.util.function.Supplier;
 import javafx.application.Platform;
@@ -17,10 +17,15 @@ final class ParameterSuggestions {
     private final FormulaField field;
 
     private final Supplier<ParameterSet> parameters;
-    private final Supplier<Translations> translations;
+
+    private final TranslationService translations;
+
     private Popup popup;
+
     private ListView<String> names;
+
     private VBox content;
+
     private Label heading, hint, empty;
     private boolean queued, changing, dismissed;
 
@@ -65,7 +70,7 @@ final class ParameterSuggestions {
         return asciiLetter(c) || c >= '0' && c <= '9' || c == '_' || c == '.';
     }
 
-    ParameterSuggestions(FormulaField field, Supplier<ParameterSet> parameters, Supplier<Translations> translations) {
+    ParameterSuggestions(FormulaField field, Supplier<ParameterSet> parameters, TranslationService translations) {
         this.field = field;
         this.parameters = parameters;
         this.translations = translations;
@@ -116,12 +121,11 @@ final class ParameterSuggestions {
         if (selected != null && matches.contains(selected))
             names.getSelectionModel().select(selected);
         else names.getSelectionModel().selectFirst();
-        var t = translations.get();
-        heading.setText(t.text("formula.parameters"));
-        hint.setText(t.text("formula.completionKeys"));
-        empty.setText(t.text("formula.noParameters"));
-        names.setAccessibleText(t.text("formula.parameters"));
-        names.setAccessibleHelp(t.text("formula.completionKeys"));
+        heading.setText(translations.translate("formula.parameters").orElseThrow());
+        hint.setText(translations.translate("formula.completionKeys").orElseThrow());
+        empty.setText(translations.translate("formula.noParameters").orElseThrow());
+        names.setAccessibleText(translations.translate("formula.parameters").orElseThrow());
+        names.setAccessibleHelp(translations.translate("formula.completionKeys").orElseThrow());
         var root = field.getScene().getRoot();
         boolean dark = root.getStyleClass().contains("dark") || root.lookup(".dark") != null;
         content.getStyleClass().removeAll("light", "dark");
@@ -150,13 +154,6 @@ final class ParameterSuggestions {
         names.setFixedCellSize(28);
         names.setPlaceholder(empty);
         names.setCellFactory(list -> new ListCell<>() {
-            @Override
-            protected void updateItem(String item, boolean unused) {
-                super.updateItem(item, unused);
-                setText(unused ? null : item);
-                setId(unused ? null : "formula-suggestion-" + item);
-            }
-
             {
                 setOnMousePressed(e -> {
                     if (e.getButton() == MouseButton.PRIMARY && !isEmpty()) {
@@ -164,6 +161,13 @@ final class ParameterSuggestions {
                         accept(getItem());
                     }
                 });
+            }
+
+            @Override
+            protected void updateItem(String item, boolean unused) {
+                super.updateItem(item, unused);
+                setText(unused ? null : item);
+                setId(unused ? null : "formula-suggestion-" + item);
             }
         });
         content = new VBox(6, heading, names, hint);

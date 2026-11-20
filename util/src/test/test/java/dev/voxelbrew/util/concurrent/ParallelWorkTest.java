@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.*;
 import org.junit.jupiter.api.Test;
 
 @SuppressWarnings("deprecation")
-class CpuWorkTest {
+class ParallelWorkTest {
     private static void await(CountDownLatch latch) {
         try {
             assertThat(latch.await(10, TimeUnit.SECONDS))
@@ -22,8 +22,9 @@ class CpuWorkTest {
 
     @Test
     void workersOverlapStayBoundedVisitEachIndexAndAllowNestedWork() throws Exception {
-        try (var pool = new CpuWork.WorkPool(3);
+        try (var executor = Executors.newFixedThreadPool(3);
                 var caller = Executors.newSingleThreadExecutor()) {
+            var pool = new ParallelWork.WorkPool(3, executor);
             var started = new CountDownLatch(3);
             var release = new CountDownLatch(1);
             var active = new AtomicInteger();
@@ -47,13 +48,14 @@ class CpuWorkTest {
             assertThat(peak.get()).isEqualTo(3);
             for (int i = 0; i < 48; i++) assertThat(visits.get(i)).isEqualTo(2);
         }
-        assertThat(CpuWork.map(List.of(3, 2, 1), n -> n * n)).isEqualTo(List.of(9, 4, 1));
+        assertThat(ParallelWork.map(List.of(3, 2, 1), n -> n * n)).isEqualTo(List.of(9, 4, 1));
     }
 
     @Test
     void failureDoesNotReturnWhileAnotherWorkerStillOwnsResources() throws Exception {
-        try (var pool = new CpuWork.WorkPool(2);
+        try (var executor = Executors.newFixedThreadPool(2);
                 var caller = Executors.newSingleThreadExecutor()) {
+            var pool = new ParallelWork.WorkPool(2, executor);
             var started = new CountDownLatch(2);
             var failed = new CountDownLatch(1);
             var release = new CountDownLatch(1);
@@ -82,7 +84,8 @@ class CpuWorkTest {
 
     @Test
     void interruptionDrainsInFlightWorkAndPreservesInterruptStatus() throws Exception {
-        try (var pool = new CpuWork.WorkPool(2)) {
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var pool = new ParallelWork.WorkPool(2, executor);
             var started = new CountDownLatch(2);
             var release = new CountDownLatch(1);
             var returned = new CountDownLatch(1);
@@ -116,11 +119,12 @@ class CpuWorkTest {
 
     @Test
     void serialModeHasNoWorkersAndRejectsInvalidBudgets() {
-        try (var pool = new CpuWork.WorkPool(1)) {
+        try (var executor = Executors.newFixedThreadPool(1)) {
+            var pool = new ParallelWork.WorkPool(1, executor);
             var caller = Thread.currentThread();
             pool.forEach(10, index -> assertThat(Thread.currentThread()).isSameAs(caller));
         }
-        assertThatThrownBy(() -> new CpuWork.WorkPool(0)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new CpuWork.WorkPool(33)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ParallelWork.WorkPool(0, null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ParallelWork.WorkPool(33, null)).isInstanceOf(IllegalArgumentException.class);
     }
 }

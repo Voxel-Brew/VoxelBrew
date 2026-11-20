@@ -1,7 +1,10 @@
 package dev.voxelbrew.slicer;
 
+import dev.voxelbrew.api.userconfig.UserConfigException;
+import dev.voxelbrew.api.userconfig.UserConfigService;
 import dev.voxelbrew.slicer.internal.BundledSlicers;
-import dev.voxelbrew.util.config.FileUserConfiguration;
+import dev.voxelbrew.util.preferences.UserConfigServiceImpl;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -9,17 +12,62 @@ import java.util.*;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 
-/** Stores named installations and their last check results alongside legacy provider defaults. */
+/** Stores named installations, their check results, and provider defaults. */
 @Slf4j
 public final class SlicerInstallationStore {
     private static final String PREFIX = "installation-";
+
     private static final String EXTENSION = ".properties";
+
     private static final String INPUT_PREFIX = "input.";
 
     private final Path directory;
 
-    private static SlicerInstallation read(UUID id, Path path) throws IOException {
-        var values = new FileUserConfiguration(path).read();
+    private final UserConfigService configuration;
+
+    private static String fileName(UUID id) {
+        return PREFIX + id + EXTENSION;
+    }
+
+    private static UserConfigServiceImpl openConfig(Path home, String fileName) throws IOException {
+        try {
+            return new UserConfigServiceImpl(home, fileName);
+        } catch (IllegalArgumentException failure) {
+            throw new IOException("Cannot open slicer settings " + home.resolve(fileName), failure);
+        }
+    }
+
+    @SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "The injected service provides current preferences.")
+    public SlicerInstallationStore(@NonNull UserConfigService configuration) {
+        this.configuration = configuration;
+        directory = configuration.slicersFolder();
+    }
+
+    public Map<String, String> providerDefaults(String id) throws IOException {
+        var current = providerConfig(id);
+        String prefix = "slicer." + id + ".";
+        var defaults = new TreeMap<String, String>();
+        configuration.readUserConfig().forEach((key, value) -> {
+            if (key.startsWith(prefix)) defaults.put(key.substring(prefix.length()), value);
+        });
+        defaults.putAll(openConfig(configuration.homeFolder(), "config-slicer-" + id + EXTENSION)
+                .readUserConfig());
+        defaults.putAll(current.readUserConfig());
+        return Collections.unmodifiableMap(defaults);
+    }
+
+    public void saveProviderDefaults(String id, Map<String, String> values) throws IOException {
+        providerConfig(id).update(values, Set.of());
+    }
+
+    private UserConfigServiceImpl providerConfig(String id) throws IOException {
+        if (id == null || !id.matches("[a-z0-9][a-z0-9.-]*"))
+            throw new IllegalArgumentException("Invalid slicer provider ID");
+        return openConfig(directory, id + EXTENSION);
+    }
+
+    private SlicerInstallation read(UUID id) {
+        var values = new UserConfigServiceImpl(directory, fileName(id)).readUserConfig();
         var settings = new LinkedHashMap<String, String>();
         values.forEach((key, value) -> {
             if (key.startsWith(INPUT_PREFIX)) settings.put(key.substring(INPUT_PREFIX.length()), value);
@@ -31,10 +79,6 @@ public final class SlicerInstallationStore {
                 values.getOrDefault("version", ""),
                 values.getOrDefault("failure", ""),
                 settings);
-    }
-
-    public SlicerInstallationStore(Path configuration) {
-        directory = configuration.resolveSibling("slicers");
     }
 
     public List<SlicerInstallation> load() throws IOException {
@@ -49,8 +93,8 @@ public final class SlicerInstallationStore {
                     String id = file.substring(PREFIX.length(), file.length() - EXTENSION.length());
                     try {
                         UUID key = UUID.fromString(id);
-                        if (!BundledSlicers.reserved(key)) installations.add(read(key, path));
-                    } catch (IOException | IllegalArgumentException invalid) {
+                        if (!BundledSlicers.reserved(key)) installations.add(read(key));
+                    } catch (UserConfigException | IllegalArgumentException invalid) {
                         log.warn("Cannot read slicer installation {}", path, invalid);
                     }
                 }
@@ -61,7 +105,7 @@ public final class SlicerInstallationStore {
                 .toList();
     }
 
-    public SlicerInstallation require(String id) throws IOException {
+    public SlicerInstallation require(String id) {
         var key = UUID.fromString(id);
         if (BundledSlicers.reserved(key))
             return BundledSlicers.installations().stream()
@@ -70,10 +114,10 @@ public final class SlicerInstallationStore {
                     .orElseThrow(() -> new IllegalArgumentException("Bundled slicer installation is unavailable"));
         var path = path(key);
         if (!Files.isRegularFile(path)) throw new IllegalArgumentException("Saved slicer installation is unavailable");
-        return read(key, path);
+        return read(key);
     }
 
-    public void save(SlicerInstallation installation) throws IOException {
+    public void save(SlicerInstallation installation) {
         if (installation.bundled()) throw new IllegalArgumentException("Bundled slicer settings are read-only");
         if (!installation.operational()) throw new IllegalArgumentException("Slicer installation must pass its check");
         var values = new LinkedHashMap<String, String>();
@@ -82,8 +126,8 @@ public final class SlicerInstallationStore {
         values.put("version", installation.version());
         values.put("failure", installation.failure());
         installation.settings().forEach((key, value) -> values.put(INPUT_PREFIX + key, value));
-        var configuration = new FileUserConfiguration(path(installation.id()));
-        var removed = new HashSet<>(configuration.read().keySet());
+        var configuration = new UserConfigServiceImpl(directory, fileName(installation.id()));
+        var removed = new HashSet<>(configuration.readUserConfig().keySet());
         removed.removeAll(values.keySet());
         configuration.update(values, removed);
     }
@@ -94,6 +138,6 @@ public final class SlicerInstallationStore {
     }
 
     private Path path(UUID id) {
-        return directory.resolve(PREFIX + id + EXTENSION);
+        return directory.resolve(fileName(id));
     }
 }

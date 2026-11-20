@@ -2,11 +2,11 @@ package dev.voxelbrew.gui;
 
 import dev.voxelbrew.api.exporter.ExportDialog;
 import dev.voxelbrew.api.exporter.ExportWindow;
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.vui.Component;
 import dev.voxelbrew.api.model.vui.FileDestination;
 import dev.voxelbrew.api.model.vui.HorizontalLayout;
 import dev.voxelbrew.api.model.vui.VerticalLayout;
-import dev.voxelbrew.util.i18n.Translations;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
@@ -37,14 +37,20 @@ public final class DesktopExportWindow implements ExportWindow {
 
     private final Path current;
 
-    private final Translations translations;
+    private final TranslationService translations;
 
     private Path suggestedDestination;
+
     private String exporterVersion;
+
     private String confirmLabel;
+
     private String inputPrefix = "export-";
+
     private Function<String, String> sourceCaption;
+
     private PathAction pathAction;
+
     private CheckAction checkAction;
 
     private record PathAction(String inputId, String label, Supplier<Optional<Path>> selectPath) {}
@@ -241,7 +247,8 @@ public final class DesktopExportWindow implements ExportWindow {
             dialog.getDialogPane().setContent(content);
         }
         var confirm = new ButtonType(
-                confirmLabel == null ? translations.text("gui.export") : confirmLabel, ButtonBar.ButtonData.OK_DONE);
+                confirmLabel == null ? translations.translate("gui.export").orElseThrow() : confirmLabel,
+                ButtonBar.ButtonData.OK_DONE);
         var accepted = new AtomicReference<R>();
         BiConsumer<ActionEvent, Boolean> attempt = (event, checkOnly) -> {
             if (checkOnly) event.consume();
@@ -274,7 +281,9 @@ public final class DesktopExportWindow implements ExportWindow {
                         && Files.exists(Path.of(selected.get("destination")))) {
                     var confirmation = new Alert(
                             Alert.AlertType.CONFIRMATION,
-                            translations.text("file.replace", Path.of(selected.get("destination"))),
+                            translations
+                                    .translate("file.replace", Path.of(selected.get("destination")))
+                                    .orElseThrow(),
                             ButtonType.YES,
                             ButtonType.NO);
                     if (Dialogs.show(confirmation, owner, translations).orElse(ButtonType.NO) != ButtonType.YES) {
@@ -327,8 +336,10 @@ public final class DesktopExportWindow implements ExportWindow {
             var path = new javafx.scene.control.TextField(
                     source.defaultPath() == null ? "" : source.defaultPath().toString());
             path.setId(inputPrefix + source.id());
-            var caption = sourceCaption == null ? translations.text("import.source") : sourceCaption.apply(source.id());
-            var browse = new Button(translations.text("gui.browse"));
+            var caption = sourceCaption == null
+                    ? translations.translate("import.source").orElseThrow()
+                    : sourceCaption.apply(source.id());
+            var browse = new Button(translations.translate("gui.browse").orElseThrow());
             browse.setId(inputPrefix + source.id() + "-browse");
             browse.setOnAction(event -> {
                 var chooser = new FileChooser();
@@ -338,7 +349,8 @@ public final class DesktopExportWindow implements ExportWindow {
                     chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(pattern, pattern));
                 }
                 chooser.getExtensionFilters()
-                        .add(new FileChooser.ExtensionFilter(translations.text("gui.allFiles"), "*"));
+                        .add(new FileChooser.ExtensionFilter(
+                                translations.translate("gui.allFiles").orElseThrow(), "*"));
                 try {
                     Path initial = Path.of(path.getText());
                     Path parent = initial.getParent();
@@ -363,12 +375,12 @@ public final class DesktopExportWindow implements ExportWindow {
             if (suggestion != null)
                 path.setText(dev.voxelbrew.gui.ExportDialog.destinationForFormat(suggestion, destination.extension())
                         .toString());
-            var browse = new Button(translations.text("gui.browse"));
+            var browse = new Button(translations.translate("gui.browse").orElseThrow());
             browse.setId("file-browse");
             UiHelp.install(browse, translations);
             browse.setOnAction(event -> {
                 var chooser = new FileChooser();
-                chooser.setTitle(translations.text("gui.destination"));
+                chooser.setTitle(translations.translate("gui.destination").orElseThrow());
                 chooser.getExtensionFilters()
                         .add(new FileChooser.ExtensionFilter(
                                 "*." + destination.extension(), "*." + destination.extension()));
@@ -387,7 +399,7 @@ public final class DesktopExportWindow implements ExportWindow {
                     destination.id(),
                     path::getText,
                     path,
-                    field(translations.text("gui.destination"), Dialogs.pathRow(path, browse)),
+                    field(translations.translate("gui.destination").orElseThrow(), Dialogs.pathRow(path, browse)),
                     path.textProperty(),
                     onChange);
         }
@@ -440,7 +452,8 @@ public final class DesktopExportWindow implements ExportWindow {
         if (component instanceof dev.voxelbrew.api.model.vui.CheckBox box) {
             var input = new javafx.scene.control.CheckBox(box.label());
             input.setId(inputPrefix + box.id());
-            UiHelp.describe(input, translations.textOrDefault("help.export-" + box.id(), box.label()));
+            UiHelp.describe(
+                    input, translations.translate("help.export-" + box.id()).orElse(box.label()));
             input.setSelected(box.selected());
             input.getStyleClass().add("export-dialog-choice");
             return bind(

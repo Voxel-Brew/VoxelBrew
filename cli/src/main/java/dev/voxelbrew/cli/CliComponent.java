@@ -1,7 +1,7 @@
 package dev.voxelbrew.cli;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.util.di.ApplicationModule;
-import dev.voxelbrew.util.i18n.Translations;
 import picocli.CommandLine;
 
 public interface CliComponent {
@@ -15,7 +15,7 @@ public interface CliComponent {
 
     CommandFactory commands();
 
-    Translations translations();
+    TranslationService translations();
 
     default CommandLine commandLine() {
         return VoxelBrew.commandLine(commands(), translations());

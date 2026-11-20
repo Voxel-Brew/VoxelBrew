@@ -23,8 +23,11 @@ final class SketchController implements AutoCloseable {
     private final Consumer<Runnable> dispatch;
 
     private final Function<SketchGeometry, SketchSolver.Result> solver;
+
     private final Object lock = new Object();
+
     private final Deque<State> undo = new ArrayDeque<>(), redo = new ArrayDeque<>();
+
     private final AtomicLong sequence = new AtomicLong();
 
     @Getter(AccessLevel.PACKAGE)
@@ -84,7 +87,7 @@ final class SketchController implements AutoCloseable {
     }
 
     SketchController(SketchGeometry geometry, ParameterSet parameters, String featureId, Consumer<Runnable> dispatch) {
-        this(geometry, parameters, featureId, dispatch, SketchSolver::solve, WindowResources.worker("sketch-solver"));
+        this(geometry, parameters, featureId, dispatch, SketchSolver::solve, WindowResources.worker());
     }
 
     SketchController(
@@ -117,7 +120,7 @@ final class SketchController implements AutoCloseable {
             SketchGeometry geometry,
             Consumer<Runnable> dispatch,
             Function<SketchGeometry, SketchSolver.Result> solver) {
-        this(geometry, ParameterSet.empty(), "sketch", dispatch, solver, WindowResources.worker("sketch-solver"));
+        this(geometry, ParameterSet.empty(), "sketch", dispatch, solver, WindowResources.worker());
     }
 
     boolean canUndo() {

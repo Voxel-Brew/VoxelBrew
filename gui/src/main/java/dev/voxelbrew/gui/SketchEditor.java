@@ -2,6 +2,7 @@ package dev.voxelbrew.gui;
 
 import static dev.voxelbrew.api.model.sketch.SketchGeometry.*;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.Feature;
 import dev.voxelbrew.api.model.parameters.*;
 import dev.voxelbrew.api.model.sketch.*;
@@ -34,61 +35,98 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
 
     private final dev.voxelbrew.api.model.UuidGenerator uuidGenerator;
 
-    private final dev.voxelbrew.util.i18n.Translations translations;
+    private final TranslationService translations;
 
     private final Canvas canvas = new Canvas();
 
     private final LinkedHashSet<Ref> selection = new LinkedHashSet<>();
+
     private final List<Vec> drawing = new ArrayList<>();
+
     private final List<Ref> snaps = new ArrayList<>();
+
     private final List<Badge> badges = new ArrayList<>();
+
     private final ListView<Constraint> constraints = new ListView<>();
+
     private final ComboBox<Ref> references = new ComboBox<>();
+
     private final ComboBox<Type> dimension = new ComboBox<>();
+
     private final Button createType;
+
     private final VBox toolOptions = new VBox(6);
-    private final FormulaField toolRadius = numeric("5", ParameterUnit.MM),
-            toolRho = numeric("0.5", ParameterUnit.NUMBER).dragStep(0.01),
-            textContent = FormulaField.text("Text", this::formulaParameters),
-            textFont = FormulaField.text("SansSerif", this::formulaParameters),
-            textHeight = numeric("10", ParameterUnit.MM),
-            textAngle = numeric("0", ParameterUnit.DEG),
-            textSpacing = numeric("0", ParameterUnit.NUMBER).dragStep(0.01),
-            pointX = numeric("0", ParameterUnit.MM),
-            pointY = numeric("0", ParameterUnit.MM);
+
+    private final FormulaField toolRadius,
+            toolRho,
+            textContent,
+            textFont,
+            textHeight,
+            textAngle,
+            textSpacing,
+            pointX,
+            pointY;
+
     private final ComboBox<Integer> splineDegree = new ComboBox<>();
+
     private final ComboBox<String> textStyle = new ComboBox<>();
+
     private final CheckBox closedCurve = new CheckBox("");
-    private final FormulaField dimensionValue = FormulaField.number("10", this::formulaParameters, this::dimensionUnit),
-            sides = numeric("6", ParameterUnit.NUMBER).dragStep(1);
+
+    private final FormulaField dimensionValue, sides;
     private final CheckBox construction = new CheckBox(""), auto = new CheckBox(""), showBadges = new CheckBox("");
     private final Label selected = new Label(""), status = new Label(""), error = new Label(), hint = new Label();
     private final Button finish, undo, redo;
+
     private final Map<String, Button> shortcutActions = new LinkedHashMap<>();
+
     private final java.util.function.BiConsumer<Feature.Sketch, ParameterSet> accept;
+
     private final Feature.Sketch original;
+
     private final String featureId;
+
     private final List<Feature> documentFeatures;
+
     private final Map<String, Vec> dimensionPositions = new HashMap<>();
+
     private final List<DimensionHit> dimensionHits = new ArrayList<>();
+
     private final QuickMenu quickMenu;
+
     private final boolean dark;
+
     private final Feature.Plane selectedPlane;
+
     private SketchSnapping.Snap hoverSnap;
+
     private SketchTools.Tool advanced;
+
     private Runnable dismiss = () -> {};
+
     private Draw tool = Draw.SELECT;
+
     private Type activeConstraint;
+
     private boolean dimensionTool;
+
     private HBox dimensionEntry;
+
     private Vec dimensionEntryPosition;
+
     private DimensionHit draggedDimension;
+
     private Vec previousDimensionPosition;
+
     private Ref dragPoint;
+
     private boolean boxCandidate, boxSelecting, boxAdditive;
+
     private Vec cursor = new Vec(0, 0);
+
     private double centerX = 30, centerY = 20, scale = 4, lastX, lastY, pressX, pressY;
     private boolean moving, panning, refreshing, closed;
+
     private int nextId = 1;
 
     enum Draw {
@@ -125,7 +163,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             Feature.Plane selectedPlane,
             List<Feature> features,
             ParameterSet parameters,
-            dev.voxelbrew.util.i18n.Translations translations,
+            TranslationService translations,
             java.util.function.BiConsumer<Feature.Sketch, ParameterSet> accept) {
         var scene = stage.getScene();
         Parent previous = WindowFrame.content(scene);
@@ -240,21 +278,23 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             List<Feature> features,
             ParameterSet parameters,
             boolean dark,
-            dev.voxelbrew.util.i18n.Translations translations,
+            TranslationService translations,
             java.util.function.BiConsumer<Feature.Sketch, ParameterSet> accept) {
         this.translations = translations;
         finish = button("", "constraint-finish", this::finish);
         undo = button("", "sketch-undo", () -> controllerUndo(false));
         redo = button("", "sketch-redo", () -> controllerUndo(true));
-        closedCurve.setText(translations.text("gui.closed_curve"));
-        construction.setText(translations.text("gui.construction"));
-        auto.setText(translations.text("gui.auto_constraints"));
-        showBadges.setText(translations.text("gui.show_badges"));
-        selected.setText(translations.text("gui.select_a_curve_or_point_shift_click_adds_to_the_selection"));
-        status.setText(translations.text("gui.solving"));
-        finish.setText(translations.text("gui.finish_sketch"));
-        undo.setText(translations.text("action.undo"));
-        redo.setText(translations.text("action.redo"));
+        closedCurve.setText(translations.translate("gui.closed_curve").orElseThrow());
+        construction.setText(translations.translate("gui.construction").orElseThrow());
+        auto.setText(translations.translate("gui.auto_constraints").orElseThrow());
+        showBadges.setText(translations.translate("gui.show_badges").orElseThrow());
+        selected.setText(translations
+                .translate("gui.select_a_curve_or_point_shift_click_adds_to_the_selection")
+                .orElseThrow());
+        status.setText(translations.translate("gui.solving").orElseThrow());
+        finish.setText(translations.translate("gui.finish_sketch").orElseThrow());
+        undo.setText(translations.translate("action.undo").orElseThrow());
+        redo.setText(translations.translate("action.redo").orElseThrow());
         this.original = sketch;
         uuidGenerator = parameters.uuidGenerator();
         this.selectedPlane = sketch == null ? selectedPlane : sketch.plane();
@@ -266,25 +306,26 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                 ? new FeatureDimensions.Converted(SketchGeometry.empty(), parameters)
                 : FeatureDimensions.convert(sketch, parameters);
         controller = controllers.create(converted.geometry(), converted.parameters(), featureId);
-        for (var field : List.of(
-                toolRadius,
-                toolRho,
-                textContent,
-                textFont,
-                textHeight,
-                textAngle,
-                textSpacing,
-                pointX,
-                pointY,
-                dimensionValue,
-                sides)) field.localized(translations);
+        toolRadius = numeric("5", ParameterUnit.MM);
+        toolRho = numeric("0.5", ParameterUnit.NUMBER).dragStep(0.01);
+        textContent = FormulaField.text("Text", this::formulaParameters, translations);
+        textFont = FormulaField.text("SansSerif", this::formulaParameters, translations);
+        textHeight = numeric("10", ParameterUnit.MM);
+        textAngle = numeric("0", ParameterUnit.DEG);
+        textSpacing = numeric("0", ParameterUnit.NUMBER).dragStep(0.01);
+        pointX = numeric("0", ParameterUnit.MM);
+        pointY = numeric("0", ParameterUnit.MM);
+        dimensionValue = FormulaField.number("10", this::formulaParameters, this::dimensionUnit, translations);
+        sides = numeric("6", ParameterUnit.NUMBER).dragStep(1);
         UiText.enums(dimension, translations, "constraint.");
         setId("sketch-editor");
         getStyleClass().add("sketch-editor");
         var title = new Label(
                 sketch == null
-                        ? translations.text("gui.create_constrained_sketch")
-                        : translations.text("gui.edit_sketch"));
+                        ? translations
+                                .translate("gui.create_constrained_sketch")
+                                .orElseThrow()
+                        : translations.translate("gui.edit_sketch").orElseThrow());
         title.getStyleClass().add("selection-title");
         var space = new Region();
         HBox.setHgrow(space, Priority.ALWAYS);
@@ -292,34 +333,46 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         var header = new HBox(
                 10,
                 title,
-                button(translations.text("action.parameters"), "sketch-parameters", this::parameters),
+                button(
+                        translations.translate("action.parameters").orElseThrow(),
+                        "sketch-parameters",
+                        this::parameters),
                 space,
                 finish,
-                button(translations.text("action.cancel"), "constraint-cancel", () -> dismiss.run()));
+                button(
+                        translations.translate("action.cancel").orElseThrow(),
+                        "constraint-cancel",
+                        () -> dismiss.run()));
         header.setAlignment(Pos.CENTER_LEFT);
         var tools = new FlowPane(5, 5);
         for (var draw : Draw.values()) {
             if (draw == Draw.ADVANCED) continue;
             var button = button(
-                    translations.text("draw." + draw.name()),
+                    translations.translate("draw." + draw.name()).orElseThrow(),
                     "sketch-tool-" + draw.name().toLowerCase(Locale.ROOT),
                     () -> tool(draw));
             tools.getChildren().add(button);
         }
-        createType = button(translations.text("gui.more_sketch_types"), "sketch-create-type", this::chooseSketchType);
+        createType = button(
+                translations.translate("gui.more_sketch_types").orElseThrow(),
+                "sketch-create-type",
+                this::chooseSketchType);
         tools.getChildren().add(createType);
         tools.getChildren()
-                .add(button(translations.text("gui.sketch_dimension"), "sketch-dimension", this::startDimension));
+                .add(button(
+                        translations.translate("gui.sketch_dimension").orElseThrow(),
+                        "sketch-dimension",
+                        this::startDimension));
         splineDegree.getItems().setAll(3, 5);
         splineDegree.setValue(3);
         splineDegree.setId("sketch-spline-degree");
         textStyle
                 .getItems()
                 .setAll(
-                        translations.text("gui.regular"),
-                        translations.text("gui.bold"),
-                        translations.text("gui.italic"),
-                        translations.text("gui.bold_italic"));
+                        translations.translate("gui.regular").orElseThrow(),
+                        translations.translate("gui.bold").orElseThrow(),
+                        translations.translate("gui.italic").orElseThrow(),
+                        translations.translate("gui.bold_italic").orElseThrow());
         textStyle.getSelectionModel().select(0);
         textStyle.setId("sketch-text-style");
         closedCurve.setId("sketch-closed-curve");
@@ -340,36 +393,43 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         auto.setSelected(true);
         tools.getChildren()
                 .addAll(
-                        new Label(translations.text("gui.sides")),
+                        new Label(translations.translate("gui.sides").orElseThrow()),
                         sides,
                         construction,
                         auto,
                         undo,
                         redo,
-                        button(translations.text("action.fit"), "sketch-fit", this::fit),
+                        button(translations.translate("action.fit").orElseThrow(), "sketch-fit", this::fit),
                         button(
                                 "F1",
                                 "keyboard-shortcuts",
                                 () -> KeyboardShortcuts.show(getScene().getWindow(), translations)));
-        var menu = new MenuButton(translations.text("gui.constraints"));
+        var menu = new MenuButton(translations.translate("gui.constraints").orElseThrow());
         menu.setId("sketch-constraint-menu");
         UiHelp.menu(menu, translations);
         var constraintBar = new FlowPane(4, 4, menu);
         for (var type : Type.values()) {
             if (type.dimension()) continue;
             String label = type == Type.FIX
-                    ? translations.text("gui.fix_unfix")
-                    : translations.text("constraint." + type.name());
+                    ? translations.translate("gui.fix_unfix").orElseThrow()
+                    : translations.translate("constraint." + type.name()).orElseThrow();
             var item = new MenuItem(label);
             item.setId("constraint-menu-" + type.name().toLowerCase(Locale.ROOT));
-            UiHelp.menuItem(item, translations.text("constraint.hint." + type.name()));
+            UiHelp.menuItem(
+                    item,
+                    translations.translate("constraint.hint." + type.name()).orElseThrow());
             item.setOnAction(e -> request(type));
             menu.getItems().add(item);
             var action =
                     button(symbol(type), "constraint-" + type.name().toLowerCase(Locale.ROOT), () -> request(type));
             action.getStyleClass().add("constraint-icon");
             action.setAccessibleText(label);
-            UiHelp.describe(action, label + " · " + translations.text("constraint.hint." + type.name()));
+            UiHelp.describe(
+                    action,
+                    label + " · "
+                            + translations
+                                    .translate("constraint.hint." + type.name())
+                                    .orElseThrow());
             constraintBar.getChildren().add(action);
         }
         hint.setWrapText(true);
@@ -460,17 +520,22 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
     private void chooseSketchType() {
         var search = new TextField();
         search.setId("sketch-type-search");
-        search.setPromptText(translations.text("gui.search_sketch_types"));
-        search.setAccessibleText(translations.text("gui.search_sketch_types"));
+        search.setPromptText(translations.translate("gui.search_sketch_types").orElseThrow());
+        search.setAccessibleText(
+                translations.translate("gui.search_sketch_types").orElseThrow());
         var results = new ListView<SketchTools.Tool>();
         results.setId("sketch-type-results");
         results.setPrefHeight(300);
-        results.setPlaceholder(new Label(translations.text("gui.no_sketch_types")));
+        results.setPlaceholder(
+                new Label(translations.translate("gui.no_sketch_types").orElseThrow()));
         results.setCellFactory(list -> new ListCell<>() {
             @Override
             protected void updateItem(SketchTools.Tool item, boolean empty) {
                 super.updateItem(item, empty);
-                setText(empty || item == null ? null : translations.text("tool." + item.name()));
+                setText(
+                        empty || item == null
+                                ? null
+                                : translations.translate("tool." + item.name()).orElseThrow());
             }
         });
         results.getItems().setAll(SketchTools.Tool.values());
@@ -480,14 +545,15 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             results.getItems()
                     .setAll(Arrays.stream(SketchTools.Tool.values())
                             .filter(value -> translations
-                                    .text("tool." + value.name())
+                                    .translate("tool." + value.name())
+                                    .orElseThrow()
                                     .toLowerCase(Locale.ROOT)
                                     .contains(filter))
                             .toList());
             results.getSelectionModel().selectFirst();
         });
         var dialog = new Dialog<SketchTools.Tool>();
-        dialog.setTitle(translations.text("gui.more_sketch_types_"));
+        dialog.setTitle(translations.translate("gui.more_sketch_types_").orElseThrow());
         var content = new VBox(8, search, results);
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
@@ -560,14 +626,14 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                 return Ref.parse(value);
             }
         });
-        var add = button(translations.text("gui.add_to_selection"), "sketch-select-ref", () -> {
+        var add = button(translations.translate("gui.add_to_selection").orElseThrow(), "sketch-select-ref", () -> {
             if (dimensionTool && (dimensionEntry != null || selection.size() >= 2)) return;
             if (references.getValue() != null) {
                 selection.add(references.getValue());
                 selectionChanged();
             }
         });
-        var clear = button(translations.text("gui.clear"), "sketch-clear-selection", () -> {
+        var clear = button(translations.translate("gui.clear").orElseThrow(), "sketch-clear-selection", () -> {
             selection.clear();
             activeConstraint = null;
             selectionChanged();
@@ -581,7 +647,8 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         dimension.setMaxWidth(Double.MAX_VALUE);
         dimensionValue.setId("sketch-dimension-value");
         dimensionValue.setOnAction(e -> dimension());
-        var apply = button(translations.text("gui.apply_dimension"), "sketch-apply-dimension", this::dimension);
+        var apply = button(
+                translations.translate("gui.apply_dimension").orElseThrow(), "sketch-apply-dimension", this::dimension);
         constraints.setId("sketch-constraints");
         constraints.setPrefHeight(140);
         constraints.setCellFactory(view -> new ListCell<>() {
@@ -593,8 +660,10 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                                 ? null
                                 : symbol(value.type())
                                         + " "
-                                        + translations.text(
-                                                "constraint." + value.type().name())
+                                        + translations
+                                                .translate("constraint."
+                                                        + value.type().name())
+                                                .orElseThrow()
                                         + (value.type().dimension()
                                                 ? " = " + number(value.values().getFirst())
                                                 : "")
@@ -625,32 +694,48 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         var content = new VBox(
                 8,
                 toolOptions,
-                new Label(translations.text("gui.selected_geometry")),
+                new Label(translations.translate("gui.selected_geometry").orElseThrow()),
                 selected,
                 references,
                 new HBox(5, add, clear),
-                button(translations.text("gui.apply_active_constraint"), "sketch-apply-constraint", () -> {
-                    if (activeConstraint != null) apply(activeConstraint);
-                }),
+                button(
+                        translations.translate("gui.apply_active_constraint").orElseThrow(),
+                        "sketch-apply-constraint",
+                        () -> {
+                            if (activeConstraint != null) apply(activeConstraint);
+                        }),
                 new Separator(),
-                new Label(translations.text("gui.driving_value_mm_degrees_ratio")),
+                new Label(translations
+                        .translate("gui.driving_value_mm_degrees_ratio")
+                        .orElseThrow()),
                 dimension,
                 dimensionValue,
                 apply,
                 new Separator(),
-                new Label(translations.text("gui.constraints_")),
+                new Label(translations.translate("gui.constraints_").orElseThrow()),
                 constraints,
-                button(translations.text("gui.remove_unfix"), "sketch-remove-constraint", this::removeConstraint),
+                button(
+                        translations.translate("gui.remove_unfix").orElseThrow(),
+                        "sketch-remove-constraint",
+                        this::removeConstraint),
                 showBadges,
-                button(translations.text("gui.edit_selected_text"), "sketch-edit-text", this::editText),
+                button(
+                        translations.translate("gui.edit_selected_text").orElseThrow(),
+                        "sketch-edit-text",
+                        this::editText),
                 new Separator(),
                 button(
-                        translations.text("gui.toggle_construction"),
+                        translations.translate("gui.toggle_construction").orElseThrow(),
                         "sketch-toggle-construction",
                         this::toggleConstruction),
-                button(translations.text("gui.use_selected_as_profile"), "sketch-use-profile", this::useProfile),
                 button(
-                        translations.text("gui.use_all_nonconstruction_curves"),
+                        translations.translate("gui.use_selected_as_profile").orElseThrow(),
+                        "sketch-use-profile",
+                        this::useProfile),
+                button(
+                        translations
+                                .translate("gui.use_all_nonconstruction_curves")
+                                .orElseThrow(),
                         "sketch-all-profile",
                         () -> edit(controller
                                 .definition()
@@ -659,7 +744,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                                         .map(Entity::id)
                                         .toList()))),
                 button(
-                        translations.text("gui.delete_selected_geometry"),
+                        translations.translate("gui.delete_selected_geometry").orElseThrow(),
                         "sketch-delete-geometry",
                         this::deleteGeometry));
         var scroll = new ScrollPane(content);
@@ -844,23 +929,43 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         hint.setText(
                 switch (next) {
                     case SELECT ->
-                        translations.text(
-                                "gui.select_curves_or_points_shift_click_adds_a_selection_drag_points_to_reshape_middle_drag_pans_wh");
-                    case POINT -> translations.text("gui.click_to_place_a_sketch_point");
+                        translations
+                                .translate(
+                                        "gui.select_curves_or_points_shift_click_adds_a_selection_drag_points_to_reshape_middle_drag_pans_wh")
+                                .orElseThrow();
+                    case POINT ->
+                        translations
+                                .translate("gui.click_to_place_a_sketch_point")
+                                .orElseThrow();
                     case LINE ->
-                        translations.text(
-                                "gui.click_two_endpoints_nearby_endpoints_and_horizontal_vertical_directions_snap_when_auto_constrai");
+                        translations
+                                .translate(
+                                        "gui.click_two_endpoints_nearby_endpoints_and_horizontal_vertical_directions_snap_when_auto_constrai")
+                                .orElseThrow();
                     case RECTANGLE ->
-                        translations.text(
-                                "gui.click_two_opposite_corners_horizontal_vertical_and_coincident_constraints_are_added");
-                    case CIRCLE -> translations.text("gui.click_a_center_then_a_radius_point");
-                    case ARC -> translations.text("gui.click_center_start_then_end_the_arc_runs_counterclockwise");
+                        translations
+                                .translate(
+                                        "gui.click_two_opposite_corners_horizontal_vertical_and_coincident_constraints_are_added")
+                                .orElseThrow();
+                    case CIRCLE ->
+                        translations
+                                .translate("gui.click_a_center_then_a_radius_point")
+                                .orElseThrow();
+                    case ARC ->
+                        translations
+                                .translate("gui.click_center_start_then_end_the_arc_runs_counterclockwise")
+                                .orElseThrow();
                     case SPLINE ->
-                        translations.text("gui.click_start_first_control_point_second_control_point_then_end");
+                        translations
+                                .translate("gui.click_start_first_control_point_second_control_point_then_end")
+                                .orElseThrow();
                     case POLYGON ->
-                        translations.text(
-                                "gui.click_center_then_a_vertex_the_sides_remain_equal_with_a_regular_polygon_constraint");
-                    case ADVANCED -> translations.text("tool.hint." + advanced.name());
+                        translations
+                                .translate(
+                                        "gui.click_center_then_a_vertex_the_sides_remain_equal_with_a_regular_polygon_constraint")
+                                .orElseThrow();
+                    case ADVANCED ->
+                        translations.translate("tool.hint." + advanced.name()).orElseThrow();
                 });
         showToolOptions();
         draw();
@@ -872,37 +977,45 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         toolOptions.setVisible(visible);
         toolOptions.setManaged(visible);
         if (!visible) return;
-        toolOptions.getChildren().add(new Label(translations.text("tool." + advanced.name())));
+        toolOptions
+                .getChildren()
+                .add(new Label(translations.translate("tool." + advanced.name()).orElseThrow()));
         switch (advanced) {
-            case CIRCLE_TWO_TANGENT -> option(translations.text("gui.radius_mm"), toolRadius);
-            case CONIC -> option(translations.text("gui.rho_0_1"), toolRho);
+            case CIRCLE_TWO_TANGENT ->
+                option(translations.translate("gui.radius_mm").orElseThrow(), toolRadius);
+            case CONIC -> option(translations.translate("gui.rho_0_1").orElseThrow(), toolRho);
             case CONTROL_SPLINE -> {
-                option(translations.text("gui.degree"), splineDegree);
+                option(translations.translate("gui.degree").orElseThrow(), splineDegree);
                 toolOptions.getChildren().add(closedCurve);
             }
             case FIT_SPLINE -> toolOptions.getChildren().add(closedCurve);
             case TEXT, TEXT_ON_PATH -> {
-                option(translations.text("gui.text_up_to_32_characters"), textContent);
-                option(translations.text("gui.font_family"), textFont);
-                option(translations.text("gui.style"), textStyle);
-                option(translations.text("gui.height_mm"), textHeight);
-                option(translations.text("gui.angle_degrees"), textAngle);
-                option(translations.text("gui.extra_spacing_em"), textSpacing);
+                option(translations.translate("gui.text_up_to_32_characters").orElseThrow(), textContent);
+                option(translations.translate("gui.font_family").orElseThrow(), textFont);
+                option(translations.translate("gui.style").orElseThrow(), textStyle);
+                option(translations.translate("gui.height_mm").orElseThrow(), textHeight);
+                option(translations.translate("gui.angle_degrees").orElseThrow(), textAngle);
+                option(translations.translate("gui.extra_spacing_em").orElseThrow(), textSpacing);
             }
             default -> {}
         }
-        option(translations.text("gui.next_point_x_mm"), pointX);
-        option(translations.text("gui.next_point_y_mm"), pointY);
-        toolOptions.getChildren().add(button(translations.text("gui.add_numeric_point"), "sketch-add-point", () -> {
-            try {
-                advancedPoint(new Vec(value(pointX, "X"), value(pointY, "Y")));
-            } catch (RuntimeException failure) {
-                error.setText(failure.getMessage());
-            }
-        }));
+        option(translations.translate("gui.next_point_x_mm").orElseThrow(), pointX);
+        option(translations.translate("gui.next_point_y_mm").orElseThrow(), pointY);
         toolOptions
                 .getChildren()
-                .add(button(translations.text("gui.complete_retry"), "sketch-complete-curve", this::finishAdvanced));
+                .add(button(translations.translate("gui.add_numeric_point").orElseThrow(), "sketch-add-point", () -> {
+                    try {
+                        advancedPoint(new Vec(value(pointX, "X"), value(pointY, "Y")));
+                    } catch (RuntimeException failure) {
+                        error.setText(failure.getMessage());
+                    }
+                }));
+        toolOptions
+                .getChildren()
+                .add(button(
+                        translations.translate("gui.complete_retry").orElseThrow(),
+                        "sketch-complete-curve",
+                        this::finishAdvanced));
         toolOptions.getChildren().add(new Separator());
     }
 
@@ -916,15 +1029,15 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                 splineDegree.getValue(),
                 closedCurve.isSelected(),
                 construction.isSelected(),
-                value(toolRadius, translations.text("gui.radius")),
-                value(toolRho, translations.text("gui.rho")),
+                value(toolRadius, translations.translate("gui.radius").orElseThrow()),
+                value(toolRho, translations.translate("gui.rho").orElseThrow()),
                 textContent.evaluatedText(),
                 textFont.evaluatedText().strip(),
                 textStyle.getSelectionModel().getSelectedIndex(),
-                value(textHeight, translations.text("gui.text_height")),
-                dev.voxelbrew.api.model.units.Measurements.radians(
-                        value(textAngle, translations.text("gui.text_angle"))),
-                value(textSpacing, translations.text("gui.text_spacing")));
+                value(textHeight, translations.translate("gui.text_height").orElseThrow()),
+                dev.voxelbrew.api.model.units.Measurements.radians(value(
+                        textAngle, translations.translate("gui.text_angle").orElseThrow())),
+                value(textSpacing, translations.translate("gui.text_spacing").orElseThrow()));
     }
 
     private void advancedPoint(Vec point) {
@@ -987,18 +1100,19 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                     .map(r -> controller.definition().entity(r.entityId()))
                     .filter(e -> e.kind() == Kind.TEXT)
                     .findFirst()
-                    .orElseThrow(
-                            () -> new IllegalArgumentException(translations.text("gui.select_a_text_entity_first")));
+                    .orElseThrow(() -> new IllegalArgumentException(translations
+                            .translate("gui.select_a_text_entity_first")
+                            .orElseThrow()));
             var dialog = new Dialog<Entity>();
             dialog.initOwner(getScene().getWindow());
-            dialog.setTitle(translations.text("gui.edit_sketch_text"));
+            dialog.setTitle(translations.translate("gui.edit_sketch_text").orElseThrow());
             var content = FormulaField.text(
-                    textExpression(chosen, "content", chosen.text().content()), this::formulaParameters);
-            content.localized(translations);
+                    textExpression(chosen, "content", chosen.text().content()), this::formulaParameters, translations);
+
             content.setId("sketch-edit-text-content");
             var font = FormulaField.text(
-                    textExpression(chosen, "font", chosen.text().font()), this::formulaParameters);
-            font.localized(translations);
+                    textExpression(chosen, "font", chosen.text().font()), this::formulaParameters, translations);
+
             font.setId("sketch-edit-text-font");
             var path = new ComboBox<String>();
             path.setId("sketch-edit-text-path");
@@ -1009,17 +1123,20 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             if (!path.getItems().contains(chosen.text().pathId()))
                 path.getItems().add(chosen.text().pathId());
             path.setValue(chosen.text().pathId());
-            path.setPromptText(translations.text("gui.no_path_baseline_position"));
+            path.setPromptText(
+                    translations.translate("gui.no_path_baseline_position").orElseThrow());
             var message = new Label();
             message.setWrapText(true);
             dialog.getDialogPane()
                     .setContent(new VBox(
                             7,
-                            new Label(translations.text("tool.TEXT")),
+                            new Label(translations.translate("tool.TEXT").orElseThrow()),
                             content,
-                            new Label(translations.text("gui.font_family")),
+                            new Label(translations.translate("gui.font_family").orElseThrow()),
                             font,
-                            new Label(translations.text("gui.path_blank_to_detach")),
+                            new Label(translations
+                                    .translate("gui.path_blank_to_detach")
+                                    .orElseThrow()),
                             path,
                             message));
             dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
@@ -1132,7 +1249,10 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                                 drawing.get(2).y(),
                                 b.x(),
                                 b.y());
-                    default -> throw new IllegalArgumentException(translations.text("gui.choose_a_drawing_tool"));
+                    default ->
+                        throw new IllegalArgumentException(translations
+                                .translate("gui.choose_a_drawing_tool")
+                                .orElseThrow());
                 };
                 addition =
                         new SketchGeometry(List.of(entity), List.of(), entity.construction() ? List.of() : List.of(id));
@@ -1201,9 +1321,9 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         drawing.clear();
         snaps.clear();
         activeConstraint = type;
-        hint.setText(translations.text("constraint." + type.name())
+        hint.setText(translations.translate("constraint." + type.name()).orElseThrow()
                 + " · "
-                + translations.text("constraint.hint." + type.name()));
+                + translations.translate("constraint.hint." + type.name()).orElseThrow());
         if (enough(type)) apply(type);
         draw();
     }
@@ -1228,7 +1348,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         }
         selected.setText(
                 selection.isEmpty()
-                        ? translations.text("gui.nothing_selected")
+                        ? translations.translate("gui.nothing_selected").orElseThrow()
                         : selection.stream()
                                 .map(Ref::toString)
                                 .reduce((a, b) -> a + "\n" + b)
@@ -1286,7 +1406,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         selection.addAll(refs);
         constraints.getSelectionModel().clearSelection();
         dimensionTool = true;
-        hint.setText(translations.text("gui.dimension_hint"));
+        hint.setText(translations.translate("gui.dimension_hint").orElseThrow());
         canvas.requestFocus();
         selectionChanged();
     }
@@ -1299,7 +1419,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             dimensionValue.setText(number(candidate.value()));
             editDimensionValue(position);
         } catch (RuntimeException failure) {
-            error.setText(translations.text("gui.dimension_hint") + "\n" + failure.getMessage());
+            error.setText(translations.translate("gui.dimension_hint").orElseThrow() + "\n" + failure.getMessage());
         }
     }
 
@@ -1311,17 +1431,17 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
     private void editDimensionValue(Vec position) {
         closeDimensionEntry();
         dimensionEntryPosition = position;
-        var input = FormulaField.number(dimensionValue.getText(), this::formulaParameters, this::dimensionUnit)
-                .localized(translations);
+        var input = FormulaField.number(
+                dimensionValue.getText(), this::formulaParameters, this::dimensionUnit, translations);
         input.setId("sketch-inline-dimension");
         input.setPrefColumnCount(14);
         input.setMinWidth(200);
         input.setPrefWidth(200);
-        input.setAccessibleText(translations.text("gui.sketch_dimension"));
+        input.setAccessibleText(translations.translate("gui.sketch_dimension").orElseThrow());
         var apply = new Button("✓");
         apply.setId("sketch-inline-dimension-apply");
         apply.setMinWidth(Region.USE_PREF_SIZE);
-        UiHelp.describe(apply, translations.text("gui.apply_dimension"));
+        UiHelp.describe(apply, translations.translate("gui.apply_dimension").orElseThrow());
         Runnable commit = () -> {
             if (controller.busy()) return;
             dimensionValue.setText(input.getText());
@@ -1407,7 +1527,9 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
     private void removeConstraint() {
         var chosen = constraints.getSelectionModel().getSelectedItem();
         if (chosen == null) {
-            error.setText(translations.text("gui.select_a_constraint_in_the_list_or_click_its_badge_first"));
+            error.setText(translations
+                    .translate("gui.select_a_constraint_in_the_list_or_click_its_badge_first")
+                    .orElseThrow());
             return;
         }
         edit(controller
@@ -1437,8 +1559,9 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                     .distinct()
                     .toList();
             if (ids.isEmpty())
-                throw new IllegalArgumentException(
-                        translations.text("gui.select_the_boundary_curves_including_any_holes"));
+                throw new IllegalArgumentException(translations
+                        .translate("gui.select_the_boundary_curves_including_any_holes")
+                        .orElseThrow());
             var next = controller.definition().withBoundary(ids);
             SketchProfiles.profile(next);
             edit(next);
@@ -1507,16 +1630,24 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                     || controller.definition().entities().isEmpty());
             status.setText(
                     controller.busy()
-                            ? translations.text("gui.solving_constraints")
+                            ? translations.translate("gui.solving_constraints").orElseThrow()
                             : controller.result() == null
-                                    ? translations.text("status.ready")
+                                    ? translations.translate("status.ready").orElseThrow()
                                     : !controller.result().solved()
-                                            ? translations.text("solver.failed")
+                                            ? translations
+                                                    .translate("solver.failed")
+                                                    .orElseThrow()
                                             : controller.result().degreesOfFreedom() == 0
-                                                    ? translations.text("solver.full")
-                                                    : translations.text(
-                                                            "solver.free",
-                                                            controller.result().degreesOfFreedom()));
+                                                    ? translations
+                                                            .translate("solver.full")
+                                                            .orElseThrow()
+                                                    : translations
+                                                            .translate(
+                                                                    "solver.free",
+                                                                    controller
+                                                                            .result()
+                                                                            .degreesOfFreedom())
+                                                            .orElseThrow());
             if (!controller.busy() && !controller.interactionError().isEmpty())
                 error.setText(controller.interactionError());
             else if (!controller.busy()
@@ -1525,10 +1656,12 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                 error.setText(controller.result().problems().stream()
                         .map(SketchSolver.Problem::message)
                         .reduce((a, b) -> a + "\n" + b)
-                        .orElse(translations.text("gui.constraint_conflict")));
+                        .orElse(translations
+                                .translate("gui.constraint_conflict")
+                                .orElseThrow()));
             selected.setText(
                     selection.isEmpty()
-                            ? translations.text("gui.nothing_selected")
+                            ? translations.translate("gui.nothing_selected").orElseThrow()
                             : selection.stream()
                                     .map(Ref::toString)
                                     .reduce((a, b) -> a + "\n" + b)
@@ -1938,7 +2071,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
     }
 
     private FormulaField numeric(String text, ParameterUnit unit) {
-        return FormulaField.number(text, this::formulaParameters, unit);
+        return FormulaField.number(text, this::formulaParameters, unit, translations);
     }
 
     private ParameterUnit dimensionUnit() {

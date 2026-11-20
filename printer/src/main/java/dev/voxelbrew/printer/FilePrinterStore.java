@@ -3,7 +3,8 @@ package dev.voxelbrew.printer;
 import com.google.gson.*;
 import dev.voxelbrew.api.printer.*;
 import dev.voxelbrew.api.printer.driver.*;
-import dev.voxelbrew.util.config.UserConfiguration;
+import dev.voxelbrew.api.userconfig.UserConfigService;
+import dev.voxelbrew.util.services.Services;
 import java.io.*;
 import java.net.URI;
 import java.nio.file.*;
@@ -13,6 +14,7 @@ import java.util.*;
 /** Atomic credential JSON persistence with owner-only file permissions. */
 public final class FilePrinterStore implements PrinterStore {
     private static final Gson JSON = new GsonBuilder().setPrettyPrinting().create();
+
     private final Path directory;
 
     static JsonObject encode(DriverConfiguration config) {
@@ -85,11 +87,11 @@ public final class FilePrinterStore implements PrinterStore {
     }
 
     public FilePrinterStore() {
-        this(UserConfiguration.user());
+        this(Services.load(UserConfigService.class));
     }
 
-    public FilePrinterStore(@lombok.NonNull UserConfiguration configuration) {
-        this(configuration.path().resolveSibling("printers"));
+    public FilePrinterStore(@lombok.NonNull UserConfigService configuration) {
+        this(configuration.printersFolder());
     }
 
     public FilePrinterStore(@lombok.NonNull Path directory) {

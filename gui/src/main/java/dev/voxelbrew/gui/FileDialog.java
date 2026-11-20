@@ -1,5 +1,6 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.parameters.ParameterSet;
 import java.nio.file.Path;
 import java.util.List;
@@ -17,8 +18,8 @@ final class FileDialog {
             boolean save,
             Path current,
             ParameterSet parameters,
-            dev.voxelbrew.util.i18n.Translations translations,
-            dev.voxelbrew.util.config.UserConfiguration configuration) {
+            TranslationService translations,
+            dev.voxelbrew.api.userconfig.UserConfigService configuration) {
         return choose(owner, save, current, parameters, translations, configuration, "vxb", null);
     }
 
@@ -26,8 +27,8 @@ final class FileDialog {
             Window owner,
             Path current,
             ParameterSet parameters,
-            dev.voxelbrew.util.i18n.Translations translations,
-            dev.voxelbrew.util.config.UserConfiguration configuration,
+            TranslationService translations,
+            dev.voxelbrew.api.userconfig.UserConfigService configuration,
             List<Path> recentFiles) {
         return choose(owner, false, current, parameters, translations, configuration, "vxb", null, recentFiles);
     }
@@ -37,8 +38,8 @@ final class FileDialog {
             boolean save,
             Path current,
             ParameterSet parameters,
-            dev.voxelbrew.util.i18n.Translations translations,
-            dev.voxelbrew.util.config.UserConfiguration configuration,
+            TranslationService translations,
+            dev.voxelbrew.api.userconfig.UserConfigService configuration,
             String extension,
             String title) {
         return choose(owner, save, current, parameters, translations, configuration, extension, title, List.of());
@@ -49,31 +50,33 @@ final class FileDialog {
             boolean save,
             Path current,
             ParameterSet parameters,
-            dev.voxelbrew.util.i18n.Translations translations,
-            dev.voxelbrew.util.config.UserConfiguration configuration,
+            TranslationService translations,
+            dev.voxelbrew.api.userconfig.UserConfigService configuration,
             String extension,
             String title,
             List<Path> recentFiles) {
         var dialog = new Dialog<Path>();
         dialog.setTitle(
-                save ? translations.text("gui.save_editable_design") : translations.text("gui.open_editable_design"));
+                save
+                        ? translations.translate("gui.save_editable_design").orElseThrow()
+                        : translations.translate("gui.open_editable_design").orElseThrow());
         if (title != null && !extension.equals("vxb")) dialog.setTitle(title);
         Path initial = current;
         if (initial == null) {
             try {
                 initial = save
-                        ? configuration.defaultSaveFolder().resolve("Untitled." + extension)
+                        ? configuration.homeFolder().resolve("Untitled." + extension)
                         : Path.of(System.getProperty("user.home"), "Untitled.vxb");
-            } catch (java.io.IOException | IllegalArgumentException failure) {
+            } catch (IllegalArgumentException failure) {
                 Dialogs.show(
                         new Alert(Alert.AlertType.ERROR, failure.getMessage(), ButtonType.OK), owner, translations);
                 return Optional.empty();
             }
         }
-        var path = FormulaField.text(initial.toString(), () -> parameters).localized(translations);
+        var path = FormulaField.text(initial.toString(), () -> parameters, translations);
         path.setId("file-path");
         path.setPrefColumnCount(48);
-        var browse = new Button(translations.text("gui.browse"));
+        var browse = new Button(translations.translate("gui.browse").orElseThrow());
         browse.setId("file-browse");
         UiHelp.install(browse, translations);
         browse.setOnAction(e -> {
@@ -101,15 +104,22 @@ final class FileDialog {
         var error = new Label();
         error.getStyleClass().add("error");
         var box = new VBox(
-                10, new Label(translations.text("gui.editable_design_location")), Dialogs.pathRow(path, browse), error);
+                10,
+                new Label(translations.translate("gui.editable_design_location").orElseThrow()),
+                Dialogs.pathRow(path, browse),
+                error);
         dialog.getDialogPane().setContent(box);
         var confirm = new ButtonType(
-                save ? translations.text("action.save") : translations.text("gui.open"), ButtonBar.ButtonData.OK_DONE);
+                save
+                        ? translations.translate("action.save").orElseThrow()
+                        : translations.translate("gui.open").orElseThrow(),
+                ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(confirm, ButtonType.CANCEL);
         var button = dialog.getDialogPane().lookupButton(confirm);
         button.setId("file-confirm");
         if (!save && !recentFiles.isEmpty()) {
-            var recent = new VBox(4, new Label(translations.text("menu-open-recent")));
+            var recent = new VBox(
+                    4, new Label(translations.translate("menu-open-recent").orElseThrow()));
             recent.setId("file-recent-projects");
             for (int i = 0; i < Math.min(3, recentFiles.size()); i++) {
                 Path project = recentFiles.get(i);
@@ -132,7 +142,8 @@ final class FileDialog {
         button.addEventFilter(ActionEvent.ACTION, e -> {
             try {
                 if (path.evaluatedText().isBlank())
-                    throw new IllegalArgumentException(translations.text("gui.choose_a_file_path"));
+                    throw new IllegalArgumentException(
+                            translations.translate("gui.choose_a_file_path").orElseThrow());
                 Path selected = Path.of(path.evaluatedText()).toAbsolutePath();
                 Path parent = selected.getParent();
                 if (parent == null) throw new IllegalArgumentException("Expected a file path: " + selected);

@@ -1,8 +1,8 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.printing.PrintProfile.Point;
 import dev.voxelbrew.api.printer.*;
-import dev.voxelbrew.util.i18n.Translations;
 import java.nio.file.Path;
 import java.util.*;
 import javafx.scene.control.*;
@@ -11,7 +11,8 @@ import javafx.stage.*;
 
 /** Edits custom hardware definitions; bundled definitions can only be copied. */
 final class ProfileEditor {
-    static Optional<Profile> show(Window owner, Translations text, PrinterProfileCatalog catalog, Profile source) {
+    static Optional<Profile> show(
+            Window owner, TranslationService text, PrinterProfileCatalog catalog, Profile source) {
         var dialog = new Dialog<Profile>();
         dialog.setTitle(source == null ? "New printer profile" : "Edit / copy printer profile");
         dialog.getDialogPane().setId("profile-editor");

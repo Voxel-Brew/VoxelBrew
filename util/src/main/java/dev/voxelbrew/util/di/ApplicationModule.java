@@ -1,8 +1,10 @@
 package dev.voxelbrew.util.di;
 
-import dev.voxelbrew.util.config.ApplicationPaths;
-import dev.voxelbrew.util.config.UserConfiguration;
+import dev.voxelbrew.api.i18n.TranslationService;
+import dev.voxelbrew.api.userconfig.UserConfigService;
+import dev.voxelbrew.util.services.Services;
 import dev.voxelbrew.util.update.*;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
@@ -10,23 +12,24 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public final class ApplicationModule {
     @NonNull
-    private final UserConfiguration configuration;
+    private final UserConfigService configuration;
 
     @NonNull
     private final UpdateServiceFactory updates;
 
     @NonNull
-    private final ApplicationPaths paths;
+    private final TranslationService translations;
 
     public static ApplicationModule system(ApplicationImage.Component component) {
-        return new ApplicationModule(UserConfiguration.user(), () -> UpdateService.system(component));
+        return system(() -> UpdateService.system(component));
     }
 
-    public ApplicationModule(UserConfiguration configuration, UpdateServiceFactory updates) {
-        this(configuration, updates, dev.voxelbrew.util.services.Services.load(ApplicationPaths.class));
+    public static ApplicationModule system(UpdateServiceFactory updates) {
+        return new ApplicationModule(
+                Services.load(UserConfigService.class), updates, Services.load(TranslationService.class));
     }
 
-    public UserConfiguration configuration() {
+    public UserConfigService configuration() {
         return configuration;
     }
 
@@ -34,7 +37,10 @@ public final class ApplicationModule {
         return updates;
     }
 
-    public ApplicationPaths paths() {
-        return paths;
+    @SuppressFBWarnings(
+            value = "EI_EXPOSE_REP",
+            justification = "The application graph shares its translation service.")
+    public TranslationService translations() {
+        return translations;
     }
 }

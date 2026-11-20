@@ -14,18 +14,18 @@ rootProject.name = "voxelbrew"
 
 // A direct app invocation in the workspace uses the same projects as the parent composite.
 if (gradle.parent == null) {
-    val bom = file("../BOM")
-    val apis =
-        listOf("model", "import", "export", "printer", "slicer").associateWith {
-            file("../api/$it")
-        }
-    if (
-        bom.resolve("settings.gradle.kts").isFile &&
-            apis.values.all { it.resolve("settings.gradle.kts").isFile }
-    ) {
+    val apiNames = listOf("model", "import", "export", "printer", "slicer")
+    val checkouts =
+        listOf(file("../BOM") to file("../api"), file(".tools/bom") to file(".tools/api"))
+            .firstOrNull { (bom, apis) ->
+                bom.resolve("settings.gradle.kts").isFile &&
+                    apiNames.all { apis.resolve("$it/settings.gradle.kts").isFile }
+            }
+    if (checkouts != null) {
+        val (bom, apis) = checkouts
         includeBuild(bom) { name = "bom" }
-        apis.forEach { (api, directory) ->
-            includeBuild(directory) {
+        apiNames.forEach { api ->
+            includeBuild(apis.resolve(api)) {
                 name = api
                 dependencySubstitution {
                     substitute(module("dev.voxelbrew.api:$api")).using(project(":"))

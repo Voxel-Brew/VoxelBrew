@@ -1,4 +1,4 @@
-package dev.voxelbrew.util.config;
+package dev.voxelbrew.util.preferences;
 
 import java.nio.file.Path;
 

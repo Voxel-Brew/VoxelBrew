@@ -2,6 +2,7 @@ package dev.voxelbrew.gui;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.*;
 import dev.voxelbrew.api.model.parameters.*;
 import dev.voxelbrew.api.model.printing.*;
@@ -23,6 +24,10 @@ import dev.voxelbrew.printer.ProfileHardware;
 import dev.voxelbrew.printer.moonraker.MoonrakerDriverGui;
 import dev.voxelbrew.slicer.prusa.PrusaSlicerBackend;
 import dev.voxelbrew.util.Version;
+import dev.voxelbrew.util.concurrent.SerialExecutor;
+import dev.voxelbrew.util.i18n.TranslationCatalogs;
+import dev.voxelbrew.util.i18n.TranslationServiceImpl;
+import dev.voxelbrew.util.preferences.UserConfigServiceImpl;
 import java.nio.ByteBuffer;
 import java.nio.file.*;
 import java.security.MessageDigest;
@@ -49,6 +54,8 @@ import org.junit.jupiter.api.io.TempDir;
 /** Actual JavaFX windows, rendering, picking, keyboard input and mouse gestures on both OSes. */
 @ExtendWith(UiTestShard.class)
 class WorkbenchUiTest {
+    private static final String CONFIG_FILE_NAME = "preferences.properties";
+
     private static Robot robot;
 
     private static Appearance.Choice originalAppearance;
@@ -62,11 +69,13 @@ class WorkbenchUiTest {
 
     private UpdateFixture updates;
 
-    private dev.voxelbrew.util.config.UserConfiguration configuration;
+    private dev.voxelbrew.util.preferences.UserConfigServiceImpl configuration;
 
     @BeforeAll
     static void toolkit() throws Exception {
-        originalAppearance = new Appearance().load();
+        originalAppearance = new Appearance(
+                        dev.voxelbrew.util.services.Services.load(dev.voxelbrew.api.userconfig.UserConfigService.class))
+                .load();
         var started = new CountDownLatch(1);
         Launcher.configureGraphics();
         Platform.startup(() -> {
@@ -85,7 +94,8 @@ class WorkbenchUiTest {
 
     @AfterAll
     static void shutdown() {
-        new Appearance().save(originalAppearance);
+        new Appearance(dev.voxelbrew.util.services.Services.load(dev.voxelbrew.api.userconfig.UserConfigService.class))
+                .save(originalAppearance);
         Platform.exit();
     }
 
@@ -488,9 +498,7 @@ class WorkbenchUiTest {
         assertThat(document().printSetup().printerSnapshot()).isEqualTo(ProfileHardware.resolve(saved.profile()));
         assertThat(document().printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID))
                 .isEqualTo(saved.id());
-        var catalog = new dev.voxelbrew.printer.DefaultPrinterProfileCatalog(
-                dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
-                        .profiles());
+        var catalog = new DefaultPrinterProfileCatalog(configuration.profilesFolder());
         var original = saved.profile();
         catalog.save(
                 new dev.voxelbrew.api.printer.Profile(
@@ -760,14 +768,16 @@ class WorkbenchUiTest {
                     @Override
                     public void close() {}
                 };
-                var worker = WindowResources.worker("printer")) {
+                var executor = Executors.newSingleThreadExecutor();
+                var worker = new SerialExecutor(executor)) {
+            var workerThread = worker.submit(Thread::currentThread).get(5, TimeUnit.SECONDS);
             var pane = fx(() -> {
                 var created = new PrinterPane(
                         store,
                         registry,
                         catalog,
                         new PrinterVisibility(configuration),
-                        new dev.voxelbrew.util.i18n.Translations(Locale.ENGLISH),
+                        TranslationCatalogs.forLocale(Locale.ENGLISH, directory),
                         worker);
                 new Scene(created, 820, 650);
                 created.applyCss();
@@ -791,7 +801,7 @@ class WorkbenchUiTest {
                 assertThat(responsive.get(2, TimeUnit.SECONDS))
                         .as("JavaFX must process events while G-code submission is blocked")
                         .isTrue();
-                assertThat(submissionThread.get().getName()).isEqualTo("voxelbrew-printer");
+                assertThat(submissionThread.get()).isSameAs(workerThread);
                 assertThat(transportOnFx.get())
                         .as("Submission and monitoring must stay off JavaFX")
                         .isFalse();
@@ -961,7 +971,11 @@ class WorkbenchUiTest {
     void formulaUnitSuffixesFollowDeclaredUnitsWithoutChangingInput() throws Exception {
         fx(() -> {
             var selected = new javafx.beans.property.SimpleObjectProperty<>(ParameterUnit.MM);
-            var field = FormulaField.number("5", ParameterSet::empty, selected::get);
+            var field = FormulaField.number(
+                    "5",
+                    ParameterSet::empty,
+                    selected::get,
+                    dev.voxelbrew.util.services.Services.load(TranslationService.class));
             selected.addListener(o -> field.refreshFormula());
             field.setSkin(field.createDefaultSkin());
             field.refreshFormula();
@@ -981,7 +995,8 @@ class WorkbenchUiTest {
             assertThat(label.getText()).isEqualTo("%");
             assertThat(field.getText()).isEqualTo("25");
             assertThat(field.value()).isCloseTo(25, org.assertj.core.data.Offset.offset(1e-9));
-            var text = FormulaField.text("name", ParameterSet::empty);
+            var text = FormulaField.text(
+                    "name", ParameterSet::empty, dev.voxelbrew.util.services.Services.load(TranslationService.class));
             text.setSkin(text.createDefaultSkin());
             text.refreshFormula();
             assertThat(((Label) text.lookup(".formula-unit")).getText()).isEqualTo("");
@@ -993,7 +1008,11 @@ class WorkbenchUiTest {
     void formulaBoundsValidateDisplayedUnitsAndStrictEndpoints() throws Exception {
         fx(() -> {
             var invalid = javafx.css.PseudoClass.getPseudoClass("formula-invalid");
-            var field = FormulaField.number("1", ParameterSet::empty, ParameterUnit.CM)
+            var field = FormulaField.number(
+                            "1",
+                            ParameterSet::empty,
+                            ParameterUnit.CM,
+                            dev.voxelbrew.util.services.Services.load(TranslationService.class))
                     .bounds(1, false, 2, true);
             assertThat(field.getPseudoClassStates().contains(invalid)).isTrue();
             field.setText("=15 mm");
@@ -2319,7 +2338,7 @@ class WorkbenchUiTest {
         ready();
         click("print-add");
         ready();
-        var store = new dev.voxelbrew.slicer.SlicerInstallationStore(configuration.path());
+        var store = new dev.voxelbrew.slicer.SlicerInstallationStore(configuration);
 
         click("menu-slicer");
         click("slicer-settings");
@@ -2486,7 +2505,7 @@ class WorkbenchUiTest {
 
     @Test
     void slicerListShowsOnlyProviderVersionsThatDifferFromTheApp() throws Exception {
-        var store = new dev.voxelbrew.slicer.SlicerInstallationStore(configuration.path());
+        var store = new dev.voxelbrew.slicer.SlicerInstallationStore(configuration);
         store.save(new dev.voxelbrew.slicer.SlicerInstallation(
                 UUID.randomUUID(), "probe-slicer", "Third-party fixture", "Backend 7.4.0", "", Map.of()));
         ready();
@@ -2570,7 +2589,7 @@ class WorkbenchUiTest {
 
     private void saveSlicerInstallation(String name) throws Exception {
         click("export-confirm");
-        var store = new dev.voxelbrew.slicer.SlicerInstallationStore(configuration.path());
+        var store = new dev.voxelbrew.slicer.SlicerInstallationStore(configuration);
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
         while (store.load().stream().noneMatch(entry -> entry.name().equals(name)) && System.nanoTime() < deadline)
             Thread.sleep(25);
@@ -3218,8 +3237,8 @@ class WorkbenchUiTest {
                         .getDiffuseColor()))
                 .isEqualTo(javafx.scene.paint.Color.RED);
         renderStyle("technical");
-        assertThat(configuration.get("rendering.style", "")).isEqualTo("TECHNICAL");
-        assertThat(configuration.get("external.setting", "")).isEqualTo("preserve me");
+        assertThat(configuration.readUserConfig("rendering.style").orElse("")).isEqualTo("TECHNICAL");
+        assertThat(configuration.readUserConfig("external.setting").orElse("")).isEqualTo("preserve me");
         fx(() -> {
             workbench.close();
             return null;
@@ -3229,7 +3248,8 @@ class WorkbenchUiTest {
             workbench = Workbench.create(
                     stage,
                     directory.resolve("plugins with spaces"),
-                    new dev.voxelbrew.util.di.ApplicationModule(configuration, updates::service),
+                    new dev.voxelbrew.util.di.ApplicationModule(
+                            configuration, updates::service, startupTranslations(configuration, CONFIG_FILE_NAME)),
                     new dev.voxelbrew.gui.FileIoModule());
             stage.setScene(workbench.createScene(964, 648));
             stage.toFront();
@@ -3240,6 +3260,20 @@ class WorkbenchUiTest {
         open(file);
         assertThat(fx(() -> workbench.viewport().rendering())).isEqualTo(Rendering.Style.TECHNICAL);
         assertThat(Files.readAllBytes(file)).containsExactly(bytes);
+    }
+
+    private TranslationService startupTranslations(UserConfigServiceImpl config, String fileName) {
+        String previousHome =
+                System.setProperty("voxelbrew.home", config.homeFolder().toString());
+        String previousConfig = System.setProperty("voxelbrew.config", fileName);
+        try {
+            return new TranslationServiceImpl();
+        } finally {
+            if (previousHome == null) System.clearProperty("voxelbrew.home");
+            else System.setProperty("voxelbrew.home", previousHome);
+            if (previousConfig == null) System.clearProperty("voxelbrew.config");
+            else System.setProperty("voxelbrew.config", previousConfig);
+        }
     }
 
     private void renderStyle(String style) throws Exception {
@@ -3578,17 +3612,16 @@ class WorkbenchUiTest {
     @BeforeEach
     void window(TestInfo info) throws Exception {
         updates = new UpdateFixture(directory.resolve("update fixture"));
-        configuration =
-                new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("preferences.properties"));
+        configuration = new UserConfigServiceImpl(directory, CONFIG_FILE_NAME);
         String testName = info.getTestMethod().orElseThrow().getName();
         if (!testName.equals("namedSlicerInstallationsAreCheckedBeforeTheyCanBeSelected")) {
-            var store = new dev.voxelbrew.slicer.SlicerInstallationStore(configuration.path());
+            var store = new dev.voxelbrew.slicer.SlicerInstallationStore(configuration);
             store.save(new dev.voxelbrew.slicer.SlicerInstallation(
                     UUID.randomUUID(), "prusa-slicer", "PrusaSlicer", "test installation", "", Map.of()));
         }
         boolean firstLaunch = testName.startsWith("firstLaunch");
-        if (!firstLaunch) configuration.set("language", testName.startsWith("polish") ? "pl" : "en");
-        configuration.set("external.setting", "preserve me");
+        if (!firstLaunch) configuration.saveUserConfig("language", testName.startsWith("polish") ? "pl" : "en");
+        configuration.saveUserConfig("external.setting", "preserve me");
         Path plugins = Files.createDirectory(directory.resolve("plugins with spaces"));
         Files.copy(Path.of(System.getProperty("voxelbrew.test.plugin")), plugins.resolve("provider.jar"));
         fx(() -> {
@@ -3600,7 +3633,8 @@ class WorkbenchUiTest {
                 workbench = Workbench.create(
                         stage,
                         plugins,
-                        new dev.voxelbrew.util.di.ApplicationModule(configuration, updates::service),
+                        new dev.voxelbrew.util.di.ApplicationModule(
+                                configuration, updates::service, startupTranslations(configuration, CONFIG_FILE_NAME)),
                         new dev.voxelbrew.gui.FileIoModule());
             } finally {
                 Locale.setDefault(Locale.Category.DISPLAY, previousDisplay);
@@ -3968,8 +4002,8 @@ class WorkbenchUiTest {
     void polishBodyRenameTargetsTheClickedBodyAndSupportsDarkPalette() throws Exception {
         createRenameBodies();
         choice("appearance", 2);
-        var translations = new dev.voxelbrew.util.i18n.Translations(Locale.forLanguageTag("pl"));
-        bodyTreeClick(translations.text("feature.body", 2), MouseButton.SECONDARY, 1);
+        var translations = TranslationCatalogs.forLocale(Locale.forLanguageTag("pl"), directory);
+        bodyTreeClick(translations.translate("feature.body", 2).orElseThrow(), MouseButton.SECONDARY, 1);
         assertThat(fx(() -> ((Label) node("#body-rename").lookup(".label")).getText()))
                 .isEqualTo("Zmień nazwę");
         fx(() -> {
@@ -4189,14 +4223,14 @@ class WorkbenchUiTest {
         ready();
         assertThat(fx(() -> command(workbench, "save").getText())).isEqualTo("Zapisz");
         assertThat(fx(() -> node("#view-cube-top").getAccessibleText())).isEqualTo("Widok: Góra");
-        assertThat(configuration.read().containsKey("language")).isFalse();
+        assertThat(configuration.readUserConfig().containsKey("language")).isFalse();
         click("language");
         assertThat(fx(() -> ((ComboBox<?>) node("#language-choice")).getValue()))
                 .isEqualTo("system");
         assertThat(fx(() -> ((Button) node("#language-save")).getText())).isEqualTo("Zapisz");
         click("language-close");
-        assertThat(configuration.read().containsKey("language")).isFalse();
-        assertThat(configuration.get("external.setting", "")).isEqualTo("preserve me");
+        assertThat(configuration.readUserConfig().containsKey("language")).isFalse();
+        assertThat(configuration.readUserConfig("external.setting").orElse("")).isEqualTo("preserve me");
         assertThat(fx(() -> workbench.controller().dirty())).isFalse();
     }
 
@@ -4325,8 +4359,8 @@ class WorkbenchUiTest {
                     .isTrue();
             Thread.sleep(30);
         }
-        assertThat(configuration.get("language", "")).isEqualTo("en-EN");
-        assertThat(configuration.get("external.setting", "")).isEqualTo("preserve me");
+        assertThat(configuration.readUserConfig("language").orElse("")).isEqualTo("en-EN");
+        assertThat(configuration.readUserConfig("external.setting").orElse("")).isEqualTo("preserve me");
         click("language-close");
         assertThat(document()).isEqualTo(part);
         assertThat(fx(() -> workbench.controller().dirty())).isFalse();
@@ -4338,7 +4372,8 @@ class WorkbenchUiTest {
             var reopened = Workbench.create(
                     reopenedStage,
                     directory.resolve("plugins with spaces"),
-                    new dev.voxelbrew.util.di.ApplicationModule(configuration, updates::service),
+                    new dev.voxelbrew.util.di.ApplicationModule(
+                            configuration, updates::service, startupTranslations(configuration, CONFIG_FILE_NAME)),
                     new dev.voxelbrew.gui.FileIoModule());
             try {
                 reopenedStage.setScene(reopened.createScene(964, 648));
@@ -4355,17 +4390,21 @@ class WorkbenchUiTest {
     @Test
     void serviceScopesIsolateWindowsPreferencesAndWorkerLifetimes() throws Exception {
         fx(() -> {
-            var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("isolated.properties"));
-            config.set("language", "pl");
-            config.set("appearance", "DARK");
+            String fileName = "isolated.properties";
+            var config = new UserConfigServiceImpl(directory, fileName);
+            config.saveUserConfig("language", "pl");
+            config.saveUserConfig("appearance", "DARK");
             var secondStage = new Stage();
             var graph = GuiComponent.factory()
                     .create(
                             secondStage,
                             directory.resolve("isolated plugins"),
-                            new dev.voxelbrew.util.di.ApplicationModule(config, () -> {
-                                throw new AssertionError("Startup must not create an updater");
-                            }),
+                            new dev.voxelbrew.util.di.ApplicationModule(
+                                    config,
+                                    () -> {
+                                        throw new AssertionError("Startup must not create an updater");
+                                    },
+                                    startupTranslations(config, fileName)),
                             new dev.voxelbrew.gui.FileIoModule());
             var second = graph.workbench();
             try {
@@ -4379,8 +4418,9 @@ class WorkbenchUiTest {
                         .isNotSameAs(
                                 workbench.controller().snapshot().document().uuidGenerator());
                 assertThat(command(second, "save").getText())
-                        .isEqualTo(new dev.voxelbrew.util.i18n.Translations(Locale.forLanguageTag("pl"))
-                                .text("action.save"));
+                        .isEqualTo(TranslationCatalogs.forLocale(Locale.forLanguageTag("pl"), directory)
+                                .translate("action.save")
+                                .orElseThrow());
                 assertThat(second.getStyleClass().contains("dark")).isTrue();
                 second.close();
                 second.close();
@@ -5001,6 +5041,9 @@ class WorkbenchUiTest {
         rectangle(0);
         click("export");
         chooseExporter("json");
+        assertThat(fx(() ->
+                        Path.of(((TextField) node("#export-path")).getText()).getParent()))
+                .isEqualTo(configuration.homeFolder());
         text("export-path", "");
         click("export-confirm");
 
@@ -5708,7 +5751,11 @@ class WorkbenchUiTest {
     @Test
     void numericFormulaFieldsSupportMiddleButtonDragging() throws Exception {
         fx(() -> {
-            var field = FormulaField.number("1.25", ParameterSet::empty, ParameterUnit.CM);
+            var field = FormulaField.number(
+                    "1.25",
+                    ParameterSet::empty,
+                    ParameterUnit.CM,
+                    dev.voxelbrew.util.services.Services.load(TranslationService.class));
             java.util.function.BiConsumer<javafx.event.EventType<MouseEvent>, Double> middle =
                     (type, x) -> field.fireEvent(new MouseEvent(
                             type,
@@ -5850,7 +5897,8 @@ class WorkbenchUiTest {
             var centimeters = FormulaField.number(
                     "=$width/2",
                     () -> workbench.controller().snapshot().document().parameters(),
-                    ParameterUnit.CM);
+                    ParameterUnit.CM,
+                    dev.voxelbrew.util.services.Services.load(TranslationService.class));
             assertThat(centimeters.value()).isEqualTo(30);
             assertThat(centimeters.declaredValue()).isEqualTo(3);
             Screenshot.save(stage.getScene(), artifacts.resolve("formulas-light.png"));
@@ -7893,9 +7941,9 @@ class WorkbenchUiTest {
         // Both frontends need the same named installation, even with separate test homes.
         var installationId = dev.voxelbrew.slicer.SlicerInstallation.selectedId(
                 DocumentReader.load(file).printSetup());
-        var guiInstallations = new dev.voxelbrew.slicer.SlicerInstallationStore(configuration.path());
-        var cliInstallations =
-                new dev.voxelbrew.slicer.SlicerInstallationStore(directory.resolve("cli-settings/config.properties"));
+        var guiInstallations = new dev.voxelbrew.slicer.SlicerInstallationStore(configuration);
+        var cliInstallations = new dev.voxelbrew.slicer.SlicerInstallationStore(
+                new UserConfigServiceImpl(directory.resolve("cli-settings"), "config.properties"));
         cliInstallations.save(guiInstallations.require(installationId));
         Path cliJob = directory.resolve("CLI printer job.gcode");
         assertThat(cli("slicer", "validate", file.toString()).contains("VALID")).isTrue();

@@ -25,8 +25,8 @@ public final class FeatureRegistry implements AutoCloseable {
     private record Entry(FeatureDescriptor descriptor, FeatureProvider provider) {}
 
     public static Path defaultDirectory() {
-        return dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
-                .plugins();
+        return dev.voxelbrew.util.services.Services.load(dev.voxelbrew.api.userconfig.UserConfigService.class)
+                .pluginsFolder();
     }
 
     private static Map<String, Double> normalize(

@@ -70,6 +70,31 @@ class TranslationServiceImplTest {
                 .isEqualTo("Example");
     }
 
+    @Test
+    void listsLocalesRegisteredAfterStartup() {
+        var service = new TranslationServiceImpl(Locale.ENGLISH, directory);
+        var snapshot = service.languages();
+
+        service.addSupportedLocale(Locale.CANADA_FRENCH);
+        service.registerTranslation(Locale.JAPANESE, "language.name", "日本語");
+
+        assertThat(service.languages())
+                .containsEntry("fr-CA", Locale.CANADA_FRENCH.getDisplayName(Locale.CANADA_FRENCH))
+                .containsEntry("ja", "日本語");
+        assertThat(snapshot).doesNotContainKeys("fr-CA", "ja");
+        assertThatThrownBy(() -> snapshot.put("ja", "Japanese")).isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void keepsBothLocalesWhenARegisteredTagMatchesABundledAlias() {
+        var service = new TranslationServiceImpl(Locale.ENGLISH, directory);
+        var polish = Locale.forLanguageTag("pl-PL");
+
+        service.registerTranslation(polish, "language.name", "Polski (Polska)");
+
+        assertThat(service.languages()).containsEntry("pl", "Polski").containsEntry("pl-PL", "Polski (Polska)");
+    }
+
     @BeforeEach
     void rememberStartupEnvironment() {
         previousHome = System.setProperty("voxelbrew.home", directory.toString());

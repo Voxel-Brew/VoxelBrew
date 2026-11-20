@@ -20,6 +20,15 @@ class TranslationServiceImplTest {
         else System.setProperty(key, value);
     }
 
+    private static Properties readCatalog(String language) throws java.io.IOException {
+        var properties = new Properties();
+        try (var stream = TranslationServiceImpl.class.getResourceAsStream("messages_" + language + ".properties")) {
+            properties.load(new java.io.InputStreamReader(
+                    Objects.requireNonNull(stream), java.nio.charset.StandardCharsets.UTF_8));
+        }
+        return properties;
+    }
+
     private static Set<String> placeholders(String pattern) {
         var result = new TreeSet<String>();
         var matcher = java.util.regex.Pattern.compile("\\{(\\d+)(?:[,}])").matcher(pattern);
@@ -31,16 +40,16 @@ class TranslationServiceImplTest {
     void loadsUserCatalogAndFallsBackToEnglishForMissingKeys() throws Exception {
         var catalogs = Files.createDirectory(directory.resolve("i18n"));
         Files.writeString(
-                catalogs.resolve("messages_de-DE.properties"),
-                "language.name=Deutsch\nlanguage.i18n=de-DE\naction.save=Speichern\n");
-        var german = new TranslationServiceImpl(Locale.forLanguageTag("de-DE"), catalogs);
-        assertThat(german.supportedLocales())
-                .containsExactlyInAnyOrder(Locale.ENGLISH, Locale.forLanguageTag("pl"), Locale.GERMANY);
-        assertThat(german.translate("action.save").orElseThrow()).isEqualTo("Speichern");
-        assertThat(german.translate("language.title").orElseThrow()).isEqualTo("Application language");
-        assertThat(german.languages().get("de-DE")).isEqualTo("Deutsch");
-        assertThat(german.languages().get("en-EN")).isEqualTo("English");
-        assertThat(german.languages().get("pl-PL")).isEqualTo("Polski");
+                catalogs.resolve("messages_fi-FI.properties"),
+                "language.name=Suomi\nlanguage.i18n=fi-FI\naction.save=Tallenna\n");
+        var finnish = new TranslationServiceImpl(Locale.forLanguageTag("fi-FI"), catalogs);
+        assertThat(finnish.supportedLocales())
+                .contains(Locale.ENGLISH, Locale.forLanguageTag("pl"), Locale.forLanguageTag("fi-FI"));
+        assertThat(finnish.translate("action.save").orElseThrow()).isEqualTo("Tallenna");
+        assertThat(finnish.translate("language.title").orElseThrow()).isEqualTo("Application language");
+        assertThat(finnish.languages().get("fi-FI")).isEqualTo("Suomi");
+        assertThat(finnish.languages().get("en-EN")).isEqualTo("English");
+        assertThat(finnish.languages().get("pl-PL")).isEqualTo("Polski");
     }
 
     @Test
@@ -48,11 +57,30 @@ class TranslationServiceImplTest {
         var service = new TranslationServiceImpl(Locale.ENGLISH, directory);
         var snapshot = service.supportedLocales();
 
-        service.registerTranslation(Locale.JAPANESE, "test.message", "Example");
+        service.registerTranslation(Locale.KOREAN, "test.message", "Example");
 
-        assertThat(service.supportedLocales()).contains(Locale.JAPANESE);
-        assertThat(snapshot).doesNotContain(Locale.JAPANESE);
-        assertThatThrownBy(() -> snapshot.add(Locale.JAPANESE)).isInstanceOf(UnsupportedOperationException.class);
+        assertThat(service.supportedLocales()).contains(Locale.KOREAN);
+        assertThat(snapshot).doesNotContain(Locale.KOREAN);
+        assertThatThrownBy(() -> snapshot.add(Locale.KOREAN)).isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void regionalPreferencesSelectBundledCadCatalogs() {
+        var examples = Map.of(
+                "fr-CA", "Congé",
+                "it-IT", "Raccordo",
+                "es-MX", "Redondeo",
+                "pt-PT", "Arredondamento",
+                "de-AT", "Verrundung",
+                "sv-SE", "Avrundning",
+                "no-NO", "Avrunding",
+                "zh-CN", "圆角",
+                "ja-JP", "フィレット");
+        examples.forEach((tag, expected) -> {
+            var service = new TranslationServiceImpl(Locale.forLanguageTag(tag), directory);
+            assertThat(service.translate("action.fillet")).as(tag).contains(expected);
+            assertThat(service.languages()).containsKey(service.currentLocale().toLanguageTag());
+        });
     }
 
     @Test
@@ -143,7 +171,7 @@ class TranslationServiceImplTest {
     void missingUnsupportedAndInvalidLanguagesFallBackWhileSavedChoicesOverrideSystem() throws Exception {
         var config = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties");
         Locale.setDefault(Locale.forLanguageTag("pl-PL"));
-        for (var unsupported : List.of(Locale.ROOT, Locale.GERMAN, Locale.JAPANESE)) {
+        for (var unsupported : List.of(Locale.ROOT, Locale.forLanguageTag("fi"), Locale.KOREAN)) {
             Locale.setDefault(Locale.Category.DISPLAY, unsupported);
             assertThat(new TranslationServiceImpl().currentLocale()).isEqualTo(Locale.ENGLISH);
         }
@@ -151,7 +179,7 @@ class TranslationServiceImplTest {
         assertThat(new TranslationServiceImpl().translate("action.save").orElseThrow())
                 .isEqualTo("Zapisz");
         Locale.setDefault(Locale.Category.DISPLAY, Locale.forLanguageTag("pl-PL"));
-        for (var saved : List.of("en", "en-GB", "de-DE", "not_a_tag")) {
+        for (var saved : List.of("en", "en-GB", "fi-FI", "not_a_tag")) {
             config.saveUserConfig("language", saved);
             assertThat(new TranslationServiceImpl().currentLocale()).isEqualTo(Locale.ENGLISH);
         }
@@ -194,7 +222,7 @@ class TranslationServiceImplTest {
             config.saveUserConfig("language", "system");
             Locale.setDefault(Locale.Category.DISPLAY, Locale.ROOT);
             new TranslationServiceImpl();
-            Locale.setDefault(Locale.Category.DISPLAY, Locale.GERMAN);
+            Locale.setDefault(Locale.Category.DISPLAY, Locale.forLanguageTag("fi"));
             new TranslationServiceImpl();
             config.saveUserConfig("language", "not_a_tag");
             new TranslationServiceImpl();
@@ -209,7 +237,7 @@ class TranslationServiceImplTest {
                     .isTrue();
             assertThat(messages.get(2).contains("English fallback")).isTrue();
             assertThat(messages.get(2).contains("system display locale (und)")).isTrue();
-            assertThat(messages.get(3).contains("system display locale (de)")).isTrue();
+            assertThat(messages.get(3).contains("system display locale (fi)")).isTrue();
             assertThat(messages.get(4).contains("English fallback for unreadable or invalid"))
                     .isTrue();
         } finally {
@@ -229,11 +257,11 @@ class TranslationServiceImplTest {
             assertThat(polish.translate("action.open").orElseThrow()).isEqualTo("Otwórz…");
             assertThat(polish.translate("update.installed", "1.2.3").orElseThrow())
                     .isEqualTo("Zainstalowano: 1.2.3");
-            assertThat(new TranslationServiceImpl(Locale.JAPANESE, directory)
+            assertThat(new TranslationServiceImpl(Locale.KOREAN, directory)
                             .translate("action.open")
                             .orElseThrow())
                     .isEqualTo("Open…");
-            assertThat(new TranslationServiceImpl(Locale.JAPANESE, directory).currentLocale())
+            assertThat(new TranslationServiceImpl(Locale.KOREAN, directory).currentLocale())
                     .isEqualTo(Locale.ENGLISH);
             assertThat(polish.translate("view.accessible", "Góra").orElseThrow())
                     .isEqualTo("Widok: Góra");
@@ -259,24 +287,18 @@ class TranslationServiceImplTest {
         assertThat(new TranslationServiceImpl().translate("action.save").orElseThrow())
                 .isEqualTo("Save");
         var english = new TranslationServiceImpl(Locale.ENGLISH, directory);
-        var polish = new TranslationServiceImpl(Locale.forLanguageTag("pl"), directory);
-        // Read the files directly so ResourceBundle's inherited keys cannot hide an omission.
-        var keys = new Properties();
-        var translated = new Properties();
-        try (var base = TranslationServiceImpl.class.getResourceAsStream("messages_en.properties");
-                var local = TranslationServiceImpl.class.getResourceAsStream("messages_pl.properties")) {
-            keys.load(new java.io.InputStreamReader(
-                    Objects.requireNonNull(base), java.nio.charset.StandardCharsets.UTF_8));
-            translated.load(new java.io.InputStreamReader(
-                    Objects.requireNonNull(local), java.nio.charset.StandardCharsets.UTF_8));
-        }
-        assertThat(translated.keySet()).isEqualTo(keys.keySet());
-        for (String key : keys.stringPropertyNames()) {
-            assertThat(english.translate(key, "test").orElseThrow().isBlank()).isFalse();
-            assertThat(polish.translate(key, "test").orElseThrow().isBlank()).isFalse();
-            assertThat(placeholders(translated.getProperty(key)))
-                    .as(key)
-                    .isEqualTo(placeholders(keys.getProperty(key)));
+        var keys = readCatalog("en");
+        for (var locale : english.supportedLocales()) {
+            var service = new TranslationServiceImpl(locale, directory);
+            var translated = readCatalog(locale.getLanguage());
+            assertThat(service.currentLocale()).isEqualTo(locale);
+            assertThat(translated.keySet()).as(locale.toString()).isEqualTo(keys.keySet());
+            for (String key : keys.stringPropertyNames()) {
+                assertThat(service.translate(key, "test").orElseThrow()).as(key).isNotBlank();
+                assertThat(placeholders(translated.getProperty(key)))
+                        .as("%s %s", locale, key)
+                        .isEqualTo(placeholders(keys.getProperty(key)));
+            }
         }
     }
 
@@ -299,7 +321,7 @@ class TranslationServiceImplTest {
             Locale.setDefault(Locale.forLanguageTag("pl-PL"));
             assertThat(new TranslationServiceImpl().translate("action.save").orElseThrow())
                     .isEqualTo("Zapisz");
-            Locale.setDefault(Locale.GERMAN);
+            Locale.setDefault(Locale.forLanguageTag("fi"));
             assertThat(new TranslationServiceImpl().translate("action.save").orElseThrow())
                     .isEqualTo("Save");
         } finally {

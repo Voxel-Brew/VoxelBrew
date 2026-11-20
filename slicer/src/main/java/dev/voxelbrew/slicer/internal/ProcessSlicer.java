@@ -62,8 +62,9 @@ public interface ProcessSlicer {
             if (exporterId == null
                     || !exporterId.matches("[a-z0-9][a-z0-9.-]*")
                     || extension == null
-                    || !extension.matches("[a-zA-Z0-9]+"))
+                    || !extension.matches("[a-zA-Z0-9]+")) {
                 throw new IllegalArgumentException("Invalid slicer input format");
+            }
         }
     }
 

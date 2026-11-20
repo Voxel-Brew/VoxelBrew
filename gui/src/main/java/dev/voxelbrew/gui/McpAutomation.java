@@ -16,14 +16,16 @@ final class McpAutomation {
     private BooleanSupplier busy;
 
     private static String text(Map<String, Object> args, String key) {
-        if (!(args.get(key) instanceof String value) || value.isBlank())
+        if (!(args.get(key) instanceof String value) || value.isBlank()) {
             throw new IllegalArgumentException("Missing " + key);
+        }
         return value;
     }
 
     private static Number number(Map<String, Object> args, String key) {
-        if (!(args.get(key) instanceof Number value) || !Double.isFinite(value.doubleValue()))
+        if (!(args.get(key) instanceof Number value) || !Double.isFinite(value.doubleValue())) {
             throw new IllegalArgumentException("Invalid " + key);
+        }
         return value;
     }
 
@@ -59,13 +61,15 @@ final class McpAutomation {
             try {
                 if (result.isCancelled()) return;
                 if (!name.equals("document_inspect")) {
-                    if (busy.getAsBoolean() || document.ioBusy() || document.hasPreview())
+                    if (busy.getAsBoolean() || document.ioBusy() || document.hasPreview()) {
                         throw new IllegalStateException("busy: finish or cancel the active editor first");
+                    }
                     var current = document.snapshot();
                     if (!text(args, "documentId").equals(current.document().id())
                             || integer(args, "revision") != current.revision()
-                            || integer(args, "generation") != document.generation())
+                            || integer(args, "generation") != document.generation()) {
                         throw new IllegalStateException("conflict: inspect the document again");
+                    }
                 }
                 CompletableFuture<?> pending = null;
                 switch (name) {
@@ -121,11 +125,14 @@ final class McpAutomation {
                     default -> throw new IllegalArgumentException("Unknown tool");
                 }
                 if (pending == null) result.complete(state());
-                else
+                else {
                     pending.whenComplete((ignored, failure) -> {
                         if (failure != null) result.completeExceptionally(failure);
-                        else result.complete(state());
+                        else {
+                            result.complete(state());
+                        }
                     });
+                }
             } catch (RuntimeException failure) {
                 result.completeExceptionally(failure);
             }
@@ -134,8 +141,9 @@ final class McpAutomation {
     }
 
     private void requireDiscard(Map<String, Object> args) {
-        if (document.dirty() && !Boolean.TRUE.equals(args.get("discardUnsaved")))
+        if (document.dirty() && !Boolean.TRUE.equals(args.get("discardUnsaved"))) {
             throw new IllegalStateException("Unsaved changes: supply discardUnsaved explicitly");
+        }
     }
 
     private Feature feature(Map<String, Object> args) {

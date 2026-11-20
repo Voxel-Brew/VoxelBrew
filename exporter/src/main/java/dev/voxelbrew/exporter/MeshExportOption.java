@@ -23,13 +23,15 @@ public record MeshExportOption(
 
         switch (type) {
             case BOOLEAN -> {
-                if (!value.equals("true") && !value.equals("false"))
+                if (!value.equals("true") && !value.equals("false")) {
                     throw new IllegalArgumentException("expected true or false");
+                }
             }
             case INTEGER -> Long.parseLong(value);
             case DECIMAL -> {
-                if (!Double.isFinite(Double.parseDouble(value)))
+                if (!Double.isFinite(Double.parseDouble(value))) {
                     throw new IllegalArgumentException("expected finite decimal");
+                }
             }
             case CHOICE -> {
                 if (!choices.contains(value)) throw new IllegalArgumentException("expected one of " + choices);

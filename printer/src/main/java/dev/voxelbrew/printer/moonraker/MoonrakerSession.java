@@ -71,15 +71,18 @@ final class MoonrakerSession implements DeviceTransport {
         var builder = HttpRequest.newBuilder(URI.create(base + endpoint)).timeout(Duration.ofSeconds(60));
         if (!device.secret().isEmpty()) builder.header("X-Api-Key", device.secret());
         if (body == null) builder.GET();
-        else builder.POST(body);
+        else {
+            builder.POST(body);
+        }
         return send(builder.build());
     }
 
     private JsonObject send(HttpRequest request) throws IOException {
         try {
             var response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (response.statusCode() / 100 == 4)
+            if (response.statusCode() / 100 == 4) {
                 throw new JobRejectedException("Moonraker rejected the request (HTTP " + response.statusCode() + ")");
+            }
             if (response.statusCode() / 100 != 2) throw new IOException("Moonraker HTTP " + response.statusCode());
             var json = JsonParser.parseString(response.body()).getAsJsonObject();
             if (json.has("error")) throw new JobRejectedException("Moonraker rejected the request");

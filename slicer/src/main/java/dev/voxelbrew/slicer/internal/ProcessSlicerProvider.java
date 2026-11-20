@@ -90,29 +90,38 @@ public abstract class ProcessSlicerProvider implements SlicerProvider {
         }
     }
 
-    private static PrintArtifact run(
-            ProcessSlicer process, ManufacturingModel model, Cancellation cancellation, Consumer<String> diagnostics)
-            throws IOException, SlicerException {
-        var descriptor = process.descriptor();
-        if (!descriptor.outputFormats().contains(model.profile().printer().outputFormat()))
-            throw new SlicerException.UnsupportedInput("Slicer cannot produce required printer format "
-                    + model.profile().printer().outputFormat());
+    private static EnumSet<ProcessSlicer.Capability> requiredCapabilities(ManufacturingModel model) {
         var required = EnumSet.noneOf(ProcessSlicer.Capability.class);
         var settings = model.profile().process();
         if (settings.automaticSupports()) required.add(ProcessSlicer.Capability.AUTOMATIC_SUPPORTS);
         if (settings.supportsOnBedOnly()) required.add(ProcessSlicer.Capability.BUILD_PLATE_SUPPORTS);
         if (settings.brimWidth() > 0) required.add(ProcessSlicer.Capability.BRIM);
         if (settings.raftLayers() > 0) required.add(ProcessSlicer.Capability.RAFT);
-        if (model.setup().supports().stream().anyMatch(s -> s.role() != SupportVolume.Role.SOLID_SUPPORT))
+        if (model.setup().supports().stream().anyMatch(s -> s.role() != SupportVolume.Role.SOLID_SUPPORT)) {
             required.add(ProcessSlicer.Capability.SUPPORT_VOLUMES);
-        if (!descriptor.capabilities().containsAll(required))
+        }
+        return required;
+    }
+
+    private static PrintArtifact run(
+            ProcessSlicer process, ManufacturingModel model, Cancellation cancellation, Consumer<String> diagnostics)
+            throws IOException, SlicerException {
+        var descriptor = process.descriptor();
+        if (!descriptor.outputFormats().contains(model.profile().printer().outputFormat())) {
+            throw new SlicerException.UnsupportedInput("Slicer cannot produce required printer format "
+                    + model.profile().printer().outputFormat());
+        }
+        var required = requiredCapabilities(model);
+        if (!descriptor.capabilities().containsAll(required)) {
             throw new SlicerException.UnsupportedInput(
                     "Slicer does not support requested process capabilities: " + required);
+        }
         Path command = command(process);
         var probe = process.probe(command, cancellation);
-        if (!probe.capabilities().containsAll(required))
+        if (!probe.capabilities().containsAll(required)) {
             throw new SlicerException.UnsupportedInput(
                     "Executable does not support requested process capabilities: " + required);
+        }
         diagnostics.accept("Backend: " + probe.actualVersion());
         try (var scratch = new Scratch(Files.createTempDirectory("voxelbrew-slice-"))) {
             var format = process.inputFormat();
@@ -145,8 +154,9 @@ public abstract class ProcessSlicerProvider implements SlicerProvider {
                 throw new SlicerException.InvalidArtifact("Slicer did not produce G-code output", missing);
             }
             var job = GcodeReader.read(raw);
-            if (job.modelLayers().isEmpty())
+            if (job.modelLayers().isEmpty()) {
                 throw new SlicerException.InvalidArtifact("Slicer output has no identifiable model deposition layers");
+            }
             var metadata = new LinkedHashMap<>(SliceService.provenance(model, descriptor.id()));
             metadata.put("backend_version", probe.actualVersion());
             metadata.put("material", model.profile().material().id());
@@ -208,9 +218,10 @@ public abstract class ProcessSlicerProvider implements SlicerProvider {
         var settings = window.show(new SettingsDialog(process, translations))
                 .orElseThrow(java.util.concurrent.CancellationException::new);
         if (process.configurationOptions().containsKey("executable")
-                && settings.getOrDefault("executable", "").isBlank())
+                && settings.getOrDefault("executable", "").isBlank()) {
             throw new SlicerException.Configuration(
                     translations.translate("slicer.config.executable").orElseThrow());
+        }
         var configured = process.configure(settings);
         return configured.probe(command(configured), cancellation).actualVersion();
     }

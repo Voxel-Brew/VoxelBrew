@@ -1,6 +1,7 @@
 plugins {
     `java-library`
     id("dev.voxelbrew.spotbugs")
+    id("dev.voxelbrew.checkstyle")
 }
 
 group = "external.consumer"

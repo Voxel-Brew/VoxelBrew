@@ -39,12 +39,14 @@ public class SliceService {
             Path parent = target.getParent();
             if (filename == null
                     || parent == null
-                    || !filename.toString().toLowerCase(Locale.ROOT).endsWith("." + artifact.format()))
+                    || !filename.toString().toLowerCase(Locale.ROOT).endsWith("." + artifact.format())) {
                 throw new IllegalArgumentException("Artifact requires a ." + artifact.format() + " destination");
+            }
             boolean exists = Files.exists(target, LinkOption.NOFOLLOW_LINKS);
-            if (exists && (!overwrite || !Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)))
+            if (exists && (!overwrite || !Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS))) {
                 throw new FileAlreadyExistsException(
                         target.toString(), null, overwrite ? "Expected a regular file" : "Explicit overwrite required");
+            }
             Path scratch = Files.createTempFile(parent, ".voxelbrew-slice-", ".tmp");
             Path backup = null;
             try {
@@ -72,15 +74,19 @@ public class SliceService {
         }
 
         void publish(boolean overwrite) throws IOException {
-            if (overwrite && backup != null)
+            if (overwrite && backup != null) {
                 Files.move(scratch, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            else Files.createLink(target, scratch);
+            } else {
+                Files.createLink(target, scratch);
+            }
         }
 
         void restore() throws IOException {
-            if (backup != null)
+            if (backup != null) {
                 Files.move(backup, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            else Files.deleteIfExists(target);
+            } else {
+                Files.deleteIfExists(target);
+            }
         }
 
         void cleanup() {
@@ -98,11 +104,13 @@ public class SliceService {
             throws Exception {
         cancellation.check();
         var validation = PrintValidation.validate(model);
-        if (!validation.valid())
+        if (!validation.valid()) {
             throw new SlicerException.UnsupportedInput("Print setup is invalid: " + validation.diagnostics());
+        }
         var id = provider.descriptor().id();
-        if (!id.equals(model.setup().backendId()))
+        if (!id.equals(model.setup().backendId())) {
             throw new SlicerException.UnsupportedInput("Selected slicer does not match print setup");
+        }
         var setup = model.setup();
         var target = setup.workspaceSettings().get(PrintTarget.PRINTER_ID);
         var input = new ManufacturingModel(
@@ -136,22 +144,27 @@ public class SliceService {
     public static Result inspect(ManufacturingModel model, String providerId, PrintArtifact artifact)
             throws IOException, SlicerException.InvalidArtifact {
         for (var entry : provenance(model, providerId).entrySet()) {
-            if (!entry.getValue().equals(artifact.metadata().get(entry.getKey())))
+            if (!entry.getValue().equals(artifact.metadata().get(entry.getKey()))) {
                 throw new SlicerException.InvalidArtifact(
                         "Slicer artifact does not match plate provenance: " + entry.getKey());
+            }
         }
-        if (artifact.metadata().getOrDefault("backend_version", "").isBlank())
+        if (artifact.metadata().getOrDefault("backend_version", "").isBlank()) {
             throw new SlicerException.InvalidArtifact("Slicer artifact lacks the actual backend version");
+        }
         String required = model.profile().printer().outputFormat();
         boolean bambu = model.profile().printer().id().startsWith("bambu-lab-");
         if (bambu
                 && required.equals("gcode")
-                && artifact.metadata().get("target_kind").equals("printer")) required = "gcode.3mf";
+                && artifact.metadata().get("target_kind").equals("printer")) {
+            required = "gcode.3mf";
+        }
         boolean packageCompatible =
                 required.equals("gcode") && artifact.format().equals("gcode.3mf") && bambu;
-        if (!artifact.format().equals(required) && !packageCompatible)
+        if (!artifact.format().equals(required) && !packageCompatible) {
             throw new SlicerException.InvalidArtifact(
                     "Slicer artifact format does not match printer format: " + required);
+        }
         byte[] content = switch (artifact.format()) {
             case "gcode" -> artifact.bytes();
             case "gcode.3mf" -> unpack(artifact.bytes());
@@ -165,8 +178,9 @@ public class SliceService {
         } catch (IOException invalid) {
             throw new SlicerException.InvalidArtifact("Cannot read the artifact's G-code", invalid);
         }
-        if (job.modelLayers().isEmpty())
+        if (job.modelLayers().isEmpty()) {
             throw new SlicerException.InvalidArtifact("Slicer artifact has no identifiable model deposition layers");
+        }
         return new Result(job, artifact);
     }
 
@@ -176,15 +190,18 @@ public class SliceService {
             Files.write(packageFile, bytes);
             try (var zip = new ZipFile(packageFile.toFile())) {
                 var entry = zip.getEntry("Metadata/plate_1.gcode");
-                if (entry == null || entry.isDirectory())
+                if (entry == null || entry.isDirectory()) {
                     throw new SlicerException.InvalidArtifact("Slicer package lacks plate 1 G-code");
+                }
                 int limit = 64 * 1024 * 1024;
-                if (entry.getSize() < 1 || entry.getSize() > limit)
+                if (entry.getSize() < 1 || entry.getSize() > limit) {
                     throw new SlicerException.InvalidArtifact("Invalid packaged G-code size");
+                }
                 try (var input = zip.getInputStream(entry)) {
                     var content = input.readNBytes(limit + 1);
-                    if (content.length != entry.getSize())
+                    if (content.length != entry.getSize()) {
                         throw new SlicerException.InvalidArtifact("Invalid packaged G-code size");
+                    }
                     return content;
                 }
             }
@@ -204,8 +221,9 @@ public class SliceService {
             try {
                 for (var entry : artifacts.entrySet()) {
                     var target = entry.getKey().toAbsolutePath().normalize();
-                    if (files.containsKey(target))
+                    if (files.containsKey(target)) {
                         throw new IllegalArgumentException("Duplicate artifact destination: " + target);
+                    }
                     files.put(target, StagedFile.prepare(target, entry.getValue(), overwrite));
                 }
                 for (var file : files.values()) {

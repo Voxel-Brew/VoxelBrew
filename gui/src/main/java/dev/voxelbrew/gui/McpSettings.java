@@ -23,13 +23,16 @@ record McpSettings(boolean autoStart, int port, int maxConnections, int idleTime
     }
 
     McpSettings {
-        if (port != 0 && (port < 1024 || port > 65535))
+        if (port != 0 && (port < 1024 || port > 65535)) {
             throw new IllegalArgumentException("Port must be 0 or 1024–65535");
+        }
         if (maxConnections < 1 || maxConnections > 16) throw new IllegalArgumentException("Connections must be 1–16");
-        if (idleTimeoutMinutes < 1 || idleTimeoutMinutes > 120)
+        if (idleTimeoutMinutes < 1 || idleTimeoutMinutes > 120) {
             throw new IllegalArgumentException("Idle timeout must be 1–120 minutes");
-        if (activityHistorySize < 10 || activityHistorySize > 1000)
+        }
+        if (activityHistorySize < 10 || activityHistorySize > 1000) {
             throw new IllegalArgumentException("History size must be 10–1000");
+        }
     }
 
     void save(UserConfigService store) {

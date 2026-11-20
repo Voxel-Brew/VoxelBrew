@@ -40,8 +40,9 @@ final class BambuSession implements DeviceTransport {
                         var delta = message.getAsJsonObject("print");
                         delta.entrySet().forEach(e -> report.add(e.getKey(), e.getValue()));
                         if (delta.has("result")
-                                && "FAIL".equalsIgnoreCase(delta.get("result").getAsString()))
+                                && "FAIL".equalsIgnoreCase(delta.get("result").getAsString())) {
                             commandFailure = "Printer rejected command; check LAN / Developer Mode and device display";
+                        }
                         lastReport = System.nanoTime();
                     }
                 } catch (JsonParseException | IllegalStateException ignored) {
@@ -72,8 +73,9 @@ final class BambuSession implements DeviceTransport {
         if (!peer.connected()) throw new IOException("Bambu device disconnected");
         synchronized (report) {
             if (lastReport == 0
-                    || System.nanoTime() - lastReport > Duration.ofSeconds(30).toNanos())
+                    || System.nanoTime() - lastReport > Duration.ofSeconds(30).toNanos()) {
                 return DriverStatus.unknown("Waiting for current printer status");
+            }
             String state = string("gcode_state");
             var mapped = switch (state) {
                 case "IDLE" -> DriverStatus.State.IDLE;
@@ -104,11 +106,13 @@ final class BambuSession implements DeviceTransport {
 
     @Override
     public Upload upload(Path artifact, DoubleConsumer progress) throws IOException {
-        if (!artifact.toString().endsWith(".gcode.3mf"))
+        if (!artifact.toString().endsWith(".gcode.3mf")) {
             throw new IOException("Bambu requires a compatible sliced .gcode.3mf package");
+        }
         try (var zip = new ZipFile(artifact.toFile())) {
-            if (zip.getEntry("Metadata/plate_1.gcode") == null)
+            if (zip.getEntry("Metadata/plate_1.gcode") == null) {
                 throw new IOException("Package does not contain plate 1 G-code");
+            }
         }
         var ftp = transfers.get();
         long size = Files.size(artifact);

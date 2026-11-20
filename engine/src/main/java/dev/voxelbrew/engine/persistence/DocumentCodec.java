@@ -31,28 +31,7 @@ public final class DocumentCodec {
     public static final int MAX_ENCODED_BYTES = MAX_PAYLOAD + HEADER;
 
     public static CadDocument decode(byte[] bytes) throws IOException {
-        int size = bytes.length;
-        if (size < HEADER || size > MAX_PAYLOAD + HEADER) {
-            throw new DocumentFormatException(
-                    "Invalid or truncated .vxb file: expected a complete header and <=128 MiB payload");
-        }
-        bytes = bytes.clone();
-        if (!Arrays.equals(MAGIC, Arrays.copyOf(bytes, MAGIC.length))) {
-            throw new DocumentFormatException("Not a VoxelBrew .vxb file (magic mismatch)");
-        }
-        ByteBuffer buffer = ByteBuffer.wrap(bytes);
-        buffer.position(8);
-        int length = buffer.getInt();
-        if (length < 1 || length > MAX_PAYLOAD || length != bytes.length - HEADER) {
-            throw new DocumentFormatException("Truncated or damaged .vxb payload: length does not match the header");
-        }
-        byte[] expectedHash = new byte[32];
-        buffer.get(expectedHash);
-        byte[] payload = new byte[length];
-        buffer.get(payload);
-        if (!MessageDigest.isEqual(expectedHash, sha256(payload))) {
-            throw new DocumentFormatException("Damaged .vxb file: payload checksum mismatch");
-        }
+        byte[] payload = verifiedPayload(bytes);
         try {
             DocumentProto.Document message = DocumentProto.Document.parseFrom(payload);
             if (message.getSchemaVersion() != SCHEMA_VERSION && message.getSchemaVersion() != LATEST_SCHEMA_VERSION) {
@@ -112,6 +91,32 @@ public final class DocumentCodec {
         } catch (IOException | IllegalArgumentException failure) {
             throw new DocumentFormatException("Invalid .vxb feature definitions: " + failure.getMessage(), failure);
         }
+    }
+
+    private static byte[] verifiedPayload(byte[] bytes) throws IOException {
+        int size = bytes.length;
+        if (size < HEADER || size > MAX_PAYLOAD + HEADER) {
+            throw new DocumentFormatException(
+                    "Invalid or truncated .vxb file: expected a complete header and <=128 MiB payload");
+        }
+        bytes = bytes.clone();
+        if (!Arrays.equals(MAGIC, Arrays.copyOf(bytes, MAGIC.length))) {
+            throw new DocumentFormatException("Not a VoxelBrew .vxb file (magic mismatch)");
+        }
+        ByteBuffer buffer = ByteBuffer.wrap(bytes);
+        buffer.position(8);
+        int length = buffer.getInt();
+        if (length < 1 || length > MAX_PAYLOAD || length != bytes.length - HEADER) {
+            throw new DocumentFormatException("Truncated or damaged .vxb payload: length does not match the header");
+        }
+        byte[] expectedHash = new byte[32];
+        buffer.get(expectedHash);
+        byte[] payload = new byte[length];
+        buffer.get(payload);
+        if (!MessageDigest.isEqual(expectedHash, sha256(payload))) {
+            throw new DocumentFormatException("Damaged .vxb file: payload checksum mismatch");
+        }
+        return payload;
     }
 
     /** Parses strict ProtoJSON, applying the same schema, size and domain validation as VXB. */
@@ -380,15 +385,17 @@ public final class DocumentCodec {
                 .setToolCount(definition.toolCount())
                 .setGenericGcode(definition.genericGcode())
                 .setModified(definition.modified());
-        for (var zone : p.excludedZones())
+        for (var zone : p.excludedZones()) {
             out.addExcludedZones(DocumentProto.PrinterPolygon.newBuilder()
                     .addAllPoints(zone.stream().map(DocumentCodec::point).toList()));
+        }
         return out.build();
     }
 
     private static PrintSetup fromProto(DocumentProto.PrintSetup setup) {
-        if (setup.hasPrinterSnapshot() && setup.getVersion() != 4)
+        if (setup.hasPrinterSnapshot() && setup.getVersion() != 4) {
             throw new IllegalArgumentException("Printer snapshot requires print setup version 4");
+        }
         if (setup.getVersion() >= 2 && setup.getVersion() <= 4) {
             var base = fromProto(setup.toBuilder()
                     .setVersion(1)
@@ -502,13 +509,14 @@ public final class DocumentCodec {
                         .setBrimWidth(p.brimWidth())
                         .setRaftLayers(p.raftLayers()));
         if (setup.printerSnapshot() != null) out.setPrinterSnapshot(toProto(setup.printerSnapshot()));
-        for (var i : setup.instances())
+        for (var i : setup.instances()) {
             out.addInstances(DocumentProto.PrintInstance.newBuilder()
                     .setId(i.id())
                     .setBodyId(i.bodyId())
                     .addAllTransform(
                             Arrays.stream(i.transform().matrix()).boxed().toList()));
-        for (var s : setup.supports())
+        }
+        for (var s : setup.supports()) {
             out.addSupports(DocumentProto.SupportVolume.newBuilder()
                     .setId(s.id())
                     .setInstanceId(s.instanceId())
@@ -524,6 +532,7 @@ public final class DocumentCodec {
                     .setWidth(s.width())
                     .setDepth(s.depth())
                     .setHeight(s.height()));
+        }
         if (setup.version() >= 2) {
             out.setActivePlateId(setup.activePlateId());
             for (var plate : setup.plates()) {
@@ -553,7 +562,7 @@ public final class DocumentCodec {
                     .setTool(c.tool().name())
                     .setValue(c.value())
                     .setAlternate(c.alternate());
-            for (var input : c.inputs())
+            for (var input : c.inputs()) {
                 definition.addInputs(DocumentProto.ConstructionInput.newBuilder()
                         .setSelection(input.selection().name())
                         .setSource(input.source())
@@ -562,6 +571,7 @@ public final class DocumentCodec {
                         .setX(input.position().x())
                         .setY(input.position().y())
                         .setZ(input.position().z()));
+            }
             out.setConstruction(definition);
         } else if (feature instanceof Feature.Sketch s) {
             var sketch = DocumentProto.Sketch.newBuilder()
@@ -628,7 +638,9 @@ public final class DocumentCodec {
                         .setType(custom.type())
                         .setPayloadVersion(custom.payloadVersion())
                         .setPayload(com.google.protobuf.ByteString.copyFrom(custom.payload())));
-            } else throw new IllegalArgumentException("Unsupported feature " + feature.id());
+            } else {
+                throw new IllegalArgumentException("Unsupported feature " + feature.id());
+            }
         }
         return out.build();
     }

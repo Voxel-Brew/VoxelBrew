@@ -14,8 +14,9 @@ public final class FeatureText {
     public record Field(ParameterSet.Target target, String value) {}
 
     public static String key(String entityId, String property) {
-        if (!Set.of("content", "font").contains(property))
+        if (!Set.of("content", "font").contains(property)) {
             throw new IllegalArgumentException("Unknown text property: " + property);
+        }
         return "text:" + entityId + ":" + property;
     }
 
@@ -24,8 +25,9 @@ public final class FeatureText {
     }
 
     public static List<Field> list(Feature feature) {
-        if (feature instanceof Feature.Sketch sketch && sketch.profile() instanceof Feature.Constrained profile)
+        if (feature instanceof Feature.Sketch sketch && sketch.profile() instanceof Feature.Constrained profile) {
             return list(sketch.id(), profile.geometry());
+        }
         return List.of();
     }
 
@@ -55,8 +57,9 @@ public final class FeatureText {
     }
 
     public static void validate(String expression, Map<String, Quantity<?>> values, BuiltinParameters builtins) {
-        if (!Expressions.isFormula(expression))
+        if (!Expressions.isFormula(expression)) {
             throw new IllegalArgumentException("A text formula must start with '='");
+        }
         Expressions.evaluateText(expression, name -> name.startsWith("vb.") ? builtins.value(name) : values.get(name));
     }
 
@@ -67,8 +70,9 @@ public final class FeatureText {
         for (var binding : parameters.bindings()) {
             if (binding.target().featureId().equals(featureId)
                     && isField(binding.target().field())) {
-                if (!available.contains(binding.target().field()))
+                if (!available.contains(binding.target().field())) {
                     throw new IllegalArgumentException("Missing bound sketch text: " + binding.target());
+                }
                 validate(binding.expression(), values, parameters.builtins());
             }
         }
@@ -91,7 +95,7 @@ public final class FeatureText {
                         entity.text().font());
                 // Reuse the persisted outlines when the text is unchanged, including offline fonts.
                 if (!content.equals(entity.text().content())
-                        || !font.equals(entity.text().font()))
+                        || !font.equals(entity.text().font())) {
                     entity = SketchText.create(
                             entity.id(),
                             content,
@@ -104,6 +108,7 @@ public final class FeatureText {
                             entity.value(4),
                             entity.text().pathId(),
                             entity.construction());
+                }
             }
             entities.add(entity);
         }
@@ -118,11 +123,10 @@ public final class FeatureText {
             String property,
             String fallback) {
         String expression = parameters.binding(new ParameterSet.Target(featureId, key(entityId, property)));
-        return expression.isEmpty()
-                ? fallback
-                : Expressions.evaluateText(
-                        expression,
-                        name -> name.startsWith("vb.") ? parameters.builtins().value(name) : values.get(name));
+        if (expression.isEmpty()) return fallback;
+        return Expressions.evaluateText(
+                expression,
+                name -> name.startsWith("vb.") ? parameters.builtins().value(name) : values.get(name));
     }
 
     private FeatureText() {}

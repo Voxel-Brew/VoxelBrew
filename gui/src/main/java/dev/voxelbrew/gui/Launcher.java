@@ -41,8 +41,9 @@ public final class Launcher {
                     Path image = parent.getParent();
                     runtime = image == null ? null : image.resolve("native");
                 }
-                if (runtime != null && Files.isDirectory(runtime))
+                if (runtime != null && Files.isDirectory(runtime)) {
                     System.setProperty("voxelbrew.native.path", runtime.toString());
+                }
             } catch (java.net.URISyntaxException ignored) {
                 /* Kernel supplies the load diagnostic. */
             }

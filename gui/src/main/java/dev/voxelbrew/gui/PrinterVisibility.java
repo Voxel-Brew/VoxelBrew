@@ -26,7 +26,9 @@ final class PrinterVisibility {
             if (!entry.bundled()) continue;
             String id = entry.definition().printer().id();
             if (visible.contains(id)) hidden.remove(id);
-            else hidden.add(id);
+            else {
+                hidden.add(id);
+            }
         }
         configuration.saveUserConfig(KEY, String.join(",", hidden));
     }

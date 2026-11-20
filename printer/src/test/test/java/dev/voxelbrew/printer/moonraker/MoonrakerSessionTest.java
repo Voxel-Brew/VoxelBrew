@@ -60,15 +60,17 @@ class MoonrakerSessionTest {
             calls.add(exchange.getRequestURI().getPath());
             assertThat(exchange.getRequestHeaders().getFirst("X-Api-Key")).isEqualTo("key");
             String response;
-            if (exchange.getRequestURI().getPath().endsWith("query"))
+            if (exchange.getRequestURI().getPath().endsWith("query")) {
                 response = "{\"result\":{\"status\":{\"print_stats\":{\"state\":\"" + state.get()
                         + "\"},\"virtual_sdcard\":{\"progress\":0.25}}}}";
-            else if (exchange.getRequestURI().getPath().endsWith("upload")) {
+            } else if (exchange.getRequestURI().getPath().endsWith("upload")) {
                 String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
                 assertThat(body.contains("G1 X10")).isTrue();
                 assertThat(body.contains("name=\"print\"")).isFalse();
                 response = "{\"result\":{\"item\":{\"path\":\"stored.gcode\"}}}";
-            } else response = "{\"result\":\"ok\"}";
+            } else {
+                response = "{\"result\":\"ok\"}";
+            }
             byte[] data = response.getBytes(StandardCharsets.UTF_8);
             exchange.sendResponseHeaders(200, data.length);
             try (var output = exchange.getResponseBody()) {

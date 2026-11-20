@@ -316,7 +316,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 setText(empty || entry == null ? null : entry.label());
                 setGraphic(null);
             }
-            setContextMenu(empty || entry == null || entry.id() == null ? null : entry.body() ? menu : featureMenu);
+            if (empty || entry == null || entry.id() == null) setContextMenu(null);
+            else setContextMenu(entry.body() ? menu : featureMenu);
             if (empty) {
                 menu.hide();
                 featureMenu.hide();
@@ -369,10 +370,11 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             });
             var input = editor;
             input.focusedProperty().addListener((observable, before, focused) -> {
-                if (!focused)
+                if (!focused) {
                     Platform.runLater(() -> {
                         if (isEditing() && editor == input && !input.isFocused()) tree.edit(null);
                     });
+                }
             });
             focusEditor(true);
         }
@@ -414,7 +416,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 String accepted = name;
                 attempt(() -> {
                     if (original.body()) controller.renameBody(original.id(), accepted);
-                    else controller.renameFeature(original.id(), accepted);
+                    else {
+                        controller.renameFeature(original.id(), accepted);
+                    }
                 });
             }
         }
@@ -487,8 +491,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             field.getStyleClass().remove("invalid");
             return value;
         } catch (IllegalArgumentException failure) {
-            if (!field.getStyleClass().contains("invalid"))
+            if (!field.getStyleClass().contains("invalid")) {
                 field.getStyleClass().add("invalid");
+            }
             throw new IllegalArgumentException(name + ": " + failure.getMessage(), failure);
         }
     }
@@ -613,48 +618,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         var fileMenu = menu("menu-file");
         var newItem = menuItem(translations.translate("action.new").orElseThrow(), "new", true, this::newDocument);
         var openItem = menuItem(translations.translate("action.open").orElseThrow(), "open", true, this::open);
-        var recentMenu = menu("menu-open-recent");
-        Runnable refreshRecent = () -> {
-            recentMenu.getItems().clear();
-            for (Path path : recentFiles.paths()) {
-                var item = new MenuItem(path.toString());
-                item.setMnemonicParsing(false);
-                item.setOnAction(event -> openProject(path));
-                recentMenu.getItems().add(item);
-            }
-            if (recentMenu.getItems().isEmpty()) {
-                var empty = new MenuItem(translations.translate("recent.empty").orElseThrow());
-                empty.setDisable(true);
-                recentMenu.getItems().add(empty);
-            }
-        };
-        refreshRecent.run();
-        recentMenu.setOnShowing(event -> refreshRecent.run());
-        recentMenu.disableProperty().bind(disabledProperty().or(fileBusy));
-        var titleRecentMenu = new ContextMenu();
-        UiHelp.menu(titleRecentMenu);
-        documentTitle.setOnMouseClicked(event -> {
-            if (event.getButton() != MouseButton.PRIMARY || !event.isStillSincePress()) return;
-            titleRecentMenu.getItems().clear();
-            for (Path path : recentFiles.paths()) {
-                var item = new MenuItem(path.toString());
-                item.setMnemonicParsing(false);
-                item.setOnAction(action -> openProject(path));
-                titleRecentMenu.getItems().add(item);
-            }
-            if (titleRecentMenu.getItems().isEmpty()) {
-                var empty = new MenuItem(translations.translate("recent.empty").orElseThrow());
-                empty.setDisable(true);
-                titleRecentMenu.getItems().add(empty);
-            }
-            if (!isDisabled() && !fileBusy.get())
-                titleRecentMenu.show(documentTitle, javafx.geometry.Side.BOTTOM, 0, 0);
-            event.consume();
-        });
-        controller.onFileUsed(path -> {
-            recentFiles.remember(path);
-            preferencesWorker.execute(recentFiles::save);
-        });
+        var recentMenu = recentMenu();
         var saveItem = menuItem(translations.translate("action.save").orElseThrow(), "save", true, () -> save(false));
         var importItem = menuItem(
                 translations.translate("action.import").orElseThrow(),
@@ -663,8 +627,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 () -> requestChange(this::importFile));
         var saveAsItem =
                 menuItem(translations.translate("action.saveAs").orElseThrow(), "save-as", true, () -> save(true));
-        for (var item : List.of(newItem, openItem, importItem, saveItem, saveAsItem))
+        for (var item : List.of(newItem, openItem, importItem, saveItem, saveAsItem)) {
             item.disableProperty().bind(disabledProperty().or(fileBusy));
+        }
         export.disableProperty().bind(disabledProperty().or(fileBusy));
         fileMenu.getItems()
                 .addAll(
@@ -680,61 +645,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         var editMenu = menu("menu-edit");
         editMenu.getItems()
                 .addAll(mirror(undo, true), mirror(redo, true), new SeparatorMenuItem(), mirror(parameters, true));
-        var viewMenu = menu("menu-view");
-        viewMenu.getItems().add(menuItem(translations.translate("action.fit").orElseThrow(), "menu-fit", false, () -> {
-            viewport.fit(meshes());
-            Platform.runLater(viewport::requestFocus);
-        }));
-        for (var name : STANDARD_VIEWS) {
-            var item = menuItem(
-                    UiText.view(translations, name),
-                    "view-" + name.toLowerCase(Locale.ROOT),
-                    false,
-                    () -> viewport.standardView(name));
-            viewMenu.getItems().add(item);
-        }
-        var appearanceMenu = new Menu(translations.translate("appearance.label").orElseThrow());
-        appearanceMenu.setId("menu-appearance");
-        UiHelp.menu(appearanceMenu, translations);
-        var themeGroup = new ToggleGroup();
-        for (var choice : Appearance.Choice.values()) {
-            String name = choice.name().toLowerCase(Locale.ROOT);
-            var item = new RadioMenuItem(
-                    translations.translate("appearance." + name).orElseThrow());
-            item.setId("appearance-" + name);
-            item.setToggleGroup(themeGroup);
-            item.setSelected(choice == appearanceChoice);
-            item.disableProperty().bind(disabledProperty());
-            UiHelp.menuItem(item, translations.translate("help.appearance").orElseThrow());
-            item.setOnAction(event -> {
-                appearanceChoice = choice;
-                appearance.save(choice);
-                applyAppearance();
-            });
-            appearanceMenu.getItems().add(item);
-        }
-        viewMenu.getItems().addAll(new SeparatorMenuItem(), appearanceMenu);
-        var renderingMenu = new Menu(translations.translate("rendering.label").orElseThrow());
-        renderingMenu.setId("menu-rendering");
-        UiHelp.menu(renderingMenu, translations);
-        var renderingGroup = new ToggleGroup();
-        for (var style : Rendering.Style.values()) {
-            String name = style.name().toLowerCase(Locale.ROOT);
-            var item = new RadioMenuItem(
-                    translations.translate("rendering." + name).orElseThrow());
-            item.setId("rendering-" + name);
-            item.setToggleGroup(renderingGroup);
-            item.setSelected(style == viewport.rendering());
-            item.disableProperty().bind(disabledProperty());
-            UiHelp.menuItem(
-                    item, translations.translate("help.rendering-" + name).orElseThrow());
-            item.setOnAction(event -> {
-                viewport.setRendering(style);
-                rendering.save(style);
-            });
-            renderingMenu.getItems().add(item);
-        }
-        viewMenu.getItems().add(renderingMenu);
+        var viewMenu = viewMenu(rendering);
         var settingsMenu = menu("menu-settings");
         {
             try {
@@ -865,69 +776,14 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         operationsIcon.setMouseTransparent(true);
         solidCommands.setGraphic(operationsIcon);
         UiHelp.menu(solidCommands, translations);
-        for (var command : List.of(extrude, cut, fillet, chamfer, shell, splitBody)) {
-            var item = menuItem(command.getText(), command.getId(), true, command::fire);
-            item.setGraphic(OperationIcons.icon(command.getId()));
-            item.disableProperty().bind(disabledProperty().or(command.disabledProperty()));
-            solidCommands.getItems().add(item);
-        }
+        populateSolidCommands(solidCommands);
         sketchCommands.getStyleClass().add("command-group");
-        var constructionMenu =
-                new MenuButton(translations.translate("construction.menu").orElseThrow());
-        constructionMenu.setId("construction-menu");
-        constructionMenu.setGraphic(
-                ConstructionIcons.icon(dev.voxelbrew.api.model.construction.ConstructionTools.Tool.OFFSET_PLANE));
-        UiHelp.menu(constructionMenu, translations);
-        for (var command : dev.voxelbrew.api.model.construction.ConstructionTools.Tool.values()) {
-            if (command == dev.voxelbrew.api.model.construction.ConstructionTools.Tool.OFFSET_PLANE
-                    || command == dev.voxelbrew.api.model.construction.ConstructionTools.Tool.AXIS_SURFACE
-                    || command == dev.voxelbrew.api.model.construction.ConstructionTools.Tool.POINT_VERTEX)
-                constructionMenu.getItems().add(new SeparatorMenuItem());
-            var item = new MenuItem(
-                    translations.translate("construction." + command.name()).orElseThrow());
-            item.setGraphic(ConstructionIcons.icon(command));
-            UiHelp.menuItem(
-                    item,
-                    translations.translate("construction." + command.name()).orElseThrow() + ". "
-                            + translations.translate("construction.select").orElseThrow());
-            item.setId("construct-" + command.name().toLowerCase(Locale.ROOT).replace('_', '-'));
-            item.setOnAction(event -> attempt(() -> beginConstruction(command, null)));
-            constructionMenu.getItems().add(item);
-        }
+        var constructionMenu = constructionMenu();
         var toolbar = new FlowPane(10, 6, sketchCommands, solidCommands, constructionMenu);
         toolbar.setId("modeling-toolbar");
         toolbar.getStyleClass().add("command-strip");
         constrainedSketch.getStyleClass().add("primary");
-        tree.setId("model-tree");
-        tree.setShowRoot(false);
-        tree.setEditable(true);
-        tree.setCellFactory(view -> new BodyTreeCell());
-        tree.getSelectionModel().selectedItemProperty().addListener((o, old, item) -> {
-            if (refreshing || item == null || item.getValue().id() == null || tool != Tool.NONE) return;
-            var entry = item.getValue();
-            if (entry.body()) selectBody(entry.id(), -1);
-            else selectFeature(entry.id());
-        });
-        configuration.setId("active-configuration");
-        UiHelp.install(configuration, translations);
-        configuration.setMaxWidth(Double.MAX_VALUE);
-        configuration.setOnAction(e -> {
-            if (!refreshing && configuration.getValue() != null)
-                attempt(() -> controller.configuration(configuration.getValue()));
-        });
-        var left = new VBox(
-                10,
-                heading(translations.translate("gui.model").orElseThrow()),
-                tree,
-                new Separator(),
-                heading(translations.translate("workbench.configuration").orElseThrow()),
-                configuration,
-                parameters,
-                customFeature);
-        left.getStyleClass().add("side-panel");
-        left.setPrefWidth(220);
-        left.setMinWidth(185);
-        VBox.setVgrow(tree, Priority.ALWAYS);
+        var left = modelPanel();
         inspector.getStyleClass().add("side-panel");
         inspector.setPrefWidth(270);
         inspector.setMinWidth(240);
@@ -967,35 +823,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         printerTab.setClosable(false);
         printerTab.setDisable(true);
         workspaces = new TabPane(designTab, printTab, printerTab);
-        for (int index = 0; index < workspaces.getTabs().size(); index++) {
-            var tab = workspaces.getTabs().get(index);
-            var key = KeyCombination.keyCombination("Shortcut+" + (index + 1)).getDisplayText();
-            tab.setTooltip(UiHelp.tooltip(UiHelp.baseDescription(translations, tab.getId())
-                    + "\n"
-                    + translations.translate("shortcuts.hint", key).orElseThrow()));
-        }
-        workspaces.setId("workspaces");
-        workspaces.getSelectionModel().selectedItemProperty().addListener((o, a, b) -> {
-            quickMenus.forEach(QuickMenu::hide);
-            if (b == printTab && printTab.isDisable()) {
-                workspaces.getSelectionModel().select(designTab);
-                return;
-            }
-            if (b == printTab && (controller.path() == null || controller.dirty())) {
-                javafx.application.Platform.runLater(() -> {
-                    workspaces.getSelectionModel().select(designTab);
-                    save(false)
-                            .thenRun(() -> {
-                                if (controller.path() != null && !controller.dirty() && !printTab.isDisable())
-                                    workspaces.getSelectionModel().select(printTab);
-                            })
-                            .exceptionally(failure -> null);
-                });
-                return;
-            }
-            cancelTool();
-            printing.documentChanged();
-        });
+        configureWorkspaceTabs();
         setCenter(workspaces);
         quickMenus.add(viewport.quickMenu(this, this::designQuickMenu, this::quickWorkspaces));
         quickMenus.add(printing.quickMenu(this, this::quickWorkspaces));
@@ -1020,128 +848,13 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 new Label(translations.translate("gui.mm_occt_7_9_grid_10_mm").orElseThrow()));
         statusbar.getStyleClass().add("status-strip");
         design.setBottom(new VBox(timeline, statusbar));
-        viewport.onSelection((id, face) -> {
-            if (tool == Tool.CONSTRUCTION && constructionEditor != null) {
-                constructionEditor.pick(id, face);
-                return;
-            }
-            if (tool == Tool.PLANE) {
-                chooseBodyPlane(id, face);
-                return;
-            }
-            if (tool == Tool.MODIFY) {
-                selectModificationFace(id, face);
-                return;
-            }
-            if (tool != Tool.NONE || controller.rebuilding()) return;
-            if (controller.snapshot().document().features().stream().anyMatch(f -> f.id().equals(id)))
-                selectFeature(id);
-            else selectBody(id, face);
-        });
-        viewport.onEdgeSelection((id, edge) -> {
-            if (constructionEditor != null) constructionEditor.pickEdge(id, edge);
-            else selectModificationEdge(id, edge);
-        });
+        installViewportSelection();
         controller.onChanged(this::refresh);
         windowFocus = (o, old, focused) -> {
             if (!closed && focused && appearanceChoice == Appearance.Choice.SYSTEM) applyAppearance();
         };
         stage.focusedProperty().addListener(windowFocus);
-        window.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
-            if (isDisabled() || menuBar.getMenus().stream().anyMatch(Menu::isShowing)) return;
-            var focus = getScene().getFocusOwner();
-            if (KeyboardShortcuts.textUndo(e, focus)) return;
-            if (e.getCode() == KeyCode.ESCAPE) {
-                if (printing.cancelPlateRename() || printing.cancelDrag()) {
-                    e.consume();
-                    return;
-                }
-                if (tree.getEditingItem() != null) {
-                    tree.edit(null);
-                    e.consume();
-                    return;
-                }
-                cancelTool();
-                e.consume();
-                return;
-            }
-            String action = KeyboardShortcuts.match(KeyboardShortcuts.Scope.DOCUMENT, e, focus);
-            if (action != null) {
-                // Consume before opening a modal nested event loop, and use the same
-                // enabled-state gates as the visible controls.
-                e.consume();
-                switch (action) {
-                    case "new" -> fire(newItem);
-                    case "open" -> fire(openItem);
-                    case "import" -> fire(importItem);
-                    case "save" -> fire(saveItem);
-                    case "save-as" -> fire(saveAsItem);
-                    case "export" -> fire(export);
-                    case "undo" -> undo.fire();
-                    case "redo" -> redo.fire();
-                    case "parameters" -> parameters.fire();
-                    case "workspace-number" -> selectWorkspaceNumber(e);
-                    case "workspace-previous" -> moveWorkspace(-1);
-                    case "workspace-next" -> moveWorkspace(1);
-                    case "context-help" -> {
-                        var help = new Alert(Alert.AlertType.INFORMATION);
-                        help.initOwner(stage);
-                        help.setTitle(translations
-                                .translate(
-                                        printerTab.isSelected()
-                                                ? "help.printer.title"
-                                                : printTab.isSelected() ? "help.slicer.title" : "help.designer.title")
-                                .orElseThrow());
-                        help.setHeaderText(null);
-                        help.setContentText(translations
-                                .translate(
-                                        printerTab.isSelected()
-                                                ? "help.printer.content"
-                                                : printTab.isSelected()
-                                                        ? "help.slicer.content"
-                                                        : "help.designer.content")
-                                .orElseThrow());
-                        help.getDialogPane().setPrefWidth(600);
-                        help.getDialogPane().getButtonTypes().setAll(ButtonType.CLOSE);
-                        help.getDialogPane().lookupButton(ButtonType.CLOSE).setId("context-help-close");
-                        var content = new Label(help.getContentText());
-                        content.setId("context-help-content");
-                        content.setWrapText(true);
-                        help.getDialogPane().setContent(content);
-                        Dialogs.show(help, stage, translations);
-                    }
-                    default -> throw new IllegalStateException(action);
-                }
-                return;
-            }
-            if (!designTab.isSelected()) return;
-            action = KeyboardShortcuts.match(KeyboardShortcuts.Scope.DESIGN, e, focus);
-            if (action == null) return;
-            KeyboardShortcuts.consume(e, getScene());
-            String viewAction = action;
-            switch (action) {
-                case "constrained-sketch" -> constrainedSketch.fire();
-                case "operations-menu" -> {
-                    constructionMenu.hide();
-                    solidCommands.requestFocus();
-                    solidCommands.show();
-                }
-                case "construction-menu" -> {
-                    solidCommands.hide();
-                    constructionMenu.requestFocus();
-                    constructionMenu.show();
-                }
-                case "extrude" -> extrude.fire();
-                case "cut" -> cut.fire();
-                case "split-body" -> splitBody.fire();
-                case "fit" -> viewport.fit(meshes());
-                default ->
-                    STANDARD_VIEWS.stream()
-                            .filter(name -> ("view-" + name.toLowerCase(Locale.ROOT)).equals(viewAction))
-                            .findFirst()
-                            .ifPresent(viewport::standardView);
-            }
-        });
+        installShortcuts(menuBar, newItem, openItem, importItem, saveItem, saveAsItem, constructionMenu, solidCommands);
         stage.setOnCloseRequest(e -> {
             e.consume();
             requestChange(() -> {
@@ -1307,8 +1020,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     private void selectWorkspaceNumber(KeyEvent event) {
         int index = event.getCode().getCode() - KeyCode.DIGIT1.getCode();
         if (index < 0 || index >= workspaces.getTabs().size()) return;
-        if (!workspaces.getTabs().get(index).isDisable())
+        if (!workspaces.getTabs().get(index).isDisable()) {
             workspaces.getSelectionModel().select(index);
+        }
     }
 
     private void refresh() {
@@ -1316,55 +1030,14 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         refreshing = true;
         try {
             var snapshot = controller.snapshot();
-            printTab.setDisable(controller.build().bodies().isEmpty());
-            if (printTab.isDisable() && printTab.isSelected())
-                workspaces.getSelectionModel().select(designTab);
-            if (tool == Tool.PLANE && !planeSelectionCurrent()) {
-                tool = Tool.NONE;
-                planeSnapshot = null;
-                planeRepair = null;
-                viewport.stopPlaneSelection();
-                inspect();
-            }
             var document = snapshot.document();
-            printer.documentChanged(document);
-            printerTab.setDisable(!printer.hasJobs());
-            if (printerTab.isDisable() && printerTab.isSelected())
-                workspaces.getSelectionModel().select(printTab.isDisable() ? designTab : printTab);
+            refreshWorkspaceTabs(document);
             var effective = controller.effectiveFeatures();
             boolean buildStateChanged = lastBuild != controller.build()
                     || lastRebuilding != controller.rebuilding()
                     || lastIoBusy != controller.ioBusy();
-            boolean changed = !lastFeatures.equals(effective)
-                    || !lastBodyStyles.equals(document.bodyStyles())
-                    || !lastBodyNames.equals(document.bodyNames())
-                    || !lastFeatureNames.equals(document.featureNames())
-                    || !lastParameters.equals(document.parameters())
-                    || !lastDocument.equals(document.id());
-            if (!lastDocument.equals(document.id())) {
-                selectedFeature = null;
-                selectedBody = null;
-                viewport.select(null);
-                fitNext = true;
-            }
-            if (changed || lastBuild != controller.build()) rebuildTree(document);
-            if (lastBuild != controller.build()) {
-                viewport.showBodies(controller.build().bodies());
-                viewport.showConstruction(controller.build().construction(), id -> {
-                    if (constructionEditor != null) constructionEditor.pickDatum(id);
-                    else selectFeature(id);
-                });
-                if (fitNext && !controller.build().bodies().isEmpty()) {
-                    viewport.fit(meshes());
-                    fitNext = false;
-                }
-                lastBuild = controller.build();
-                if (tool == Tool.NONE) {
-                    updateFeatureDiagnostics();
-                    var feature = selected();
-                    if (feature != null) selectionLabel.setText(shortName(feature));
-                }
-            }
+            boolean changed = featuresChanged(document, effective);
+            refreshBodies(document, changed);
             var styles = new LinkedHashMap<String, BodyStyle>();
             controller.build().bodies().forEach(b -> styles.put(b.id(), document.bodyStyle(b.id())));
             viewport.setBodyStyles(styles);
@@ -1379,104 +1052,11 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             lastFeatureNames = document.featureNames();
             lastParameters = document.parameters();
             lastDocument = document.id();
-            timeline.update(
-                    document,
-                    selectedFeature,
-                    controller.build().diagnostics(),
-                    controller.ioBusy() || tool != Tool.NONE || controller.hasPreview(),
-                    controller.rebuilding(),
-                    controller.build().valid());
-            undo.setDisable(!snapshot.canUndo() || controller.ioBusy());
-            redo.setDisable(!snapshot.canRedo() || controller.ioBusy());
-            parameters.setDisable(controller.ioBusy() || tool != Tool.NONE || controller.rebuilding());
-            var names = new ArrayList<String>();
-            names.add("Default");
-            document.parameters().configurations().forEach(c -> names.add(c.name()));
-            if (!configuration.getItems().equals(names))
-                configuration.getItems().setAll(names);
-            configuration.setValue(document.parameters().activeName());
-            configuration.setDisable(controller.ioBusy() || tool != Tool.NONE);
-            fileBusy.set(controller.ioBusy());
-            splitBody.setDisable(tool != Tool.NONE
-                    || !controller.canExport()
-                    || controller.build().bodies().isEmpty());
-            fillet.setDisable(splitBody.isDisabled());
-            chamfer.setDisable(splitBody.isDisabled());
-            shell.setDisable(splitBody.isDisabled());
-            printing.documentChanged();
+            refreshCommands(document, snapshot);
             boolean atEnd = document.cursor() == document.features().size() && !controller.ioBusy();
-            customFeature.setDisable(!atEnd || tool != Tool.NONE || controller.rebuilding());
-            constrainedSketch.setDisable(!atEnd || tool != Tool.NONE || controller.rebuilding());
-            extrude.setDisable(!atEnd
-                    || tool != Tool.NONE
-                    || !(selected() instanceof Feature.Sketch s
-                            && (!(s.profile() instanceof Feature.Constrained c)
-                                    || dev.voxelbrew.engine.sketch.SketchProfiles.hasProfile(c.geometry()))));
-            cut.setDisable(!atEnd
-                    || tool != Tool.NONE
-                    || !(selected() instanceof Feature.Sketch s
-                            && (s.profile() instanceof Feature.Circle
-                                    || s.profile() instanceof Feature.Constrained c
-                                            && dev.voxelbrew.engine.sketch.SketchProfiles.hasProfile(c.geometry())))
-                    || controller.rebuilding()
-                    || controller.build().bodies().isEmpty());
-            progress.setVisible(controller.rebuilding() || controller.ioBusy());
-            String diagnostics = controller.build().diagnostics().stream()
-                    .filter(d -> d.state() == Evaluation.State.FAILED || d.state() == Evaluation.State.BLOCKED)
-                    .map(d -> d.featureId() + ": " + d.message())
-                    .reduce((a, b) -> a + " | " + b)
-                    .orElse("");
-            status.setText(
-                    !controller.error().isBlank()
-                            ? controller.error()
-                            : controller.ioBusy()
-                                    ? translations
-                                            .translate("gui.working_with_file")
-                                            .orElseThrow()
-                                    : controller.rebuilding()
-                                            ? translations
-                                                    .translate("gui.rebuilding")
-                                                    .orElseThrow()
-                                            : !diagnostics.isBlank()
-                                                    ? diagnostics
-                                                    : controller.hasPreview()
-                                                            ? translations
-                                                                    .translate(
-                                                                            "gui.preview_release_or_enter_to_commit_escape_to_cancel")
-                                                                    .orElseThrow()
-                                                            : translations
-                                                                    .translate(
-                                                                            "status.bodies",
-                                                                            controller
-                                                                                    .build()
-                                                                                    .bodies()
-                                                                                    .size(),
-                                                                            String.format(
-                                                                                    Locale.ROOT,
-                                                                                    "%.3f mm³",
-                                                                                    controller.build().bodies().stream()
-                                                                                            .mapToDouble(
-                                                                                                    DocumentController
-                                                                                                                    .Body
-                                                                                                            ::volume)
-                                                                                            .sum()))
-                                                                    .orElseThrow());
-            documentTitle.setText((controller.dirty() ? "● " : "")
-                    + (controller.path() == null
-                            ? translations.translate("gui.untitled").orElseThrow()
-                            : java.util.Objects.toString(
-                                    controller.path().getFileName(),
-                                    translations.translate("gui.untitled").orElseThrow())));
-            UiHelp.describe(
-                    documentTitle,
-                    controller.path() == null
-                            ? translations.translate("help.unsaved-document").orElseThrow()
-                            : controller.path().toString());
-            stage.setTitle((controller.dirty() ? "● " : "")
-                    + (controller.path() == null
-                            ? translations.translate("gui.untitled").orElseThrow()
-                            : controller.path().getFileName())
-                    + " — VoxelBrew CAD");
+            refreshSolidCommands(atEnd);
+            refreshCut(atEnd);
+            refreshStatus();
         } finally {
             refreshing = false;
         }
@@ -1497,29 +1077,36 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     }
 
     private String defaultFeatureName(Feature feature) {
-        if (feature instanceof ConstructionFeature construction)
+        if (feature instanceof ConstructionFeature construction) {
             return translations
                     .translate("construction." + construction.tool().name())
                     .orElseThrow();
-        if (feature instanceof Feature.Custom custom)
+        }
+        if (feature instanceof Feature.Custom custom) {
             return translations.translate("feature.custom", custom.type()).orElseThrow();
-        if (feature instanceof Feature.EdgeFinish finish)
+        }
+        if (feature instanceof Feature.EdgeFinish finish) {
             return translations
                     .translate(finish.kind() == Feature.EdgeFinish.Kind.FILLET ? "action.fillet" : "action.chamfer")
                     .orElseThrow();
-        if (feature instanceof Feature.Shell)
+        }
+        if (feature instanceof Feature.Shell) {
             return translations.translate("action.shell").orElseThrow();
-        return feature instanceof Feature.Sketch s
-                ? (s.profile() instanceof Feature.Circle
-                        ? translations.translate("gui.circle").orElseThrow()
-                        : s.profile() instanceof Feature.Constrained
-                                ? translations.translate("gui.sketch").orElseThrow()
-                                : translations.translate("gui.rectangle").orElseThrow())
-                : feature instanceof Feature.Extrude
-                        ? translations.translate("gui.extrude").orElseThrow()
-                        : feature instanceof Feature.SplitBody
-                                ? translations.translate("gui.split").orElseThrow()
-                                : translations.translate("action.cut").orElseThrow();
+        }
+        if (feature instanceof Feature.Sketch s) {
+            if (s.profile() instanceof Feature.Circle) {
+                return translations.translate("gui.circle").orElseThrow();
+            }
+            return translations
+                    .translate(s.profile() instanceof Feature.Constrained ? "gui.sketch" : "gui.rectangle")
+                    .orElseThrow();
+        }
+        if (feature instanceof Feature.Extrude) {
+            return translations.translate("gui.extrude").orElseThrow();
+        }
+        return translations
+                .translate(feature instanceof Feature.SplitBody ? "gui.split" : "action.cut")
+                .orElseThrow();
     }
 
     private void rebuildTree(CadDocument document) {
@@ -1543,7 +1130,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 new Entry(null, translations.translate("gui.bodies").orElseThrow(), true));
         bodies.setExpanded(true);
         int index = 1;
-        for (var body : controller.build().bodies())
+        for (var body : controller.build().bodies()) {
             bodies.getChildren()
                     .add(new TreeItem<>(new Entry(
                             body.id(),
@@ -1553,36 +1140,42 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                                             .translate("feature.body", index++)
                                             .orElseThrow()),
                             true)));
+        }
         root.getChildren().add(features);
         root.getChildren().add(bodies);
         tree.setRoot(root);
-        for (var item : features.getChildren())
-            if (item.getValue().id().equals(selectedFeature))
+        for (var item : features.getChildren()) {
+            if (item.getValue().id().equals(selectedFeature)) {
                 tree.getSelectionModel().select(item);
+            }
+        }
     }
 
     private void synchronizeTreeSelection() {
         if (tree.getRoot() == null) return;
         String id = selectedBody == null ? selectedFeature : selectedBody;
-        for (var group : tree.getRoot().getChildren())
-            for (var item : group.getChildren())
+        for (var group : tree.getRoot().getChildren()) {
+            for (var item : group.getChildren()) {
                 if (item.getValue().id().equals(id)) {
                     tree.getSelectionModel().select(item);
                     return;
                 }
+            }
+        }
         tree.getSelectionModel().clearSelection();
     }
 
     private String bodyLabel(String id) {
         int index = 1;
         for (var body : controller.build().bodies()) {
-            if (body.id().equals(id))
+            if (body.id().equals(id)) {
                 return controller
                         .snapshot()
                         .document()
                         .bodyName(
                                 id,
                                 translations.translate("feature.body", index).orElseThrow());
+            }
             index++;
         }
         return id;
@@ -1620,8 +1213,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         viewport.select(id);
         printing.selectedFace(id, face);
         inspect();
-        if (face >= 0)
+        if (face >= 0) {
             selectionLabel.setText(translations.translate("feature.face", face).orElseThrow() + " · " + bodyLabel(id));
+        }
         refresh();
     }
 
@@ -1648,6 +1242,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         identity.getStyleClass().add("muted");
         form.getChildren().add(identity);
         if (selectedBody != null) bodyStyleEditor(selectedBody);
+        inspectFeature(feature);
+    }
+
+    private void inspectFeature(Feature feature) {
         if (feature instanceof ConstructionFeature construction) {
             var edit = new Button(translations.translate("construction.edit").orElseThrow());
             edit.setId("construction-edit");
@@ -1704,8 +1302,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         } else if (feature instanceof Feature.Shell s) {
             dimension(feature, "thickness", s.thickness());
             referenceEditor(feature, null, s.body());
-        } else if (feature instanceof Feature.ThroughCut c) referenceEditor(feature, c.profile(), c.body());
-        else if (feature instanceof Feature.SplitBody s) {
+        } else if (feature instanceof Feature.ThroughCut c) {
+            referenceEditor(feature, c.profile(), c.body());
+        } else if (feature instanceof Feature.SplitBody s) {
             dimension(feature, "offset", s.plane().offset());
             referenceEditor(feature, null, s.body());
         } else if (feature instanceof Feature.Custom custom) {
@@ -1825,9 +1424,11 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         if (!expression.isEmpty()) field.setText(expression);
         var apply = button(translations.translate("gui.apply").orElseThrow(), "apply-" + name, () -> {
             String text = field.getText().strip();
-            if (text.matches("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?"))
+            if (text.matches("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?")) {
                 controller.edit(feature.id(), name, number(field, name));
-            else controller.expression(feature.id(), name, text);
+            } else {
+                controller.expression(feature.id(), name, text);
+            }
         });
         field.setOnAction(e -> apply.fire());
         form.getChildren().add(apply);
@@ -1979,12 +1580,13 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         hint.setId("sketch-plane-hint");
         form.getChildren().add(hint);
         var origins = new HBox(6);
-        for (var name : List.of("XY", "XZ", "YZ"))
+        for (var name : List.of("XY", "XZ", "YZ")) {
             origins.getChildren()
                     .add(button(
                             name,
                             "choose-plane-" + name.toLowerCase(Locale.ROOT),
                             () -> choosePlane(Feature.Plane.origin(name))));
+        }
         form.getChildren().add(origins);
         controller.build().construction().forEach((id, datum) -> {
             if (datum instanceof dev.voxelbrew.api.model.construction.ConstructionGeometry.Plane plane) {
@@ -2071,7 +1673,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             boolean boundOffset = controller.snapshot().document().parameters().bindings().stream()
                     .anyMatch(b -> b.target().featureId().equals(repair.id())
                             && b.target().field().equals("offsetZ"));
-            if (placement.isOrigin() && (placement.offsetZ() != 0 || boundOffset))
+            if (placement.isOrigin() && (placement.offsetZ() != 0 || boundOffset)) {
                 placement = new Feature.Plane(
                         "plane-"
                                 + controller
@@ -2082,6 +1684,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                         placement.offsetZ(),
                         placement.frame(),
                         null);
+            }
             controller.sketch(
                     new Feature.Sketch(repair.id(), repair.profileId(), placement, repair.profile()),
                     controller.snapshot().document().parameters(),
@@ -2095,10 +1698,11 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     private void openSketch(Feature.Sketch sketch, Feature.Plane plane) {
         cancelTool();
         var before = controller.snapshot();
-        if (controller.ioBusy() || controller.rebuilding())
+        if (controller.ioBusy() || controller.rebuilding()) {
             throw new IllegalArgumentException(translations
                     .translate("gui.wait_for_the_current_rebuild_or_file_operation")
                     .orElseThrow());
+        }
         SketchEditor.show(
                 stage,
                 sketches,
@@ -2110,10 +1714,11 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 (result, parameters) -> {
                     var current = controller.snapshot();
                     if (!before.document().id().equals(current.document().id())
-                            || before.revision() != current.revision())
+                            || before.revision() != current.revision()) {
                         throw new IllegalStateException(translations
                                 .translate("gui.the_document_changed_while_editing_cancel_and_reopen_the_sketch")
                                 .orElseThrow());
+                    }
                     controller.sketch(result, parameters, sketch == null);
                     selectedFeature = result.id();
                     selectedBody = null;
@@ -2124,10 +1729,11 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private void beginExtrusion() {
         var feature = selected();
-        if (!(feature instanceof Feature.Sketch sketch))
+        if (!(feature instanceof Feature.Sketch sketch)) {
             throw new IllegalArgumentException(translations
                     .translate("gui.select_a_closed_sketch_profile_first")
                     .orElseThrow());
+        }
         cancelTool();
         extrusionSketch = sketch;
         tool = Tool.EXTRUDE;
@@ -2221,13 +1827,15 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private void beginCut() {
         if (!(selected() instanceof Feature.Sketch sketch)
-                || !(sketch.profile() instanceof Feature.Circle || sketch.profile() instanceof Feature.Constrained))
+                || !(sketch.profile() instanceof Feature.Circle || sketch.profile() instanceof Feature.Constrained)) {
             throw new IllegalArgumentException(
                     translations.translate("gui.select_a_closed_sketch_profile").orElseThrow());
+        }
         var choices = controller.build().bodies();
-        if (choices.isEmpty())
+        if (choices.isEmpty()) {
             throw new IllegalArgumentException(
                     translations.translate("gui.a_target_body_is_required").orElseThrow());
+        }
         var dialog = new ChoiceDialog<>(
                 choices.getFirst().id(),
                 choices.stream().map(DocumentController.Body::id).toList());
@@ -2286,10 +1894,11 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 1);
         finish = button(translations.translate("gui.commit").orElseThrow(), "commit-modification", () -> {
             try {
-                if (modificationFaces.isEmpty() && modificationEdges.isEmpty())
+                if (modificationFaces.isEmpty() && modificationEdges.isEmpty()) {
                     throw new IllegalArgumentException(translations
                             .translate("gui.choose_faces_in_viewport")
                             .orElseThrow());
+                }
                 var body = controller.build().bodies().stream()
                         .filter(b -> b.id().equals(modificationBody))
                         .findFirst()
@@ -2299,9 +1908,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                         + controller.snapshot().document().uuidGenerator().next();
                 Feature feature;
                 if (modification.equals("action.shell")) {
-                    if (modificationFaces.size() != 1)
+                    if (modificationFaces.size() != 1) {
                         throw new IllegalArgumentException(
                                 translations.translate("gui.choose_one_face").orElseThrow());
+                    }
                     feature = new Feature.Shell(
                             id,
                             body.output(),
@@ -2311,10 +1921,11 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     var edges = new java.util.TreeSet<Integer>();
                     edges.addAll(modificationEdges);
                     modificationFaces.forEach(face -> edges.addAll(body.edgesOnFace(face)));
-                    if (edges.isEmpty())
+                    if (edges.isEmpty()) {
                         throw new IllegalArgumentException(translations
                                 .translate("gui.choose_faces_in_viewport")
                                 .orElseThrow());
+                    }
                     feature = new Feature.EdgeFinish(
                             id,
                             body.output(),
@@ -2449,8 +2060,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                                 axis.getValue().equals("Z") ? 1 : 0,
                                 number(offset, "offset")));
                 var parameters = formulaParameters();
-                if (!Expressions.isNumber(offset.getText()))
+                if (!Expressions.isNumber(offset.getText())) {
                     parameters = parameters.bind(new ParameterSet.Target(id, "offset"), offset.getText());
+                }
                 controller.add(feature, parameters);
                 selectedFeature = id;
             } catch (RuntimeException failure) {
@@ -2465,11 +2077,14 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             dev.voxelbrew.api.model.construction.ConstructionTools.Tool command, ConstructionFeature original) {
         if (controller.rebuilding()
                 || controller.ioBusy()
-                || (original == null && !controller.build().valid())) return;
+                || (original == null && !controller.build().valid())) {
+            return;
+        }
         var document = controller.snapshot().document();
-        if (document.cursor() != document.features().size())
+        if (document.cursor() != document.features().size()) {
             throw new IllegalStateException(
                     translations.translate("construction.end").orElseThrow());
+        }
         cancelTool();
         tool = Tool.CONSTRUCTION;
         viewport.pickEdges(true);
@@ -2557,11 +2172,13 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     }
 
     private CompletableFuture<Void> save(boolean saveAs) {
-        if (controller.ioBusy())
+        if (controller.ioBusy()) {
             return CompletableFuture.failedFuture(new IllegalStateException(
                     translations.translate("gui.file_operation_in_progress").orElseThrow()));
-        if (!saveAs && controller.path() != null)
+        }
+        if (!saveAs && controller.path() != null) {
             return controller.save(controller.path(), Files.exists(controller.path()));
+        }
         return controller.saveAs(exportWindow("vxb"));
     }
 
@@ -2755,8 +2372,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         alert.getDialogPane().lookupButton(ButtonType.CANCEL).setId("unsaved-cancel");
         var choice = Dialogs.show(alert, stage, translations).orElse(ButtonType.CANCEL);
         if (choice == discard) action.run();
-        else if (choice == save)
+        else if (choice == save) {
             save(false).thenRun(() -> requestChange(action)).exceptionally(failure -> null);
+        }
     }
 
     private void applyAppearance() {
@@ -2820,5 +2438,511 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             log.warn("MCP listener was not started", failure);
             error.setText("MCP: " + failure.getMessage());
         }
+    }
+
+    private Menu recentMenu() {
+        var recentMenu = menu("menu-open-recent");
+        Runnable refreshRecent = () -> {
+            recentMenu.getItems().clear();
+            for (Path path : recentFiles.paths()) {
+                var item = new MenuItem(path.toString());
+                item.setMnemonicParsing(false);
+                item.setOnAction(event -> openProject(path));
+                recentMenu.getItems().add(item);
+            }
+            if (recentMenu.getItems().isEmpty()) {
+                var empty = new MenuItem(translations.translate("recent.empty").orElseThrow());
+                empty.setDisable(true);
+                recentMenu.getItems().add(empty);
+            }
+        };
+        refreshRecent.run();
+        recentMenu.setOnShowing(event -> refreshRecent.run());
+        recentMenu.disableProperty().bind(disabledProperty().or(fileBusy));
+        var titleRecentMenu = new ContextMenu();
+        UiHelp.menu(titleRecentMenu);
+        documentTitle.setOnMouseClicked(event -> {
+            if (event.getButton() != MouseButton.PRIMARY || !event.isStillSincePress()) return;
+            titleRecentMenu.getItems().clear();
+            for (Path path : recentFiles.paths()) {
+                var item = new MenuItem(path.toString());
+                item.setMnemonicParsing(false);
+                item.setOnAction(action -> openProject(path));
+                titleRecentMenu.getItems().add(item);
+            }
+            if (titleRecentMenu.getItems().isEmpty()) {
+                var empty = new MenuItem(translations.translate("recent.empty").orElseThrow());
+                empty.setDisable(true);
+                titleRecentMenu.getItems().add(empty);
+            }
+            if (!isDisabled() && !fileBusy.get()) {
+                titleRecentMenu.show(documentTitle, javafx.geometry.Side.BOTTOM, 0, 0);
+            }
+            event.consume();
+        });
+        controller.onFileUsed(path -> {
+            recentFiles.remember(path);
+            preferencesWorker.execute(recentFiles::save);
+        });
+        return recentMenu;
+    }
+
+    private Menu viewMenu(Rendering rendering) {
+        var viewMenu = menu("menu-view");
+        viewMenu.getItems().add(menuItem(translations.translate("action.fit").orElseThrow(), "menu-fit", false, () -> {
+            viewport.fit(meshes());
+            Platform.runLater(viewport::requestFocus);
+        }));
+        for (var name : STANDARD_VIEWS) {
+            var item = menuItem(
+                    UiText.view(translations, name),
+                    "view-" + name.toLowerCase(Locale.ROOT),
+                    false,
+                    () -> viewport.standardView(name));
+            viewMenu.getItems().add(item);
+        }
+        var appearanceMenu = new Menu(translations.translate("appearance.label").orElseThrow());
+        appearanceMenu.setId("menu-appearance");
+        UiHelp.menu(appearanceMenu, translations);
+        var themeGroup = new ToggleGroup();
+        for (var choice : Appearance.Choice.values()) {
+            String name = choice.name().toLowerCase(Locale.ROOT);
+            var item = new RadioMenuItem(
+                    translations.translate("appearance." + name).orElseThrow());
+            item.setId("appearance-" + name);
+            item.setToggleGroup(themeGroup);
+            item.setSelected(choice == appearanceChoice);
+            item.disableProperty().bind(disabledProperty());
+            UiHelp.menuItem(item, translations.translate("help.appearance").orElseThrow());
+            item.setOnAction(event -> {
+                appearanceChoice = choice;
+                appearance.save(choice);
+                applyAppearance();
+            });
+            appearanceMenu.getItems().add(item);
+        }
+        viewMenu.getItems().addAll(new SeparatorMenuItem(), appearanceMenu);
+        var renderingMenu = new Menu(translations.translate("rendering.label").orElseThrow());
+        renderingMenu.setId("menu-rendering");
+        UiHelp.menu(renderingMenu, translations);
+        var renderingGroup = new ToggleGroup();
+        for (var style : Rendering.Style.values()) {
+            String name = style.name().toLowerCase(Locale.ROOT);
+            var item = new RadioMenuItem(
+                    translations.translate("rendering." + name).orElseThrow());
+            item.setId("rendering-" + name);
+            item.setToggleGroup(renderingGroup);
+            item.setSelected(style == viewport.rendering());
+            item.disableProperty().bind(disabledProperty());
+            UiHelp.menuItem(
+                    item, translations.translate("help.rendering-" + name).orElseThrow());
+            item.setOnAction(event -> {
+                viewport.setRendering(style);
+                rendering.save(style);
+            });
+            renderingMenu.getItems().add(item);
+        }
+        viewMenu.getItems().add(renderingMenu);
+        return viewMenu;
+    }
+
+    private void populateSolidCommands(MenuButton solidCommands) {
+        for (var command : List.of(extrude, cut, fillet, chamfer, shell, splitBody)) {
+            var item = menuItem(command.getText(), command.getId(), true, command::fire);
+            item.setGraphic(OperationIcons.icon(command.getId()));
+            item.disableProperty().bind(disabledProperty().or(command.disabledProperty()));
+            solidCommands.getItems().add(item);
+        }
+    }
+
+    private MenuButton constructionMenu() {
+        var constructionMenu =
+                new MenuButton(translations.translate("construction.menu").orElseThrow());
+        constructionMenu.setId("construction-menu");
+        constructionMenu.setGraphic(
+                ConstructionIcons.icon(dev.voxelbrew.api.model.construction.ConstructionTools.Tool.OFFSET_PLANE));
+        UiHelp.menu(constructionMenu, translations);
+        for (var command : dev.voxelbrew.api.model.construction.ConstructionTools.Tool.values()) {
+            if (command == dev.voxelbrew.api.model.construction.ConstructionTools.Tool.OFFSET_PLANE
+                    || command == dev.voxelbrew.api.model.construction.ConstructionTools.Tool.AXIS_SURFACE
+                    || command == dev.voxelbrew.api.model.construction.ConstructionTools.Tool.POINT_VERTEX) {
+                constructionMenu.getItems().add(new SeparatorMenuItem());
+            }
+            var item = new MenuItem(
+                    translations.translate("construction." + command.name()).orElseThrow());
+            item.setGraphic(ConstructionIcons.icon(command));
+            UiHelp.menuItem(
+                    item,
+                    translations.translate("construction." + command.name()).orElseThrow() + ". "
+                            + translations.translate("construction.select").orElseThrow());
+            item.setId("construct-" + command.name().toLowerCase(Locale.ROOT).replace('_', '-'));
+            item.setOnAction(event -> attempt(() -> beginConstruction(command, null)));
+            constructionMenu.getItems().add(item);
+        }
+        return constructionMenu;
+    }
+
+    private VBox modelPanel() {
+        tree.setId("model-tree");
+        tree.setShowRoot(false);
+        tree.setEditable(true);
+        tree.setCellFactory(view -> new BodyTreeCell());
+        tree.getSelectionModel().selectedItemProperty().addListener((o, old, item) -> {
+            if (refreshing || item == null || item.getValue().id() == null || tool != Tool.NONE) return;
+            var entry = item.getValue();
+            if (entry.body()) selectBody(entry.id(), -1);
+            else {
+                selectFeature(entry.id());
+            }
+        });
+        configuration.setId("active-configuration");
+        UiHelp.install(configuration, translations);
+        configuration.setMaxWidth(Double.MAX_VALUE);
+        configuration.setOnAction(e -> {
+            if (!refreshing && configuration.getValue() != null) {
+                attempt(() -> controller.configuration(configuration.getValue()));
+            }
+        });
+        var left = new VBox(
+                10,
+                heading(translations.translate("gui.model").orElseThrow()),
+                tree,
+                new Separator(),
+                heading(translations.translate("workbench.configuration").orElseThrow()),
+                configuration,
+                parameters,
+                customFeature);
+        left.getStyleClass().add("side-panel");
+        left.setPrefWidth(220);
+        left.setMinWidth(185);
+        VBox.setVgrow(tree, Priority.ALWAYS);
+        return left;
+    }
+
+    private void configureWorkspaceTabs() {
+        for (int index = 0; index < workspaces.getTabs().size(); index++) {
+            var tab = workspaces.getTabs().get(index);
+            var key = KeyCombination.keyCombination("Shortcut+" + (index + 1)).getDisplayText();
+            tab.setTooltip(UiHelp.tooltip(UiHelp.baseDescription(translations, tab.getId())
+                    + "\n"
+                    + translations.translate("shortcuts.hint", key).orElseThrow()));
+        }
+        workspaces.setId("workspaces");
+        workspaces.getSelectionModel().selectedItemProperty().addListener((o, a, b) -> {
+            quickMenus.forEach(QuickMenu::hide);
+            if (b == printTab && printTab.isDisable()) {
+                workspaces.getSelectionModel().select(designTab);
+                return;
+            }
+            if (b == printTab && (controller.path() == null || controller.dirty())) {
+                javafx.application.Platform.runLater(() -> {
+                    workspaces.getSelectionModel().select(designTab);
+                    save(false)
+                            .thenRun(() -> {
+                                if (controller.path() != null && !controller.dirty() && !printTab.isDisable()) {
+                                    workspaces.getSelectionModel().select(printTab);
+                                }
+                            })
+                            .exceptionally(failure -> null);
+                });
+                return;
+            }
+            cancelTool();
+            printing.documentChanged();
+        });
+    }
+
+    private void installViewportSelection() {
+        viewport.onSelection((id, face) -> {
+            if (tool == Tool.CONSTRUCTION && constructionEditor != null) {
+                constructionEditor.pick(id, face);
+                return;
+            }
+            if (tool == Tool.PLANE) {
+                chooseBodyPlane(id, face);
+                return;
+            }
+            if (tool == Tool.MODIFY) {
+                selectModificationFace(id, face);
+                return;
+            }
+            if (tool != Tool.NONE || controller.rebuilding()) return;
+            if (controller.snapshot().document().features().stream().anyMatch(f -> f.id().equals(id))) {
+                selectFeature(id);
+            } else {
+                selectBody(id, face);
+            }
+        });
+        viewport.onEdgeSelection((id, edge) -> {
+            if (constructionEditor != null) constructionEditor.pickEdge(id, edge);
+            else {
+                selectModificationEdge(id, edge);
+            }
+        });
+    }
+
+    private void installShortcuts(
+            MenuBar menuBar,
+            MenuItem newItem,
+            MenuItem openItem,
+            MenuItem importItem,
+            MenuItem saveItem,
+            MenuItem saveAsItem,
+            MenuButton constructionMenu,
+            MenuButton solidCommands) {
+        window.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
+            if (isDisabled() || menuBar.getMenus().stream().anyMatch(Menu::isShowing)) return;
+            var focus = getScene().getFocusOwner();
+            if (KeyboardShortcuts.textUndo(e, focus)) return;
+            if (e.getCode() == KeyCode.ESCAPE) {
+                if (printing.cancelPlateRename() || printing.cancelDrag()) {
+                    e.consume();
+                    return;
+                }
+                if (tree.getEditingItem() != null) {
+                    tree.edit(null);
+                    e.consume();
+                    return;
+                }
+                cancelTool();
+                e.consume();
+                return;
+            }
+            String action = KeyboardShortcuts.match(KeyboardShortcuts.Scope.DOCUMENT, e, focus);
+            if (action != null) {
+                // Consume before opening a modal nested event loop, and use the same
+                // enabled-state gates as the visible controls.
+                e.consume();
+                switch (action) {
+                    case "new" -> fire(newItem);
+                    case "open" -> fire(openItem);
+                    case "import" -> fire(importItem);
+                    case "save" -> fire(saveItem);
+                    case "save-as" -> fire(saveAsItem);
+                    case "export" -> fire(export);
+                    case "undo" -> undo.fire();
+                    case "redo" -> redo.fire();
+                    case "parameters" -> parameters.fire();
+                    case "workspace-number" -> selectWorkspaceNumber(e);
+                    case "workspace-previous" -> moveWorkspace(-1);
+                    case "workspace-next" -> moveWorkspace(1);
+                    case "context-help" -> {
+                        showWorkspaceHelp();
+                    }
+                    default -> throw new IllegalStateException(action);
+                }
+                return;
+            }
+            if (!designTab.isSelected()) return;
+            action = KeyboardShortcuts.match(KeyboardShortcuts.Scope.DESIGN, e, focus);
+            if (action == null) return;
+            KeyboardShortcuts.consume(e, getScene());
+            String viewAction = action;
+            switch (action) {
+                case "constrained-sketch" -> constrainedSketch.fire();
+                case "operations-menu" -> {
+                    constructionMenu.hide();
+                    solidCommands.requestFocus();
+                    solidCommands.show();
+                }
+                case "construction-menu" -> {
+                    solidCommands.hide();
+                    constructionMenu.requestFocus();
+                    constructionMenu.show();
+                }
+                case "extrude" -> extrude.fire();
+                case "cut" -> cut.fire();
+                case "split-body" -> splitBody.fire();
+                case "fit" -> viewport.fit(meshes());
+                default ->
+                    STANDARD_VIEWS.stream()
+                            .filter(name -> ("view-" + name.toLowerCase(Locale.ROOT)).equals(viewAction))
+                            .findFirst()
+                            .ifPresent(viewport::standardView);
+            }
+        });
+    }
+
+    private void showWorkspaceHelp() {
+        var help = new Alert(Alert.AlertType.INFORMATION);
+        help.initOwner(stage);
+        String workspace = "designer";
+        if (printerTab.isSelected()) {
+            workspace = "printer";
+        } else if (printTab.isSelected()) {
+            workspace = "slicer";
+        }
+        help.setTitle(translations.translate("help." + workspace + ".title").orElseThrow());
+        help.setHeaderText(null);
+        help.setContentText(
+                translations.translate("help." + workspace + ".content").orElseThrow());
+        help.getDialogPane().setPrefWidth(600);
+        help.getDialogPane().getButtonTypes().setAll(ButtonType.CLOSE);
+        help.getDialogPane().lookupButton(ButtonType.CLOSE).setId("context-help-close");
+        var content = new Label(help.getContentText());
+        content.setId("context-help-content");
+        content.setWrapText(true);
+        help.getDialogPane().setContent(content);
+        Dialogs.show(help, stage, translations);
+    }
+
+    private void refreshWorkspaceTabs(CadDocument document) {
+        printTab.setDisable(controller.build().bodies().isEmpty());
+        if (printTab.isDisable() && printTab.isSelected()) {
+            workspaces.getSelectionModel().select(designTab);
+        }
+        if (tool == Tool.PLANE && !planeSelectionCurrent()) {
+            tool = Tool.NONE;
+            planeSnapshot = null;
+            planeRepair = null;
+            viewport.stopPlaneSelection();
+            inspect();
+        }
+        printer.documentChanged(document);
+        printerTab.setDisable(!printer.hasJobs());
+        if (printerTab.isDisable() && printerTab.isSelected()) {
+            workspaces.getSelectionModel().select(printTab.isDisable() ? designTab : printTab);
+        }
+    }
+
+    private boolean featuresChanged(CadDocument document, List<Feature> effective) {
+        return !lastFeatures.equals(effective)
+                || !lastBodyStyles.equals(document.bodyStyles())
+                || !lastBodyNames.equals(document.bodyNames())
+                || !lastFeatureNames.equals(document.featureNames())
+                || !lastParameters.equals(document.parameters())
+                || !lastDocument.equals(document.id());
+    }
+
+    private void refreshBodies(CadDocument document, boolean changed) {
+        if (!lastDocument.equals(document.id())) {
+            selectedFeature = null;
+            selectedBody = null;
+            viewport.select(null);
+            fitNext = true;
+        }
+        if (changed || lastBuild != controller.build()) rebuildTree(document);
+        if (lastBuild != controller.build()) {
+            viewport.showBodies(controller.build().bodies());
+            viewport.showConstruction(controller.build().construction(), id -> {
+                if (constructionEditor != null) constructionEditor.pickDatum(id);
+                else {
+                    selectFeature(id);
+                }
+            });
+            if (fitNext && !controller.build().bodies().isEmpty()) {
+                viewport.fit(meshes());
+                fitNext = false;
+            }
+            lastBuild = controller.build();
+            if (tool == Tool.NONE) {
+                updateFeatureDiagnostics();
+                var feature = selected();
+                if (feature != null) selectionLabel.setText(shortName(feature));
+            }
+        }
+    }
+
+    private void refreshCommands(CadDocument document, ModelSession.Snapshot snapshot) {
+        timeline.update(
+                document,
+                selectedFeature,
+                controller.build().diagnostics(),
+                controller.ioBusy() || tool != Tool.NONE || controller.hasPreview(),
+                controller.rebuilding(),
+                controller.build().valid());
+        undo.setDisable(!snapshot.canUndo() || controller.ioBusy());
+        redo.setDisable(!snapshot.canRedo() || controller.ioBusy());
+        parameters.setDisable(controller.ioBusy() || tool != Tool.NONE || controller.rebuilding());
+        var names = new ArrayList<String>();
+        names.add("Default");
+        document.parameters().configurations().forEach(c -> names.add(c.name()));
+        if (!configuration.getItems().equals(names)) {
+            configuration.getItems().setAll(names);
+        }
+        configuration.setValue(document.parameters().activeName());
+        configuration.setDisable(controller.ioBusy() || tool != Tool.NONE);
+        fileBusy.set(controller.ioBusy());
+    }
+
+    private void refreshSolidCommands(boolean atEnd) {
+        splitBody.setDisable(tool != Tool.NONE
+                || !controller.canExport()
+                || controller.build().bodies().isEmpty());
+        fillet.setDisable(splitBody.isDisabled());
+        chamfer.setDisable(splitBody.isDisabled());
+        shell.setDisable(splitBody.isDisabled());
+        printing.documentChanged();
+        customFeature.setDisable(!atEnd || tool != Tool.NONE || controller.rebuilding());
+        constrainedSketch.setDisable(!atEnd || tool != Tool.NONE || controller.rebuilding());
+        extrude.setDisable(!atEnd
+                || tool != Tool.NONE
+                || !(selected() instanceof Feature.Sketch s
+                        && (!(s.profile() instanceof Feature.Constrained c)
+                                || dev.voxelbrew.engine.sketch.SketchProfiles.hasProfile(c.geometry()))));
+    }
+
+    private void refreshCut(boolean atEnd) {
+        cut.setDisable(!atEnd
+                || tool != Tool.NONE
+                || !(selected() instanceof Feature.Sketch s
+                        && (s.profile() instanceof Feature.Circle
+                                || s.profile() instanceof Feature.Constrained c
+                                        && dev.voxelbrew.engine.sketch.SketchProfiles.hasProfile(c.geometry())))
+                || controller.rebuilding()
+                || controller.build().bodies().isEmpty());
+    }
+
+    private void refreshStatus() {
+        progress.setVisible(controller.rebuilding() || controller.ioBusy());
+        String diagnostics = controller.build().diagnostics().stream()
+                .filter(d -> d.state() == Evaluation.State.FAILED || d.state() == Evaluation.State.BLOCKED)
+                .map(d -> d.featureId() + ": " + d.message())
+                .reduce((a, b) -> a + " | " + b)
+                .orElse("");
+        status.setText(buildStatus(diagnostics));
+        documentTitle.setText((controller.dirty() ? "● " : "")
+                + (controller.path() == null
+                        ? translations.translate("gui.untitled").orElseThrow()
+                        : java.util.Objects.toString(
+                                controller.path().getFileName(),
+                                translations.translate("gui.untitled").orElseThrow())));
+        UiHelp.describe(
+                documentTitle,
+                controller.path() == null
+                        ? translations.translate("help.unsaved-document").orElseThrow()
+                        : controller.path().toString());
+        stage.setTitle((controller.dirty() ? "● " : "")
+                + (controller.path() == null
+                        ? translations.translate("gui.untitled").orElseThrow()
+                        : controller.path().getFileName())
+                + " — VoxelBrew CAD");
+    }
+
+    private String buildStatus(String diagnostics) {
+        if (!controller.error().isBlank()) return controller.error();
+        if (controller.ioBusy()) {
+            return translations.translate("gui.working_with_file").orElseThrow();
+        }
+        if (controller.rebuilding()) {
+            return translations.translate("gui.rebuilding").orElseThrow();
+        }
+        if (!diagnostics.isBlank()) return diagnostics;
+        if (controller.hasPreview()) {
+            return translations
+                    .translate("gui.preview_release_or_enter_to_commit_escape_to_cancel")
+                    .orElseThrow();
+        }
+        return translations
+                .translate(
+                        "status.bodies",
+                        controller.build().bodies().size(),
+                        String.format(
+                                Locale.ROOT,
+                                "%.3f mm³",
+                                controller.build().bodies().stream()
+                                        .mapToDouble(DocumentController.Body::volume)
+                                        .sum()))
+                .orElseThrow();
     }
 }

@@ -49,9 +49,11 @@ class ParameterIntegrationTest {
             assertThat(bounds.minZ()).isCloseTo(12, org.assertj.core.data.Offset.offset(.001));
             assertThat(bounds.maxZ()).isCloseTo(20, org.assertj.core.data.Offset.offset(.001));
             assertThat(bounds.maxX()).isCloseTo(20, org.assertj.core.data.Offset.offset(.001));
-            for (var f : e.resolvedFeatures())
-                if (f instanceof Feature.Sketch sketch)
+            for (var f : e.resolvedFeatures()) {
+                if (f instanceof Feature.Sketch sketch) {
                     assertThat(sketch.plane().offsetZ()).isEqualTo(20);
+                }
+            }
         }
         s.editDimension("plate", "offsetZ", 30);
         assertThat(s.document().parameters().bindings().stream()

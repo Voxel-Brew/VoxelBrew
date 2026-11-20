@@ -43,7 +43,7 @@ final class FeatureDialog {
                 fields.clear();
                 form.getChildren().clear();
                 errors.setText("");
-                if (type.getValue() != null)
+                if (type.getValue() != null) {
                     for (var p : type.getValue().parameters()) {
                         var input = FormulaField.number(
                                 Double.toString(p.defaultValue()),
@@ -54,6 +54,7 @@ final class FeatureDialog {
                         fields.put(p.key(), input);
                         form.getChildren().addAll(new Label(p.label()), input);
                     }
+                }
             });
             type.getSelectionModel().selectFirst();
             var scroll = new ScrollPane(form);
@@ -77,11 +78,12 @@ final class FeatureDialog {
             var button = (Button) dialog.getDialogPane().lookupButton(add);
             button.setId("custom-add");
             button.setDisable(type.getItems().isEmpty());
-            if (type.getItems().isEmpty())
+            if (type.getItems().isEmpty()) {
                 errors.setText(translations
                         .translate(
                                 "gui.no_feature_providers_installed_add_a_trusted_jar_to_this_directory_and_reopen_features")
                         .orElseThrow());
+            }
             dialog.getDialogPane().lookupButton(ButtonType.CANCEL).setId("custom-cancel");
             Feature.Custom[] result = new Feature.Custom[1];
             button.addEventFilter(ActionEvent.ACTION, e -> {
@@ -105,8 +107,9 @@ final class FeatureDialog {
                 } catch (RuntimeException failure) {
                     errors.setText(failure.getMessage());
                     fields.forEach((key, field) -> {
-                        if (failure.getMessage().contains(key))
+                        if (failure.getMessage().contains(key)) {
                             field.getStyleClass().add("invalid");
+                        }
                     });
                     e.consume();
                 }

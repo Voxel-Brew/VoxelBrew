@@ -34,9 +34,10 @@ class SketchCurveTypesTest {
     @Test
     void fitSplinesInterpolateAndClosedSplinesJoinWithC2Continuity() {
         var e = spline(Kind.FIT_SPLINE, 0, false, 0, 0, 10, 10, 20, 0, 30, 10);
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 4; i++) {
             assertThat(e.at(i / 3.0).distance(e.point(new Ref(e.id(), Part.FIT, i))))
                     .isCloseTo(0, org.assertj.core.data.Offset.offset(1e-10));
+        }
         var closed = spline(Kind.FIT_SPLINE, 0, true, 0, 0, 10, 0, 10, 10, 0, 10);
         assertThat(closed.at(0).distance(closed.at(1))).isCloseTo(0, org.assertj.core.data.Offset.offset(1e-10));
         assertThat(closed.derivative(0).distance(closed.derivative(1)))

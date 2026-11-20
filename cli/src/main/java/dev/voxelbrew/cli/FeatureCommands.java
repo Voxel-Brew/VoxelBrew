@@ -28,7 +28,7 @@ final class FeatureCommands {
         @Override
         public Integer call() throws Exception {
             try (var registry = features.open(plugins)) {
-                for (var d : registry.descriptors())
+                for (var d : registry.descriptors()) {
                     spec.commandLine()
                             .getOut()
                             .println(d
@@ -38,6 +38,7 @@ final class FeatureCommands {
                                     + d.payloadVersion()
                                     + " parameters="
                                     + d.parameters());
+                }
                 registry.diagnostics().forEach(spec.commandLine().getErr()::println);
             }
             return 0;

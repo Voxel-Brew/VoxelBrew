@@ -18,13 +18,16 @@ final class SketchSelection {
                 var points = curve.sample();
                 hasCurve = true;
                 for (var p : points) all &= inside(p, minX, minY, maxX, maxY);
-                for (int i = 1; i < points.size(); i++)
+                for (int i = 1; i < points.size(); i++) {
                     any |= intersects(points.get(i - 1), points.get(i), minX, minY, maxX, maxY);
+                }
             }
             if (hasCurve && (crossing ? any : all)) result.add(entity.ref());
-            else if (entity.kind() == Kind.POINT)
-                for (var ref : entity.pointRefs())
+            else if (entity.kind() == Kind.POINT) {
+                for (var ref : entity.pointRefs()) {
                     if (inside(entity.point(ref), minX, minY, maxX, maxY)) result.add(ref);
+                }
+            }
         }
         return result;
     }

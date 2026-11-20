@@ -28,16 +28,14 @@ final class PrinterPickerDialog {
             @Override
             protected void updateItem(PrinterProfileCatalog.Entry item, boolean empty) {
                 super.updateItem(item, empty);
-                setText(
-                        empty || item == null
-                                ? null
-                                : item.name()
-                                        + (item.bundled()
-                                                ? " ("
-                                                        + translations
-                                                                .translate("print.builtInPrinter")
-                                                                .orElseThrow() + ")"
-                                                : ""));
+                if (empty || item == null) {
+                    setText(null);
+                    return;
+                }
+                String suffix = item.bundled()
+                        ? " (" + translations.translate("print.builtInPrinter").orElseThrow() + ")"
+                        : "";
+                setText(item.name() + suffix);
             }
         });
         results.getItems().setAll(entries);
@@ -69,7 +67,9 @@ final class PrinterPickerDialog {
         search.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.DOWN || event.getCode() == KeyCode.UP) {
                 if (event.getCode() == KeyCode.DOWN) results.getSelectionModel().selectNext();
-                else results.getSelectionModel().selectPrevious();
+                else {
+                    results.getSelectionModel().selectPrevious();
+                }
                 results.scrollTo(results.getSelectionModel().getSelectedIndex());
                 event.consume();
             }

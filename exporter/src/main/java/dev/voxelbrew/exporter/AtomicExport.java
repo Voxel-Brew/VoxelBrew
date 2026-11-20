@@ -22,8 +22,9 @@ public class AtomicExport {
 
     public static void write(FileExportDialog.Destination destination, Writer writer) throws IOException {
         Path target = destination.path().toAbsolutePath().normalize();
-        if (!destination.overwrite() && Files.exists(target))
+        if (!destination.overwrite() && Files.exists(target)) {
             throw new IOException("Destination exists; use explicit overwrite: " + target);
+        }
         Path temporary = Files.createTempFile(parentDirectory(target), ".voxelbrew-export-", ".tmp");
         try {
             try (var channel = FileChannel.open(temporary, StandardOpenOption.WRITE);
@@ -43,9 +44,11 @@ public class AtomicExport {
                 borrowed.flush();
                 channel.force(true);
             }
-            if (destination.overwrite())
+            if (destination.overwrite()) {
                 Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            else Files.createLink(target, temporary);
+            } else {
+                Files.createLink(target, temporary);
+            }
         } catch (RuntimeException failure) {
             throw new IOException("Export serialization failed: " + failure.getMessage(), failure);
         } finally {

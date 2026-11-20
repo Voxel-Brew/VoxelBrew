@@ -46,10 +46,12 @@ public final class DesktopImportWindow implements ImportWindow {
                 if (caption != null) caption.getStyleClass().remove("import-dialog-invalid-label");
                 control.setAccessibleHelp(null);
             } else {
-                if (!control.getStyleClass().contains("import-dialog-invalid"))
+                if (!control.getStyleClass().contains("import-dialog-invalid")) {
                     control.getStyleClass().add("import-dialog-invalid");
-                if (caption != null && !caption.getStyleClass().contains("import-dialog-invalid-label"))
+                }
+                if (caption != null && !caption.getStyleClass().contains("import-dialog-invalid-label")) {
                     caption.getStyleClass().add("import-dialog-invalid-label");
+                }
                 control.setAccessibleHelp(error);
             }
             message.setText(error == null ? "" : error);
@@ -80,8 +82,9 @@ public final class DesktopImportWindow implements ImportWindow {
         message.managedProperty().bind(message.visibleProperty());
         container.getChildren().add(message);
         Label caption = container.getChildren().getFirst() instanceof Label label ? label : null;
-        if (inputs.putIfAbsent(id, new InputBinding(value, control, caption, message)) != null)
+        if (inputs.putIfAbsent(id, new InputBinding(value, control, caption, message)) != null) {
             throw new IllegalArgumentException("Duplicate import input: " + id);
+        }
         changed.addListener((observable, before, after) -> onChange.run());
         return container;
     }
@@ -118,8 +121,9 @@ public final class DesktopImportWindow implements ImportWindow {
     @Override
     public <R> Optional<R> show(ImportDialog<R> request) {
         Objects.requireNonNull(request, "request");
-        if (!javafx.application.Platform.isFxApplicationThread())
+        if (!javafx.application.Platform.isFxApplicationThread()) {
             throw new IllegalStateException("Import dialogs must be shown on the JavaFX application thread");
+        }
         var inputs = new LinkedHashMap<String, InputBinding>();
         var dialog = new Dialog<R>();
         dialog.setTitle(importerVersion == null ? request.title() : request.title() + " (" + importerVersion + ")");
@@ -200,40 +204,7 @@ public final class DesktopImportWindow implements ImportWindow {
         }
         if (component instanceof dev.voxelbrew.api.model.vui.Label label) return new Label(label.text());
         if (component instanceof dev.voxelbrew.api.model.vui.Separator) return new Separator();
-        if (component instanceof FileSource source) {
-            var path = new javafx.scene.control.TextField();
-            path.setId("import-path");
-            Path suggestion = source.defaultPath() != null
-                    ? source.defaultPath()
-                    : suggestedSource == null ? current : suggestedSource;
-            if (suggestion != null) path.setText(suggestion.toString());
-            var browse = new Button(translations.translate("gui.browse").orElseThrow());
-            browse.setId("file-browse");
-            UiHelp.install(browse, translations);
-            browse.setOnAction(event -> {
-                var chooser = new FileChooser();
-                chooser.setTitle(translations.translate("import.source").orElseThrow());
-                chooser.getExtensionFilters()
-                        .add(new FileChooser.ExtensionFilter("*." + source.extension(), "*." + source.extension()));
-                if (!path.getText().isBlank()) {
-                    Path initial = Path.of(path.getText()).toAbsolutePath().normalize();
-                    Path parent = initial.getParent();
-                    Path filename = initial.getFileName();
-                    if (parent != null && Files.isDirectory(parent)) chooser.setInitialDirectory(parent.toFile());
-                    if (filename != null) chooser.setInitialFileName(filename.toString());
-                }
-                var chosen = chooser.showOpenDialog(owner);
-                if (chosen != null) path.setText(chosen.toString());
-            });
-            return bind(
-                    inputs,
-                    source.id(),
-                    path::getText,
-                    path,
-                    field(translations.translate("import.source").orElseThrow(), Dialogs.pathRow(path, browse)),
-                    path.textProperty(),
-                    onChange);
-        }
+        if (component instanceof FileSource source) return renderFileSource(source, inputs, onChange);
         if (component instanceof dev.voxelbrew.api.model.vui.PasswordField field) {
             var input = new javafx.scene.control.PasswordField();
             input.setText(field.value());
@@ -340,5 +311,45 @@ public final class DesktopImportWindow implements ImportWindow {
         }
         throw new UnsupportedOperationException(
                 "Unsupported import component: " + component.getClass().getName());
+    }
+
+    private Node renderFileSource(FileSource source, Map<String, InputBinding> inputs, Runnable onChange) {
+        var path = new javafx.scene.control.TextField();
+        path.setId("import-path");
+        Path suggestion;
+        if (source.defaultPath() != null) {
+            suggestion = source.defaultPath();
+        } else if (suggestedSource == null) {
+            suggestion = current;
+        } else {
+            suggestion = suggestedSource;
+        }
+        if (suggestion != null) path.setText(suggestion.toString());
+        var browse = new Button(translations.translate("gui.browse").orElseThrow());
+        browse.setId("file-browse");
+        UiHelp.install(browse, translations);
+        browse.setOnAction(event -> {
+            var chooser = new FileChooser();
+            chooser.setTitle(translations.translate("import.source").orElseThrow());
+            chooser.getExtensionFilters()
+                    .add(new FileChooser.ExtensionFilter("*." + source.extension(), "*." + source.extension()));
+            if (!path.getText().isBlank()) {
+                Path initial = Path.of(path.getText()).toAbsolutePath().normalize();
+                Path parent = initial.getParent();
+                Path filename = initial.getFileName();
+                if (parent != null && Files.isDirectory(parent)) chooser.setInitialDirectory(parent.toFile());
+                if (filename != null) chooser.setInitialFileName(filename.toString());
+            }
+            var chosen = chooser.showOpenDialog(owner);
+            if (chosen != null) path.setText(chosen.toString());
+        });
+        return bind(
+                inputs,
+                source.id(),
+                path::getText,
+                path,
+                field(translations.translate("import.source").orElseThrow(), Dialogs.pathRow(path, browse)),
+                path.textProperty(),
+                onChange);
     }
 }

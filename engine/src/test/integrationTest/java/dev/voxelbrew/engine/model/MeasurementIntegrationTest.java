@@ -94,13 +94,15 @@ class MeasurementIntegrationTest {
                 .setSchemaVersion(dev.voxelbrew.engine.persistence.DocumentCodec.SCHEMA_VERSION)
                 .setApplicationVersion(Version.version())
                 .setFileVersion(before.getFileVersion() + 1);
-        for (var feature : migrated.getFeaturesBuilderList())
-            if (feature.hasSketch())
+        for (var feature : migrated.getFeaturesBuilderList()) {
+            if (feature.hasSketch()) {
                 feature.getSketchBuilder()
                         .getPlaneBuilder()
                         .addAllFrame(Arrays.stream(Transform.IDENTITY.matrix())
                                 .boxed()
                                 .toList());
+            }
+        }
         assertThat(after).isEqualTo(migrated.build());
         assertThat(DocumentReader.load(file)).isEqualTo(document);
         session.selectConfiguration("Default");

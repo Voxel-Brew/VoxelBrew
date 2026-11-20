@@ -33,10 +33,11 @@ class ImportTest {
 
     private static void collect(dev.voxelbrew.api.model.vui.Component component, Set<String> ids) {
         if (component instanceof dev.voxelbrew.api.model.vui.Input input) ids.add(input.id());
-        else if (component instanceof dev.voxelbrew.api.model.vui.HorizontalLayout row)
+        else if (component instanceof dev.voxelbrew.api.model.vui.HorizontalLayout row) {
             row.children().forEach(child -> collect(child, ids));
-        else if (component instanceof dev.voxelbrew.api.model.vui.VerticalLayout column)
+        } else if (component instanceof dev.voxelbrew.api.model.vui.VerticalLayout column) {
             column.children().forEach(child -> collect(child, ids));
+        }
     }
 
     @Test

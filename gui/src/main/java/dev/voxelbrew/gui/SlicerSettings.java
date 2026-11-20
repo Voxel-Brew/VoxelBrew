@@ -85,12 +85,24 @@ final class SlicerSettings {
                         : item.name() + " (" + descriptor.version() + ")";
                 var match = VERSION.matcher(item.version());
                 String release = match.find() ? match.group(1) : item.version();
-                String subtitle = item.name().equalsIgnoreCase(provider)
-                        ? release
-                        : release.isBlank() ? provider : provider + " · " + release;
+                String subtitle;
+                if (item.name().equalsIgnoreCase(provider)) {
+                    subtitle = release;
+                } else if (release.isBlank()) {
+                    subtitle = provider;
+                } else {
+                    subtitle = provider + " · " + release;
+                }
                 name.setText(displayName);
                 version.setText(subtitle);
-                String status = item.bundled() ? "bundled" : item.operational() ? "ready" : "unavailable";
+                String status;
+                if (item.bundled()) {
+                    status = "bundled";
+                } else if (item.operational()) {
+                    status = "ready";
+                } else {
+                    status = "unavailable";
+                }
                 state.setText(
                         text.translate("slicer.installation.state." + status).orElseThrow());
                 state.getStyleClass().setAll("label", "slicer-installation-state", "slicer-state-" + status);
@@ -102,14 +114,17 @@ final class SlicerSettings {
     }
 
     private static void showInstallationDetail(Label status, SlicerInstallation selected, TranslationService text) {
-        String detail = selected == null
-                ? ""
-                : selected.bundled()
-                        ? text.translate("slicer.installation.bundled").orElseThrow()
-                        : selected.operational()
-                                ? selected.settings().getOrDefault("executable", selected.version())
-                                : text.translate("slicer.installation.failed", selected.failure())
-                                        .orElseThrow();
+        String detail;
+        if (selected == null) {
+            detail = "";
+        } else if (selected.bundled()) {
+            detail = text.translate("slicer.installation.bundled").orElseThrow();
+        } else if (selected.operational()) {
+            detail = selected.settings().getOrDefault("executable", selected.version());
+        } else {
+            detail = text.translate("slicer.installation.failed", selected.failure())
+                    .orElseThrow();
+        }
         status.setText(detail);
         status.setTooltip(detail.isBlank() ? null : new Tooltip(detail));
     }
@@ -209,7 +224,9 @@ final class SlicerSettings {
         java.util.function.Consumer<SlicerInstallation> update = saved -> {
             installations.getItems().setAll(installations());
             if (saved == null) installations.getSelectionModel().selectFirst();
-            else installations.getSelectionModel().select(saved);
+            else {
+                installations.getSelectionModel().select(saved);
+            }
             refresh.run();
         };
         add.setOnAction(event -> editSafely(registry, types.getValue().id(), null, owner, text, update));
@@ -320,17 +337,18 @@ final class SlicerSettings {
                         values -> {
                             var errors = new LinkedHashMap<String, String>();
                             String proposed = values.getOrDefault(NAME, "").strip();
-                            if (proposed.isEmpty())
+                            if (proposed.isEmpty()) {
                                 errors.put(
                                         NAME,
                                         text.translate("slicer.installation.nameRequired")
                                                 .orElseThrow());
-                            else if (others.stream()
-                                    .anyMatch(entry -> entry.name().equalsIgnoreCase(proposed)))
+                            } else if (others.stream()
+                                    .anyMatch(entry -> entry.name().equalsIgnoreCase(proposed))) {
                                 errors.put(
                                         NAME,
                                         text.translate("slicer.installation.duplicate")
                                                 .orElseThrow());
+                            }
                             errors.putAll(validateProvider.apply(values));
                             return errors;
                         },
@@ -372,11 +390,12 @@ final class SlicerSettings {
                 });
             } catch (Exception | LinkageError failure) {
                 Platform.runLater(() -> {
-                    if (!cancellation.cancelled())
+                    if (!cancellation.cancelled()) {
                         status.setText(text.translate(
                                         "slicer.discovery.failed",
                                         Objects.toString(failure.getMessage(), failure.toString()))
                                 .orElseThrow());
+                    }
                 });
             }
         });
@@ -411,9 +430,10 @@ final class SlicerSettings {
         var result = check(provider, settings, owner, text)
                 .orElseThrow(() -> new IllegalArgumentException(
                         text.translate("slicer.installation.cancelled").orElseThrow()));
-        if (!result.failure().isEmpty())
+        if (!result.failure().isEmpty()) {
             throw new IllegalArgumentException(text.translate("slicer.installation.failed", result.failure())
                     .orElseThrow());
+        }
         return result.version();
     }
 
@@ -437,8 +457,9 @@ final class SlicerSettings {
             Check checked;
             try {
                 String version = provider.checkConfiguration(SlicerInputs.window(settings, Map.of()), cancellation);
-                if (version == null || version.isBlank())
+                if (version == null || version.isBlank()) {
                     throw new IllegalArgumentException("Slicer did not report a version");
+                }
                 checked = new Check(version, "");
             } catch (CancellationException cancelled) {
                 checked = new Check(

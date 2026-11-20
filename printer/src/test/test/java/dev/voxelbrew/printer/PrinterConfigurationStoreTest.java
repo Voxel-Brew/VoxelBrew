@@ -50,10 +50,10 @@ class PrinterConfigurationStoreTest {
         assertThat(loaded.toString()).doesNotContain("secret");
         var posix = Files.getFileAttributeView(
                 directory.resolve("id.json"), java.nio.file.attribute.PosixFileAttributeView.class);
-        if (posix != null)
+        if (posix != null) {
             assertThat(posix.readAttributes().permissions())
                     .isEqualTo(java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
-        else {
+        } else {
             var acl = Files.getFileAttributeView(
                     directory.resolve("id.json"), java.nio.file.attribute.AclFileAttributeView.class);
             assertThat(acl.getAcl())

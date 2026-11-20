@@ -25,9 +25,10 @@ class TechnicalEdgesTest {
         var edges = TechnicalEdges.from(mesh).edges();
         assertThat(edges.size()).isEqualTo(18);
         assertThat(edges.stream().filter(TechnicalEdges.Edge::boundary).count()).isEqualTo(12);
-        for (var eye : List.of(new TechnicalEdges.Point(3, 4, 5), new TechnicalEdges.Point(-3, -4, -5)))
+        for (var eye : List.of(new TechnicalEdges.Point(3, 4, 5), new TechnicalEdges.Point(-3, -4, -5))) {
             assertThat(edges.stream().filter(edge -> edge.visibleFrom(eye)).count())
                     .isEqualTo(12);
+        }
         assertThat(mesh.vertices())
                 .as("Rendering adjacency must not change exported geometry")
                 .containsExactly(detached);

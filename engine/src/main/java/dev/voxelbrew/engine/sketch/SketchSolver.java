@@ -44,17 +44,43 @@ public final class SketchSolver {
         }
 
         public SketchGeometry requireSolved() {
-            if (!solved())
+            if (!solved()) {
                 throw new IllegalArgumentException(problems.stream()
                         .map(Problem::message)
                         .reduce((a, b) -> a + "; " + b)
                         .orElseThrow());
+            }
             return geometry;
         }
     }
 
     public static Result solve(SketchGeometry input) {
         return solve(input, true);
+    }
+
+    private static Result classify(
+            SketchGeometry input, SketchGeometry current, double[] x, double[] residual, boolean parallel) {
+        var problems = problems(current);
+        if (!problems.isEmpty()) return new Result(current, -1, 0, problems);
+        if (x.length == 0 || residual.length == 0) {
+            return new Result(current, x.length, residual.length, List.of(), Set.of(ORIGIN));
+        }
+        var decomposition = new SingularValueDecomposition(
+                new Array2DRowRealMatrix(jacobian(input, x, residual.length, parallel), false));
+        var singular = decomposition.getSingularValues();
+        double cutoff = Math.max(1e-7, singular[0] * 1e-8);
+        int rank = 0;
+        for (double value : singular) {
+            if (value > cutoff) {
+                rank++;
+            }
+        }
+        return new Result(
+                current,
+                Math.max(0, x.length - rank),
+                Math.max(0, residual.length - rank),
+                List.of(),
+                constrainedReferences(current, decomposition.getV(), rank));
     }
 
     static Result solve(SketchGeometry input, boolean parallel) {
@@ -81,8 +107,9 @@ public final class SketchSolver {
                     var step = new double[x.length];
                     for (int k = 0; k < singular.length; k++) {
                         double coefficient = 0;
-                        for (int row = 0; row < residual.length; row++)
+                        for (int row = 0; row < residual.length; row++) {
                             coefficient -= u.getEntry(row, k) * residual[row];
+                        }
                         coefficient *= singular[k] / (singular[k] * singular[k] + lambda);
                         for (int col = 0; col < step.length; col++) step[col] += v.getEntry(col, k) * coefficient;
                     }
@@ -107,22 +134,7 @@ public final class SketchSolver {
                 }
                 if (!improved) break;
             }
-            var problems = problems(current);
-            if (!problems.isEmpty()) return new Result(current, -1, 0, problems);
-            if (x.length == 0 || residual.length == 0)
-                return new Result(current, x.length, residual.length, List.of(), Set.of(ORIGIN));
-            var decomposition = new SingularValueDecomposition(
-                    new Array2DRowRealMatrix(jacobian(input, x, residual.length, parallel), false));
-            var singular = decomposition.getSingularValues();
-            double cutoff = Math.max(1e-7, singular[0] * 1e-8);
-            int rank = 0;
-            for (double value : singular) if (value > cutoff) rank++;
-            return new Result(
-                    current,
-                    Math.max(0, x.length - rank),
-                    Math.max(0, residual.length - rank),
-                    List.of(),
-                    constrainedReferences(current, decomposition.getV(), rank));
+            return classify(input, current, x, residual, parallel);
         } catch (IllegalArgumentException failure) {
             return new Result(input, -1, 0, List.of(new Problem("", failure.getMessage())));
         }
@@ -185,7 +197,7 @@ public final class SketchSolver {
         var result = new ArrayList<Problem>();
         for (var c : g.constraints()) {
             double error = max(SketchConstraints.residuals(g, c));
-            if (!Double.isFinite(error) || error > TOLERANCE)
+            if (!Double.isFinite(error) || error > TOLERANCE) {
                 result.add(
                         new Problem(
                                 c.id(),
@@ -193,13 +205,18 @@ public final class SketchSolver {
                                         + " · "
                                         + c.type()
                                         + ": cannot satisfy this constraint together with the current dimensions/fixed geometry"));
+            }
         }
         return result;
     }
 
     private static double[] residual(SketchGeometry g) {
         var values = new ArrayList<Double>();
-        for (var c : g.constraints()) for (double value : SketchConstraints.residuals(g, c)) values.add(value);
+        for (var c : g.constraints()) {
+            for (double value : SketchConstraints.residuals(g, c)) {
+                values.add(value);
+            }
+        }
         return values.stream().mapToDouble(Double::doubleValue).toArray();
     }
 
@@ -215,9 +232,11 @@ public final class SketchSolver {
             for (int row = 0; row < rows; row++) result[row][col] = (ra[row] - rb[row]) / (2 * h);
         };
         // Tiny sketches cost less than scheduling work. Columns write disjoint matrix entries.
-        if (parallel && x.length >= 128 && (long) rows * x.length >= 16384)
+        if (parallel && x.length >= 128 && (long) rows * x.length >= 16384) {
             dev.voxelbrew.util.concurrent.ParallelWork.forEach(x.length, column);
-        else for (int col = 0; col < x.length; col++) column.accept(col);
+        } else {
+            for (int col = 0; col < x.length; col++) column.accept(col);
+        }
         return result;
     }
 

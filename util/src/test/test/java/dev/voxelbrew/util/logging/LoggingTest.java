@@ -150,8 +150,9 @@ class LoggingTest {
         try (var files = Files.list(logs)) {
             var paths = files.filter(p -> p.toString().endsWith(".log")).toList();
             assertThat(paths.size()).isEqualTo(2);
-            for (var path : paths)
+            for (var path : paths) {
                 assertThat(Files.size(path) <= 20L * 1024 * 1024).isTrue();
+            }
             long archived = paths.stream()
                     .filter(p -> !p.getFileName().toString().equals("app.log"))
                     .mapToLong(p -> p.toFile().length())

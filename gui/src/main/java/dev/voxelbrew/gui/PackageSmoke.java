@@ -40,9 +40,10 @@ final class PackageSmoke {
                 awaitBuild(w, stage, file, deadline);
                 return;
             }
-            if (!w.controller().canExport())
+            if (!w.controller().canExport()) {
                 throw new IllegalStateException(
                         "Smoke rebuild failed: " + w.controller().error());
+            }
             stage.setAlwaysOnTop(true);
             stage.centerOnScreen();
             stage.toFront();
@@ -54,7 +55,9 @@ final class PackageSmoke {
                 if (result.getIntersectedNode() != null
                         && "body-thickness.body"
                                 .equals(result.getIntersectedNode().getId())
-                        && result.getIntersectedFace() >= 0) picked[0] = true;
+                        && result.getIntersectedFace() >= 0) {
+                    picked[0] = true;
+                }
             });
             later(1, () -> {
                 var point = w.viewport().modelToScreen(new Point3D(30, 20, 8));
@@ -66,8 +69,9 @@ final class PackageSmoke {
                     later(.1, () -> {
                         robot.mouseRelease(MouseButton.PRIMARY);
                         later(.5, () -> {
-                            if (!picked[0])
+                            if (!picked[0]) {
                                 throw new IllegalStateException("Packaged GUI did not pick the rendered body");
+                            }
                             try {
                                 Screenshot.save(stage.getScene(), file);
                                 String result = "GUI_SMOKE_PASS rendered and picked OCCT reference; Java "

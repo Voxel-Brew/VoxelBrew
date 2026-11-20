@@ -29,10 +29,12 @@ record NumericFieldBounds(double min, boolean minInclusive, double max, boolean 
     }
 
     String minimumHint() {
-        return Double.isFinite(min) ? format(min) + (minInclusive ? " ≤" : " <") : "";
+        if (!Double.isFinite(min)) return "";
+        return format(min) + (minInclusive ? " ≤" : " <");
     }
 
     String maximumHint() {
-        return Double.isFinite(max) ? (maxInclusive ? "≤ " : "< ") + format(max) : "";
+        if (!Double.isFinite(max)) return "";
+        return (maxInclusive ? "≤ " : "< ") + format(max);
     }
 }

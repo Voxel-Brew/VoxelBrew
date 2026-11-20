@@ -29,10 +29,31 @@ public final class SketchProfiles {
 
     public static PlanarProfile profile(SketchGeometry g) {
         var regions = regions(g);
-        if (regions.size() != 1)
+        if (regions.size() != 1) {
             throw new IllegalArgumentException(
                     "Profile contains separate regions; choose one region or extrude them as separate bodies");
+        }
         return regions.getFirst().profile();
+    }
+
+    private static int[] enclosingLoops(List<List<Edge>> loops, List<List<Vec>> polygons, double[] areas) {
+        int[] parent = new int[loops.size()];
+        Arrays.fill(parent, -1);
+        for (int i = 0; i < loops.size(); i++) {
+            if (!Double.isFinite(areas[i]) || Math.abs(areas[i]) < 1e-12) {
+                throw new IllegalArgumentException("Profile has zero or invalid area");
+            }
+            double size = Double.POSITIVE_INFINITY;
+            for (int j = 0; j < loops.size(); j++) {
+                if (Math.abs(areas[j]) > Math.abs(areas[i])
+                        && Math.abs(areas[j]) < size
+                        && inside(loops.get(i).getFirst().start(), polygons.get(j))) {
+                    parent[i] = j;
+                    size = Math.abs(areas[j]);
+                }
+            }
+        }
+        return parent;
     }
 
     public static List<Region> regions(SketchGeometry g) {
@@ -59,8 +80,9 @@ public final class SketchProfiles {
 
     private static List<Region> regions(SketchGeometry g, boolean individual) {
         SketchConstraints.requireSatisfied(g);
-        if (g.boundary().isEmpty())
+        if (g.boundary().isEmpty()) {
             throw new IllegalArgumentException("Select closed profile geometry in Edit sketch before extruding");
+        }
         var remaining = new ArrayList<>(g.boundary().stream()
                 .map(g::entity)
                 .flatMap(e -> g.curves(e).stream())
@@ -69,20 +91,7 @@ public final class SketchProfiles {
         var loops = boundaryLoops(remaining, individual);
         var polygons = loops.stream().map(SketchProfiles::samples).toList();
         var areas = polygons.stream().mapToDouble(SketchProfiles::area).toArray();
-        int[] parent = new int[loops.size()];
-        Arrays.fill(parent, -1);
-        for (int i = 0; i < loops.size(); i++) {
-            if (!Double.isFinite(areas[i]) || Math.abs(areas[i]) < 1e-12)
-                throw new IllegalArgumentException("Profile has zero or invalid area");
-            double size = Double.POSITIVE_INFINITY;
-            for (int j = 0; j < loops.size(); j++)
-                if (Math.abs(areas[j]) > Math.abs(areas[i])
-                        && Math.abs(areas[j]) < size
-                        && inside(loops.get(i).getFirst().start(), polygons.get(j))) {
-                    parent[i] = j;
-                    size = Math.abs(areas[j]);
-                }
-        }
+        int[] parent = enclosingLoops(loops, polygons, areas);
         var result = new ArrayList<Region>();
         for (int i = 0; i < loops.size(); i++) {
             int depth = 0;
@@ -90,7 +99,11 @@ public final class SketchProfiles {
             if (depth % 2 != 0) continue;
             var wires = new ArrayList<List<PlanarProfile.Segment>>();
             wires.add(segments(loops.get(i), areas[i] < 0));
-            for (int j = 0; j < loops.size(); j++) if (parent[j] == i) wires.add(segments(loops.get(j), areas[j] > 0));
+            for (int j = 0; j < loops.size(); j++) {
+                if (parent[j] == i) {
+                    wires.add(segments(loops.get(j), areas[j] > 0));
+                }
+            }
             String id = individual
                     ? regionId(loops.get(i))
                     : loops.get(i).getFirst().entity().id();
@@ -116,9 +129,10 @@ public final class SketchProfiles {
                     .filter(e -> e.start().distance(edge.end()) <= TOLERANCE)
                     .sorted(Comparator.comparingDouble(SketchProfiles::angle))
                     .toList();
-            if (outgoing.size() < 2)
+            if (outgoing.size() < 2) {
                 throw new IllegalArgumentException(
                         "Open profile at " + edge.entity().id() + "; add Coincident constraints to close it");
+            }
             int reverse = outgoing.indexOf(edge.reverse());
             next.put(edge, outgoing.get((reverse + outgoing.size() - 1) % outgoing.size()));
         }
@@ -128,19 +142,22 @@ public final class SketchProfiles {
             var path = new ArrayList<Edge>();
             var edge = start;
             do {
-                if (!visited.add(edge))
+                if (!visited.add(edge)) {
                     throw new IllegalArgumentException(
                             "Ambiguous profile boundary at " + edge.entity().id());
+                }
                 path.add(edge);
                 edge = next.get(edge);
             } while (!edge.equals(start));
             double signedArea = area(samples(path));
             if (Math.abs(signedArea) < 1e-12) throw new IllegalArgumentException("Profile has zero or invalid area");
-            if (signedArea < 0 && path.stream().map(Edge::entity).distinct().count() != path.size())
+            if (signedArea < 0 && path.stream().map(Edge::entity).distinct().count() != path.size()) {
                 throw new IllegalArgumentException("Profile contains an open connecting edge");
+            }
             if (individual ? signedArea > 0 : signedArea < 0) {
-                if (path.stream().map(Edge::entity).distinct().count() != path.size())
+                if (path.stream().map(Edge::entity).distinct().count() != path.size()) {
                     throw new IllegalArgumentException("Profile contains an open connecting edge");
+                }
                 loops.add(path);
             }
         }
@@ -209,7 +226,9 @@ public final class SketchProfiles {
             var a = polygon.get(i);
             var b = polygon.get(j);
             if ((a.y() > p.y()) != (b.y() > p.y())
-                    && p.x() < (b.x() - a.x()) * (p.y() - a.y()) / (b.y() - a.y()) + a.x()) result = !result;
+                    && p.x() < (b.x() - a.x()) * (p.y() - a.y()) / (b.y() - a.y()) + a.x()) {
+                result = !result;
+            }
         }
         return result;
     }

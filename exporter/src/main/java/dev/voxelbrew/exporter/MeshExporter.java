@@ -47,26 +47,31 @@ public abstract class MeshExporter implements Exporter<MeshExportDialog.Settings
         var selection = requested.selection();
         boolean preparedPlate = document.printSetup().plates().stream()
                 .anyMatch(p -> !p.instances().isEmpty());
-        if (format().extensions().contains("3mf") && preparedPlate)
+        if (format().extensions().contains("3mf") && preparedPlate) {
             selection = new ExportSelection(
                     ExportSelection.Space.BUILD_PLATE,
                     selection.contents(),
                     selection.space() == ExportSelection.Space.DESIGN ? null : selection.body(),
                     selection.instance());
+        }
         var settings = new MeshExportDialog.Settings(
                 selection, requested.mesh(), requested.options(), requested.destination(), requested.snapshot());
         if (settings.snapshot() != null) {
             var model = settings.snapshot();
             if (!document.id().equals(model.documentId())
-                    || !DocumentCodec.fingerprint(document).equals(model.revision()))
+                    || !DocumentCodec.fingerprint(document).equals(model.revision())) {
                 throw new IllegalArgumentException("Manufacturing snapshot does not match the document");
-            if (settings.selection().space() != ExportSelection.Space.BUILD_PLATE)
+            }
+            if (settings.selection().space() != ExportSelection.Space.BUILD_PLATE) {
                 throw new IllegalArgumentException("Manufacturing snapshots require BUILD_PLATE space");
+            }
             var view = ModelViews.from(model, settings.selection().contents());
-            if (settings.selection().body() != null)
+            if (settings.selection().body() != null) {
                 view = ModelViews.select(view, settings.selection().body());
-            if (settings.selection().instance() != null)
+            }
+            if (settings.selection().instance() != null) {
                 view = ModelViews.selectInstance(view, settings.selection().instance());
+            }
             writeFile(view, settings, document.printSetup());
         } else {
             try (var evaluation = Evaluator.evaluate(document, pluginDirectory)) {
@@ -102,8 +107,9 @@ public abstract class MeshExporter implements Exporter<MeshExportDialog.Settings
             ModelView view, MeshExportDialog.Settings settings, dev.voxelbrew.api.model.printing.PrintSetup setup)
             throws IOException {
         if (view.instances().isEmpty()) throw new IllegalArgumentException("Nothing to export");
-        if (!format().multipleInstances() && view.instances().size() != 1)
+        if (!format().multipleInstances() && view.instances().size() != 1) {
             throw new IllegalArgumentException("Exporter requires one selected body/instance");
+        }
         var values = new LinkedHashMap<String, String>();
         for (var option : format().options()) values.put(option.key(), option.defaultValue());
         for (var option : settings.options().entrySet()) {

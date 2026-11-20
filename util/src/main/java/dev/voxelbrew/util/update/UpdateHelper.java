@@ -42,20 +42,25 @@ public class UpdateHelper {
                 || stage == null
                 || stageName == null
                 || !stageName.toString().startsWith(".VoxelBrew-update-")
-                || Files.isSymbolicLink(stage)) throw new IOException("Invalid update staging directory");
+                || Files.isSymbolicLink(stage)) {
+            throw new IOException("Invalid update staging directory");
+        }
         Properties p = ApplicationImage.read(job);
         Path target = Path.of(p.getProperty("target")).toAbsolutePath().normalize();
-        if (!java.util.Objects.equals(target.getParent(), stage.getParent()) || Files.isSymbolicLink(target))
+        if (!java.util.Objects.equals(target.getParent(), stage.getParent()) || Files.isSymbolicLink(target)) {
             throw new IOException("Update must remain beside its original installation");
+        }
         var component = ApplicationImage.Component.valueOf(p.getProperty("component"));
         String platform = p.getProperty("platform");
         var original = ApplicationImage.open(target, component, platform);
-        if (!original.version().toString().equals(p.getProperty("oldVersion")))
+        if (!original.version().toString().equals(p.getProperty("oldVersion"))) {
             throw new IOException("Installation changed while preparing update");
+        }
         Path source = stage.resolve("payload").resolve(component.imageName(platform));
         var replacement = ApplicationImage.open(source, component, platform);
-        if (!replacement.version().toString().equals(p.getProperty("newVersion")))
+        if (!replacement.version().toString().equals(p.getProperty("newVersion"))) {
             throw new IOException("Replacement version changed");
+        }
         Path backup = target.resolveSibling("."
                 + target.getFileName()
                 + "-backup-"
@@ -69,15 +74,17 @@ public class UpdateHelper {
                     .filter(h -> h.isAlive()
                             && h.info().startInstant().map(start::equals).orElse(true))
                     .isPresent()) {
-                if (System.nanoTime() > deadline)
+                if (System.nanoTime() > deadline) {
                     throw new IOException(
                             "Application did not exit; no files replaced. Close all instances and retry.");
+                }
                 Thread.sleep(100);
             }
             try (var runningLock = waitLock(original.runningLock(), false, deadline)) {
                 var current = ApplicationImage.open(target, component, platform);
-                if (!current.version().equals(original.version()))
+                if (!current.version().equals(original.version())) {
                     throw new IOException("Installation changed; no files replaced");
+                }
                 status(stage, "INSTALLING", "Installing " + replacement.version());
                 replace(target, source, backup, UpdateHelper::move);
                 status(stage, "SUCCESS", "Installed " + replacement.version() + "; backup: " + backup);
@@ -91,9 +98,10 @@ public class UpdateHelper {
             try {
                 return ApplicationImage.lock(file, shared);
             } catch (IOException failure) {
-                if (System.nanoTime() > deadline)
+                if (System.nanoTime() > deadline) {
                     throw new IOException(
                             "Installation is busy. Close all instances and retry; no update was installed.", failure);
+                }
                 Thread.sleep(100);
             }
         }

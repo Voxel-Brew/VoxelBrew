@@ -26,9 +26,31 @@ public final class ParallelWork {
         private final int parallelism;
         private final ExecutorService executor;
 
+        private static void awaitWorkers(CountDownLatch finished, AtomicBoolean stop, Throwable[] failures) {
+            boolean interrupted = false;
+            for (; ; ) {
+                try {
+                    finished.await();
+                    break;
+                } catch (InterruptedException cancelled) {
+                    interrupted = true;
+                    stop.set(true);
+                    // Future.cancel() would report completion before JNI actually exits. Drain
+                    // instead.
+                }
+            }
+            if (interrupted) Thread.currentThread().interrupt();
+            checkInterrupted();
+            for (var failure : failures) {
+                if (failure instanceof RuntimeException runtime) throw runtime;
+                if (failure instanceof Error error) throw error;
+            }
+        }
+
         WorkPool(int parallelism, ExecutorService executor) {
-            if (parallelism < 1 || parallelism > 32)
+            if (parallelism < 1 || parallelism > 32) {
                 throw new IllegalArgumentException("voxelbrew.compute.threads must be from 1 to 32");
+            }
             this.parallelism = parallelism;
             this.executor = executor;
         }
@@ -74,24 +96,7 @@ public final class ParallelWork {
                     finished.countDown();
                 }
             }
-            boolean interrupted = false;
-            for (; ; ) {
-                try {
-                    finished.await();
-                    break;
-                } catch (InterruptedException cancelled) {
-                    interrupted = true;
-                    stop.set(true);
-                    // Future.cancel() would report completion before JNI actually exits. Drain
-                    // instead.
-                }
-            }
-            if (interrupted) Thread.currentThread().interrupt();
-            checkInterrupted();
-            for (var failure : failures) {
-                if (failure instanceof RuntimeException runtime) throw runtime;
-                if (failure instanceof Error error) throw error;
-            }
+            awaitWorkers(finished, stop, failures);
         }
     }
 

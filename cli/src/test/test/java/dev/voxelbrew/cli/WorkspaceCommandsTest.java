@@ -198,12 +198,13 @@ class WorkspaceCommandsTest {
                             .execute(args.toArray(String[]::new)))
                     .as(path.toString())
                     .isEqualTo(0);
-        } else
+        } else {
             command.getSubcommands().forEach((name, child) -> {
                 var next = new ArrayList<>(path);
                 next.add(name);
                 verifyHelp(child, next);
             });
+        }
     }
 
     @Test

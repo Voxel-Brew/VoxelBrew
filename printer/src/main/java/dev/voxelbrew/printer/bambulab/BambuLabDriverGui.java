@@ -57,29 +57,34 @@ public final class BambuLabDriverGui implements DriverGui {
                     || uri.getPort() == 0
                     || uri.getPort() > 65535
                     || (uri.getPort() != -1 && uri.getPort() != 8883)
-                    || (!uri.getPath().isEmpty() && !uri.getPath().equals("/"))) throw new IllegalArgumentException();
+                    || (!uri.getPath().isEmpty() && !uri.getPath().equals("/"))) {
+                throw new IllegalArgumentException();
+            }
         } catch (IllegalArgumentException failure) {
             errors.put(
                     BAMBU_ADDRESS_ID,
                     translations.translate("printer.bambulab.invalidAddress").orElseThrow());
         }
-        if (values.getOrDefault(BAMBU_SERIAL_ID, "").isBlank())
+        if (values.getOrDefault(BAMBU_SERIAL_ID, "").isBlank()) {
             errors.put(
                     BAMBU_SERIAL_ID,
                     translations.translate("printer.bambulab.missingSerial").orElseThrow());
-        if (values.getOrDefault(BAMBU_SECRET_ID, "").isBlank())
+        }
+        if (values.getOrDefault(BAMBU_SECRET_ID, "").isBlank()) {
             errors.put(
                     BAMBU_SECRET_ID,
                     translations.translate("printer.bambulab.missingCode").orElseThrow());
+        }
         return Map.copyOf(errors);
     }
 
     @Override
     public DriverConfiguration buildConfiguration(Map<String, String> values) {
         var errors = validate(values);
-        if (!errors.isEmpty())
+        if (!errors.isEmpty()) {
             throw new IllegalArgumentException(
                     translations.translate("printer.invalid", errors).orElseThrow());
+        }
         return new DriverConfiguration(Map.of(
                 BAMBU_ADDRESS_ID,
                 URI.create(values.get(BAMBU_ADDRESS_ID)),

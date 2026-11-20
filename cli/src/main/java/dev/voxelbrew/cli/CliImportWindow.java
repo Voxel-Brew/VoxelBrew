@@ -15,8 +15,9 @@ final class CliImportWindow implements ImportWindow {
 
     private static void collect(Component component, Map<String, Input> inputs) {
         if (component instanceof Input input) {
-            if (inputs.putIfAbsent(input.id(), input) != null)
+            if (inputs.putIfAbsent(input.id(), input) != null) {
                 throw new IllegalArgumentException("Duplicate import input: " + input.id());
+            }
         } else if (component instanceof HorizontalLayout layout) {
             layout.children().forEach(child -> collect(child, inputs));
         } else if (component instanceof VerticalLayout layout) {
@@ -36,16 +37,24 @@ final class CliImportWindow implements ImportWindow {
         var values = new LinkedHashMap<String, String>();
         for (var input : inputs.values()) {
             if (input instanceof FileSource) values.put(input.id(), source.toString());
-            else if (input instanceof TextField field) values.put(input.id(), field.value());
-            else if (input instanceof TextArea area) values.put(input.id(), area.value());
-            else if (input instanceof CheckBox box) values.put(input.id(), Boolean.toString(box.selected()));
-            else if (input instanceof ComboBox box) values.put(input.id(), box.selected());
-            else if (input instanceof RadioButtonGroup group) values.put(input.id(), group.selected());
-            else if (input instanceof Slider slider) values.put(input.id(), Double.toString(slider.value()));
+            else if (input instanceof TextField field) {
+                values.put(input.id(), field.value());
+            } else if (input instanceof TextArea area) {
+                values.put(input.id(), area.value());
+            } else if (input instanceof CheckBox box) {
+                values.put(input.id(), Boolean.toString(box.selected()));
+            } else if (input instanceof ComboBox box) {
+                values.put(input.id(), box.selected());
+            } else if (input instanceof RadioButtonGroup group) {
+                values.put(input.id(), group.selected());
+            } else if (input instanceof Slider slider) {
+                values.put(input.id(), Double.toString(slider.value()));
+            }
         }
         for (var option : options.entrySet()) {
-            if (!inputs.containsKey(option.getKey()) || inputs.get(option.getKey()) instanceof FileSource)
+            if (!inputs.containsKey(option.getKey()) || inputs.get(option.getKey()) instanceof FileSource) {
                 throw new IllegalArgumentException("Unknown import option: " + option.getKey());
+            }
             values.put(option.getKey(), option.getValue());
         }
         var errors = dialog.validate(values);

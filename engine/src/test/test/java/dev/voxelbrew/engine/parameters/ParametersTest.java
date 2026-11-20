@@ -99,8 +99,9 @@ class ParametersTest {
         assertThatThrownBy(() -> ParameterSet.empty().put("mm", ParameterUnit.MM, "5", ""))
                 .isInstanceOf(IllegalArgumentException.class);
         var deep = ParameterSet.empty();
-        for (int i = 0; i < 34; i++)
+        for (int i = 0; i < 34; i++) {
             deep = deep.put("p" + "_".repeat(i), ParameterUnit.MM, i == 33 ? "1" : "p" + "_".repeat(i + 1), "");
+        }
         assertThat(org.assertj.core.api.Assertions.catchThrowableOfType(deep::validate, IllegalArgumentException.class)
                         .getMessage()
                         .contains("depth exceeds 32"))

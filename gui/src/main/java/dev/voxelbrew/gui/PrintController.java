@@ -137,7 +137,9 @@ public final class PrintController implements AutoCloseable {
     public void documentChanged(CadDocument document) {
         if (revision.isEmpty()
                 || (revision.equals(DocumentCodec.fingerprint(document))
-                        && installationId.equals(SlicerInstallation.selectedId(document.printSetup())))) return;
+                        && installationId.equals(SlicerInstallation.selectedId(document.printSetup())))) {
+            return;
+        }
         outdated("Model or print settings changed. Slice again to update the job.");
     }
 
@@ -193,12 +195,7 @@ public final class PrintController implements AutoCloseable {
             try {
                 var job = gcodeReader.readLines(lines);
                 dispatch.accept(() -> {
-                    if (closed
-                            || ticket != generation
-                            || !captured.equals(restoredRevision)
-                            || running
-                            || !captured.equals(DocumentCodec.fingerprint(current.get()))
-                            || !lines.equals(current.get().activeGcode())) return;
+                    if (stalePreview(ticket, captured, lines)) return;
                     revision = captured;
                     installationId = SlicerInstallation.selectedId(document.printSetup());
                     result = new SliceService.Result(job, null);
@@ -208,12 +205,7 @@ public final class PrintController implements AutoCloseable {
                 });
             } catch (IOException failure) {
                 dispatch.accept(() -> {
-                    if (closed
-                            || ticket != generation
-                            || !captured.equals(restoredRevision)
-                            || running
-                            || !captured.equals(DocumentCodec.fingerprint(current.get()))
-                            || !lines.equals(current.get().activeGcode())) return;
+                    if (stalePreview(ticket, captured, lines)) return;
                     restoredRevision = "";
                     message = "Cannot preview stored G-code: " + failure.getMessage();
                     onChanged.run();
@@ -263,13 +255,7 @@ public final class PrintController implements AutoCloseable {
                                     models.get(i),
                                     window,
                                     token,
-                                    line -> dispatch.accept(() -> {
-                                        if (closed || ticket != generation || state != State.SLICING) return;
-                                        if (diagnostics.size() == 100) diagnostics.removeFirst();
-                                        diagnostics.add(label + line);
-                                        message = label + line;
-                                        onChanged.run();
-                                    }))
+                                    line -> dispatch.accept(() -> reportDiagnostic(ticket, label, line)))
                             .orElseThrow(CancellationException::new);
                     lastResult = completed;
                     artifacts.put(request.printSetup().activePlateId(), completed.artifact());
@@ -278,56 +264,21 @@ public final class PrintController implements AutoCloseable {
                             completed.job().lines());
                     if (request.printSetup()
                             .activePlateId()
-                            .equals(document.printSetup().activePlateId())) selectedResult = completed;
+                            .equals(document.printSetup().activePlateId())) {
+                        selectedResult = completed;
+                    }
                 }
                 token.check();
                 var completed = lastResult;
                 var preview = selectedResult;
-                dispatch.accept(() -> {
-                    if (closed || ticket != generation) {
-                        future.cancel(false);
-                        return;
-                    }
-                    running = false;
-                    var live = current.get();
-                    if (state == State.OUTDATED
-                            || !revision.equals(DocumentCodec.fingerprint(live))
-                            || !Objects.equals(
-                                    document.printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID),
-                                    live.printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID))
-                            || !SlicerInstallation.selectedId(document.printSetup())
-                                    .equals(SlicerInstallation.selectedId(live.printSetup()))) {
-                        state = State.OUTDATED;
-                        message = "Job is outdated; slice the current revision again.";
-                        result = null;
-                        future.completeExceptionally(new SliceService.OutdatedException());
-                    } else if (token.cancelled()) {
-                        state = State.CANCELLED;
-                        result = null;
-                        message = "Slicing cancelled.";
-                        future.completeExceptionally(new CancellationException(message));
-                    } else {
-                        try {
-                            token.publish(() -> {
-                                state = State.SUCCEEDED;
-                                completedGcode = Map.copyOf(jobs);
-                                completedArtifacts = Map.copyOf(artifacts);
-                                result = preview;
-                                message = "Sliced " + requests.size() + " plate(s). G-code ready to export.";
-                                future.complete(completed);
-                            });
-                        } catch (IOException | CancellationException failure) {
-                            state = failure instanceof CancellationException ? State.CANCELLED : State.FAILED;
-                            message = failure.getMessage();
-                            future.completeExceptionally(failure);
-                        }
-                    }
-                    onChanged.run();
-                });
+                dispatch.accept(() -> completeSlice(
+                        ticket, document, token, jobs, artifacts, preview, completed, requests.size(), future));
             } catch (Exception | LinkageError failure) {
-                if (failure instanceof CancellationException || failure instanceof SliceService.OutdatedException)
+                if (failure instanceof CancellationException || failure instanceof SliceService.OutdatedException) {
                     log.debug("Print job cancelled or outdated", failure);
-                else log.error("Print job failed", failure);
+                } else {
+                    log.error("Print job failed", failure);
+                }
                 dispatch.accept(() -> {
                     if (closed || ticket != generation) {
                         future.cancel(false);
@@ -336,9 +287,11 @@ public final class PrintController implements AutoCloseable {
                     running = false;
                     result = null;
                     if (state != State.OUTDATED) {
-                        state = failure instanceof CancellationException
-                                ? State.CANCELLED
-                                : failure instanceof SliceService.OutdatedException ? State.OUTDATED : State.FAILED;
+                        state = switch (failure) {
+                            case CancellationException ignored -> State.CANCELLED;
+                            case SliceService.OutdatedException ignored -> State.OUTDATED;
+                            default -> State.FAILED;
+                        };
                         message = Objects.toString(failure.getMessage(), failure.toString());
                     }
                     onChanged.run();
@@ -365,5 +318,73 @@ public final class PrintController implements AutoCloseable {
         generation++;
         if (cancellation != null) cancellation.cancel();
         worker.shutdown();
+    }
+
+    private void reportDiagnostic(long ticket, String label, String line) {
+        if (closed || ticket != generation || state != State.SLICING) return;
+        if (diagnostics.size() == 100) diagnostics.removeFirst();
+        diagnostics.add(label + line);
+        message = label + line;
+        onChanged.run();
+    }
+
+    private void completeSlice(
+            long ticket,
+            CadDocument document,
+            Cancellation token,
+            Map<String, List<String>> jobs,
+            Map<String, PrintArtifact> artifacts,
+            SliceService.Result preview,
+            SliceService.Result completed,
+            int count,
+            CompletableFuture<SliceService.Result> future) {
+        if (closed || ticket != generation) {
+            future.cancel(false);
+            return;
+        }
+        running = false;
+        var live = current.get();
+        if (state == State.OUTDATED
+                || !revision.equals(DocumentCodec.fingerprint(live))
+                || !Objects.equals(
+                        document.printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID),
+                        live.printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID))
+                || !SlicerInstallation.selectedId(document.printSetup())
+                        .equals(SlicerInstallation.selectedId(live.printSetup()))) {
+            state = State.OUTDATED;
+            message = "Job is outdated; slice the current revision again.";
+            result = null;
+            future.completeExceptionally(new SliceService.OutdatedException());
+        } else if (token.cancelled()) {
+            state = State.CANCELLED;
+            result = null;
+            message = "Slicing cancelled.";
+            future.completeExceptionally(new CancellationException(message));
+        } else {
+            try {
+                token.publish(() -> {
+                    state = State.SUCCEEDED;
+                    completedGcode = Map.copyOf(jobs);
+                    completedArtifacts = Map.copyOf(artifacts);
+                    result = preview;
+                    message = "Sliced " + count + " plate(s). G-code ready to export.";
+                    future.complete(completed);
+                });
+            } catch (IOException | CancellationException failure) {
+                state = failure instanceof CancellationException ? State.CANCELLED : State.FAILED;
+                message = failure.getMessage();
+                future.completeExceptionally(failure);
+            }
+        }
+        onChanged.run();
+    }
+
+    private boolean stalePreview(long ticket, String captured, List<String> lines) {
+        return closed
+                || ticket != generation
+                || !captured.equals(restoredRevision)
+                || running
+                || !captured.equals(DocumentCodec.fingerprint(current.get()))
+                || !lines.equals(current.get().activeGcode());
     }
 }

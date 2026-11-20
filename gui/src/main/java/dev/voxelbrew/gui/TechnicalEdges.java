@@ -74,9 +74,9 @@ final class TechnicalEdges {
                 int start = corners[k], end = corners[(k + 1) % 3];
                 var pair = new Pair(Math.min(start, end), Math.max(start, end));
                 var old = adjacent.get(pair);
-                if (old == null)
+                if (old == null) {
                     adjacent.put(pair, new Adjacent(points.get(start), points.get(end), normal, mesh.faceIndex(t)));
-                else {
+                } else {
                     old.boundary |= old.face != mesh.faceIndex(t) || old.second != null;
                     old.second = normal;
                 }

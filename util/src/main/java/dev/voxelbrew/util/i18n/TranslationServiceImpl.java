@@ -104,12 +104,13 @@ public final class TranslationServiceImpl implements TranslationService {
     private Locale selectLocale(Locale locale, Map<String, Properties> catalogs) {
         String requested = locale.toLanguageTag().toLowerCase(Locale.ROOT);
         Properties external = catalogs.get(requested);
-        if (external == null && !requested.contains("-"))
+        if (external == null && !requested.contains("-")) {
             external = catalogs.entrySet().stream()
                     .filter(entry -> entry.getKey().startsWith(requested + "-"))
                     .map(Map.Entry::getValue)
                     .findFirst()
                     .orElse(null);
+        }
         if (external != null) return Locale.forLanguageTag(external.getProperty("language.i18n"));
         if (translations.containsKey(locale)) return locale;
         Locale language = Locale.forLanguageTag(locale.getLanguage());
@@ -128,17 +129,18 @@ public final class TranslationServiceImpl implements TranslationService {
 
     private void logLanguageSelection(Startup startup) {
         if (startup.source() == null) return;
-        if (startup.locale().getLanguage().equals(currentLocale().getLanguage()))
+        if (startup.locale().getLanguage().equals(currentLocale().getLanguage())) {
             log.info(
                     "Selected application language {} from {} ({})",
                     currentLocale().toLanguageTag(),
                     startup.source(),
                     startup.locale().toLanguageTag());
-        else
+        } else {
             log.info(
                     "Selected application language en: English fallback for unset or unsupported {} ({})",
                     startup.source(),
                     startup.locale().toLanguageTag());
+        }
     }
 
     private Map<String, String> registerExternalCatalogs(Map<String, Properties> catalogs) {

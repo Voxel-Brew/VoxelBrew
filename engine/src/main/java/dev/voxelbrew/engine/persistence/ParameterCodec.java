@@ -29,23 +29,26 @@ class ParameterCodec {
 
     static DocumentProto.ParameterSet toProto(ParameterSet parameters) {
         var result = DocumentProto.ParameterSet.newBuilder().setActiveConfiguration(parameters.active());
-        for (var p : parameters.parameters())
+        for (var p : parameters.parameters()) {
             result.addParameters(DocumentProto.UserParameter.newBuilder()
                     .setId(p.id())
                     .setName(p.name())
                     .setUnit(p.unit().name())
                     .setExpression(p.expression())
                     .setComment(p.comment()));
-        for (var c : parameters.configurations())
+        }
+        for (var c : parameters.configurations()) {
             result.addConfigurations(DocumentProto.ParameterConfiguration.newBuilder()
                     .setId(c.id())
                     .setName(c.name())
                     .putAllOverrides(c.overrides()));
-        for (var b : parameters.bindings())
+        }
+        for (var b : parameters.bindings()) {
             result.addBindings(DocumentProto.DimensionBinding.newBuilder()
                     .setFeatureId(b.target().featureId())
                     .setField(b.target().field())
                     .setExpression(b.expression()));
+        }
         return result.build();
     }
 }

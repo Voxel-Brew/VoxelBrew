@@ -11,10 +11,12 @@ import org.junit.jupiter.api.Test;
 class FormulaExpressionsTest {
     @Test
     void dottedNamesValidateEvaluateAndRenameAsWholeReferences() {
-        for (var name : List.of("x", "x.fo", "x.bo", "Plate.width", "a_b", "a.."))
+        for (var name : List.of("x", "x.fo", "x.bo", "Plate.width", "a_b", "a..")) {
             assertThatCode(() -> ParameterSet.requireName(name)).doesNotThrowAnyException();
-        for (var name : List.of("_x", ".x", "x1", "1x", "vb.width", "vb.", "a-b", "é"))
+        }
+        for (var name : List.of("_x", ".x", "x1", "1x", "vb.width", "vb.", "a-b", "é")) {
             assertThatThrownBy(() -> ParameterSet.requireName(name)).isInstanceOf(IllegalArgumentException.class);
+        }
         var p = ParameterSet.empty()
                 .put("x.fo", ParameterUnit.MM, "10", "")
                 .put("x.bo", ParameterUnit.MM, "=$x.fo * 2", "");
@@ -69,7 +71,9 @@ class FormulaExpressionsTest {
                 "==2",
                 "=\"unclosed",
                 "=\"x\"*2",
-                "=sin(\"x\")")) assertThatThrownBy(() -> p.text(input)).isInstanceOf(IllegalArgumentException.class);
+                "=sin(\"x\")")) {
+            assertThatThrownBy(() -> p.text(input)).isInstanceOf(IllegalArgumentException.class);
+        }
         assertThatThrownBy(() -> p.value("=\"5\"", ParameterUnit.NUMBER)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> p.value("=2 mm", ParameterUnit.DEG)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> p.text("=" + "(".repeat(40) + "1" + ")".repeat(40)))

@@ -107,8 +107,9 @@ class UpdateTest {
                 .isTrue();
         assertThat(ReleaseVersion.parse("1.2.3-SNAPSHOT").compareTo(current) < 0)
                 .isTrue();
-        for (String invalid : List.of("01.2.3", "1.2", "1.2.3-rc1", "65535.0.0", "1.2.3/path"))
+        for (String invalid : List.of("01.2.3", "1.2", "1.2.3-rc1", "65535.0.0", "1.2.3/path")) {
             assertThatThrownBy(() -> ReleaseVersion.parse(invalid)).isInstanceOf(IllegalArgumentException.class);
+        }
         assertThatThrownBy(() -> ReleaseVersion.release("1.2.3-SNAPSHOT")).isInstanceOf(IllegalArgumentException.class);
         assertThat(check("1.2.3", null, false).available()).isFalse();
         assertThat(check("1.2.3", null, true).available()).isTrue();
@@ -135,9 +136,10 @@ class UpdateTest {
                 "{}",
                 "{broken",
                 "[]",
-                metadata("v1.2.3", "false", "false") + " {}"))
+                metadata("v1.2.3", "false", "false") + " {}")) {
             assertThatThrownBy(() -> GitHubReleaseSource.parse(metadata, current))
                     .isInstanceOf(IOException.class);
+        }
         var missing = new ReleaseSource.Release(current, Set.of("SHA256SUMS"));
         assertThatThrownBy(() ->
                         service(missing, Optional.empty()).check(new UpdateService.Request(null, true), cancellation))

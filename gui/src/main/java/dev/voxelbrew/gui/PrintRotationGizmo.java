@@ -54,8 +54,9 @@ final class PrintRotationGizmo {
                 if (lengthSquared < 1e-9) continue;
                 double fraction = Math.clamp(point.subtract(a).dotProduct(segment) / lengthSquared, 0, 1);
                 double distance = point.distance(a.add(segment.multiply(fraction)));
-                if (distance <= 7 && (best == null || distance < best.distance()))
+                if (distance <= 7 && (best == null || distance < best.distance())) {
                     best = new Hit(this, angle + fraction * Math.PI / 36, distance);
+                }
             }
             return best;
         }
@@ -86,8 +87,9 @@ final class PrintRotationGizmo {
                 var tangent =
                         ring.u().multiply(-Math.sin(startAngle)).add(ring.v().multiply(Math.cos(startAngle)));
                 // At an edge-on extremity use vertical screen motion rather than dividing by zero.
-                if (tangent.magnitude() < 8)
+                if (tangent.magnitude() < 8) {
                     tangent = new Point2D(0, -Math.max(40, ring.u().magnitude()));
+                }
                 accumulated = point.subtract(start).dotProduct(tangent) / tangent.dotProduct(tangent);
             } else {
                 double angle = ring.angle(point);
@@ -114,8 +116,9 @@ final class PrintRotationGizmo {
     static Axis topAxis(Transform frame) {
         var matrix = frame.matrix();
         int best = 2;
-        for (int axis = 0; axis < 3; axis++)
+        for (int axis = 0; axis < 3; axis++) {
             if (Math.abs(matrix[8 + axis]) > Math.abs(matrix[8 + best]) + 1e-9) best = axis;
+        }
         return Axis.values()[best];
     }
 

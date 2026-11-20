@@ -19,8 +19,9 @@ class ExecutableDiscoveryTest {
     private static Path executable(Path path) throws IOException {
         Files.createDirectories(path.getParent());
         Files.writeString(path, "This is not a runnable program");
-        if (Files.getFileStore(path).supportsFileAttributeView("posix"))
+        if (Files.getFileStore(path).supportsFileAttributeView("posix")) {
             Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rwx------"));
+        }
         return path;
     }
 

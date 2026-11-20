@@ -73,7 +73,9 @@ public final class GitHubReleaseSource implements ReleaseSource {
                 failed = true;
                 subscription.cancel();
                 delegate.onError(new IOException("GitHub response exceeds size limit"));
-            } else delegate.onNext(buffers);
+            } else {
+                delegate.onNext(buffers);
+            }
         }
 
         @Override
@@ -92,17 +94,20 @@ public final class GitHubReleaseSource implements ReleaseSource {
             reader.setStrictness(Strictness.STRICT);
             var root = JsonParser.parseReader(reader).getAsJsonObject();
             if (reader.peek() != JsonToken.END_DOCUMENT) throw new IOException("Invalid GitHub release metadata");
-            if (booleanField(root, "draft") || booleanField(root, "prerelease"))
+            if (booleanField(root, "draft") || booleanField(root, "prerelease")) {
                 throw new IOException("Only published stable releases can be installed");
+            }
             String tag = stringField(root, "tag_name");
             var version = ReleaseVersion.release(tag);
-            if (!tag.equals("v" + version) || requested != null && !version.equals(requested))
+            if (!tag.equals("v" + version) || requested != null && !version.equals(requested)) {
                 throw new IOException("GitHub returned a different release tag");
+            }
             var assets = new HashSet<String>();
             for (var entry : root.getAsJsonArray("assets")) {
                 String asset = stringField(entry.getAsJsonObject(), "name");
-                if (!asset.matches("[A-Za-z0-9._-]+") || !assets.add(asset))
+                if (!asset.matches("[A-Za-z0-9._-]+") || !assets.add(asset)) {
                     throw new IOException("Invalid or duplicate release asset");
+                }
             }
             return new Release(version, assets);
         } catch (RuntimeException failure) {
@@ -114,8 +119,9 @@ public final class GitHubReleaseSource implements ReleaseSource {
         var value = object.get(name);
         if (value == null
                 || !value.isJsonPrimitive()
-                || !value.getAsJsonPrimitive().isString())
+                || !value.getAsJsonPrimitive().isString()) {
             throw new IOException("Invalid GitHub release field: " + name);
+        }
         return value.getAsString();
     }
 
@@ -123,16 +129,18 @@ public final class GitHubReleaseSource implements ReleaseSource {
         var value = object.get(name);
         if (value == null
                 || !value.isJsonPrimitive()
-                || !value.getAsJsonPrimitive().isBoolean())
+                || !value.getAsJsonPrimitive().isBoolean()) {
             throw new IOException("Invalid GitHub release field: " + name);
+        }
         return value.getAsBoolean();
     }
 
     private static IOException responseFailure(HttpResponse.ResponseInfo info, long limit) {
         int status = info.statusCode();
-        if (status == 404)
+        if (status == 404) {
             return new IOException(
                     "Published VoxelBrew release or asset not found (HTTP 404). Check the selected version or try again after a release is published.");
+        }
         if (status == 429
                 || status == 403
                         && (info.headers()
@@ -147,11 +155,13 @@ public final class GitHubReleaseSource implements ReleaseSource {
             return new IOException(
                     "GitHub's public download rate limit was reached (HTTP " + status + "). Try again later." + retry);
         }
-        if (status != 200)
+        if (status != 200) {
             return new IOException("Public GitHub update request failed (HTTP " + status + "); try again later.");
+        }
         try {
-            if (info.headers().firstValueAsLong("Content-Length").orElse(0) > limit)
+            if (info.headers().firstValueAsLong("Content-Length").orElse(0) > limit) {
                 return new IOException("GitHub response exceeds size limit");
+            }
         } catch (NumberFormatException invalid) {
             return new IOException("Invalid GitHub response length", invalid);
         }
@@ -183,8 +193,9 @@ public final class GitHubReleaseSource implements ReleaseSource {
                     || !"/".equals(fixtureRoot.getPath())
                     || fixtureRoot.getUserInfo() != null
                     || fixtureRoot.getQuery() != null
-                    || fixtureRoot.getFragment() != null)
+                    || fixtureRoot.getFragment() != null) {
                 throw new IllegalArgumentException("Update fixture must be http://127.0.0.1:PORT/");
+            }
             releases = fixtureRoot.resolve("repos/" + REPOSITORY + "/releases/");
             downloads = fixtureRoot.resolve(REPOSITORY + "/releases/download/");
         }
@@ -208,8 +219,9 @@ public final class GitHubReleaseSource implements ReleaseSource {
     @Override
     public void download(Release release, String asset, Path destination, UpdateCancellation cancellation)
             throws IOException {
-        if (!release.assets().contains(asset) || !asset.matches("[A-Za-z0-9._-]+"))
+        if (!release.assets().contains(asset) || !asset.matches("[A-Za-z0-9._-]+")) {
             throw new IOException("Unknown release asset");
+        }
         cancellation.check();
         // Claim the path atomically. Failure/cancellation removes only the file we created.
         Files.createFile(destination);
@@ -260,8 +272,9 @@ public final class GitHubReleaseSource implements ReleaseSource {
             try {
                 while (true) {
                     cancellation.check();
-                    if (System.nanoTime() >= deadline)
+                    if (System.nanoTime() >= deadline) {
                         throw new IOException("GitHub update request timed out; try again");
+                    }
                     try {
                         var response = pending.get(100, TimeUnit.MILLISECONDS);
                         cancellation.check();

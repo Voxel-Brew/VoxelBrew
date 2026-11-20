@@ -25,7 +25,9 @@ public final class PrintOrientation {
                 boolean onBed = true;
                 for (int c = 0; c < 3; c++) onBed &= Math.abs(placed.coordinate(placed.vertexIndex(t, c), 2)) < 0.001;
                 if (onBed) contact += area;
-                else if (n[2] < -2 * area * Math.cos(Math.PI / 4)) overhang += area;
+                else if (n[2] < -2 * area * Math.cos(Math.PI / 4)) {
+                    overhang += area;
+                }
             }
             double height =
                     dev.voxelbrew.api.model.printing.MeshGeometry.bounds(placed).maxZ();

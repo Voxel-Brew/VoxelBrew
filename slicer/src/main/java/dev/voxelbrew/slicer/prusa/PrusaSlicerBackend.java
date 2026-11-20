@@ -48,8 +48,9 @@ public final class PrusaSlicerBackend implements ProcessSlicer {
 
     @Override
     public ProcessSlicer configure(Map<String, String> options) {
-        if (!configurationOptions().keySet().containsAll(options.keySet()))
+        if (!configurationOptions().keySet().containsAll(options.keySet())) {
             throw new IllegalArgumentException("Unknown PrusaSlicer option");
+        }
         var merged = new TreeMap<>(configuration);
         merged.putAll(options);
         return new PrusaSlicerBackend(merged);
@@ -69,8 +70,9 @@ public final class PrusaSlicerBackend implements ProcessSlicer {
     @Override
     public Probe probe(Path executable, Cancellation cancellation) throws IOException, SlicerException {
         String profile = configuration.getOrDefault("profile", "");
-        if (!profile.isBlank() && !Files.isReadable(Path.of(profile)))
+        if (!profile.isBlank() && !Files.isReadable(Path.of(profile))) {
             throw new SlicerException.Configuration("Cannot read PrusaSlicer profile: " + profile);
+        }
         String help = ProcessRunner.run(List.of(executable.toString(), "--help"), null, cancellation, line -> {});
         var version = help.lines()
                 .map(String::strip)
@@ -79,9 +81,17 @@ public final class PrusaSlicerBackend implements ProcessSlicer {
                 .orElseThrow(
                         () -> new SlicerException.Configuration("Executable did not report a PrusaSlicer version"));
         for (var flag : List.of(
-                "--export-gcode", "--dont-arrange", "--no-ensure-on-bed", "--load", "--datadir", "--merge", "--output"))
-            if (!help.contains(flag))
+                "--export-gcode",
+                "--dont-arrange",
+                "--no-ensure-on-bed",
+                "--load",
+                "--datadir",
+                "--merge",
+                "--output")) {
+            if (!help.contains(flag)) {
                 throw new SlicerException.Configuration("Slicer is missing required capability " + flag);
+            }
+        }
         return new Probe(version, CAPABILITIES);
     }
 
@@ -93,22 +103,25 @@ public final class PrusaSlicerBackend implements ProcessSlicer {
     @Override
     public RunResult slice(Request request) throws IOException, SlicerException {
         var profile = request.model().profile();
-        if (!Set.of("PLA", "PETG").contains(profile.material().id()))
+        if (!Set.of("PLA", "PETG").contains(profile.material().id())) {
             throw new SlicerException.UnsupportedInput(
                     "Unsupported material profile: " + profile.material().id());
+        }
         if ((!profile.printer().firmware().equals("marlin2")
                         && !profile.printer().firmware().equals("vendor"))
-                || !profile.printer().outputFormat().equals("gcode"))
+                || !profile.printer().outputFormat().equals("gcode")) {
             throw new SlicerException.UnsupportedInput(
                     "Unsupported printer/output pairing; this backend requires Marlin 2 or vendor hardware with generic text G-code");
+        }
         Path project = request.input(), config = request.workingDirectory().resolve("process.ini");
         Files.writeString(config, PrusaConfiguration.ini(request.model()), StandardCharsets.UTF_8);
         var arguments = new ArrayList<String>();
         arguments.add(request.executable().toString());
         String baseProfile = configuration.getOrDefault("profile", "");
-        if (!baseProfile.isBlank())
+        if (!baseProfile.isBlank()) {
             arguments.addAll(
                     List.of("--load", Path.of(baseProfile).toAbsolutePath().toString()));
+        }
         arguments.addAll(List.of(
                 "--datadir",
                 request.workingDirectory().resolve("configuration").toString(),

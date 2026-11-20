@@ -69,81 +69,15 @@ final class ConstructionEditor extends VBox {
         var hint = new Label(translations.translate("construction.select").orElseThrow());
         hint.setWrapText(true);
         getChildren().add(hint);
-        var choices = new ArrayList<Input>();
-        var zero = new Vector(0, 0, 0);
-        for (int i = 0; i < 3; i++) {
-            choices.add(Input.originPlane(i));
-            choices.add(new Input(Selection.ORIGIN_AXIS, "", "", i, zero));
-        }
-        choices.add(new Input(Selection.ORIGIN_POINT, "", "", 0, zero));
-        choices.add(new Input(Selection.POSITION, "", "", 0, zero));
-        var document = controller.snapshot().document();
-        for (var feature : document.features()) {
-            if (feature.id().equals(id)) break;
-            if (controller.build().construction().containsKey(feature.id())) {
-                int parts = controller.build().construction().get(feature.id())
-                                instanceof dev.voxelbrew.api.model.construction.ConstructionGeometry.CoordinateSystem
-                        ? 7
-                        : 1;
-                for (int part = 0; part < parts; part++)
-                    choices.add(new Input(Selection.DATUM, feature.id(), "", part, zero));
-            }
-        }
-        choices.addAll(controller.build().constructionInputs().stream()
-                .filter(i -> !i.source().equals(id))
-                .toList());
-        int count = tool.inputs().size();
-        for (int i = 0; i < count; i++) {
-            int slot = i;
-            var selector = new ComboBox<Input>();
-            selector.setId("construction-input-" + i);
-            selector.setMaxWidth(Double.MAX_VALUE);
-            selector.setMinWidth(0);
-            selector.setPrefWidth(220);
-            selector.getItems().setAll(choices);
-            UiText.choices(selector, this::label);
-            selector.setOnMousePressed(event -> active = slot);
-            selector.focusedProperty().addListener((o, a, focused) -> {
-                if (focused) active = slot;
-            });
-            var xyz = List.of(new TextField("0"), new TextField("0"), new TextField("0"));
-            for (int axis = 0; axis < 3; axis++) {
-                xyz.get(axis).setPromptText("XYZ".substring(axis, axis + 1));
-                xyz.get(axis).setPrefColumnCount(4);
-            }
-            var row = new HBox(4);
-            row.getChildren().addAll(xyz);
-            row.visibleProperty().bind(selector.valueProperty().map(v -> v.selection() == Selection.POSITION));
-            row.managedProperty().bind(row.visibleProperty());
-            selectors.add(selector);
-            coordinates.add(xyz);
-            getChildren()
-                    .addAll(
-                            new Label((i + 1) + ". "
-                                    + translations
-                                            .translate("construction.role."
-                                                    + tool.inputs().get(i))
-                                            .orElseThrow()),
-                            selector,
-                            row);
-            if (original != null) {
-                var input = original.inputs().get(i);
-                if (!selector.getItems().contains(input)) selector.getItems().add(input);
-                selector.setValue(input);
-                xyz.get(0).setText(Double.toString(input.position().x()));
-                xyz.get(1).setText(Double.toString(input.position().y()));
-                xyz.get(2).setText(Double.toString(input.position().z()));
-            }
-        }
-        boolean usesValue = tool == Tool.OFFSET_PLANE
-                || tool == Tool.ANGLED_PLANE
-                || tool == Tool.TANGENT_PLANE
-                || tool == Tool.PLANE_ALONG_PATH
-                || tool == Tool.POINT_ALONG_PATH;
-        if (usesValue) {
-            String key = tool == Tool.OFFSET_PLANE
-                    ? "construction.distance"
-                    : tool == Tool.ANGLED_PLANE ? "construction.angle" : "construction.fraction";
+        var choices = inputChoices();
+        addInputSelectors(choices);
+        String key = switch (tool) {
+            case OFFSET_PLANE -> "construction.distance";
+            case ANGLED_PLANE -> "construction.angle";
+            case TANGENT_PLANE, PLANE_ALONG_PATH, POINT_ALONG_PATH -> "construction.fraction";
+            default -> null;
+        };
+        if (key != null) {
             getChildren().addAll(new Label(translations.translate(key).orElseThrow()), value);
         }
         value.setId("construction-value");
@@ -181,13 +115,14 @@ final class ConstructionEditor extends VBox {
     private String label(Input input) {
         if (input.selection() == Selection.ORIGIN_PLANE) return new String[] {"YZ", "XZ", "XY"}[input.index()];
         if (input.selection() == Selection.ORIGIN_AXIS) return "XYZ".substring(input.index(), input.index() + 1);
-        if (input.selection() == Selection.DATUM)
+        if (input.selection() == Selection.DATUM) {
             return controller.snapshot().document().featureName(input.source(), input.source())
                     + (controller.build().construction().get(input.source())
                                     instanceof
                                     dev.voxelbrew.api.model.construction.ConstructionGeometry.CoordinateSystem
                             ? " · " + new String[] {"O", "X", "Y", "Z", "YZ", "XZ", "XY"}[input.index()]
                             : "");
+        }
         String name = translations
                 .translate("construction.selection." + input.selection())
                 .orElseThrow();
@@ -239,9 +174,10 @@ final class ConstructionEditor extends VBox {
         var inputs = new ArrayList<Input>();
         for (int i = 0; i < selectors.size(); i++) {
             var input = selectors.get(i).getValue();
-            if (input == null)
+            if (input == null) {
                 throw new IllegalArgumentException(
                         translations.translate("construction.select").orElseThrow());
+            }
             if (input.selection() == Selection.POSITION) {
                 var xyz = coordinates.get(i);
                 input = new Input(
@@ -282,9 +218,13 @@ final class ConstructionEditor extends VBox {
                         if (commit) {
                             close();
                             if (original == null) controller.add(feature);
-                            else controller.replaceFeature(feature);
+                            else {
+                                controller.replaceFeature(feature);
+                            }
                             finished.run();
-                        } else viewport.previewConstruction(datum);
+                        } else {
+                            viewport.previewConstruction(datum);
+                        }
                     }));
         } catch (RuntimeException failure) {
             error.setText(failure.getMessage());
@@ -295,5 +235,79 @@ final class ConstructionEditor extends VBox {
         closed = true;
         generation++;
         viewport.previewConstruction(null);
+    }
+
+    private List<Input> inputChoices() {
+        var choices = new ArrayList<Input>();
+        var zero = new Vector(0, 0, 0);
+        for (int i = 0; i < 3; i++) {
+            choices.add(Input.originPlane(i));
+            choices.add(new Input(Selection.ORIGIN_AXIS, "", "", i, zero));
+        }
+        choices.add(new Input(Selection.ORIGIN_POINT, "", "", 0, zero));
+        choices.add(new Input(Selection.POSITION, "", "", 0, zero));
+        var document = controller.snapshot().document();
+        for (var feature : document.features()) {
+            if (feature.id().equals(id)) break;
+            if (controller.build().construction().containsKey(feature.id())) {
+                int parts = controller.build().construction().get(feature.id())
+                                instanceof dev.voxelbrew.api.model.construction.ConstructionGeometry.CoordinateSystem
+                        ? 7
+                        : 1;
+                for (int part = 0; part < parts; part++) {
+                    choices.add(new Input(Selection.DATUM, feature.id(), "", part, zero));
+                }
+            }
+        }
+        choices.addAll(controller.build().constructionInputs().stream()
+                .filter(i -> !i.source().equals(id))
+                .toList());
+        return choices;
+    }
+
+    private void addInputSelectors(List<Input> choices) {
+        int count = tool.inputs().size();
+        for (int i = 0; i < count; i++) {
+            int slot = i;
+            var selector = new ComboBox<Input>();
+            selector.setId("construction-input-" + i);
+            selector.setMaxWidth(Double.MAX_VALUE);
+            selector.setMinWidth(0);
+            selector.setPrefWidth(220);
+            selector.getItems().setAll(choices);
+            UiText.choices(selector, this::label);
+            selector.setOnMousePressed(event -> active = slot);
+            selector.focusedProperty().addListener((o, a, focused) -> {
+                if (focused) active = slot;
+            });
+            var xyz = List.of(new TextField("0"), new TextField("0"), new TextField("0"));
+            for (int axis = 0; axis < 3; axis++) {
+                xyz.get(axis).setPromptText("XYZ".substring(axis, axis + 1));
+                xyz.get(axis).setPrefColumnCount(4);
+            }
+            var row = new HBox(4);
+            row.getChildren().addAll(xyz);
+            row.visibleProperty().bind(selector.valueProperty().map(v -> v.selection() == Selection.POSITION));
+            row.managedProperty().bind(row.visibleProperty());
+            selectors.add(selector);
+            coordinates.add(xyz);
+            getChildren()
+                    .addAll(
+                            new Label((i + 1) + ". "
+                                    + translations
+                                            .translate("construction.role."
+                                                    + tool.inputs().get(i))
+                                            .orElseThrow()),
+                            selector,
+                            row);
+            if (original != null) {
+                var input = original.inputs().get(i);
+                if (!selector.getItems().contains(input)) selector.getItems().add(input);
+                selector.setValue(input);
+                xyz.get(0).setText(Double.toString(input.position().x()));
+                xyz.get(1).setText(Double.toString(input.position().y()));
+                xyz.get(2).setText(Double.toString(input.position().z()));
+            }
+        }
     }
 }

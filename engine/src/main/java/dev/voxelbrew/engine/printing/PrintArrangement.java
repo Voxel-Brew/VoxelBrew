@@ -19,21 +19,7 @@ public final class PrintArrangement {
         var plateBounds = bed.getBounds2D();
         for (var zone : model.profile().printer().excludedZones()) bed.subtract(MeshGeometry.polygon(zone));
         var bedBounds = bed.getBounds2D();
-        var parts = new ArrayList<Part>();
-        for (var instance : model.instances()) {
-            var b = MeshGeometry.bounds(model.placedMesh(instance));
-            Rectangle2D bounds = new Rectangle2D.Double(b.minX(), b.minY(), b.maxX() - b.minX(), b.maxY() - b.minY());
-            for (var support : model.setup().supports())
-                if (support.instanceId().equals(instance.id())) {
-                    var s = MeshGeometry.bounds(
-                            MeshGeometry.transform(MeshGeometry.box(support), instance.transform()));
-                    bounds.add(new Rectangle2D.Double(s.minX(), s.minY(), s.maxX() - s.minX(), s.maxY() - s.minY()));
-                }
-            parts.add(new Part(instance, bounds));
-        }
-        parts.sort(Comparator.comparingDouble(
-                        (Part p) -> p.bounds().getWidth() * p.bounds().getHeight())
-                .reversed());
+        var parts = partsByArea(model);
         var occupied = new ArrayList<Rectangle2D>();
         var placements = new HashMap<String, BodyInstance>();
         for (var part : parts) {
@@ -52,7 +38,7 @@ public final class PrintArrangement {
             }
             Rectangle2D chosen = null;
             search:
-            for (double y : ys)
+            for (double y : ys) {
                 for (double x : xs) {
                     var candidate = new Rectangle2D.Double(
                             x, y, part.bounds().getWidth(), part.bounds().getHeight());
@@ -64,6 +50,7 @@ public final class PrintArrangement {
                     chosen = candidate;
                     break search;
                 }
+            }
             if (chosen == null) return Optional.empty();
             occupied.add(chosen);
             var source = part.instance();
@@ -100,6 +87,26 @@ public final class PrintArrangement {
         }
         return Optional.of(
                 model.instances().stream().map(i -> placements.get(i.id())).toList());
+    }
+
+    private static List<Part> partsByArea(ManufacturingModel model) {
+        var parts = new ArrayList<Part>();
+        for (var instance : model.instances()) {
+            var b = MeshGeometry.bounds(model.placedMesh(instance));
+            Rectangle2D bounds = new Rectangle2D.Double(b.minX(), b.minY(), b.maxX() - b.minX(), b.maxY() - b.minY());
+            for (var support : model.setup().supports()) {
+                if (support.instanceId().equals(instance.id())) {
+                    var s = MeshGeometry.bounds(
+                            MeshGeometry.transform(MeshGeometry.box(support), instance.transform()));
+                    bounds.add(new Rectangle2D.Double(s.minX(), s.minY(), s.maxX() - s.minX(), s.maxY() - s.minY()));
+                }
+            }
+            parts.add(new Part(instance, bounds));
+        }
+        parts.sort(Comparator.comparingDouble(
+                        (Part p) -> p.bounds().getWidth() * p.bounds().getHeight())
+                .reversed());
+        return parts;
     }
 
     private PrintArrangement() {}

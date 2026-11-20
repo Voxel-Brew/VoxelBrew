@@ -158,8 +158,9 @@ public final class Viewport extends StackPane {
             points[3 * v + 2] = (float) p.getZ();
         }
         int[] faces = new int[data.triangleCount() * 6];
-        for (int t = 0; t < data.triangleCount(); t++)
+        for (int t = 0; t < data.triangleCount(); t++) {
             for (int c = 0; c < 3; c++) faces[6 * t + 2 * c] = data.vertexIndex(t, c);
+        }
         mesh.getPoints().setAll(points);
         mesh.getTexCoords().setAll(0, 0);
         mesh.getFaces().setAll(faces);
@@ -226,40 +227,8 @@ public final class Viewport extends StackPane {
         getChildren().add(viewCube);
         setDark(false);
         grid();
-        scene.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
-            if (e.getButton() != MouseButton.SECONDARY) return;
-            lastX = e.getSceneX();
-            lastY = e.getSceneY();
-            primaryOrbit = false;
-            pressedSketch = null;
-            requestFocus();
-            scene.setCursor(Cursor.CLOSED_HAND);
-            e.consume();
-        });
-        scene.addEventFilter(MouseEvent.MOUSE_DRAGGED, e -> {
-            if (!e.isSecondaryButtonDown()) return;
-            pan.setX(pan.getX() + (e.getSceneX() - lastX) * distance / 700);
-            pan.setY(pan.getY() + (e.getSceneY() - lastY) * distance / 700);
-            lastX = e.getSceneX();
-            lastY = e.getSceneY();
-            e.consume();
-        });
-        scene.addEventFilter(MouseEvent.MOUSE_RELEASED, e -> {
-            if (e.getButton() != MouseButton.SECONDARY) return;
-            scene.setCursor(Cursor.DEFAULT);
-            e.consume();
-        });
-        scene.setOnMousePressed(e -> {
-            lastX = e.getSceneX();
-            lastY = e.getSceneY();
-            boolean background = isNavigationBackground(e.getPickResult().getIntersectedNode());
-            pressedSketch = e.getButton() == MouseButton.PRIMARY && planeClick == null && background
-                    ? nearbySketch(e.getScreenX(), e.getScreenY())
-                    : null;
-            primaryOrbit =
-                    e.getButton() == MouseButton.PRIMARY && planeClick == null && background && pressedSketch == null;
-            requestFocus();
-        });
+        installPanHandlers();
+        scene.setOnMousePressed(this::beginOrbit);
         scene.setOnMouseDragged(e -> {
             double dx = e.getSceneX() - lastX, dy = e.getSceneY() - lastY;
             lastX = e.getSceneX();
@@ -314,8 +283,9 @@ public final class Viewport extends StackPane {
     }
 
     private boolean isNavigationBackground(Node picked) {
-        for (Node node = picked; node != null; node = node.getParent())
+        for (Node node = picked; node != null; node = node.getParent()) {
             if (node == bodies || node == sketches || node == handle || node == planeTargets) return false;
+        }
         return true;
     }
 
@@ -491,8 +461,9 @@ public final class Viewport extends StackPane {
                     && point.getX() <= getWidth()
                     && point.getY() >= 0
                     && point.getY() <= getHeight());
-            if (point != null)
+            if (point != null) {
                 label.relocate(point.getX() - label.getWidth() / 2, point.getY() - label.getHeight() / 2);
+            }
         });
     }
 
@@ -514,8 +485,13 @@ public final class Viewport extends StackPane {
         var data = currentMeshes.get(body);
         if (data == null || face < 0) return;
         var indices = new java.util.ArrayList<Integer>();
-        for (int t = 0; t < data.triangleCount(); t++)
-            if (data.faceIndex(t) == face) for (int c = 0; c < 3; c++) indices.add(data.vertexIndex(t, c));
+        for (int t = 0; t < data.triangleCount(); t++) {
+            if (data.faceIndex(t) == face) {
+                for (int c = 0; c < 3; c++) {
+                    indices.add(data.vertexIndex(t, c));
+                }
+            }
+        }
         if (indices.isEmpty()) return;
         var overlay = meshView(new MeshData(
                 data.vertices(), indices.stream().mapToInt(Integer::intValue).toArray(), new int[indices.size() / 3]));
@@ -558,13 +534,14 @@ public final class Viewport extends StackPane {
         var consumed = new java.util.HashSet<String>();
         if (rendering == Rendering.Style.TECHNICAL) {
             for (var feature : features) {
-                if (feature instanceof Feature.Extrude extrude)
+                if (feature instanceof Feature.Extrude extrude) {
                     consumed.add(extrude.profile().sketchId());
-                else if (feature instanceof Feature.ThroughCut cut)
+                } else if (feature instanceof Feature.ThroughCut cut) {
                     consumed.add(cut.profile().sketchId());
+                }
             }
         }
-        for (var feature : features)
+        for (var feature : features) {
             if (feature instanceof Feature.Sketch sketch) {
                 if (consumed.contains(sketch.id()) && !sketch.id().equals(selectedSketch)) continue;
                 if (sketch.profile() instanceof Feature.Constrained constrained) {
@@ -572,70 +549,9 @@ public final class Viewport extends StackPane {
                             sketch, constrained.geometry(), sketch.id().equals(selectedSketch));
                     continue;
                 }
-                double[] xy;
-                if (sketch.profile() instanceof Feature.Rectangle r)
-                    xy = new double[] {
-                        r.x(),
-                        r.y(),
-                        r.x() + r.width(),
-                        r.y(),
-                        r.x() + r.width(),
-                        r.y() + r.height(),
-                        r.x(),
-                        r.y() + r.height()
-                    };
-                else {
-                    var c = (Feature.Circle) sketch.profile();
-                    xy = new double[128];
-                    for (int n = 0; n < 64; n++) {
-                        xy[2 * n] = c.centerX() + c.diameter() / 2 * Math.cos(2 * Math.PI * n / 64);
-                        xy[2 * n + 1] = c.centerY() + c.diameter() / 2 * Math.sin(2 * Math.PI * n / 64);
-                    }
-                }
-                int count = xy.length / 2;
-                float[] points = new float[count * 3];
-                for (int i = 0; i < count; i++) {
-                    var p = toView(xy[2 * i], xy[2 * i + 1], sketch.plane().offsetZ() + 0.035);
-                    points[3 * i] = (float) p.getX();
-                    points[3 * i + 1] = (float) p.getY();
-                    points[3 * i + 2] = (float) p.getZ();
-                }
-                var mesh = new TriangleMesh();
-                mesh.getPoints().setAll(points);
-                mesh.getTexCoords().setAll(0, 0);
-                int[] faces = new int[(count - 2) * 6];
-                for (int i = 0; i < count - 2; i++) {
-                    faces[6 * i] = 0;
-                    faces[6 * i + 2] = i + 1;
-                    faces[6 * i + 4] = i + 2;
-                }
-                mesh.getFaces().setAll(faces);
-                var profile = new MeshView(mesh);
-                profile.setCullFace(CullFace.NONE);
-                boolean chosen = sketch.id().equals(selectedSketch);
-                profile.setMaterial(new PhongMaterial(Color.web(chosen ? "#eead48" : "#388eae", chosen ? 0.52 : 0.18)));
-                profile.setOnMouseClicked(e -> {
-                    if (e.getButton() == MouseButton.PRIMARY && e.isStillSincePress()) {
-                        selection.accept(sketch.id(), -1);
-                        e.consume();
-                    }
-                });
-                var group = new Group(profile);
-                group.getTransforms().add(viewTransform(sketch.plane().frame()));
-                sketches.getChildren().add(group);
-                for (int i = 0; i < count; i++) {
-                    var line = line(
-                            toView(xy[2 * i], xy[2 * i + 1], sketch.plane().offsetZ() + 0.04),
-                            toView(
-                                    xy[2 * ((i + 1) % count)],
-                                    xy[2 * ((i + 1) % count) + 1],
-                                    sketch.plane().offsetZ() + 0.04),
-                            chosen ? 0.14 : 0.065,
-                            chosen ? Color.web("#dc8d18") : Color.web("#2d839f"));
-                    line.setMouseTransparent(true);
-                    group.getChildren().add(line);
-                }
+                showProfile(sketch, selectedSketch);
             }
+        }
     }
 
     private void showConstrainedSketch(
@@ -669,8 +585,8 @@ public final class Viewport extends StackPane {
                 }
                 var view = meshView(SketchStrokes.mesh(segments, sketch.plane().offsetZ() + .04, chosen ? .14 : .075));
                 view.getStyleClass().add("sketch-curves");
-                view.setMaterial(new PhongMaterial(
-                        Color.web(chosen ? "#dc8d18" : entity.construction() ? "#8795a3" : "#2d839f")));
+                String stroke = entity.construction() ? "#8795a3" : "#2d839f";
+                view.setMaterial(new PhongMaterial(Color.web(chosen ? "#dc8d18" : stroke)));
                 group.getChildren().add(view);
             }
         }
@@ -770,7 +686,8 @@ public final class Viewport extends StackPane {
 
     public void setDark(boolean dark) {
         this.dark = dark;
-        scene.setFill(rendering == Rendering.Style.TECHNICAL ? Color.WHITE : Color.web(dark ? "#1e1f22" : "#f2f3f5"));
+        var background = Color.web(dark ? "#1e1f22" : "#f2f3f5");
+        scene.setFill(rendering == Rendering.Style.TECHNICAL ? Color.WHITE : background);
         viewCube.setDark(dark);
     }
 
@@ -950,13 +867,15 @@ public final class Viewport extends StackPane {
         } else {
             double[] min = {Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY},
                     max = {-1e99, -1e99, -1e99};
-            for (var mesh : meshes.values())
-                for (int v = 0; v < mesh.vertexCount(); v++)
+            for (var mesh : meshes.values()) {
+                for (int v = 0; v < mesh.vertexCount(); v++) {
                     for (int a = 0; a < 3; a++) {
                         double x = mesh.coordinate(v, a);
                         min[a] = Math.min(min[a], x);
                         max[a] = Math.max(max[a], x);
                     }
+                }
+            }
             var p = toView((min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2);
             center.setX(-p.getX());
             center.setY(-p.getY());
@@ -1008,5 +927,102 @@ public final class Viewport extends StackPane {
         z.setMaterial(new PhongMaterial(Color.web("#5b86d6")));
         aids.getChildren().add(z);
         aids.setMouseTransparent(true);
+    }
+
+    private void installPanHandlers() {
+        scene.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+            if (e.getButton() != MouseButton.SECONDARY) return;
+            lastX = e.getSceneX();
+            lastY = e.getSceneY();
+            primaryOrbit = false;
+            pressedSketch = null;
+            requestFocus();
+            scene.setCursor(Cursor.CLOSED_HAND);
+            e.consume();
+        });
+        scene.addEventFilter(MouseEvent.MOUSE_DRAGGED, e -> {
+            if (!e.isSecondaryButtonDown()) return;
+            pan.setX(pan.getX() + (e.getSceneX() - lastX) * distance / 700);
+            pan.setY(pan.getY() + (e.getSceneY() - lastY) * distance / 700);
+            lastX = e.getSceneX();
+            lastY = e.getSceneY();
+            e.consume();
+        });
+        scene.addEventFilter(MouseEvent.MOUSE_RELEASED, e -> {
+            if (e.getButton() != MouseButton.SECONDARY) return;
+            scene.setCursor(Cursor.DEFAULT);
+            e.consume();
+        });
+    }
+
+    private void beginOrbit(MouseEvent e) {
+        lastX = e.getSceneX();
+        lastY = e.getSceneY();
+        boolean background = isNavigationBackground(e.getPickResult().getIntersectedNode());
+        pressedSketch = e.getButton() == MouseButton.PRIMARY && planeClick == null && background
+                ? nearbySketch(e.getScreenX(), e.getScreenY())
+                : null;
+        primaryOrbit =
+                e.getButton() == MouseButton.PRIMARY && planeClick == null && background && pressedSketch == null;
+        requestFocus();
+    }
+
+    private void showProfile(Feature.Sketch sketch, String selectedSketch) {
+        double[] xy;
+        if (sketch.profile() instanceof Feature.Rectangle r) {
+            xy = new double[] {
+                r.x(), r.y(), r.x() + r.width(), r.y(), r.x() + r.width(), r.y() + r.height(), r.x(), r.y() + r.height()
+            };
+        } else {
+            var c = (Feature.Circle) sketch.profile();
+            xy = new double[128];
+            for (int n = 0; n < 64; n++) {
+                xy[2 * n] = c.centerX() + c.diameter() / 2 * Math.cos(2 * Math.PI * n / 64);
+                xy[2 * n + 1] = c.centerY() + c.diameter() / 2 * Math.sin(2 * Math.PI * n / 64);
+            }
+        }
+        int count = xy.length / 2;
+        float[] points = new float[count * 3];
+        for (int i = 0; i < count; i++) {
+            var p = toView(xy[2 * i], xy[2 * i + 1], sketch.plane().offsetZ() + 0.035);
+            points[3 * i] = (float) p.getX();
+            points[3 * i + 1] = (float) p.getY();
+            points[3 * i + 2] = (float) p.getZ();
+        }
+        var mesh = new TriangleMesh();
+        mesh.getPoints().setAll(points);
+        mesh.getTexCoords().setAll(0, 0);
+        int[] faces = new int[(count - 2) * 6];
+        for (int i = 0; i < count - 2; i++) {
+            faces[6 * i] = 0;
+            faces[6 * i + 2] = i + 1;
+            faces[6 * i + 4] = i + 2;
+        }
+        mesh.getFaces().setAll(faces);
+        var profile = new MeshView(mesh);
+        profile.setCullFace(CullFace.NONE);
+        boolean chosen = sketch.id().equals(selectedSketch);
+        profile.setMaterial(new PhongMaterial(Color.web(chosen ? "#eead48" : "#388eae", chosen ? 0.52 : 0.18)));
+        profile.setOnMouseClicked(e -> {
+            if (e.getButton() == MouseButton.PRIMARY && e.isStillSincePress()) {
+                selection.accept(sketch.id(), -1);
+                e.consume();
+            }
+        });
+        var group = new Group(profile);
+        group.getTransforms().add(viewTransform(sketch.plane().frame()));
+        sketches.getChildren().add(group);
+        for (int i = 0; i < count; i++) {
+            var line = line(
+                    toView(xy[2 * i], xy[2 * i + 1], sketch.plane().offsetZ() + 0.04),
+                    toView(
+                            xy[2 * ((i + 1) % count)],
+                            xy[2 * ((i + 1) % count) + 1],
+                            sketch.plane().offsetZ() + 0.04),
+                    chosen ? 0.14 : 0.065,
+                    chosen ? Color.web("#dc8d18") : Color.web("#2d839f"));
+            line.setMouseTransparent(true);
+            group.getChildren().add(line);
+        }
     }
 }

@@ -80,28 +80,15 @@ final class WorkspaceCommands {
             while (selected.hasSubcommand()) selected = selected.subcommand();
             var document = (Path) root.getCommandSpec().findOption("--document").getValue();
             var command = selected.commandSpec();
-            if (document != null
-                    && !command.positionalParameters().isEmpty()
-                    && command.positionalParameters().getFirst().type() == Path.class
-                    && !(command.userObject() instanceof ImportCommands.ImportFile)
-                    && !(command.userObject() instanceof PrintingCommands.InspectJob)) {
-                var parameter = command.positionalParameters().getFirst();
-                if (parameter.getValue() != null && !document.equals(parameter.getValue()))
-                    throw new CommandLine.ParameterException(command.commandLine(), "Specify the document once");
-                parameter.setValue(document);
-            }
+            bindDocument(command, document);
             if (!parsed.isUsageHelpRequested() && !selected.isUsageHelpRequested()) {
-                for (var parameter : command.positionalParameters()) {
-                    if (parameter.type() == Path.class
-                            && parameter.getValue() == null
-                            && !(document != null && command.userObject() instanceof PrintingCommands.InspectJob))
-                        throw new CommandLine.ParameterException(
-                                command.commandLine(), "A document/file path is required");
-                }
+                requirePaths(command, document);
             }
             if (root.getCommandSpec().findOption("--output-format").getValue() != OutputFormat.json
                     || parsed.isUsageHelpRequested()
-                    || selected.isUsageHelpRequested()) return execution.execute(parsed);
+                    || selected.isUsageHelpRequested()) {
+                return execution.execute(parsed);
+            }
             var output = root.getOut();
             var buffer = new java.io.StringWriter();
             root.setOut(new java.io.PrintWriter(buffer));
@@ -126,6 +113,30 @@ final class WorkspaceCommands {
         });
     }
 
+    private static void bindDocument(CommandSpec command, Path document) {
+        if (document != null
+                && !command.positionalParameters().isEmpty()
+                && command.positionalParameters().getFirst().type() == Path.class
+                && !(command.userObject() instanceof ImportCommands.ImportFile)
+                && !(command.userObject() instanceof PrintingCommands.InspectJob)) {
+            var parameter = command.positionalParameters().getFirst();
+            if (parameter.getValue() != null && !document.equals(parameter.getValue())) {
+                throw new CommandLine.ParameterException(command.commandLine(), "Specify the document once");
+            }
+            parameter.setValue(document);
+        }
+    }
+
+    private static void requirePaths(CommandSpec command, Path document) {
+        for (var parameter : command.positionalParameters()) {
+            if (parameter.type() == Path.class
+                    && parameter.getValue() == null
+                    && !(document != null && command.userObject() instanceof PrintingCommands.InspectJob)) {
+                throw new CommandLine.ParameterException(command.commandLine(), "A document/file path is required");
+            }
+        }
+    }
+
     private static void configure(CommandLine node, CommandLine root) {
         node.setCaseInsensitiveEnumValuesAllowed(true);
         for (var option : node.getCommandSpec().options()) {
@@ -138,8 +149,9 @@ final class WorkspaceCommands {
     @SuppressWarnings({"rawtypes", "unchecked"})
     private static void registerEnum(CommandLine command, Class<?> type) {
         command.registerConverter((Class) type, text -> {
-            for (Object constant : type.getEnumConstants())
+            for (Object constant : type.getEnumConstants()) {
                 if (((Enum<?>) constant).name().equalsIgnoreCase(text.replace('-', '_'))) return constant;
+            }
             throw new CommandLine.TypeConversionException("Unknown " + type.getSimpleName() + ": " + text);
         });
     }

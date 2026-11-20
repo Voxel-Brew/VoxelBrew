@@ -40,6 +40,16 @@ public final class FeatureDimensions {
         };
     }
 
+    private static boolean sharesOffsetPlane(Feature feature, List<Feature> all, ParameterSet.Binding binding) {
+        if (feature instanceof Feature.Sketch sketch && binding.target().field().equals("offsetZ")) {
+            return all.stream()
+                    .anyMatch(f -> f.id().equals(binding.target().featureId())
+                            && f instanceof Feature.Sketch other
+                            && other.plane().id().equals(sketch.plane().id()));
+        }
+        return false;
+    }
+
     public static List<Dimension> list(Feature feature) {
         var result = new ArrayList<Dimension>();
         java.util.function.BiConsumer<String, Double> length = (key, value) ->
@@ -56,12 +66,14 @@ public final class FeatureDimensions {
                 length.accept("centerY", c.centerY());
                 length.accept("diameter", c.diameter());
             } else if (s.profile() instanceof Feature.Constrained c) {
-                for (var d : c.geometry().constraints())
-                    if (d.type().dimension())
+                for (var d : c.geometry().constraints()) {
+                    if (d.type().dimension()) {
                         result.add(new Dimension(
                                 new ParameterSet.Target(s.id(), "constraint:" + d.id()),
                                 unit(d.type()),
                                 d.values().getFirst()));
+                    }
+                }
             }
         } else if (feature instanceof ConstructionFeature c) {
             var unit = switch (c.tool()) {
@@ -70,11 +82,15 @@ public final class FeatureDimensions {
                 default -> ParameterUnit.NUMBER;
             };
             result.add(new Dimension(new ParameterSet.Target(c.id(), "value"), unit, c.value()));
-        } else if (feature instanceof Feature.Extrude e) length.accept("distance", e.distance());
-        else if (feature instanceof Feature.EdgeFinish f) length.accept("size", f.size());
-        else if (feature instanceof Feature.Shell s) length.accept("thickness", s.thickness());
-        else if (feature instanceof Feature.SplitBody s)
+        } else if (feature instanceof Feature.Extrude e) {
+            length.accept("distance", e.distance());
+        } else if (feature instanceof Feature.EdgeFinish f) {
+            length.accept("size", f.size());
+        } else if (feature instanceof Feature.Shell s) {
+            length.accept("thickness", s.thickness());
+        } else if (feature instanceof Feature.SplitBody s) {
             length.accept("offset", s.plane().offset());
+        }
         return List.copyOf(result);
     }
 
@@ -89,18 +105,22 @@ public final class FeatureDimensions {
     public static Feature apply(Feature feature, Map<String, Double> changes) {
         if (changes.isEmpty()) return feature;
         changes.keySet().forEach(k -> dimension(feature, k));
-        if (feature instanceof ConstructionFeature c)
+        if (feature instanceof ConstructionFeature c) {
             return new ConstructionFeature(
                     c.id(), c.tool(), c.inputs(), changes.getOrDefault("value", c.value()), c.alternate());
-        if (feature instanceof Feature.Extrude e)
+        }
+        if (feature instanceof Feature.Extrude e) {
             return new Feature.Extrude(e.id(), e.profile(), changes.getOrDefault("distance", e.distance()));
-        if (feature instanceof Feature.EdgeFinish f)
+        }
+        if (feature instanceof Feature.EdgeFinish f) {
             return new Feature.EdgeFinish(
                     f.id(), f.body(), f.kind(), changes.getOrDefault("size", f.size()), f.edges());
-        if (feature instanceof Feature.Shell s)
+        }
+        if (feature instanceof Feature.Shell s) {
             return new Feature.Shell(
                     s.id(), s.body(), changes.getOrDefault("thickness", s.thickness()), s.removedFace());
-        if (feature instanceof Feature.SplitBody s)
+        }
+        if (feature instanceof Feature.SplitBody s) {
             return new Feature.SplitBody(
                     s.id(),
                     s.body(),
@@ -109,22 +129,23 @@ public final class FeatureDimensions {
                             s.plane().normalY(),
                             s.plane().normalZ(),
                             changes.getOrDefault("offset", s.plane().offset())));
+        }
         var s = (Feature.Sketch) feature;
         var plane =
                 s.plane().withOffset(changes.getOrDefault("offsetZ", s.plane().offsetZ()));
         Feature.Profile profile = s.profile();
-        if (profile instanceof Feature.Rectangle r)
+        if (profile instanceof Feature.Rectangle r) {
             profile = new Feature.Rectangle(
                     changes.getOrDefault("x", r.x()),
                     changes.getOrDefault("y", r.y()),
                     changes.getOrDefault("width", r.width()),
                     changes.getOrDefault("height", r.height()));
-        else if (profile instanceof Feature.Circle c)
+        } else if (profile instanceof Feature.Circle c) {
             profile = new Feature.Circle(
                     changes.getOrDefault("centerX", c.centerX()),
                     changes.getOrDefault("centerY", c.centerY()),
                     changes.getOrDefault("diameter", c.diameter()));
-        else if (profile instanceof Feature.Constrained c) {
+        } else if (profile instanceof Feature.Constrained c) {
             var next = c.geometry()
                     .withConstraints(c.geometry().constraints().stream()
                             .map(d -> changes.containsKey("constraint:" + d.id())
@@ -141,14 +162,7 @@ public final class FeatureDimensions {
         var changes = new LinkedHashMap<String, Double>();
         for (var binding : parameters.bindings()) {
             boolean own = binding.target().featureId().equals(feature.id());
-            boolean sharedPlane = false;
-            if (feature instanceof Feature.Sketch sketch
-                    && binding.target().field().equals("offsetZ")) {
-                sharedPlane = all.stream()
-                        .anyMatch(f -> f.id().equals(binding.target().featureId())
-                                && f instanceof Feature.Sketch other
-                                && other.plane().id().equals(sketch.plane().id()));
-            }
+            boolean sharedPlane = sharesOffsetPlane(feature, all, binding);
             if (!own && !sharedPlane) continue;
             if (own && FeatureText.isField(binding.target().field())) {
                 FeatureText.field(feature, binding.target().field());
@@ -159,8 +173,9 @@ public final class FeatureDimensions {
                     .unit()
                     .modelValue(Expressions.evaluate(binding.expression(), descriptor.unit(), values::get));
             var previous = changes.put(descriptor.target().field(), value);
-            if (previous != null && Math.abs(previous - value) > 1e-9)
+            if (previous != null && Math.abs(previous - value) > 1e-9) {
                 throw new IllegalArgumentException("Conflicting expressions for shared plane " + feature.id());
+            }
         }
         if (feature instanceof Feature.Sketch sketch && sketch.profile() instanceof Feature.Constrained profile) {
             var geometry = FeatureText.resolve(profile.geometry(), feature.id(), parameters, values);
@@ -180,14 +195,18 @@ public final class FeatureDimensions {
                 .orElseThrow(() -> new IllegalArgumentException("Missing feature: " + target.featureId()));
         boolean text = FeatureText.isField(target.field());
         if (text) FeatureText.field(feature, target.field());
-        else dimension(feature, target.field());
+        else {
+            dimension(feature, target.field());
+        }
         var parameters = document.parameters();
         // One shared plane has one expression, regardless of which sketch is used to edit it.
         if (feature instanceof Feature.Sketch s && target.field().equals("offsetZ")) {
-            for (var f : document.features())
+            for (var f : document.features()) {
                 if (f instanceof Feature.Sketch other
-                        && s.plane().id().equals(other.plane().id()))
+                        && s.plane().id().equals(other.plane().id())) {
                     parameters = parameters.bind(new ParameterSet.Target(f.id(), "offsetZ"), "");
+                }
+            }
         }
         var result = parameters.bind(target, expression);
         result.validate();
@@ -198,9 +217,10 @@ public final class FeatureDimensions {
             for (var id : configs) {
                 var values = result.values(id);
                 if (text) FeatureText.validate(expression, values, result.builtins());
-                else
+                else {
                     Expressions.evaluate(
                             expression, dimension(feature, target.field()).unit(), values::get);
+                }
             }
         }
         return result;
@@ -257,7 +277,7 @@ public final class FeatureDimensions {
         var values = parameters.values();
         geometry = FeatureText.resolve(geometry, featureId, parameters, values);
         var changes = new LinkedHashMap<String, Double>();
-        for (var b : parameters.bindings())
+        for (var b : parameters.bindings()) {
             if (b.target().featureId().equals(featureId) && b.target().field().startsWith("constraint:")) {
                 String id = b.target().field().substring(11);
                 var c = geometry.constraints().stream()
@@ -268,6 +288,7 @@ public final class FeatureDimensions {
                         id,
                         unit(c.type()).modelValue(Expressions.evaluate(b.expression(), unit(c.type()), values::get)));
             }
+        }
         return geometry.withConstraints(geometry.constraints().stream()
                 .map(c -> changes.containsKey(c.id()) ? c.withValue(changes.get(c.id())) : c)
                 .toList());
@@ -295,8 +316,9 @@ public final class FeatureDimensions {
         var bindings = new ArrayList<ParameterSet.Binding>();
         for (var b : parameters.bindings()) {
             var target = b.target();
-            if (target.featureId().equals(sketch.id()) && !target.field().equals("offsetZ"))
+            if (target.featureId().equals(sketch.id()) && !target.field().equals("offsetZ")) {
                 target = new ParameterSet.Target(sketch.id(), "constraint:" + target.field());
+            }
             bindings.add(new ParameterSet.Binding(target, b.expression()));
         }
         return new Converted(

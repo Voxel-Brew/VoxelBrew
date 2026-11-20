@@ -92,16 +92,18 @@ final class DeviceCommands {
                 if (action.equals("clear")) setup = setup.withPrintTarget(null);
                 else {
                     String name = value(s, "--device"), profile = value(s, "--profile");
-                    if ((name == null) == (profile == null))
+                    if ((name == null) == (profile == null)) {
                         throw new IllegalArgumentException("Choose --device or --profile");
+                    }
                     if (name != null) {
                         var device = find(name);
                         setup = setup.withPrinter(ProfileHardware.resolve(device.profile()))
                                 .withPrintTarget(device.id());
-                    } else
+                    } else {
                         setup = setup.withPrintTarget(null)
                                 .withPrinter(
                                         ProfileHardware.resolve(printers.load().require(profile)));
+                    }
                 }
                 var session = new dev.voxelbrew.engine.model.ModelSession(document);
                 session.setPrintSetup(setup);
@@ -135,8 +137,9 @@ final class DeviceCommands {
             var spec = command(root, "printer " + action, s -> control(s, action), send);
             option(spec, "--device", String.class, true, null, "Saved printer name");
             if (send) option(spec, "--plate", String.class, false, null, "Plate ID; defaults to active plate");
-            if (action.equals("status"))
+            if (action.equals("status")) {
                 option(spec, "--watch", boolean.class, false, "false", "Poll status until interrupted");
+            }
         }
     }
 
@@ -182,8 +185,9 @@ final class DeviceCommands {
                             .orElseThrow(() -> new IllegalArgumentException("Missing printer driver " + driverId
                                     + ". Install its plugin or change the printer's --driver setting."));
                     var settings = new LinkedHashMap<String, String>();
-                    if (old != null && old.driverId().equals(driverId))
+                    if (old != null && old.driverId().equals(driverId)) {
                         settings.putAll(old.driverConfiguration().toInput());
+                    }
                     applySettings(settings, value(s, "--setting"), false);
                     applySettings(settings, value(s, "--setting-file"), true);
                     var errors = driver.gui().validate(settings);

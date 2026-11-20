@@ -148,8 +148,9 @@ public final class DefaultPrinterProfileCatalog implements PrinterProfileCatalog
         for (var source : loaded.sources()) {
             try {
                 var json = JsonParser.parseString(source.json()).getAsJsonObject();
-                if (json.get("version").getAsBigDecimal().intValueExact() != 1)
+                if (json.get("version").getAsBigDecimal().intValueExact() != 1) {
                     throw new IllegalArgumentException("Unsupported printer JSON version");
+                }
                 var parsed = parse(json);
                 String reference = PrinterResources.image(
                         source, json.has("image") ? json.get("image").getAsString() : null);
@@ -202,45 +203,16 @@ public final class DefaultPrinterProfileCatalog implements PrinterProfileCatalog
     public Profile save(Profile profile, java.nio.file.Path image) throws java.io.IOException {
         if (!profile.id().matches("[a-zA-Z0-9.-]{1,128}")) throw new IllegalArgumentException("Invalid profile ID");
         if (load().entries().stream()
-                .anyMatch(e -> e.bundled() && e.definition().id().equals(profile.id())))
+                .anyMatch(e -> e.bundled() && e.definition().id().equals(profile.id()))) {
             throw new IllegalArgumentException("Bundled profiles are read-only; choose a new ID");
+        }
         java.nio.file.Files.createDirectories(directory());
         if (image == null
                 && profile.imageReference() != null
                 && "jar".equals(profile.imageReference().getScheme())) {
-            boolean bundledImage = load().entries().stream()
-                    .anyMatch(e -> e.bundled()
-                            && profile.imageReference().equals(e.definition().imageReference()));
-            if (!bundledImage) throw new IllegalArgumentException("Choose a local image or installed bundled image");
-            var temporaryImage = java.nio.file.Files.createTempFile(directory(), ".profile-image-", ".png");
-            try (var input = profile.imageReference().toURL().openStream()) {
-                java.nio.file.Files.copy(input, temporaryImage, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                for (var notice : List.of("PHOTO-LICENSE.txt", "photo-sources.json")) {
-                    try (var license = PrinterResources.class.getResourceAsStream(PrinterResources.ROOT + notice)) {
-                        if (license != null) copyNew(license, directory().resolve(notice.replace(".json", ".txt")));
-                    }
-                }
-                return save(profile, temporaryImage);
-            } finally {
-                java.nio.file.Files.deleteIfExists(temporaryImage);
-            }
+            return saveBundledImage(profile);
         }
-        String imageName = null;
-        if (image != null) {
-            if (java.nio.file.Files.size(image) > 5 * 1024 * 1024)
-                throw new java.io.IOException("Profile image exceeds 5 MiB");
-            try (var input = java.nio.file.Files.newInputStream(image)) {
-                if (javax.imageio.ImageIO.read(input) == null)
-                    throw new java.io.IOException("Unsupported profile image");
-            }
-            String extension = java.util.Objects.toString(image.getFileName(), "")
-                    .replaceFirst("^.*\\.", "")
-                    .toLowerCase(java.util.Locale.ROOT);
-            if (!java.util.Set.of("png", "jpg", "jpeg", "gif", "bmp").contains(extension))
-                throw new java.io.IOException("Unsupported profile image type");
-            imageName = profile.id() + "-" + java.util.UUID.randomUUID() + "." + extension;
-            java.nio.file.Files.copy(image, directory().resolve(imageName));
-        }
+        String imageName = copyImage(profile, image);
         var json = new JsonObject();
         json.addProperty("version", 1);
         json.addProperty("id", profile.id());
@@ -263,8 +235,9 @@ public final class DefaultPrinterProfileCatalog implements PrinterProfileCatalog
                 && "file".equals(profile.imageReference().getScheme())) {
             var path = java.nio.file.Path.of(profile.imageReference());
             var filename = path.getFileName();
-            if (filename != null && directory().equals(path.getParent()))
+            if (filename != null && directory().equals(path.getParent())) {
                 json.addProperty("image", filename.toString());
+            }
         }
         var temporary = java.nio.file.Files.createTempFile(directory(), ".profile-", ".tmp");
         try {
@@ -275,12 +248,55 @@ public final class DefaultPrinterProfileCatalog implements PrinterProfileCatalog
                     java.nio.file.StandardCopyOption.ATOMIC_MOVE,
                     java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         } catch (java.io.IOException failure) {
-            if (imageName != null)
+            if (imageName != null) {
                 java.nio.file.Files.deleteIfExists(directory().resolve(imageName));
+            }
             throw failure;
         } finally {
             java.nio.file.Files.deleteIfExists(temporary);
         }
         return load().require(profile.id());
+    }
+
+    private Profile saveBundledImage(Profile profile) throws java.io.IOException {
+        boolean bundledImage = load().entries().stream()
+                .anyMatch(e -> e.bundled()
+                        && profile.imageReference().equals(e.definition().imageReference()));
+        if (!bundledImage) throw new IllegalArgumentException("Choose a local image or installed bundled image");
+        var temporaryImage = java.nio.file.Files.createTempFile(directory(), ".profile-image-", ".png");
+        try (var input = profile.imageReference().toURL().openStream()) {
+            java.nio.file.Files.copy(input, temporaryImage, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            for (var notice : List.of("PHOTO-LICENSE.txt", "photo-sources.json")) {
+                try (var license = PrinterResources.class.getResourceAsStream(PrinterResources.ROOT + notice)) {
+                    if (license != null) copyNew(license, directory().resolve(notice.replace(".json", ".txt")));
+                }
+            }
+            return save(profile, temporaryImage);
+        } finally {
+            java.nio.file.Files.deleteIfExists(temporaryImage);
+        }
+    }
+
+    private String copyImage(Profile profile, java.nio.file.Path image) throws java.io.IOException {
+        String imageName = null;
+        if (image != null) {
+            if (java.nio.file.Files.size(image) > 5 * 1024 * 1024) {
+                throw new java.io.IOException("Profile image exceeds 5 MiB");
+            }
+            try (var input = java.nio.file.Files.newInputStream(image)) {
+                if (javax.imageio.ImageIO.read(input) == null) {
+                    throw new java.io.IOException("Unsupported profile image");
+                }
+            }
+            String extension = java.util.Objects.toString(image.getFileName(), "")
+                    .replaceFirst("^.*\\.", "")
+                    .toLowerCase(java.util.Locale.ROOT);
+            if (!java.util.Set.of("png", "jpg", "jpeg", "gif", "bmp").contains(extension)) {
+                throw new java.io.IOException("Unsupported profile image type");
+            }
+            imageName = profile.id() + "-" + java.util.UUID.randomUUID() + "." + extension;
+            java.nio.file.Files.copy(image, directory().resolve(imageName));
+        }
+        return imageName;
     }
 }

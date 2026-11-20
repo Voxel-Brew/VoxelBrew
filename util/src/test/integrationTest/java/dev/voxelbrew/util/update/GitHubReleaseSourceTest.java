@@ -43,8 +43,9 @@ class GitHubReleaseSourceTest {
         server.setExecutor(workers);
         server.createContext("/", exchange -> {
             paths.add(exchange.getRequestURI().getPath());
-            for (String header : List.of("Authorization", "Proxy-Authorization", "Cookie"))
+            for (String header : List.of("Authorization", "Proxy-Authorization", "Cookie")) {
                 if (exchange.getRequestHeaders().containsKey(header)) authentication.add(header);
+            }
             try (exchange) {
                 handler.get().handle(exchange);
             }
@@ -74,7 +75,9 @@ class GitHubReleaseSourceTest {
             } else if (path.startsWith("/Voxel-Brew/")) {
                 exchange.getResponseHeaders().set("Location", "/cdn/asset");
                 exchange.sendResponseHeaders(302, -1);
-            } else respond(exchange, 200, new byte[] {0, 1, 2, (byte) 255});
+            } else {
+                respond(exchange, 200, new byte[] {0, 1, 2, (byte) 255});
+            }
         });
         var source = new GitHubReleaseSource(root);
         var token = new UpdateCancellation();
@@ -110,8 +113,9 @@ class GitHubReleaseSourceTest {
                     () -> source.fetch(null, new UpdateCancellation()), IOException.class);
             assertThat(failure.getMessage().contains("HTTP " + status)).isTrue();
             assertThat(failure.getMessage().contains("gh auth")).isFalse();
-            if (status == 403 || status == 429)
+            if (status == 403 || status == 429) {
                 assertThat(failure.getMessage().contains("rate limit")).isTrue();
+            }
         }
     }
 
@@ -235,9 +239,10 @@ class GitHubReleaseSourceTest {
                 "http://127.0.0.1/",
                 "http://user:secret@127.0.0.1:8080/",
                 "http://127.0.0.1:8080/?token=abc",
-                "http://127.0.0.1:8080/path/"))
+                "http://127.0.0.1:8080/path/")) {
             assertThatThrownBy(() -> new GitHubReleaseSource(URI.create(invalid)))
                     .isInstanceOf(IllegalArgumentException.class);
+        }
     }
 
     private String metadata() {

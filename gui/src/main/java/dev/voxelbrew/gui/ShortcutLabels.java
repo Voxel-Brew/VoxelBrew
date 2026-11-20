@@ -17,7 +17,9 @@ final class ShortcutLabels {
         // Menu buttons combine their icon with an underlined caption.
         if (key.isEmpty()
                 || (button.getGraphic() != null && !(button instanceof MenuButton))
-                || button.getProperties().putIfAbsent(ShortcutLabels.class, true) != null) return;
+                || button.getProperties().putIfAbsent(ShortcutLabels.class, true) != null) {
+            return;
+        }
         var caption = new HBox();
         caption.getStyleClass().add("shortcut-caption");
         caption.setAlignment(Pos.BASELINE_LEFT);

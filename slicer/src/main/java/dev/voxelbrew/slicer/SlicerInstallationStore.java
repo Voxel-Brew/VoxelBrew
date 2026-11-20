@@ -61,8 +61,9 @@ public final class SlicerInstallationStore {
     }
 
     private UserConfigServiceImpl providerConfig(String id) throws IOException {
-        if (id == null || !id.matches("[a-z0-9][a-z0-9.-]*"))
+        if (id == null || !id.matches("[a-z0-9][a-z0-9.-]*")) {
             throw new IllegalArgumentException("Invalid slicer provider ID");
+        }
         return openConfig(directory, id + EXTENSION);
     }
 
@@ -83,7 +84,7 @@ public final class SlicerInstallationStore {
 
     public List<SlicerInstallation> load() throws IOException {
         var installations = new ArrayList<>(BundledSlicers.installations());
-        if (Files.exists(directory))
+        if (Files.exists(directory)) {
             try (var paths = Files.list(directory)) {
                 for (var path : paths.filter(Files::isRegularFile).toList()) {
                     Path name = path.getFileName();
@@ -99,6 +100,7 @@ public final class SlicerInstallationStore {
                     }
                 }
             }
+        }
         return installations.stream()
                 .sorted(Comparator.comparing(SlicerInstallation::name, String.CASE_INSENSITIVE_ORDER)
                         .thenComparing(SlicerInstallation::id))
@@ -107,11 +109,12 @@ public final class SlicerInstallationStore {
 
     public SlicerInstallation require(String id) {
         var key = UUID.fromString(id);
-        if (BundledSlicers.reserved(key))
+        if (BundledSlicers.reserved(key)) {
             return BundledSlicers.installations().stream()
                     .filter(installation -> installation.id().equals(key))
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Bundled slicer installation is unavailable"));
+        }
         var path = path(key);
         if (!Files.isRegularFile(path)) throw new IllegalArgumentException("Saved slicer installation is unavailable");
         return read(key);

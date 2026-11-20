@@ -27,9 +27,11 @@ public final class StepDocumentWriter {
                 while (bytes.hasRemaining()) channel.write(bytes);
                 channel.force(true);
             }
-            if (overwrite)
+            if (overwrite) {
                 Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            else Files.createLink(target, temporary);
+            } else {
+                Files.createLink(target, temporary);
+            }
         } finally {
             Files.deleteIfExists(temporary);
         }

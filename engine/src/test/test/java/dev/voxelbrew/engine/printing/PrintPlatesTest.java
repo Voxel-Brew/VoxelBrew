@@ -139,9 +139,10 @@ class PrintPlatesTest {
         assertThat(edited.selectPlate("second").instances()).isEqualTo(List.of(instance));
         var multi = new CadDocument("doc", List.of(), 0, edited);
         assertThat(DocumentCodec.decode(DocumentCodec.encode(multi))).isEqualTo(multi);
-        for (String invalid : List.of("", "  ", "x".repeat(129), "bad\nname"))
+        for (String invalid : List.of("", "  ", "x".repeat(129), "bad\nname")) {
             assertThatThrownBy(() -> named.renamePlate("plate-1", invalid))
                     .isInstanceOf(IllegalArgumentException.class);
+        }
         assertThatThrownBy(() -> named.renamePlate("missing", "Name")).isInstanceOf(IllegalArgumentException.class);
     }
 

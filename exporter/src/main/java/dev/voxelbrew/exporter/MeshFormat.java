@@ -15,10 +15,12 @@ public record MeshFormat(
 
         extensions = List.copyOf(extensions);
         options = List.copyOf(options);
-        if (extensions.isEmpty() || extensions.stream().anyMatch(e -> !e.matches("[a-zA-Z0-9]+")))
+        if (extensions.isEmpty() || extensions.stream().anyMatch(e -> !e.matches("[a-zA-Z0-9]+"))) {
             throw new IllegalArgumentException("Invalid extensions");
+        }
         var keys = new HashSet<String>();
-        for (var option : options)
+        for (var option : options) {
             if (!keys.add(option.key())) throw new IllegalArgumentException("Duplicate option " + option.key());
+        }
     }
 }

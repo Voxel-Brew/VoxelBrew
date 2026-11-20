@@ -130,7 +130,7 @@ final class ParameterDialog {
     private Button button(String label, String id, Runnable action) {
         var b = new Button(label);
         b.setId(id);
-        if (id.equals("parameter-save") || id.equals("parameter-remove"))
+        if (id.equals("parameter-save") || id.equals("parameter-remove")) {
             b.disableProperty()
                     .bind(javafx.beans.binding.Bindings.createBooleanBinding(
                             () -> parameters.getSelectionModel().getSelectedItem() != null
@@ -140,6 +140,7 @@ final class ParameterDialog {
                                             .name()
                                             .startsWith("vb."),
                             parameters.getSelectionModel().selectedItemProperty()));
+        }
         UiHelp.install(b, translations);
         b.setOnAction(e -> attempt(action));
         return b;
@@ -161,84 +162,8 @@ final class ParameterDialog {
     }
 
     private Pane content() {
-        showBuiltins.setId("parameters-show-builtins");
-        showBuiltins.setText(translations.translate("parameters.showBuiltins").orElseThrow());
-        UiHelp.install(showBuiltins, translations);
-        showBuiltins.setSelected(true);
-        showBuiltins.selectedProperty().addListener((o, before, show) -> {
-            var selected = parameters.getSelectionModel().getSelectedItem();
-            if (!show && selected != null && selected.name().startsWith("vb.")) {
-                selectedParameter = null;
-                parameters.getSelectionModel().clearSelection();
-                name.clear();
-                expression.clear();
-                stringExpression.clear();
-                comment.clear();
-            }
-            refresh();
-        });
-        parameters.setId("parameter-table");
-        parameters.setPlaceholder(
-                new Label(translations.translate("parameters.empty").orElseThrow()));
-        parameters.setPrefHeight(175);
-        parameters
-                .getColumns()
-                .add(column(translations.translate("gui.name").orElseThrow(), 110, ParameterSet.Parameter::name));
-        parameters
-                .getColumns()
-                .add(column(
-                        translations.translate("gui.unit").orElseThrow(),
-                        65,
-                        p -> BuiltinParameters.isString(p.name())
-                                ? "string"
-                                : p.unit().toString()));
-        parameters
-                .getColumns()
-                .add(column(
-                        translations.translate("gui.expression").orElseThrow(),
-                        180,
-                        p -> draft.expression(p, draft.active())));
-        parameters.getColumns().add(column(translations.translate("gui.value").orElseThrow(), 90, p -> {
-            try {
-                if (p.name().startsWith("vb."))
-                    return Expressions.format(draft.builtins().value(p.name()));
-                return String.format(
-                        Locale.ROOT,
-                        "%.6g",
-                        p.unit().displayValue(draft.values().get(p.name())));
-            } catch (RuntimeException failure) {
-                return translations.translate("gui.error").orElseThrow();
-            }
-        }));
-        parameters
-                .getColumns()
-                .add(column(translations.translate("gui.comment").orElseThrow(), 130, ParameterSet.Parameter::comment));
-        parameters.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
-        parameters.getSelectionModel().selectedItemProperty().addListener((o, a, p) -> {
-            boolean builtin = p != null && p.name().startsWith("vb.");
-            boolean string = p != null && BuiltinParameters.isString(p.name());
-            stringExpression.setVisible(string);
-            stringExpression.setManaged(string);
-            expression.setVisible(!string);
-            expression.setManaged(!string);
-            unit.setPromptText(string ? "string" : "");
-            if (!string && unit.getValue() == null) unit.setValue(ParameterUnit.MM);
-            for (var control : List.of(name, unit, expression, comment)) control.setDisable(builtin);
-            if (builtin) {
-                name.setText(p.name());
-                unit.setValue(string ? null : p.unit());
-                if (string) stringExpression.setText(p.expression());
-                else expression.setText(p.expression());
-                comment.setText(p.comment());
-            }
-            if (refreshing || p == null) return;
-            if (p.name().startsWith("vb.")) return;
-            selectedParameter = p.id();
-            name.setText(p.name());
-            unit.setValue(p.unit());
-            expression.setText(draft.expression(p, draft.active()));
-            comment.setText(Expressions.literalText(p.comment()));
-        });
+        configureParameterTable();
+        parameters.getSelectionModel().selectedItemProperty().addListener((o, a, p) -> selectParameter(p));
         unit.setId("parameter-unit");
         unit.valueProperty().addListener(o -> expression.refreshFormula());
         unit.getItems().setAll(ParameterUnit.values());
@@ -270,8 +195,9 @@ final class ParameterDialog {
                     if (selectedParameter != null
                             && !next.parameter(selectedParameter)
                                     .name()
-                                    .equals(name.getText().strip()))
+                                    .equals(name.getText().strip())) {
                         next = next.rename(selectedParameter, name.getText().strip());
+                    }
                     update(next.put(
                             name.getText().strip(),
                             unit.getValue(),
@@ -406,9 +332,10 @@ final class ParameterDialog {
                 binding,
                 button(translations.translate("gui.bind_dimension").orElseThrow(), "parameter-bind", () -> {
                     var chosen = dimensions.getSelectionModel().getSelectedItem();
-                    if (chosen == null)
+                    if (chosen == null) {
                         throw new IllegalArgumentException(
                                 translations.translate("gui.select_a_dimension").orElseThrow());
+                    }
                     var doc = new dev.voxelbrew.api.model.CadDocument(
                             "parameter-editor",
                             features,
@@ -435,9 +362,10 @@ final class ParameterDialog {
 
     private String selectedConfig() {
         String id = configurations.getSelectionModel().getSelectedItem();
-        if (id == null)
+        if (id == null) {
             throw new IllegalArgumentException(
                     translations.translate("gui.select_a_configuration_row").orElseThrow());
+        }
         return id;
     }
 
@@ -453,9 +381,10 @@ final class ParameterDialog {
 
     private ParameterSet.Parameter requiredParameter() {
         var p = overrideParameter.getValue();
-        if (p == null)
+        if (p == null) {
             throw new IllegalArgumentException(
                     translations.translate("gui.choose_a_parameter").orElseThrow());
+        }
         return p;
     }
 
@@ -475,13 +404,14 @@ final class ParameterDialog {
                     .setAll(groupedParameters(draft).stream()
                             .filter(p -> showBuiltins.isSelected() || !p.name().startsWith("vb."))
                             .toList());
-            if (selectedParameter != null)
+            if (selectedParameter != null) {
                 parameters
                         .getSelectionModel()
                         .select(draft.parameters().stream()
                                 .filter(p -> p.id().equals(selectedParameter))
                                 .findFirst()
                                 .orElse(null));
+            }
             overrideParameter.getItems().setAll(draft.parameters());
             overrideParameter.setValue(
                     chosen == null
@@ -556,5 +486,90 @@ final class ParameterDialog {
             refreshing = false;
         }
         updateOverride();
+    }
+
+    private void configureParameterTable() {
+        showBuiltins.setId("parameters-show-builtins");
+        showBuiltins.setText(translations.translate("parameters.showBuiltins").orElseThrow());
+        UiHelp.install(showBuiltins, translations);
+        showBuiltins.setSelected(true);
+        showBuiltins.selectedProperty().addListener((o, before, show) -> {
+            var selected = parameters.getSelectionModel().getSelectedItem();
+            if (!show && selected != null && selected.name().startsWith("vb.")) {
+                selectedParameter = null;
+                parameters.getSelectionModel().clearSelection();
+                name.clear();
+                expression.clear();
+                stringExpression.clear();
+                comment.clear();
+            }
+            refresh();
+        });
+        parameters.setId("parameter-table");
+        parameters.setPlaceholder(
+                new Label(translations.translate("parameters.empty").orElseThrow()));
+        parameters.setPrefHeight(175);
+        parameters
+                .getColumns()
+                .add(column(translations.translate("gui.name").orElseThrow(), 110, ParameterSet.Parameter::name));
+        parameters
+                .getColumns()
+                .add(column(
+                        translations.translate("gui.unit").orElseThrow(),
+                        65,
+                        p -> BuiltinParameters.isString(p.name())
+                                ? "string"
+                                : p.unit().toString()));
+        parameters
+                .getColumns()
+                .add(column(
+                        translations.translate("gui.expression").orElseThrow(),
+                        180,
+                        p -> draft.expression(p, draft.active())));
+        parameters.getColumns().add(column(translations.translate("gui.value").orElseThrow(), 90, p -> {
+            try {
+                if (p.name().startsWith("vb.")) {
+                    return Expressions.format(draft.builtins().value(p.name()));
+                }
+                return String.format(
+                        Locale.ROOT,
+                        "%.6g",
+                        p.unit().displayValue(draft.values().get(p.name())));
+            } catch (RuntimeException failure) {
+                return translations.translate("gui.error").orElseThrow();
+            }
+        }));
+        parameters
+                .getColumns()
+                .add(column(translations.translate("gui.comment").orElseThrow(), 130, ParameterSet.Parameter::comment));
+        parameters.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+    }
+
+    private void selectParameter(ParameterSet.Parameter p) {
+        boolean builtin = p != null && p.name().startsWith("vb.");
+        boolean string = p != null && BuiltinParameters.isString(p.name());
+        stringExpression.setVisible(string);
+        stringExpression.setManaged(string);
+        expression.setVisible(!string);
+        expression.setManaged(!string);
+        unit.setPromptText(string ? "string" : "");
+        if (!string && unit.getValue() == null) unit.setValue(ParameterUnit.MM);
+        for (var control : List.of(name, unit, expression, comment)) control.setDisable(builtin);
+        if (builtin) {
+            name.setText(p.name());
+            unit.setValue(string ? null : p.unit());
+            if (string) stringExpression.setText(p.expression());
+            else {
+                expression.setText(p.expression());
+            }
+            comment.setText(p.comment());
+        }
+        if (refreshing || p == null) return;
+        if (p.name().startsWith("vb.")) return;
+        selectedParameter = p.id();
+        name.setText(p.name());
+        unit.setValue(p.unit());
+        expression.setText(draft.expression(p, draft.active()));
+        comment.setText(Expressions.literalText(p.comment()));
     }
 }

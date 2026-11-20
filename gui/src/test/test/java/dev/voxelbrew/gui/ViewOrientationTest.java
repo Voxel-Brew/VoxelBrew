@@ -20,8 +20,9 @@ class ViewOrientationTest {
     @Test
     void sketchFrameConversionPreservesModelCoordinatesForAllPlanesAndArbitraryFaces() {
         var frames = new java.util.ArrayList<dev.voxelbrew.api.model.Transform>();
-        for (String name : new String[] {"XY", "XZ", "YZ"})
+        for (String name : new String[] {"XY", "XZ", "YZ"}) {
             frames.add(dev.voxelbrew.api.model.Feature.Plane.origin(name).frame());
+        }
         frames.add(dev.voxelbrew.api.model.Transform.translation(3, 7, -9)
                 .compose(dev.voxelbrew.api.model.Transform.rotation(21, 33, 47)));
         for (var frame : frames) {
@@ -38,8 +39,8 @@ class ViewOrientationTest {
 
     @Test
     void allFacesEdgesAndCornersPointTowardsCameraInTheCadBasis() {
-        for (int x = -1; x <= 1; x++)
-            for (int y = -1; y <= 1; y++)
+        for (int x = -1; x <= 1; x++) {
+            for (int y = -1; y <= 1; y++) {
                 for (int z = -1; z <= 1; z++) {
                     if (x == 0 && y == 0 && z == 0) continue;
                     var view = ViewOrientation.lookingFrom(x, y, z);
@@ -54,6 +55,8 @@ class ViewOrientationTest {
                     assertThat(view.project(point).distance(pitch.transform(yaw.transform(new Point3D(17, -41, -23)))))
                             .isCloseTo(0, org.assertj.core.data.Offset.offset(1e-12));
                 }
+            }
+        }
     }
 
     @Test
@@ -65,8 +68,9 @@ class ViewOrientationTest {
         assertThat(ViewOrientation.named("Right")).isEqualTo(new ViewOrientation(0, 90));
         assertThat(ViewOrientation.named("Left")).isEqualTo(new ViewOrientation(0, -90));
         assertThat(ViewOrientation.named("Front").project(new Point3D(1, 0, 0))).isEqualTo(new Point3D(1, 0, 0));
-        for (String name : new String[] {"Isometric", "Top", "Bottom", "Front", "Back", "Right", "Left"})
+        for (String name : new String[] {"Isometric", "Top", "Bottom", "Front", "Back", "Right", "Left"}) {
             assertThat(ViewOrientation.named(name).name()).isEqualTo(name);
+        }
         assertThat(new ViewOrientation(12, 34).name()).isEqualTo("Custom");
     }
 

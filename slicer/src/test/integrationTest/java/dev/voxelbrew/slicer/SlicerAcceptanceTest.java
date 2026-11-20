@@ -378,7 +378,7 @@ class SlicerAcceptanceTest {
                 .isCloseTo(9.8, org.assertj.core.data.Offset.offset(.001));
         assertThat(underRoof.stream().anyMatch(s -> Math.abs(s.z1() - 5) < 1e-6))
                 .isTrue();
-        for (var s : job.segments())
+        for (var s : job.segments()) {
             if (s.deposits() && s.role().model()) {
                 assertThat(s.x1() >= 19.999 && s.x1() <= 50.001)
                         .as(s.toString())
@@ -387,6 +387,7 @@ class SlicerAcceptanceTest {
                         .as(s.toString())
                         .isTrue();
             }
+        }
         try (var evaluation = session.evaluate()) {
             assertThat(evaluation.bodies().stream()
                             .mapToDouble(b -> b.solid().volume())

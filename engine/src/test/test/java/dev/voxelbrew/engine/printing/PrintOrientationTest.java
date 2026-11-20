@@ -63,12 +63,14 @@ class PrintOrientationTest {
     void invalidAxesAndNonfiniteAnglesAreRejectedBeforeGeometryWork() {
         var source = source();
         var mesh = box();
-        for (int axis : new int[] {-1, 3})
+        for (int axis : new int[] {-1, 3}) {
             assertThatThrownBy(() -> PrintOrientation.rotate(source, mesh, axis, 10, false))
                     .isInstanceOf(IllegalArgumentException.class);
-        for (double angle : new double[] {Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY})
+        }
+        for (double angle : new double[] {Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY}) {
             assertThatThrownBy(() -> PrintOrientation.rotate(source, mesh, 0, angle, true))
                     .isInstanceOf(IllegalArgumentException.class);
+        }
     }
 
     @Test

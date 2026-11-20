@@ -145,8 +145,8 @@ final class PrintingCommands {
             instances.add(new BodyInstance(
                     id, original.bodyId(), Transform.translation(x, y, z).compose(original.transform())));
             var supports = new ArrayList<>(setup.supports());
-            for (var s : setup.supports())
-                if (s.instanceId().equals(source))
+            for (var s : setup.supports()) {
+                if (s.instanceId().equals(source)) {
                     supports.add(new SupportVolume(
                             "support-" + session.document().uuidGenerator().next(),
                             id,
@@ -157,6 +157,8 @@ final class PrintingCommands {
                             s.width(),
                             s.depth(),
                             s.height()));
+                }
+            }
             session.setPrintSetup(setup.withInstances(instances).withSupports(supports));
             return save(session);
         }
@@ -250,9 +252,10 @@ final class PrintingCommands {
             var session = session();
             var setup = session.document().printSetup();
             var p = setup.process();
-            if (printer != null && setup.workspaceSettings().containsKey(PrintTarget.PRINTER_ID))
+            if (printer != null && setup.workspaceSettings().containsKey(PrintTarget.PRINTER_ID)) {
                 throw new IllegalArgumentException(
                         "Clear the physical device target before changing its printer profile");
+            }
             var next = new ProcessSettings(
                     or(height, p.layerHeight()),
                     or(walls, p.walls()),
@@ -275,10 +278,11 @@ final class PrintingCommands {
                 updated = updated.withWorkspaceSettings(workspace);
             }
             session.setPrintSetup(updated);
-            if (printer != null && !printer.startsWith("generic-marlin-rect-"))
+            if (printer != null && !printer.startsWith("generic-marlin-rect-")) {
                 session.setPrintSetup(session.document()
                         .printSetup()
                         .withPrinter(ProfileHardware.resolve(printers.load().require(printer))));
+            }
             PrintProfile.resolve(session.document().printSetup());
             return save(session);
         }
@@ -375,8 +379,9 @@ final class PrintingCommands {
         public Integer call() throws Exception {
             var session = session();
             var setup = session.document().printSetup();
-            if (setup.supports().stream().noneMatch(s -> s.id().equals(id)))
+            if (setup.supports().stream().noneMatch(s -> s.id().equals(id))) {
                 throw new IllegalArgumentException("Unknown support " + id);
+            }
             session.setPrintSetup(setup.withSupports(
                     setup.supports().stream().filter(s -> !s.id().equals(id)).toList()));
             return save(session);
@@ -551,17 +556,104 @@ final class PrintingCommands {
             this.configuration = configuration;
         }
 
+        private List<String> plateIds(PrintSetup setup) {
+            if (!all) return List.of(plate == null ? setup.activePlateId() : plate);
+            return setup.plates().stream()
+                    .filter(p -> !p.instances().isEmpty())
+                    .map(PrintPlate::id)
+                    .toList();
+        }
+
+        private PrintSetup resolvePrinter(PrintSetup setup) throws java.io.IOException {
+            var devices = printerConnection != null || setup.workspaceSettings().containsKey(PrintTarget.PRINTER_ID)
+                    ? printerStore.load().devices()
+                    : List.<dev.voxelbrew.api.printer.Printer>of();
+            if (printerConnection != null) {
+                var connection = devices.stream()
+                        .filter(p -> p.name().equalsIgnoreCase(printerConnection.strip()))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Unknown printer: " + printerConnection));
+                setup = setup.withPrinter(ProfileHardware.resolve(connection.profile()))
+                        .withPrintTarget(connection.id());
+            }
+            String target = setup.workspaceSettings().get(PrintTarget.PRINTER_ID);
+            var hardware = PrintProfile.resolve(setup).printer();
+            if (target != null
+                    && devices.stream()
+                            .noneMatch(p -> p.id().equals(target)
+                                    && p.profile().id().equals(hardware.id())
+                                    && Double.compare(p.profile().nozzleDiameter(), hardware.nozzleMm()) == 0)) {
+                throw new IllegalArgumentException(
+                        "Selected printer connection is unavailable or references another profile");
+            }
+            return setup;
+        }
+
+        private dev.voxelbrew.api.slicer.SlicerWindow executionWindow(
+                PrintSetup setup, dev.voxelbrew.api.slicer.SlicerProvider provider) throws java.io.IOException {
+            var options = new LinkedHashMap<>(slicerOptions);
+            if (executable != null) options.put("executable", executable.toString());
+            String installationId = SlicerInstallation.selectedId(setup);
+            var store = new SlicerInstallationStore(configuration);
+            dev.voxelbrew.api.slicer.SlicerWindow window;
+            if (installationId.isBlank()) {
+                window = new CliSlicerWindow(store, provider.descriptor().id(), options);
+            } else {
+                var installation = store.require(installationId);
+                if (!installation.operational()
+                        || !installation
+                                .providerId()
+                                .equals(provider.descriptor().id())) {
+                    throw new IllegalArgumentException(
+                            "Selected slicer installation is unavailable or failed its check");
+                }
+                window = installation.executionWindow(options);
+            }
+            return window;
+        }
+
+        private Map<Path, PrintArtifact> destinations(Map<String, SliceService.Result> results)
+                throws java.io.IOException {
+            var outputs = new LinkedHashMap<Path, PrintArtifact>();
+            if (output != null) {
+                if (all) java.nio.file.Files.createDirectories(output);
+                results.forEach((id, result) -> outputs.put(
+                        all ? output.resolve(id + "." + result.artifact().format()) : output, result.artifact()));
+            }
+            for (var destination : outputs.keySet()) {
+                if (destination
+                                .toAbsolutePath()
+                                .normalize()
+                                .equals(file.toAbsolutePath().normalize())
+                        || java.nio.file.Files.exists(destination)
+                                && java.nio.file.Files.exists(file)
+                                && java.nio.file.Files.isSameFile(destination, file)) {
+                    throw new IllegalArgumentException("Artifact destination is the document file");
+                }
+            }
+            return outputs;
+        }
+
+        private void validateRevision(CadDocument original, String revision) throws java.io.IOException {
+            var live = documents.load(file);
+            if (!revision.equals(dev.voxelbrew.engine.persistence.DocumentCodec.fingerprint(live))
+                    || !Objects.equals(
+                            original.printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID),
+                            live.printSetup().workspaceSettings().get(PrintTarget.PRINTER_ID))
+                    || !SlicerInstallation.selectedId(original.printSetup())
+                            .equals(SlicerInstallation.selectedId(live.printSetup()))
+                    || !original.printArtifacts().equals(live.printArtifacts())
+                    || !original.gcode().equals(live.gcode())) {
+                throw new SliceService.OutdatedException();
+            }
+        }
+
         @Override
         public Integer call() throws Exception {
             if (background) throw new IllegalArgumentException("--background requires an editing session");
             if (all && plate != null) throw new IllegalArgumentException("Choose --plate or --all");
             var original = session().document();
-            var ids = all
-                    ? original.printSetup().plates().stream()
-                            .filter(p -> !p.instances().isEmpty())
-                            .map(PrintPlate::id)
-                            .toList()
-                    : List.of(plate == null ? original.printSetup().activePlateId() : plate);
+            var ids = plateIds(original.printSetup());
             if (ids.isEmpty()) throw new IllegalArgumentException("No nonempty plates to slice");
 
             var cancellation = new Cancellation();
@@ -579,47 +671,9 @@ final class PrintingCommands {
             Runtime.getRuntime().addShutdownHook(shutdown);
             try (var registry = slicers.get()) {
                 registry.withDirectory(pluginDirectory);
-                var setup = original.printSetup();
-                var devices =
-                        printerConnection != null || setup.workspaceSettings().containsKey(PrintTarget.PRINTER_ID)
-                                ? printerStore.load().devices()
-                                : List.<dev.voxelbrew.api.printer.Printer>of();
-                if (printerConnection != null) {
-                    var connection = devices.stream()
-                            .filter(p -> p.name().equalsIgnoreCase(printerConnection.strip()))
-                            .findFirst()
-                            .orElseThrow(() -> new IllegalArgumentException("Unknown printer: " + printerConnection));
-                    setup = setup.withPrinter(ProfileHardware.resolve(connection.profile()))
-                            .withPrintTarget(connection.id());
-                }
-                String target = setup.workspaceSettings().get(PrintTarget.PRINTER_ID);
-                var hardware = PrintProfile.resolve(setup).printer();
-                if (target != null
-                        && devices.stream()
-                                .noneMatch(p -> p.id().equals(target)
-                                        && p.profile().id().equals(hardware.id())
-                                        && Double.compare(p.profile().nozzleDiameter(), hardware.nozzleMm()) == 0)) {
-                    throw new IllegalArgumentException(
-                            "Selected printer connection is unavailable or references another profile");
-                }
+                var setup = resolvePrinter(original.printSetup());
                 var provider = registry.require(setup.backendId());
-                var options = new LinkedHashMap<>(slicerOptions);
-                if (executable != null) options.put("executable", executable.toString());
-                String installationId = SlicerInstallation.selectedId(setup);
-                var store = new SlicerInstallationStore(configuration);
-                dev.voxelbrew.api.slicer.SlicerWindow window;
-                if (installationId.isBlank()) {
-                    window = new CliSlicerWindow(store, provider.descriptor().id(), options);
-                } else {
-                    var installation = store.require(installationId);
-                    if (!installation.operational()
-                            || !installation
-                                    .providerId()
-                                    .equals(provider.descriptor().id()))
-                        throw new IllegalArgumentException(
-                                "Selected slicer installation is unavailable or failed its check");
-                    window = installation.executionWindow(options);
-                }
+                var window = executionWindow(setup, provider);
                 var results = new LinkedHashMap<String, SliceService.Result>();
                 var jobs = new LinkedHashMap<>(original.gcode());
                 var artifacts = new LinkedHashMap<>(original.printArtifacts());
@@ -639,43 +693,13 @@ final class PrintingCommands {
                     artifacts.put(id, result.get().artifact());
                 }
                 var next = withSetup(original, setup).withGcode(jobs).withPrintArtifacts(artifacts);
-                var outputs = new LinkedHashMap<Path, PrintArtifact>();
-                if (output != null) {
-                    if (all) java.nio.file.Files.createDirectories(output);
-                    results.forEach((id, result) -> outputs.put(
-                            all ? output.resolve(id + "." + result.artifact().format()) : output, result.artifact()));
-                }
-                for (var destination : outputs.keySet()) {
-                    if (destination
-                                    .toAbsolutePath()
-                                    .normalize()
-                                    .equals(file.toAbsolutePath().normalize())
-                            || java.nio.file.Files.exists(destination)
-                                    && java.nio.file.Files.exists(file)
-                                    && java.nio.file.Files.isSameFile(destination, file))
-                        throw new IllegalArgumentException("Artifact destination is the document file");
-                }
+                var outputs = destinations(results);
                 String revision = dev.voxelbrew.engine.persistence.DocumentCodec.fingerprint(original);
                 SliceService.publish(
                         outputs,
                         overwrite,
                         cancellation,
-                        () -> {
-                            var live = documents.load(file);
-                            if (!revision.equals(dev.voxelbrew.engine.persistence.DocumentCodec.fingerprint(live))
-                                    || !Objects.equals(
-                                            original.printSetup()
-                                                    .workspaceSettings()
-                                                    .get(PrintTarget.PRINTER_ID),
-                                            live.printSetup()
-                                                    .workspaceSettings()
-                                                    .get(PrintTarget.PRINTER_ID))
-                                    || !SlicerInstallation.selectedId(original.printSetup())
-                                            .equals(SlicerInstallation.selectedId(live.printSetup()))
-                                    || !original.printArtifacts().equals(live.printArtifacts())
-                                    || !original.gcode().equals(live.gcode()))
-                                throw new SliceService.OutdatedException();
-                        },
+                        () -> validateRevision(original, revision),
                         () -> documentWriter.save(next, file, true));
                 results.values()
                         .forEach(result ->
@@ -723,8 +747,7 @@ final class PrintingCommands {
         @Spec
         CommandLine.Model.CommandSpec spec;
 
-        @Override
-        public Integer call() throws Exception {
+        private GcodeJob loadJob() throws java.io.IOException {
             Path documentPath = spec.root().findOption("--document").getValue();
             GcodeJob job;
             if (documentPath != null) {
@@ -738,12 +761,20 @@ final class PrintingCommands {
                 if (file == null) throw new IllegalArgumentException("Specify --document or a G-code file");
                 job = gcode.read(file);
             }
+            return job;
+        }
+
+        @Override
+        public Integer call() throws Exception {
+            var job = loadJob();
             describe(job, spec.commandLine().getOut());
             if (paths || roles != null || lastLayer != null || firstLayer != 1) {
                 int end = lastLayer == null ? job.modelLayers().size() : lastLayer;
                 if (firstLayer < 1
                         || end < firstLayer
-                        || end > job.modelLayers().size()) throw new IllegalArgumentException("Invalid layer range");
+                        || end > job.modelLayers().size()) {
+                    throw new IllegalArgumentException("Invalid layer range");
+                }
                 double low = job.modelLayers().get(firstLayer - 1),
                         high = job.modelLayers().get(end - 1);
                 var selectedRoles =

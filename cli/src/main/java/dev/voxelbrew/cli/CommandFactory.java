@@ -15,8 +15,9 @@ final class CommandFactory implements CommandLine.IFactory {
         var provider = commands.get(type);
         if (provider != null) return type.cast(provider.get());
         if (type.isAnnotationPresent(CommandLine.Command.class)
-                && type.getPackageName().equals(VoxelBrew.class.getPackageName()))
+                && type.getPackageName().equals(VoxelBrew.class.getPackageName())) {
             throw new IllegalArgumentException("Missing command binding: " + type.getName());
+        }
         return CommandLine.defaultFactory().create(type);
     }
 }

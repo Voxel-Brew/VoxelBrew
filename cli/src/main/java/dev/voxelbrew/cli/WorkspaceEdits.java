@@ -41,7 +41,7 @@ final class WorkspaceEdits {
                 CommandSpec.wrapWithoutInspection((Callable<Integer>) () -> action.run(holder[0])), root.getFactory());
         var spec = command.getCommandSpec().mixinStandardHelpOptions(true);
         spec.usageMessage().description(route);
-        if (document)
+        if (document) {
             spec.addPositional(PositionalParamSpec.builder()
                     .index("0")
                     .arity("0..1")
@@ -49,6 +49,7 @@ final class WorkspaceEdits {
                     .paramLabel("FILE")
                     .description("Editable document (or --document)")
                     .build());
+        }
         if (document) {
             option(
                     spec,
@@ -94,14 +95,30 @@ final class WorkspaceEdits {
     }
 
     private void install(CommandLine root) {
+        registerRotation(root);
+        registerJobControl(root);
+        registerSketchPlane(root);
+        registerJobList(root);
+        registerGeometryQueries(root);
+        registerArrangement(root);
+        registerPlateSettings(root);
+        registerPlates(root);
+        registerSupportSettings(root);
+        registerProcessSettings(root);
+        registerFeatureEdits(root);
+        registerConstruction(root);
+    }
+
+    private void registerRotation(CommandLine root) {
         var rotate = edit(root, "slicer placement rotate", s -> {
             var session = session(s);
             String instanceId = value(s, "--instance"),
                     axis = ((String) value(s, "--axis")).toLowerCase(Locale.ROOT),
                     space = ((String) value(s, "--space")).toLowerCase(Locale.ROOT);
             if (!List.of("x", "y", "z").contains(axis)
-                    || !Set.of("world", "local").contains(space))
+                    || !Set.of("world", "local").contains(space)) {
                 throw new IllegalArgumentException("Choose axis x/y/z and space world/local");
+            }
             var setup = session.document().printSetup();
             var instance = setup.instances().stream()
                     .filter(i -> i.id().equals(instanceId))
@@ -127,7 +144,10 @@ final class WorkspaceEdits {
         option(rotate, "--axis", String.class, true, null, "x, y or z");
         option(rotate, "--space", String.class, false, "world", "world or local");
         option(rotate, "--angle", String.class, true, null, "Signed rotation expression in degrees");
-        for (String action : List.of("status", "wait", "cancel"))
+    }
+
+    private void registerJobControl(CommandLine root) {
+        for (String action : List.of("status", "wait", "cancel")) {
             command(
                     root,
                     "slicer job " + action,
@@ -135,6 +155,10 @@ final class WorkspaceEdits {
                         throw new IllegalArgumentException("Background job controls require an editing session");
                     },
                     false);
+        }
+    }
+
+    private void registerSketchPlane(CommandLine root) {
         var sketchPlane = edit(root, "designer sketch plane set", s -> {
             var session = session(s);
             String id = value(s, "--sketch");
@@ -151,13 +175,16 @@ final class WorkspaceEdits {
                     null);
             String construction = value(s, "--construction-plane"), bodyId = value(s, "--body");
             Integer face = value(s, "--face");
-            if (construction != null && (bodyId != null || face != null))
+            if (construction != null && (bodyId != null || face != null)) {
                 throw new IllegalArgumentException("Choose a construction plane or a face");
-            if (construction != null)
+            }
+            if (construction != null) {
                 plane = new Feature.Plane(id + ".plane", offset, Transform.IDENTITY, null, construction);
+            }
             if (bodyId != null || face != null) {
-                if (bodyId == null || face == null || value(s, "--revision") == null)
+                if (bodyId == null || face == null || value(s, "--revision") == null) {
                     throw new IllegalArgumentException("Face repair requires --body, --face and --revision");
+                }
                 try (var evaluation = session.evaluate(value(s, "--plugin-dir"))) {
                     var body = evaluation.requireCompleteDocument().stream()
                             .filter(b -> b.id().equals(bodyId))
@@ -191,6 +218,9 @@ final class WorkspaceEdits {
         option(sketchPlane, "--construction-plane", String.class, false, null, "Earlier construction plane feature");
         option(sketchPlane, "--body", String.class, false, null, "Earlier supporting body ID");
         option(sketchPlane, "--face", Integer.class, false, null, "Zero-based planar face index");
+    }
+
+    private void registerJobList(CommandLine root) {
         edit(root, "slicer job list", s -> {
             var document = session(s).document();
             document.printSetup().plates().forEach(plate -> {
@@ -203,6 +233,9 @@ final class WorkspaceEdits {
             });
             return 0;
         });
+    }
+
+    private void registerGeometryQueries(CommandLine root) {
         var topology = edit(root, "designer body topology", s -> {
             var session = session(s);
             try (var evaluation = session.evaluate(value(s, "--plugin-dir"))) {
@@ -236,31 +269,36 @@ final class WorkspaceEdits {
                     .findFirst()
                     .orElseThrow();
             s.commandLine().getOut().println(sketch.profileId());
-            if (sketch.profile() instanceof Feature.Constrained profile)
+            if (sketch.profile() instanceof Feature.Constrained profile) {
                 dev.voxelbrew.engine.sketch.SketchProfiles.selectableRegions(profile.geometry())
                         .forEach(region -> s.commandLine()
                                 .getOut()
                                 .println(dev.voxelbrew.engine.sketch.SketchProfiles.regionProfileId(
                                         sketch.profileId(), region)));
+            }
             return 0;
         });
         option(regions, "--sketch", String.class, true, null, "Sketch feature ID");
+    }
+
+    private void registerArrangement(CommandLine root) {
         for (String operation : List.of("arrange", "orient")) {
             var spec = edit(root, "slicer placement " + operation, s -> {
                 var session = session(s);
                 var model = dev.voxelbrew.engine.printing.ManufacturingModels.evaluate(
                         session.document(), dev.voxelbrew.api.model.mesh.MeshOptions.DEFAULT, value(s, "--plugin-dir"));
                 var setup = session.document().printSetup();
-                if (operation.equals("arrange"))
+                if (operation.equals("arrange")) {
                     setup = setup.withInstances(dev.voxelbrew.engine.printing.PrintArrangement.arrange(
                                     model, number(s, "--gap"))
                             .orElseThrow(() -> new IllegalArgumentException("Objects cannot fit on the plate")));
-                else {
+                } else {
                     String selected = value(s, "--instance");
                     boolean all = value(s, "--all");
                     if (all == (selected != null)) throw new IllegalArgumentException("Select --instance or --all");
-                    if (!all && setup.instances().stream().noneMatch(i -> i.id().equals(selected)))
+                    if (!all && setup.instances().stream().noneMatch(i -> i.id().equals(selected))) {
                         throw new IllegalArgumentException("Unknown instance " + selected);
+                    }
                     setup = setup.withInstances(setup.instances().stream()
                             .map(instance -> {
                                 if (!all && !instance.id().equals(selected)) return instance;
@@ -281,12 +319,15 @@ final class WorkspaceEdits {
                 option(spec, "--all", boolean.class, false, "false", "Orient every instance on the active plate");
             }
         }
+    }
+
+    private void registerPlateSettings(CommandLine root) {
         for (String action : List.of("show", "set")) {
             var spec = edit(root, "slicer bed " + action, s -> {
                 var session = session(s);
                 var setup = session.document().printSetup();
                 var printer = setup.printerSnapshot();
-                if (printer == null)
+                if (printer == null) {
                     printer = new dev.voxelbrew.api.model.printing.HardwareSettings(
                             dev.voxelbrew.api.model.printing.PrintProfile.resolve(setup)
                                     .printer(),
@@ -295,26 +336,34 @@ final class WorkspaceEdits {
                             1,
                             true,
                             false);
+                }
                 if (action.equals("show")) {
                     s.commandLine().getOut().println(printer);
                     return 0;
                 }
-                if (setup.workspaceSettings().containsKey(dev.voxelbrew.api.model.printing.PrintTarget.PRINTER_ID))
+                if (setup.workspaceSettings().containsKey(dev.voxelbrew.api.model.printing.PrintTarget.PRINTER_ID)) {
                     throw new IllegalArgumentException("Clear the physical device target before editing the bed");
+                }
                 session.setPrintSetup(setup.withPrinter(
                         printer.rectangular(number(s, "--width"), number(s, "--depth"), number(s, "--height"))));
                 return save(s, session);
             });
-            if (action.equals("set"))
-                for (String dimension : List.of("width", "depth", "height"))
+            if (action.equals("set")) {
+                for (String dimension : List.of("width", "depth", "height")) {
                     option(spec, "--" + dimension, Double.class, true, null, "Bed " + dimension + " in mm");
+                }
+            }
         }
+    }
+
+    private void registerPlates(CommandLine root) {
         for (String action : List.of("list", "add", "rename", "select", "remove")) {
             var spec = edit(root, "slicer plate " + action, s -> plate(s, action));
             if (!action.equals("list")) option(spec, "--plate", String.class, true, null, "Plate ID");
             if (action.equals("rename")) option(spec, "--name", String.class, true, null, "Plate name");
-            if (action.equals("remove"))
+            if (action.equals("remove")) {
                 option(spec, "--force", boolean.class, false, "false", "Remove a populated plate");
+            }
         }
         var move = edit(root, "slicer placement move-to-plate", s -> {
             var session = session(s);
@@ -324,18 +373,25 @@ final class WorkspaceEdits {
         });
         option(move, "--instance", String.class, true, null, "Instance ID");
         option(move, "--plate", String.class, true, null, "Destination plate ID");
-        for (boolean enabled : List.of(true, false))
+    }
+
+    private void registerSupportSettings(CommandLine root) {
+        for (boolean enabled : List.of(true, false)) {
             edit(root, "slicer supports " + (enabled ? "enable" : "disable"), s -> {
                 var session = session(s);
                 session.setPrintSetup(session.document().printSetup().withSupportsDisabled(!enabled));
                 return save(s, session);
             });
+        }
         var nozzle = edit(root, "slicer process nozzle", s -> {
             var session = session(s);
             session.setPrintSetup(session.document().printSetup().withNozzle(number(s, "--diameter")));
             return save(s, session);
         });
         option(nozzle, "--diameter", Double.class, true, null, "Installed nozzle diameter in mm");
+    }
+
+    private void registerProcessSettings(CommandLine root) {
         for (String action : List.of("show", "set", "reset")) {
             var spec = edit(root, "slicer workspace " + action, s -> {
                 var session = session(s);
@@ -344,7 +400,9 @@ final class WorkspaceEdits {
                 else {
                     var settings = new TreeMap<>(setup.workspaceSettings());
                     if (action.equals("reset")) settings.clear();
-                    else settings.put(value(s, "--key"), value(s, "--value"));
+                    else {
+                        settings.put(value(s, "--key"), value(s, "--value"));
+                    }
                     session.setPrintSetup(setup.withWorkspaceSettings(settings));
                     return save(s, session);
                 }
@@ -360,11 +418,16 @@ final class WorkspaceEdits {
             session.invalidateGcode();
             return save(s, session);
         });
+    }
+
+    private void registerFeatureEdits(CommandLine root) {
         for (String type : List.of("body", "feature")) {
             var spec = edit(root, "designer " + type + " rename", s -> {
                 var session = session(s);
                 if (type.equals("body")) session.renameBody(value(s, "--id"), value(s, "--name"));
-                else session.renameFeature(value(s, "--id"), value(s, "--name"));
+                else {
+                    session.renameFeature(value(s, "--id"), value(s, "--name"));
+                }
                 return save(s, session);
             });
             option(spec, "--id", String.class, true, null, "Stable object ID");
@@ -389,8 +452,9 @@ final class WorkspaceEdits {
                 var selectedEdges = new TreeSet<Integer>();
                 if (!kind.equals("shell")) {
                     String edges = value(s, "--edges"), faces = value(s, "--faces");
-                    if (edges != null)
+                    if (edges != null) {
                         Arrays.stream(edges.split(",")).map(Integer::valueOf).forEach(selectedEdges::add);
+                    }
                     if (faces != null) {
                         var selectedFaces = Arrays.stream(faces.split(","))
                                 .map(Integer::valueOf)
@@ -402,8 +466,9 @@ final class WorkspaceEdits {
                                     .orElseThrow(() -> new IllegalArgumentException("Unknown current body output"))
                                     .solid();
                             var pairs = solid.faceEdges();
-                            for (int i = 0; i < pairs.length; i += 2)
+                            for (int i = 0; i < pairs.length; i += 2) {
                                 if (selectedFaces.contains(pairs[i])) selectedEdges.add(pairs[i + 1]);
+                            }
                         }
                     }
                     if (selectedEdges.isEmpty()) throw new IllegalArgumentException("Select --edges or --faces");
@@ -442,6 +507,9 @@ final class WorkspaceEdits {
                         "Comma-separated zero-based faces; use their boundary edges");
             }
         }
+    }
+
+    private void registerConstruction(CommandLine root) {
         for (String action : List.of("list", "add", "set", "preview")) {
             var spec = edit(root, "designer construction " + action, s -> construction(s, action));
             if (!action.equals("list")) {
@@ -473,7 +541,7 @@ final class WorkspaceEdits {
                 .map(text -> {
                     var parts = text.split(":", -1);
                     if (parts.length != 4) throw new IllegalArgumentException("Invalid construction input: " + text);
-                    if (parts[0].equalsIgnoreCase("position"))
+                    if (parts[0].equalsIgnoreCase("position")) {
                         return new ConstructionFeature.Input(
                                 ConstructionFeature.Selection.POSITION,
                                 "",
@@ -483,6 +551,7 @@ final class WorkspaceEdits {
                                         Double.parseDouble(parts[1]),
                                         Double.parseDouble(parts[2]),
                                         Double.parseDouble(parts[3])));
+                    }
                     return new ConstructionFeature.Input(
                             ConstructionFeature.Selection.valueOf(parts[0].toUpperCase(Locale.ROOT)),
                             parts[1],
@@ -494,7 +563,9 @@ final class WorkspaceEdits {
         var feature = new ConstructionFeature(
                 value(s, "--id"), value(s, "--tool"), inputs, number(s, "--value"), value(s, "--alternate"));
         if (action.equals("set")) session.replace(feature);
-        else session.add(feature);
+        else {
+            session.add(feature);
+        }
         if (action.equals("preview")) {
             try (var evaluation = session.evaluate(value(s, "--plugin-dir"))) {
                 evaluation.diagnostics().forEach(s.commandLine().getOut()::println);
@@ -519,8 +590,9 @@ final class WorkspaceEdits {
             case "remove" -> {
                 var selected = setup.selectPlate(id);
                 if ((!selected.instances().isEmpty() || !selected.supports().isEmpty())
-                        && !(Boolean) value(s, "--force"))
+                        && !(Boolean) value(s, "--force")) {
                     throw new IllegalArgumentException("Populated plate requires --force");
+                }
                 yield selected.removeActivePlate();
             }
             default -> throw new IllegalArgumentException(action);
@@ -532,8 +604,10 @@ final class WorkspaceEdits {
     private ModelSession session(CommandSpec s) throws Exception {
         var document = documents.load(file(s));
         String expected = value(s, "--revision");
-        if (expected != null && !expected.equals(dev.voxelbrew.engine.persistence.DocumentCodec.fingerprint(document)))
+        if (expected != null
+                && !expected.equals(dev.voxelbrew.engine.persistence.DocumentCodec.fingerprint(document))) {
             throw new IllegalArgumentException("Document changed; inspect and select topology again");
+        }
         return new ModelSession(document);
     }
 

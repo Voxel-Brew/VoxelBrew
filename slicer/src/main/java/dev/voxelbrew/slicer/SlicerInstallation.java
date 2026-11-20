@@ -16,14 +16,16 @@ public record SlicerInstallation(
     }
 
     public SlicerInstallation {
-        if (providerId == null || !providerId.matches("[a-z0-9][a-z0-9.-]*"))
+        if (providerId == null || !providerId.matches("[a-z0-9][a-z0-9.-]*")) {
             throw new IllegalArgumentException("Invalid slicer provider ID");
+        }
         if (name == null || name.isBlank()) throw new IllegalArgumentException("Enter an installation name");
         java.util.Objects.requireNonNull(id);
         java.util.Objects.requireNonNull(version);
         java.util.Objects.requireNonNull(failure);
-        if (version.isBlank() == failure.isBlank())
+        if (version.isBlank() == failure.isBlank()) {
             throw new IllegalArgumentException("Invalid installation check result");
+        }
         settings = Map.copyOf(settings);
     }
 

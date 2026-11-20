@@ -124,13 +124,14 @@ final class FormulaField extends TextField {
         var selected = Objects.requireNonNull(unit.get());
         double result = parameters.get().value(getText(), selected);
         double displayed = selected.displayValue(Measurements.quantity(result, selected.canonicalUnit()));
-        if (!bounds.get().accepts(displayed))
+        if (!bounds.get().accepts(displayed)) {
             throw new IllegalArgumentException(translations
                     .translate(
                             "formula.bounds",
                             bounds.get().minimumHint(),
                             bounds.get().maximumHint())
                     .orElseThrow());
+        }
         validation.accept(result);
         return result;
     }
@@ -150,8 +151,9 @@ final class FormulaField extends TextField {
     /** Change in declared display units per horizontal screen pixel during middle-button dragging. */
     FormulaField dragStep(double step) {
         if (unit == null) throw new IllegalStateException("This is a text field");
-        if (!Double.isFinite(step) || step <= 0)
+        if (!Double.isFinite(step) || step <= 0) {
             throw new IllegalArgumentException("Drag step must be finite and positive");
+        }
         dragStep = step;
         return this;
     }
@@ -188,10 +190,11 @@ final class FormulaField extends TextField {
 
     int integer() {
         double result = value();
-        if (result != Math.rint(result) || result < Integer.MIN_VALUE || result > Integer.MAX_VALUE)
+        if (result != Math.rint(result) || result < Integer.MIN_VALUE || result > Integer.MAX_VALUE) {
             throw new IllegalArgumentException(translations
                     .translate("gui.expected_a_whole_number_in_the_supported_range")
                     .orElseThrow());
+        }
         return (int) result;
     }
 
@@ -208,11 +211,15 @@ final class FormulaField extends TextField {
         pseudoClassStateChanged(FORMULA, formula);
         try {
             var selected = unit == null ? null : unit.get();
-            String label = displayUnit != null
-                    ? displayUnit
-                    : selected == null || selected == ParameterUnit.NUMBER
-                            ? ""
-                            : selected == ParameterUnit.DEG ? "°" : selected.toString();
+            String label = displayUnit;
+            if (label == null) {
+                label = switch (selected) {
+                    case null -> "";
+                    case NUMBER -> "";
+                    case DEG -> "°";
+                    default -> selected.toString();
+                };
+            }
             if (!unitSuffix.get().equals(label)) {
                 unitSuffix.set(label);
                 requestLayout();

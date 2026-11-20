@@ -55,12 +55,14 @@ final class NativeKernel {
                     System.getProperty("os.name"),
                     System.getProperty("os.arch"),
                     failure);
-            throw new UnsatisfiedLinkError("VoxelBrew native kernel could not load for "
+            var error = new UnsatisfiedLinkError("VoxelBrew native kernel could not load for "
                     + System.getProperty("os.name")
                     + "/"
                     + System.getProperty("os.arch")
                     + ". Run the native bootstrap and :engine:buildNative; set -Dvoxelbrew.native.path to its runtime directory. "
                     + failure.getMessage());
+            error.initCause(failure);
+            throw error;
         }
     }
 

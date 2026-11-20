@@ -11,9 +11,10 @@ class ModelSessionTest {
     @Test
     void deletionPreservesCursorIdentityAndIsOneUndoTransaction() {
         var session = new ModelSession(CadDocument.empty());
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 4; i++) {
             session.add(new Feature.Sketch(
                     "s" + i, "p" + i, new Feature.Plane("origin-xy", 0), new Feature.Rectangle(0, 0, 60, 40)));
+        }
         var original = session.document().features();
         session.setCursor(2);
         session.deleteFeatures(0, 2);

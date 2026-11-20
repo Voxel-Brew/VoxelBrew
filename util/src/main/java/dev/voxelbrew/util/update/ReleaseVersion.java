@@ -16,14 +16,16 @@ public record ReleaseVersion(int major, int minor, int patch, boolean snapshot) 
 
     public static ReleaseVersion release(String text) {
         var version = parse(text);
-        if (version.snapshot)
+        if (version.snapshot) {
             throw new IllegalArgumentException("Updates require a published A.B.C release, not a snapshot");
+        }
         return version;
     }
 
     public ReleaseVersion {
-        if (major < 0 || minor < 0 || patch < 0 || major >= 65535 || minor >= 65535 || patch >= 65535)
+        if (major < 0 || minor < 0 || patch < 0 || major >= 65535 || minor >= 65535 || patch >= 65535) {
             throw new IllegalArgumentException("Version components must be between 0 and 65534");
+        }
     }
 
     @Override

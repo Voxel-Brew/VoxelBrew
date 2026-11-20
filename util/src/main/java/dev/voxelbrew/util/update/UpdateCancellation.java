@@ -11,7 +11,8 @@ public final class UpdateCancellation {
     }
 
     public void check() {
-        if (cancelled.get() || Thread.currentThread().isInterrupted())
+        if (cancelled.get() || Thread.currentThread().isInterrupted()) {
             throw new CancellationException("Update cancelled");
+        }
     }
 }

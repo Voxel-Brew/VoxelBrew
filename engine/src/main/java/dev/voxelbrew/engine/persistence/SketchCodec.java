@@ -72,9 +72,10 @@ class SketchCodec {
                     .setPathId(t.pathId());
             for (var g : t.glyphs()) {
                 var glyph = DocumentProto.SketchGlyph.newBuilder().setAdvance(g.advance());
-                for (var c : g.contours())
+                for (var c : g.contours()) {
                     glyph.addContours(DocumentProto.SketchContour.newBuilder()
                             .addAllCurves(c.stream().map(SketchCodec::entity).toList()));
+                }
                 text.addGlyphs(glyph);
             }
             out.setText(text);
@@ -91,12 +92,13 @@ class SketchCodec {
                     .setType(
                             DocumentProto.SketchConstraint.Type.valueOf(c.type().name()))
                     .addAllValues(c.values());
-            for (var r : c.refs())
+            for (var r : c.refs()) {
                 constraint.addRefs(DocumentProto.SketchReference.newBuilder()
                         .setEntityId(r.entityId())
                         .setPart(DocumentProto.SketchReference.Part.valueOf(
                                 r.part().name()))
                         .setIndex(r.index()));
+            }
             out.addConstraints(constraint);
         }
         return out.build();

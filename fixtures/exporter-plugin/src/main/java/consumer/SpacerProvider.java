@@ -34,8 +34,9 @@ public class SpacerProvider implements FeatureProvider {
     }
 
     private static void validate(Map<String, Double> p) {
-        if (p.get("innerDiameter") >= p.get("outerDiameter"))
+        if (p.get("innerDiameter") >= p.get("outerDiameter")) {
             throw new IllegalArgumentException("innerDiameter must be smaller than outerDiameter");
+        }
     }
 
     public FeatureDescriptor descriptor() {

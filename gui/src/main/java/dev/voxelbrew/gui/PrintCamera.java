@@ -46,7 +46,9 @@ final class PrintCamera {
         if (spatial) {
             orientation = orientation.dragged(dx, dy);
             updateProjection();
-        } else pan(dx, dy);
+        } else {
+            pan(dx, dy);
+        }
     }
 
     void scroll(double delta) {

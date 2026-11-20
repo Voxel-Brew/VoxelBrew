@@ -128,6 +128,19 @@ final class PrinterPane extends VBox implements AutoCloseable {
         return field;
     }
 
+    private static void validateConfiguration(
+            Driver driver,
+            Profile profile,
+            String name,
+            DesktopExportWindow.Embedded form,
+            Button saveButton,
+            Label error) {
+        boolean valid = driver != null && profile != null && !name.isBlank() && form != null;
+        var errors = valid ? driver.gui().validate(form.values().get()) : Map.<String, String>of();
+        saveButton.setDisable(!valid || !errors.isEmpty());
+        error.setText(String.join("; ", errors.values()));
+    }
+
     PrinterPane(
             PrinterStore runtime,
             DriverRegistry providers,
@@ -260,7 +273,9 @@ final class PrinterPane extends VBox implements AutoCloseable {
                     for (var node = target; node != null && node != this; node = node.getParent()) {
                         if (node instanceof javafx.scene.control.Control
                                 && !(node instanceof Label)
-                                && !(node instanceof ScrollPane)) return false;
+                                && !(node instanceof ScrollPane)) {
+                            return false;
+                        }
                     }
                     return true;
                 });
@@ -305,7 +320,9 @@ final class PrinterPane extends VBox implements AutoCloseable {
     void documentChanged(CadDocument value) {
         if (document == null
                 || !document.gcode().equals(value.gcode())
-                || !document.printArtifacts().equals(value.printArtifacts())) jobGeneration.incrementAndGet();
+                || !document.printArtifacts().equals(value.printArtifacts())) {
+            jobGeneration.incrementAndGet();
+        }
         document = value;
         String selected = plates.getValue() == null
                 ? value.printSetup().activePlateId()
@@ -326,8 +343,9 @@ final class PrinterPane extends VBox implements AutoCloseable {
                 .filter(p -> p.id().equals(selected))
                 .findFirst()
                 .orElse(choices.isEmpty() ? null : choices.getFirst());
-        if (!Objects.equals(plates.getSelectionModel().getSelectedItem(), choice))
+        if (!Objects.equals(plates.getSelectionModel().getSelectedItem(), choice)) {
             plates.getSelectionModel().select(choice);
+        }
         syncDevice(false);
     }
 
@@ -343,12 +361,16 @@ final class PrinterPane extends VBox implements AutoCloseable {
                 ? artifact.metadata().getOrDefault("target_id", "")
                 : null;
         var resolved = deviceForJob(artifact, availableDevices);
-        deviceName.setText(
-                target == null ? t("noDevice") : resolved == null ? t("unavailableDevice") : resolved.name());
+        if (target == null) deviceName.setText(t("noDevice"));
+        else {
+            deviceName.setText(resolved == null ? t("unavailableDevice") : resolved.name());
+        }
         if (reconnect || !Objects.equals(selectedDevice, resolved)) {
             selectedDevice = resolved;
             connect();
-        } else update();
+        } else {
+            update();
+        }
     }
 
     private void update() {
@@ -364,7 +386,9 @@ final class PrinterPane extends VBox implements AutoCloseable {
                     artifact != null && "printer".equals(artifact.metadata().get("target_kind"))
                             ? t("missingDevice")
                             : t("profileOnly"));
-        } else details.setText(compatible ? t("ready") : t("choose"));
+        } else {
+            details.setText(compatible ? t("ready") : t("choose"));
+        }
         print.setVisible(selectedDevice != null);
         print.setManaged(print.isVisible());
         monitor.setVisible(selectedDevice != null);
@@ -454,7 +478,9 @@ final class PrinterPane extends VBox implements AutoCloseable {
                     current = result;
                     if (current.state() == DriverStatus.State.PRINTING
                             || current.state() == DriverStatus.State.PAUSED
-                            || current.state() == DriverStatus.State.COMPLETE) startPending = false;
+                            || current.state() == DriverStatus.State.COMPLETE) {
+                        startPending = false;
+                    }
                     update();
                 }
             });
@@ -483,8 +509,9 @@ final class PrinterPane extends VBox implements AutoCloseable {
                     text.translate("file.replace", path).orElseThrow(),
                     ButtonType.YES,
                     ButtonType.NO);
-            if (Dialogs.show(confirmation, getScene().getWindow(), text).orElse(ButtonType.NO) != ButtonType.YES)
+            if (Dialogs.show(confirmation, getScene().getWindow(), text).orElse(ButtonType.NO) != ButtonType.YES) {
                 return;
+            }
         }
         try {
             var payload = artifact == null
@@ -512,7 +539,9 @@ final class PrinterPane extends VBox implements AutoCloseable {
                 || document == null
                 || plates.getValue() == null
                 || startPending
-                || !current.canStart()) return;
+                || !current.canStart()) {
+            return;
+        }
         var job = document;
         var plate = plates.getValue().id();
         var connected = session;
@@ -532,7 +561,9 @@ final class PrinterPane extends VBox implements AutoCloseable {
                     if (result instanceof Driver.PrintResult.Failure failure) {
                         startPending = failure.submissionUncertain();
                         message.setText(String.join("\n", failure.messages()));
-                    } else message.setText(t("submitted"));
+                    } else {
+                        message.setText(t("submitted"));
+                    }
                 });
             } catch (Exception failure) {
                 // Submission may have reached the printer. Keep start disabled until status reconciles it.
@@ -590,29 +621,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
                 return driver.getValue();
             }
         });
-        var profile = new ComboBox<Profile>();
-        profile.setId("device-config-profile");
-        profile.getItems()
-                .setAll(profiles.load().entries().stream()
-                        .map(PrinterProfileCatalog.Entry::definition)
-                        .toList());
-        profile.setConverter(new javafx.util.StringConverter<>() {
-            @Override
-            public String toString(Profile p) {
-                return p == null
-                        ? ""
-                        : p.manufacturer() + " " + p.name()
-                                + (list.getValue() != null
-                                                && p == list.getValue().profile()
-                                        ? " (saved snapshot)"
-                                        : "");
-            }
-
-            @Override
-            public Profile fromString(String value) {
-                return profile.getValue();
-            }
-        });
+        var profile = profileSelector(list);
         var inline = new VBox();
         inline.setId("device-config-fields");
         var error = new Label();
@@ -625,16 +634,8 @@ final class PrinterPane extends VBox implements AutoCloseable {
         var saveButton = (Button) dialog.getDialogPane().lookupButton(save);
         saveButton.setId("device-config-save");
         dialog.getDialogPane().lookupButton(ButtonType.CANCEL).setId("device-config-cancel");
-        Runnable validate = () -> {
-            boolean valid = driver.getValue() != null
-                    && profile.getValue() != null
-                    && !name.getText().isBlank()
-                    && form[0] != null;
-            var errors =
-                    valid ? driver.getValue().gui().validate(form[0].values().get()) : Map.<String, String>of();
-            saveButton.setDisable(!valid || !errors.isEmpty());
-            error.setText(String.join("; ", errors.values()));
-        };
+        Runnable validate = () -> validateConfiguration(
+                driver.getValue(), profile.getValue(), name.getText(), form[0], saveButton, error);
         driver.valueProperty().addListener((o, old, value) -> {
             form[0] = null;
             inline.getChildren().clear();
@@ -659,13 +660,15 @@ final class PrinterPane extends VBox implements AutoCloseable {
                     .setAll(profiles.load().entries().stream()
                             .map(PrinterProfileCatalog.Entry::definition)
                             .toList());
-            if (!profile.getItems().contains(value.profile()))
+            if (!profile.getItems().contains(value.profile())) {
                 profile.getItems().add(value.profile());
+            }
             profile.setValue(value.profile());
             driver.setValue(null);
             driver.setValue(providers.find(value.driverId()).orElse(null));
-            if (driver.getValue() == null)
+            if (driver.getValue() == null) {
                 error.setText("Missing driver " + value.driverId() + ". Install its plugin or choose a replacement.");
+            }
         });
         var add = new Button(t("new"));
         add.setOnAction(e -> {
@@ -766,5 +769,28 @@ final class PrinterPane extends VBox implements AutoCloseable {
         generation.incrementAndGet();
         jobGeneration.incrementAndGet();
         polling.stop();
+    }
+
+    private ComboBox<Profile> profileSelector(ComboBox<Printer> list) {
+        var profile = new ComboBox<Profile>();
+        profile.setId("device-config-profile");
+        profile.getItems()
+                .setAll(profiles.load().entries().stream()
+                        .map(PrinterProfileCatalog.Entry::definition)
+                        .toList());
+        profile.setConverter(new javafx.util.StringConverter<>() {
+            @Override
+            public String toString(Profile p) {
+                if (p == null) return "";
+                return p.manufacturer() + " " + p.name()
+                        + (list.getValue() != null && p == list.getValue().profile() ? " (saved snapshot)" : "");
+            }
+
+            @Override
+            public Profile fromString(String value) {
+                return profile.getValue();
+            }
+        });
+        return profile;
     }
 }

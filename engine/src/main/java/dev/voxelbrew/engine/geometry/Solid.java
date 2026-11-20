@@ -228,8 +228,9 @@ public final class Solid implements AutoCloseable {
             requireOpen();
             double[] data = NativeKernel.planarFaces(token);
             var result = new java.util.ArrayList<PlanarFace>();
-            for (int i = 0; i < data.length; i += 5)
+            for (int i = 0; i < data.length; i += 5) {
                 result.add(new PlanarFace((int) data[i], data[i + 1], data[i + 2], data[i + 3], data[i + 4]));
+            }
             return java.util.List.copyOf(result);
         }
     }
@@ -250,8 +251,9 @@ public final class Solid implements AutoCloseable {
             finite("normalY", ny);
             finite("normalZ", nz);
             finite("offset", offset);
-            if (Math.abs(Math.hypot(Math.hypot(nx, ny), nz) - 1) > 1e-9)
+            if (Math.abs(Math.hypot(Math.hypot(nx, ny), nz) - 1) > 1e-9) {
                 throw new IllegalArgumentException("split plane normal must have unit length");
+            }
             long[] result = NativeKernel.split(token, nx, ny, nz, offset);
             return new Split(new Solid(result[0]), new Solid(result[1]));
         }

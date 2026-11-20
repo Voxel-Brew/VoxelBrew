@@ -35,21 +35,25 @@ public class BundledSlicers {
         ProcessSlicer configure(
                 ProcessSlicer process, ManufacturingModel model, Path scratch, Cancellation cancellation)
                 throws IOException, SlicerException {
-            if (!bundle.provider().equals(process.descriptor().id()))
+            if (!bundle.provider().equals(process.descriptor().id())) {
                 throw new SlicerException.Configuration("Selected bundle belongs to another slicer provider");
+            }
             var properties = new Properties();
             try (var descriptor = BundledSlicers.class.getResourceAsStream(bundle.descriptor())) {
-                if (descriptor == null)
+                if (descriptor == null) {
                     throw new SlicerException.Configuration("Bundled " + bundle.name() + " is unavailable");
+                }
                 properties.load(descriptor);
             }
             String archive = properties.getProperty("archive", "");
-            if (!archive.equals(bundle.provider() + ".zip") && !archive.equals(bundle.provider() + ".tar.gz"))
+            if (!archive.equals(bundle.provider() + ".zip") && !archive.equals(bundle.provider() + ".tar.gz")) {
                 throw new SlicerException.Configuration("Invalid archive descriptor for bundled " + bundle.name());
+            }
             Path executable = inside(scratch, properties.getProperty("executable", ""));
             try (var payload = BundledSlicers.class.getResourceAsStream(RESOURCES + archive)) {
-                if (payload == null)
+                if (payload == null) {
                     throw new SlicerException.Configuration("Bundled " + bundle.name() + " archive is missing");
+                }
                 if (archive.endsWith(".zip")) {
                     unzip(payload, scratch, cancellation);
                 } else {
@@ -62,13 +66,15 @@ public class BundledSlicers {
                     Files.delete(file);
                 }
             }
-            if (!Files.isExecutable(executable))
+            if (!Files.isExecutable(executable)) {
                 throw new SlicerException.Configuration("Bundled " + bundle.name() + " executable is unavailable");
+            }
             cancellation.check();
             Map<String, String> options = new LinkedHashMap<>();
             options.put("executable", executable.toString());
-            if (bundle.provider().equals("orca"))
+            if (bundle.provider().equals("orca")) {
                 options.putAll(BundledOrcaPresets.prepare(scratch, model.profile(), cancellation));
+            }
             return process.configure(options);
         }
     }
@@ -131,8 +137,9 @@ public class BundledSlicers {
 
     private static Path inside(Path directory, String name) throws SlicerException.Configuration {
         Path path = directory.resolve(name).normalize();
-        if (!path.startsWith(directory) || path.equals(directory))
+        if (!path.startsWith(directory) || path.equals(directory)) {
             throw new SlicerException.Configuration("Invalid slicer bundle path");
+        }
         return path;
     }
 

@@ -14,11 +14,12 @@ public class Services {
 
     public <T> T load(@NonNull Class<T> service, ClassLoader loader) {
         var providers = ServiceLoader.load(service, loader).stream().toList();
-        if (providers.size() != 1)
+        if (providers.size() != 1) {
             throw new ServiceConfigurationError("Expected exactly one provider for " + service.getName() + "; found "
                     + providers.stream()
                             .map(provider -> provider.type().getName())
                             .toList());
+        }
         return providers.getFirst().get();
     }
 }

@@ -38,8 +38,10 @@ inputs, without changing global service state.
   The slicer store reads provider defaults from its preferences files and supports
   the older settings layouts.
 - `TranslationService` registers the English and Polish resource bundles at startup.
-  Each JAR contributes a `META-INF/voxelbrew/translations` index with one bundle base
-  name per line. User catalogs in the application home's `i18n` folder can override
+  Application modules list bundles in `META-INF/voxelbrew/translations`. The service
+  then discovers all `TranslationProvider` implementations, including the properties
+  catalogs from the export, import, and printer APIs, and merges their messages.
+  User catalogs in the application home's `i18n` folder can override
   registered messages. Standalone consumers can resolve messages from API bundles.
   CLI and desktop scopes load their catalog through `ServiceLoader` at startup.
   Registrations belong to the service instance.

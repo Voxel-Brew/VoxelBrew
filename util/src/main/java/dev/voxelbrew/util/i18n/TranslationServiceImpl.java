@@ -1,5 +1,6 @@
 package dev.voxelbrew.util.i18n;
 
+import dev.voxelbrew.api.i18n.TranslationProvider;
 import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.userconfig.UserConfigException;
 import dev.voxelbrew.api.userconfig.UserConfigService;
@@ -67,20 +68,6 @@ public final class TranslationServiceImpl implements TranslationService {
         return Optional.empty();
     }
 
-    private static Locale selectLocale(Locale locale, Map<String, Properties> catalogs) {
-        String requested = locale.toLanguageTag().toLowerCase(Locale.ROOT);
-        Properties external = catalogs.get(requested);
-        if (external == null && !requested.contains("-"))
-            external = catalogs.entrySet().stream()
-                    .filter(entry -> entry.getKey().startsWith(requested + "-"))
-                    .map(Map.Entry::getValue)
-                    .findFirst()
-                    .orElse(null);
-        return external != null
-                ? Locale.forLanguageTag(external.getProperty("language.i18n"))
-                : locale.getLanguage().equals("pl") ? POLISH : Locale.ENGLISH;
-    }
-
     private static Startup startup(UserConfigService configuration) {
         Path directory = configuration.homeFolder().resolve("i18n");
         try {
@@ -114,8 +101,28 @@ public final class TranslationServiceImpl implements TranslationService {
         this.locale = selectLocale(locale, catalogs);
     }
 
+    private Locale selectLocale(Locale locale, Map<String, Properties> catalogs) {
+        String requested = locale.toLanguageTag().toLowerCase(Locale.ROOT);
+        Properties external = catalogs.get(requested);
+        if (external == null && !requested.contains("-"))
+            external = catalogs.entrySet().stream()
+                    .filter(entry -> entry.getKey().startsWith(requested + "-"))
+                    .map(Map.Entry::getValue)
+                    .findFirst()
+                    .orElse(null);
+        if (external != null) return Locale.forLanguageTag(external.getProperty("language.i18n"));
+        if (translations.containsKey(locale)) return locale;
+        Locale language = Locale.forLanguageTag(locale.getLanguage());
+        return translations.containsKey(language) ? language : Locale.ENGLISH;
+    }
+
     private Map<String, Properties> loadCatalogs(Path directory) {
         loadBundledTranslations();
+        for (var provider : ServiceLoader.load(TranslationProvider.class)) {
+            provider.getTranslations()
+                    .forEach((language, messages) ->
+                            messages.forEach((key, value) -> registerTranslation(language, key, value)));
+        }
         return readExternalCatalogs(directory);
     }
 
@@ -136,8 +143,9 @@ public final class TranslationServiceImpl implements TranslationService {
 
     private Map<String, String> registerExternalCatalogs(Map<String, Properties> catalogs) {
         var names = new TreeMap<String, String>();
-        names.put("en-EN", lookup(Locale.ENGLISH, "language.name"));
-        names.put("pl-PL", lookup(POLISH, "language.name"));
+        translations.forEach((language, messages) -> names.put(
+                messages.getOrDefault("language.i18n", language.toLanguageTag()),
+                messages.getOrDefault("language.name", language.getDisplayName(language))));
         catalogs.forEach((tag, properties) -> registerExternalCatalog(tag, properties, names));
         return Collections.unmodifiableMap(names);
     }

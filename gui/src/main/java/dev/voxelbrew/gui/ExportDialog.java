@@ -2,6 +2,7 @@ package dev.voxelbrew.gui;
 
 import dev.voxelbrew.api.exporter.ExporterDescriptor;
 import dev.voxelbrew.api.exporter.ExporterProviderRegistry;
+import dev.voxelbrew.api.i18n.TranslationService;
 import java.nio.file.Path;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
@@ -17,10 +18,10 @@ final class ExportDialog {
             Window owner,
             DocumentController controller,
             ExporterProviderRegistry registry,
-            dev.voxelbrew.util.i18n.Translations translations,
+            TranslationService translations,
             java.util.function.Consumer<String> documentExporter) {
         var dialog = new Dialog<ExporterDescriptor>();
-        dialog.setTitle(translations.text("action.export"));
+        dialog.setTitle(translations.translate("action.export").orElseThrow());
         var format = new ComboBox<ExporterDescriptor>();
         format.setId("export-format");
         format.getItems()
@@ -34,8 +35,10 @@ final class ExportDialog {
                         .toList());
         format.getSelectionModel().selectFirst();
         format.setMaxWidth(Double.MAX_VALUE);
-        dialog.getDialogPane().setContent(new VBox(8, new Label(translations.text("gui.format")), format));
-        var confirm = new ButtonType(translations.text("gui.export"), ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane()
+                .setContent(new VBox(
+                        8, new Label(translations.translate("gui.format").orElseThrow()), format));
+        var confirm = new ButtonType(translations.translate("gui.export").orElseThrow(), ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(confirm, ButtonType.CANCEL);
         var button = dialog.getDialogPane().lookupButton(confirm);
         button.setId("export-confirm");

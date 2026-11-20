@@ -1,7 +1,7 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.util.Version;
-import dev.voxelbrew.util.i18n.Translations;
 import dev.voxelbrew.util.update.*;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -18,15 +18,25 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 final class AboutDialog {
     private final UpdateServiceFactory factory;
-    private final Translations translations;
+
+    private final TranslationService translations;
+
     private final ExecutorService worker;
+
     private final UpdateCancellation cancellation = new UpdateCancellation();
+
     private final Dialog<ButtonType> dialog = new Dialog<>();
+
     private final Label status = new Label();
+
     private final Button check;
+
     private final Hyperlink updates, license, notices;
+
     private final ProgressIndicator progress = new ProgressIndicator();
+
     private final Button close;
+
     private boolean closed, openUpdates;
 
     private static Label label(String text, String id) {
@@ -36,22 +46,23 @@ final class AboutDialog {
         return label;
     }
 
-    AboutDialog(UpdateServiceFactory factory, Translations translations, Supplier<ExecutorService> workers) {
+    AboutDialog(UpdateServiceFactory factory, TranslationService translations, Supplier<ExecutorService> workers) {
         this.factory = factory;
         this.translations = translations;
-        dialog.setTitle(translations.text("about.title"));
+        dialog.setTitle(translations.translate("about.title").orElseThrow());
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
         close = (Button) dialog.getDialogPane().lookupButton(ButtonType.CLOSE);
         close.setId("about-close");
         var product = new Label("VoxelBrew CAD");
         product.getStyleClass().add("selection-title");
-        var version = label(translations.text("about.version", Version.version()), "about-version");
+        var version =
+                label(translations.translate("about.version", Version.version()).orElseThrow(), "about-version");
         status.setId("about-status");
         status.setWrapText(true);
         progress.setMaxSize(20, 20);
         progress.setMinSize(20, 20);
         progress.managedProperty().bind(progress.visibleProperty());
-        check = new Button(translations.text("about.check"));
+        check = new Button(translations.translate("about.check").orElseThrow());
         check.setId("about-check");
         check.setMinWidth(Region.USE_PREF_SIZE);
         UiHelp.install(check, translations);
@@ -70,7 +81,7 @@ final class AboutDialog {
                 12,
                 product,
                 version,
-                label(translations.text("about.description"), "about-description"),
+                label(translations.translate("about.description").orElseThrow(), "about-description"),
                 new Separator(),
                 releaseStatus,
                 check,
@@ -105,18 +116,23 @@ final class AboutDialog {
     private void check() {
         check.setDisable(true);
         progress.setVisible(true);
-        status.setText(translations.text("about.checking"));
+        status.setText(translations.translate("about.checking").orElseThrow());
         worker.execute(() -> {
             try {
                 var result = factory.create().check(new UpdateService.Request(null, false), cancellation);
                 Platform.runLater(() -> {
                     if (closed) return;
                     String message = result.available()
-                            ? translations.text(
-                                    "about.available", result.release().version())
-                            : translations.text(
-                                    "about.current", result.release().version());
-                    if (!result.installable()) message += "\n" + translations.text("about.development");
+                            ? translations
+                                    .translate(
+                                            "about.available", result.release().version())
+                                    .orElseThrow()
+                            : translations
+                                    .translate("about.current", result.release().version())
+                                    .orElseThrow();
+                    if (!result.installable())
+                        message += "\n"
+                                + translations.translate("about.development").orElseThrow();
                     status.setText(message);
                     finished();
                 });
@@ -126,7 +142,7 @@ final class AboutDialog {
                 else log.warn("About release lookup failed", failure);
                 Platform.runLater(() -> {
                     if (closed) return;
-                    status.setText(translations.text("about.failed"));
+                    status.setText(translations.translate("about.failed").orElseThrow());
                     finished();
                 });
             }
@@ -155,12 +171,12 @@ final class AboutDialog {
             Dialogs.show(legal, owner, translations);
         } catch (IOException failure) {
             log.error("Cannot read bundled legal information {}", resource, failure);
-            status.setText(translations.text("about.legalFailed"));
+            status.setText(translations.translate("about.legalFailed").orElseThrow());
         }
     }
 
     private Hyperlink link(String key, String id) {
-        var link = new Hyperlink(translations.text(key));
+        var link = new Hyperlink(translations.translate(key).orElseThrow());
         link.setId(id);
         link.setWrapText(true);
         UiHelp.install(link, translations);

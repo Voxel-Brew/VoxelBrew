@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.util.i18n.Translations;
+import dev.voxelbrew.api.i18n.TranslationService;
 import java.awt.Desktop;
 import java.net.URI;
 import javafx.geometry.Pos;
@@ -14,12 +14,12 @@ import lombok.extern.slf4j.Slf4j;
 /** Support links shared by the Settings and About dialogs. */
 @Slf4j
 final class SupportDialog {
-    static void show(Window owner, Translations translations) {
+    static void show(Window owner, TranslationService translations) {
         var dialog = new Dialog<ButtonType>();
-        dialog.setTitle(translations.text("support.title"));
+        dialog.setTitle(translations.translate("support.title").orElseThrow());
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
         dialog.getDialogPane().lookupButton(ButtonType.CLOSE).setId("support-close");
-        var message = new Label(translations.text("support.welcome"));
+        var message = new Label(translations.translate("support.welcome").orElseThrow());
         message.setWrapText(true);
         dialog.getDialogPane().setContent(new VBox(16, message, banners()));
         Dialogs.show(dialog, owner, translations);

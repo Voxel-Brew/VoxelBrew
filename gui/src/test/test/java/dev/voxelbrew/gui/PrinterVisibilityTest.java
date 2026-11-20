@@ -15,8 +15,8 @@ class PrinterVisibilityTest {
 
     @Test
     void visibilityPersistsCanBeRestoredAndPreservesOtherPreferences() throws Exception {
-        var configuration = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
-        configuration.set("language", "pl");
+        var configuration = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties");
+        configuration.saveUserConfig("language", "pl");
         var visibility = new PrinterVisibility(configuration);
         var catalog = new dev.voxelbrew.printer.DefaultPrinterProfileCatalog(directory.resolve("printers"));
         catalog.exportDefaults(Set.of("bambu-lab-a1-mini"));
@@ -28,9 +28,11 @@ class PrinterVisibilityTest {
                 .collect(Collectors.toSet());
         visible.remove("bambu-lab-a1-mini");
         visibility.saveVisible(entries, visible);
-        var reopened = new PrinterVisibility(new dev.voxelbrew.util.config.FileUserConfiguration(configuration.path()));
+        var reopenedConfiguration = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(
+                configuration.homeFolder(), "config.properties");
+        var reopened = new PrinterVisibility(reopenedConfiguration);
         assertThat(reopened.hidden()).isEqualTo(Set.of("bambu-lab-a1-mini"));
-        assertThat(configuration.get("language", "")).isEqualTo("pl");
+        assertThat(configuration.readUserConfig("language").orElse("")).isEqualTo("pl");
         assertThat(catalog.load().require("bambu-lab-a1-mini")).isNotNull();
         visibility.saveVisible(entries, Set.of());
         assertThat(reopened.hidden().size()).isEqualTo(62);

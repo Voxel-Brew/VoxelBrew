@@ -9,40 +9,35 @@ import lombok.NonNull;
 /**
  * Bounded CPU workers for independent operations. Every call joins all its work before returning.
  */
-@lombok.extern.slf4j.Slf4j
-public final class CpuWork {
+public final class ParallelWork {
     private static final ThreadLocal<Boolean> WORKER = ThreadLocal.withInitial(() -> false);
 
     private static final class Shared {
-        static final WorkPool POOL = new WorkPool(configuredParallelism());
+        static final ExecutorService EXECUTOR = dev.voxelbrew.util.services.Services.load(
+                        dev.voxelbrew.api.multithread.MultithreadService.class)
+                .commonExecutorService();
+        static final WorkPool POOL =
+                new WorkPool(EXECUTOR instanceof ThreadPoolExecutor pool ? pool.getCorePoolSize() : 1, EXECUTOR);
     }
 
     // Separate instances let lifecycle/concurrency tests exercise real workers without global
     // overrides.
-    static final class WorkPool implements AutoCloseable {
+    static final class WorkPool {
         private final int parallelism;
         private final ExecutorService executor;
 
-        WorkPool(int parallelism) {
+        WorkPool(int parallelism, ExecutorService executor) {
             if (parallelism < 1 || parallelism > 32)
                 throw new IllegalArgumentException("voxelbrew.compute.threads must be from 1 to 32");
             this.parallelism = parallelism;
-            log.debug("Creating computation pool with parallelism {}", parallelism);
-            executor = parallelism == 1
-                    ? null
-                    : Executors.newFixedThreadPool(
-                            parallelism,
-                            Thread.ofPlatform()
-                                    .daemon()
-                                    .name("voxelbrew-compute-", 0)
-                                    .factory());
+            this.executor = executor;
         }
 
         void forEach(int size, @NonNull IntConsumer operation) {
             if (size < 0) throw new IllegalArgumentException("Negative work size");
 
             checkInterrupted();
-            if (size < 2 || executor == null || WORKER.get()) {
+            if (size < 2 || parallelism == 1 || WORKER.get() || MultithreadServiceImpl.isCommonWorker()) {
                 for (int i = 0; i < size; i++) {
                     checkInterrupted();
                     operation.accept(i);
@@ -98,22 +93,6 @@ public final class CpuWork {
                 if (failure instanceof Error error) throw error;
             }
         }
-
-        @Override
-        public void close() {
-            if (executor != null) executor.close();
-        }
-    }
-
-    private static int configuredParallelism() {
-        String configured = System.getProperty("voxelbrew.compute.threads");
-        if (configured == null)
-            return Math.max(1, Math.min(8, Runtime.getRuntime().availableProcessors()));
-        try {
-            return Integer.parseInt(configured);
-        } catch (NumberFormatException failure) {
-            throw new IllegalArgumentException("voxelbrew.compute.threads must be an integer from 1 to 32", failure);
-        }
     }
 
     public static int parallelism() {
@@ -139,5 +118,5 @@ public final class CpuWork {
         if (Thread.currentThread().isInterrupted()) throw new CancellationException("Computation cancelled");
     }
 
-    private CpuWork() {}
+    private ParallelWork() {}
 }

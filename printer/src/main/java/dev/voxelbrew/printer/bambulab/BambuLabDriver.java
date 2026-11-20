@@ -1,9 +1,12 @@
 package dev.voxelbrew.printer.bambulab;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.printing.PrintArtifact;
 import dev.voxelbrew.api.printer.driver.*;
 import dev.voxelbrew.printer.internal.JobRejectedException;
 import dev.voxelbrew.printer.internal.TransportFactory;
+import dev.voxelbrew.util.services.Services;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.NoRouteToHostException;
@@ -15,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 /** Stateless integration; every operation closes its own connection. */
 @Slf4j
 public final class BambuLabDriver implements Driver {
+    private final TranslationService translations;
     private final TransportFactory transports;
 
     private static boolean isConnectionFailure(Throwable failure) {
@@ -38,11 +42,31 @@ public final class BambuLabDriver implements Driver {
         return detail == null || detail.isBlank() ? context : context + ": " + detail;
     }
 
+    private static Connection connection(DriverConfiguration config) {
+        return new Connection(
+                config.requireUriProperty(BambuLabDriverGui.BAMBU_ADDRESS_ID).getHost(),
+                config.requireStringProperty(BambuLabDriverGui.BAMBU_SERIAL_ID),
+                new String(config.requirePasswordProperty(BambuLabDriverGui.BAMBU_SECRET_ID)));
+    }
+
     public BambuLabDriver() {
-        transports = config -> new BambuSession(connection(config));
+        this(Services.load(TranslationService.class));
+    }
+
+    public BambuLabDriver(@lombok.NonNull TranslationService translations) {
+        this(translations, config -> new BambuSession(connection(config)));
     }
 
     BambuLabDriver(@lombok.NonNull TransportFactory transports) {
+        this(Services.load(TranslationService.class), transports);
+    }
+
+    @SuppressFBWarnings(
+            value = "EI_EXPOSE_REP2",
+            justification = "The injected translation service is intentionally shared.")
+    public BambuLabDriver(
+            @lombok.NonNull TranslationService translations, @lombok.NonNull TransportFactory transports) {
+        this.translations = translations;
         this.transports = transports;
     }
 
@@ -53,29 +77,30 @@ public final class BambuLabDriver implements Driver {
 
     @Override
     public String name() {
-        return "BambuLab Configuration";
+        return translations.translate("printer.bambulab.name").orElseThrow();
     }
 
     @Override
     public DriverGui gui() {
-        return new BambuLabDriverGui();
+        return new BambuLabDriverGui(translations);
     }
 
-    private Connection connection(DriverConfiguration config) {
+    private void validate(DriverConfiguration config) {
         var form = gui();
         var values = config.toInput();
         var errors = form.validate(values);
-        if (!errors.isEmpty()) throw new IllegalArgumentException("Invalid printer configuration: " + errors);
-        return new Connection(
-                config.requireUriProperty(BambuLabDriverGui.BAMBU_ADDRESS_ID).getHost(),
-                config.requireStringProperty(BambuLabDriverGui.BAMBU_SERIAL_ID),
-                new String(config.requirePasswordProperty(BambuLabDriverGui.BAMBU_SECRET_ID)));
+        if (!errors.isEmpty())
+            throw new IllegalArgumentException(
+                    translations.translate("printer.invalid", errors).orElseThrow());
     }
 
     @Override
     public DriverStatus readPrinterStatus(DriverConfiguration config) {
-        try (var session = transports.open(config)) {
-            return session.status();
+        try {
+            validate(config);
+            try (var session = transports.open(config)) {
+                return session.status();
+            }
         } catch (IOException | RuntimeException failure) {
             if (isConnectionFailure(failure)) {
                 log.debug("Cannot connect to BambuLab for printer status", failure);
@@ -89,7 +114,7 @@ public final class BambuLabDriver implements Driver {
                     OptionalDouble.empty(),
                     OptionalDouble.empty(),
                     OptionalDouble.empty(),
-                    message("Cannot read BambuLab printer status", failure));
+                    message(translations.translate("printer.bambulab.status").orElseThrow(), failure));
         }
     }
 
@@ -99,17 +124,20 @@ public final class BambuLabDriver implements Driver {
         boolean submissionAttempted = false;
         boolean submitted = false;
         try {
-            connection(config);
+            validate(config);
             if (!artifact.format().equals("gcode.3mf"))
-                return new PrintResult.Failure(Set.of("BambuLab requires a sliced gcode.3mf package"));
+                return new PrintResult.Failure(
+                        Set.of(translations.translate("printer.bambulab.format").orElseThrow()));
             if (!"orca".equals(artifact.metadata().get("backend"))
                     || !"0".equals(artifact.metadata().get("tool")))
-                return new PrintResult.Failure(Set.of("Bambu requires an OrcaSlicer single-material tool 0 package"));
+                return new PrintResult.Failure(
+                        Set.of(translations.translate("printer.bambulab.tool").orElseThrow()));
             temporary = Files.createTempFile("voxelbrew-job-", ".gcode.3mf");
             Files.write(temporary, artifact.bytes());
             try (var session = transports.open(config)) {
                 if (!session.status().canStart())
-                    return new PrintResult.Failure(Set.of("Printer is not idle; inspect its current job"));
+                    return new PrintResult.Failure(Set.of(
+                            translations.translate("printer.bambulab.busy").orElseThrow()));
                 var uploaded = session.upload(temporary, progress -> {});
                 submissionAttempted = true;
                 session.start(uploaded);
@@ -117,7 +145,7 @@ public final class BambuLabDriver implements Driver {
                 return PrintResult.Success.SUCCESS;
             }
         } catch (JobRejectedException rejection) {
-            return failed("BambuLab rejected print operation", rejection, false);
+            return failed(translations.translate("printer.bambulab.rejected").orElseThrow(), rejection, false);
         } catch (IOException | RuntimeException failure) {
             if (submitted) {
                 log.warn("BambuLab accepted the submission but transport cleanup failed", failure);
@@ -125,8 +153,10 @@ public final class BambuLabDriver implements Driver {
             }
             return failed(
                     submissionAttempted
-                            ? "Print submission is uncertain. Check the printer before manually submitting again"
-                            : "BambuLab print operation failed",
+                            ? translations
+                                    .translate("printer.bambulab.uncertain")
+                                    .orElseThrow()
+                            : translations.translate("printer.bambulab.failed").orElseThrow(),
                     failure,
                     submissionAttempted);
         } finally {

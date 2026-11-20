@@ -42,6 +42,18 @@ Run `./gradlew checkJavaMemberOrder` to check Java source declaration order. The
 final instance fields, other instance fields, static nested types, inner classes, static methods,
 constructors, and instance methods. Preserve Java initialization order when moving fields.
 
+### Service construction
+
+Resolve services by their interfaces at the wiring point and pass them to consumers through
+constructors. Provider classes must not expose static service getters or downcast discovered
+services to their implementations.
+
+For a `ServiceLoader` provider with dependencies, expose a constructor that accepts those
+dependencies by their service interfaces and a public no-argument constructor for discovery.
+The no-argument constructor resolves the dependencies and delegates to the explicit constructor
+with `this(...)`. Keep service discovery in that constructor and use the injected dependencies
+when initializing shared resources.
+
 ## Testing Guidelines
 
 Tests use JUnit 5 and should end in `Test` (for example, `SketchSolverTest`). Add focused unit tests

@@ -1,6 +1,7 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.util.config.UserConfiguration;
+import dev.voxelbrew.api.userconfig.UserConfigException;
+import dev.voxelbrew.api.userconfig.UserConfigService;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -8,7 +9,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
-import java.util.prefs.Preferences;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,9 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 final class Appearance {
-    private final UserConfiguration configuration;
-
-    private final java.util.function.Supplier<String> legacyAppearance;
+    private final UserConfigService configuration;
 
     enum Choice {
         SYSTEM,
@@ -67,33 +65,15 @@ final class Appearance {
         }
     }
 
-    Appearance() {
-        this(
-                UserConfiguration.user(),
-                () -> Preferences.userNodeForPackage(Appearance.class).get("appearance", null));
-    }
-
-    Appearance(UserConfiguration configuration) {
-        this(
-                configuration,
-                () -> Preferences.userNodeForPackage(Appearance.class).get("appearance", null));
-    }
-
     Choice load() {
         try {
-            String value = configuration.get("appearance", null);
-            if (value == null) {
-                String legacy = legacyAppearance.get();
-                if (legacy != null) {
-                    Choice.valueOf(legacy);
-                    configuration.setIfAbsent("appearance", legacy);
-                    value = configuration.get("appearance", legacy);
-                }
-            }
-            return Choice.valueOf(value == null ? "SYSTEM" : value);
+            return configuration
+                    .readUserConfig("appearance")
+                    .map(Choice::valueOf)
+                    .orElse(Choice.SYSTEM);
         } catch (IllegalArgumentException ignored) {
             return Choice.SYSTEM;
-        } catch (IOException | SecurityException failure) {
+        } catch (UserConfigException | SecurityException failure) {
             log.warn("Cannot load appearance preference", failure);
             return Choice.SYSTEM;
         }
@@ -101,8 +81,8 @@ final class Appearance {
 
     void save(Choice choice) {
         try {
-            configuration.set("appearance", choice.name());
-        } catch (IOException failure) {
+            configuration.saveUserConfig("appearance", choice.name());
+        } catch (UserConfigException failure) {
             log.warn("Cannot save appearance preference", failure);
         }
     }

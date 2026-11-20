@@ -1,12 +1,13 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.printing.Cancellation;
 import dev.voxelbrew.api.model.vui.Layout;
 import dev.voxelbrew.api.model.vui.VerticalLayout;
 import dev.voxelbrew.api.slicer.*;
+import dev.voxelbrew.api.userconfig.UserConfigException;
+import dev.voxelbrew.api.userconfig.UserConfigService;
 import dev.voxelbrew.slicer.*;
-import dev.voxelbrew.util.config.UserConfiguration;
-import dev.voxelbrew.util.i18n.Translations;
 import dev.voxelbrew.util.update.BuildVersion;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -29,18 +30,19 @@ import javafx.util.StringConverter;
 /** Manages named slicer installations and runs provider checks off the JavaFX thread. */
 final class SlicerSettings {
     private static final String NAME = "voxelbrew.installation.name";
+
     private static final Pattern VERSION = Pattern.compile("(?<![\\w.])v?(\\d+(?:\\.\\d+)+)(?![\\d.])");
+
     private static final int INSTALLATION_ROW_HEIGHT = 54;
 
-    private final UserConfiguration configuration;
-
     private final SlicerInstallationStore store;
+
     private final ExecutorService worker;
 
     private record Check(String version, String failure) {}
 
     private static ListCell<SlicerInstallation> installationCell(
-            Map<String, SlicerDescriptor> providers, String appVersion, Translations text) {
+            Map<String, SlicerDescriptor> providers, String appVersion, TranslationService text) {
         var name = new Label();
         name.getStyleClass().add("slicer-installation-name");
         var version = new Label();
@@ -89,7 +91,8 @@ final class SlicerSettings {
                 name.setText(displayName);
                 version.setText(subtitle);
                 String status = item.bundled() ? "bundled" : item.operational() ? "ready" : "unavailable";
-                state.setText(text.text("slicer.installation.state." + status));
+                state.setText(
+                        text.translate("slicer.installation.state." + status).orElseThrow());
                 state.getStyleClass().setAll("label", "slicer-installation-state", "slicer-state-" + status);
                 setTooltip(item.version().isBlank() ? null : new Tooltip(item.version()));
                 setAccessibleText(displayName + " · " + subtitle + " · " + state.getText());
@@ -98,14 +101,15 @@ final class SlicerSettings {
         };
     }
 
-    private static void showInstallationDetail(Label status, SlicerInstallation selected, Translations text) {
+    private static void showInstallationDetail(Label status, SlicerInstallation selected, TranslationService text) {
         String detail = selected == null
                 ? ""
                 : selected.bundled()
-                        ? text.text("slicer.installation.bundled")
+                        ? text.translate("slicer.installation.bundled").orElseThrow()
                         : selected.operational()
                                 ? selected.settings().getOrDefault("executable", selected.version())
-                                : text.text("slicer.installation.failed", selected.failure());
+                                : text.translate("slicer.installation.failed", selected.failure())
+                                        .orElseThrow();
         status.setText(detail);
         status.setTooltip(detail.isBlank() ? null : new Tooltip(detail));
     }
@@ -116,9 +120,8 @@ final class SlicerSettings {
         return result;
     }
 
-    SlicerSettings(UserConfiguration configuration, ExecutorService worker) {
-        this.configuration = configuration;
-        this.store = new SlicerInstallationStore(configuration.path());
+    SlicerSettings(UserConfigService configuration, ExecutorService worker) {
+        this.store = new SlicerInstallationStore(configuration);
         this.worker = worker;
     }
 
@@ -130,9 +133,9 @@ final class SlicerSettings {
         }
     }
 
-    void configure(SlicerProviderRegistry registry, Window owner, Translations text, Runnable refresh) {
+    void configure(SlicerProviderRegistry registry, Window owner, TranslationService text, Runnable refresh) {
         var manager = new Dialog<ButtonType>();
-        manager.setTitle(text.text("slicer.settings.heading"));
+        manager.setTitle(text.translate("slicer.settings.heading").orElseThrow());
         manager.getDialogPane().setPrefWidth(570);
         manager.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
         manager.getDialogPane().lookupButton(ButtonType.CLOSE).getStyleClass().add("slicer-manager-action");
@@ -143,7 +146,7 @@ final class SlicerSettings {
         var installations = new ListView<SlicerInstallation>();
         installations.setId("slicer-installations");
         installations.getStyleClass().add("slicer-installation-list");
-        var empty = new Label(text.text("slicer.installation.empty"));
+        var empty = new Label(text.translate("slicer.installation.empty").orElseThrow());
         empty.getStyleClass().add("slicer-installation-detail");
         installations.setPlaceholder(empty);
         installations.setFixedCellSize(INSTALLATION_ROW_HEIGHT);
@@ -169,7 +172,7 @@ final class SlicerSettings {
 
         var types = new ComboBox<SlicerDescriptor>();
         types.setId("slicer-installation-provider");
-        types.setAccessibleText(text.text("slicer.installation.provider"));
+        types.setAccessibleText(text.translate("slicer.installation.provider").orElseThrow());
         types.getItems().setAll(descriptors);
         types.setConverter(new StringConverter<>() {
             @Override
@@ -183,16 +186,16 @@ final class SlicerSettings {
             }
         });
         types.getSelectionModel().selectFirst();
-        var add = new Button(text.text("slicer.installation.add"));
+        var add = new Button(text.translate("slicer.installation.add").orElseThrow());
         add.setId("slicer-installation-add");
         add.getStyleClass().addAll("slicer-manager-action", "slicer-manager-primary");
         add.setMinWidth(Region.USE_PREF_SIZE);
         add.disableProperty().bind(types.valueProperty().isNull());
-        var edit = new Button(text.text("slicer.installation.edit"));
+        var edit = new Button(text.translate("slicer.installation.edit").orElseThrow());
         edit.setId("slicer-installation-edit");
         edit.getStyleClass().add("slicer-manager-action");
         edit.setMinWidth(Region.USE_PREF_SIZE);
-        var remove = new Button(text.text("slicer.installation.remove"));
+        var remove = new Button(text.translate("slicer.installation.remove").orElseThrow());
         remove.setId("slicer-installation-remove");
         remove.getStyleClass().addAll("slicer-manager-action", "slicer-manager-remove");
         remove.setMinWidth(Region.USE_PREF_SIZE);
@@ -222,7 +225,7 @@ final class SlicerSettings {
         var actions = new HBox(8, status, edit, remove);
         actions.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(status, Priority.ALWAYS);
-        var typeLabel = new Label(text.text("slicer.installation.provider"));
+        var typeLabel = new Label(text.translate("slicer.installation.provider").orElseThrow());
         typeLabel.setLabelFor(types);
         typeLabel.setMinWidth(Region.USE_PREF_SIZE);
         var creation = new HBox(10, typeLabel, types, add);
@@ -233,21 +236,26 @@ final class SlicerSettings {
         Dialogs.show(manager, owner, text);
     }
 
-    private void removeSafely(SlicerInstallation installation, Window owner, Translations text, Runnable update) {
+    private void removeSafely(SlicerInstallation installation, Window owner, TranslationService text, Runnable update) {
         var confirmation = new Alert(
-                Alert.AlertType.CONFIRMATION, text.text("slicer.installation.removePrompt", installation.name()));
-        confirmation.setTitle(text.text("slicer.installation.remove"));
-        var remove = new ButtonType(text.text("slicer.installation.remove"), ButtonBar.ButtonData.OK_DONE);
+                Alert.AlertType.CONFIRMATION,
+                text.translate("slicer.installation.removePrompt", installation.name())
+                        .orElseThrow());
+        confirmation.setTitle(text.translate("slicer.installation.remove").orElseThrow());
+        var remove = new ButtonType(
+                text.translate("slicer.installation.remove").orElseThrow(), ButtonBar.ButtonData.OK_DONE);
         confirmation.getButtonTypes().setAll(remove, ButtonType.CANCEL);
         confirmation.getDialogPane().lookupButton(remove).setId("slicer-installation-remove-confirm");
         if (Dialogs.show(confirmation, owner, text).orElse(ButtonType.CANCEL) != remove) return;
         try {
             store.remove(installation.id());
             update.run();
-        } catch (IOException | IllegalArgumentException | UncheckedIOException failure) {
+        } catch (IOException | IllegalArgumentException | UncheckedIOException | UserConfigException failure) {
             Dialogs.show(
                     new Alert(
-                            Alert.AlertType.ERROR, text.text("slicer.installation.removeFailed", failure.getMessage())),
+                            Alert.AlertType.ERROR,
+                            text.translate("slicer.installation.removeFailed", failure.getMessage())
+                                    .orElseThrow()),
                     owner,
                     text);
         }
@@ -258,31 +266,32 @@ final class SlicerSettings {
             String providerId,
             SlicerInstallation existing,
             Window owner,
-            Translations text,
+            TranslationService text,
             java.util.function.Consumer<SlicerInstallation> update) {
         try {
             edit(registry.require(providerId), existing, owner, text).ifPresent(update);
-        } catch (IOException | IllegalArgumentException | UncheckedIOException failure) {
+        } catch (IOException | IllegalArgumentException | UncheckedIOException | UserConfigException failure) {
             Dialogs.show(
-                    new Alert(Alert.AlertType.ERROR, text.text("slicer.settings.failed", failure.getMessage())),
+                    new Alert(
+                            Alert.AlertType.ERROR,
+                            text.translate("slicer.settings.failed", failure.getMessage())
+                                    .orElseThrow()),
                     owner,
                     text);
         }
     }
 
     private Optional<SlicerInstallation> edit(
-            SlicerProvider provider, SlicerInstallation existing, Window owner, Translations text) throws IOException {
+            SlicerProvider provider, SlicerInstallation existing, Window owner, TranslationService text)
+            throws IOException {
         var descriptor = provider.descriptor();
         var dialog = provider.settingsDialog().orElse(null);
         var name = new dev.voxelbrew.api.model.vui.TextField(
-                NAME, text.text("slicer.installation.name"), descriptor.name());
+                NAME, text.translate("slicer.installation.name").orElseThrow(), descriptor.name());
         Layout layout = dialog == null
                 ? new VerticalLayout(name)
                 : new VerticalLayout(name, new dev.voxelbrew.api.model.vui.Separator(), dialog.layout());
-        var initial = new HashMap<>(
-                existing == null
-                        ? configuration.section("slicer", descriptor.id()).read()
-                        : existing.settings());
+        var initial = new HashMap<>(existing == null ? store.providerDefaults(descriptor.id()) : existing.settings());
         if (existing != null) initial.put(NAME, existing.name());
         var others = installations().stream()
                 .filter(entry -> existing == null || !entry.id().equals(existing.id()))
@@ -290,25 +299,38 @@ final class SlicerSettings {
         java.util.function.Function<Map<String, String>, Map<String, String>> validateProvider =
                 values -> dialog == null ? Map.of() : dialog.validate(providerValues(values));
         return new DesktopExportWindow(owner, null, text)
-                .interaction(text.text("action.save"), "slicer-input-")
+                .interaction(text.translate("action.save").orElseThrow(), "slicer-input-")
                 .checkAction(
-                        text.text("slicer.installation.test"),
+                        text.translate("slicer.installation.test").orElseThrow(),
                         validateProvider,
-                        values -> text.text(
-                                "slicer.installation.testPassed",
-                                checkedVersion(provider, providerValues(values), owner, text)))
-                .sourceCaption(id -> text.textOrDefault("slicer.input." + id, text.text("import.source")))
-                .pathAction("executable", text.text("slicer.discovery.action"), () -> discover(provider, owner, text))
+                        values -> text.translate(
+                                        "slicer.installation.testPassed",
+                                        checkedVersion(provider, providerValues(values), owner, text))
+                                .orElseThrow())
+                .sourceCaption(id -> text.translate("slicer.input." + id)
+                        .orElseGet(() -> text.translate("import.source").orElseThrow()))
+                .pathAction(
+                        "executable",
+                        text.translate("slicer.discovery.action").orElseThrow(),
+                        () -> discover(provider, owner, text))
                 .show(
-                        text.text("slicer.installation.configure", descriptor.name()),
+                        text.translate("slicer.installation.configure", descriptor.name())
+                                .orElseThrow(),
                         layout,
                         values -> {
                             var errors = new LinkedHashMap<String, String>();
                             String proposed = values.getOrDefault(NAME, "").strip();
-                            if (proposed.isEmpty()) errors.put(NAME, text.text("slicer.installation.nameRequired"));
+                            if (proposed.isEmpty())
+                                errors.put(
+                                        NAME,
+                                        text.translate("slicer.installation.nameRequired")
+                                                .orElseThrow());
                             else if (others.stream()
                                     .anyMatch(entry -> entry.name().equalsIgnoreCase(proposed)))
-                                errors.put(NAME, text.text("slicer.installation.duplicate"));
+                                errors.put(
+                                        NAME,
+                                        text.translate("slicer.installation.duplicate")
+                                                .orElseThrow());
                             errors.putAll(validateProvider.apply(values));
                             return errors;
                         },
@@ -317,17 +339,18 @@ final class SlicerSettings {
                         false);
     }
 
-    private Optional<Path> discover(SlicerProvider provider, Window owner, Translations text) {
+    private Optional<Path> discover(SlicerProvider provider, Window owner, TranslationService text) {
         var dialog = new Dialog<Path>();
         dialog.setTitle(
-                text.text("slicer.discovery.title", provider.descriptor().name()));
+                text.translate("slicer.discovery.title", provider.descriptor().name())
+                        .orElseThrow());
         dialog.getDialogPane().setPrefWidth(640);
-        var use = new ButtonType(text.text("slicer.discovery.select"), ButtonBar.ButtonData.OK_DONE);
+        var use = new ButtonType(text.translate("slicer.discovery.select").orElseThrow(), ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(use, ButtonType.CANCEL);
         var candidates = new ListView<Path>();
         candidates.setId("slicer-discovered-executables");
         candidates.setPrefHeight(175);
-        var status = new Label(text.text("slicer.discovery.searching"));
+        var status = new Label(text.translate("slicer.discovery.searching").orElseThrow());
         status.setWrapText(true);
         candidates.setPlaceholder(status);
         var choose = dialog.getDialogPane().lookupButton(use);
@@ -343,15 +366,17 @@ final class SlicerSettings {
                 var found = List.copyOf(provider.discoverExecutables(cancellation));
                 Platform.runLater(() -> {
                     if (cancellation.cancelled()) return;
-                    status.setText(text.text("slicer.discovery.empty"));
+                    status.setText(text.translate("slicer.discovery.empty").orElseThrow());
                     candidates.getItems().setAll(found);
                     candidates.getSelectionModel().selectFirst();
                 });
             } catch (Exception | LinkageError failure) {
                 Platform.runLater(() -> {
                     if (!cancellation.cancelled())
-                        status.setText(text.text(
-                                "slicer.discovery.failed", Objects.toString(failure.getMessage(), failure.toString())));
+                        status.setText(text.translate(
+                                        "slicer.discovery.failed",
+                                        Objects.toString(failure.getMessage(), failure.toString()))
+                                .orElseThrow());
                 });
             }
         });
@@ -367,7 +392,7 @@ final class SlicerSettings {
             SlicerInstallation existing,
             Map<String, String> inputs,
             Window owner,
-            Translations text) {
+            TranslationService text) {
         var values = providerValues(inputs);
         String version = checkedVersion(provider, values, owner, text);
         var installation = new SlicerInstallation(
@@ -377,27 +402,25 @@ final class SlicerSettings {
                 version,
                 "",
                 values);
-        try {
-            store.save(installation);
-        } catch (IOException failure) {
-            throw new UncheckedIOException(text.text("slicer.settings.failed", failure.getMessage()), failure);
-        }
+        store.save(installation);
         return installation;
     }
 
     private String checkedVersion(
-            SlicerProvider provider, Map<String, String> settings, Window owner, Translations text) {
+            SlicerProvider provider, Map<String, String> settings, Window owner, TranslationService text) {
         var result = check(provider, settings, owner, text)
-                .orElseThrow(() -> new IllegalArgumentException(text.text("slicer.installation.cancelled")));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        text.translate("slicer.installation.cancelled").orElseThrow()));
         if (!result.failure().isEmpty())
-            throw new IllegalArgumentException(text.text("slicer.installation.failed", result.failure()));
+            throw new IllegalArgumentException(text.translate("slicer.installation.failed", result.failure())
+                    .orElseThrow());
         return result.version();
     }
 
     private Optional<Check> check(
-            SlicerProvider provider, Map<String, String> settings, Window owner, Translations text) {
+            SlicerProvider provider, Map<String, String> settings, Window owner, TranslationService text) {
         var progress = new Dialog<Check>();
-        progress.setTitle(text.text("slicer.installation.checking"));
+        progress.setTitle(text.translate("slicer.installation.checking").orElseThrow());
         var done = new ButtonType("", ButtonBar.ButtonData.OTHER);
         progress.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, done);
         var finish = (ButtonBase) progress.getDialogPane().lookupButton(done);
@@ -418,7 +441,8 @@ final class SlicerSettings {
                     throw new IllegalArgumentException("Slicer did not report a version");
                 checked = new Check(version, "");
             } catch (CancellationException cancelled) {
-                checked = new Check("", text.text("slicer.installation.cancelled"));
+                checked = new Check(
+                        "", text.translate("slicer.installation.cancelled").orElseThrow());
             } catch (Exception | LinkageError failure) {
                 String message = Objects.toString(failure.getMessage(), "").strip();
                 checked = new Check("", message.isEmpty() ? failure.toString() : message);

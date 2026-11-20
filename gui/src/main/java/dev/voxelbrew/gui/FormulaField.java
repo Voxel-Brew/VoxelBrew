@@ -1,5 +1,6 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.parameters.*;
 import dev.voxelbrew.api.model.units.Measurements;
 import dev.voxelbrew.engine.parameters.*;
@@ -21,18 +22,28 @@ final class FormulaField extends TextField {
     private static final PseudoClass FORMULA = PseudoClass.getPseudoClass("formula");
 
     private static final PseudoClass INVALID = PseudoClass.getPseudoClass("formula-invalid");
+
     private final ExpressionType expressionType;
+
     private final Supplier<ParameterSet> parameters;
+
     private final Supplier<ParameterUnit> unit;
+
     private final ObjectProperty<NumericFieldBounds> bounds = new SimpleObjectProperty<>(NumericFieldBounds.UNBOUNDED);
+
     private final StringProperty unitSuffix = new SimpleStringProperty("");
+
     private final Tooltip preview = UiHelp.tooltip("");
+
     private final Tooltip syntax = UiHelp.tooltip("");
+
+    private final TranslationService translations;
+
     private java.util.function.DoubleConsumer validation = value -> {};
+
     private String displayUnit;
+
     private Double dragStep;
-    private dev.voxelbrew.util.i18n.Translations translations =
-            new dev.voxelbrew.util.i18n.Translations(java.util.Locale.ENGLISH);
 
     @RequiredArgsConstructor
     enum ExpressionType {
@@ -43,16 +54,21 @@ final class FormulaField extends TextField {
         private final String styleClass;
     }
 
-    static FormulaField number(String text, Supplier<ParameterSet> parameters, ParameterUnit unit) {
-        return number(text, parameters, () -> unit);
+    static FormulaField number(
+            String text, Supplier<ParameterSet> parameters, ParameterUnit unit, TranslationService translations) {
+        return number(text, parameters, () -> unit, translations);
     }
 
-    static FormulaField number(String text, Supplier<ParameterSet> parameters, @NonNull Supplier<ParameterUnit> unit) {
-        return new FormulaField(text, parameters, unit);
+    static FormulaField number(
+            String text,
+            Supplier<ParameterSet> parameters,
+            @NonNull Supplier<ParameterUnit> unit,
+            TranslationService translations) {
+        return new FormulaField(text, parameters, unit, translations);
     }
 
-    static FormulaField text(String text, Supplier<ParameterSet> parameters) {
-        return new FormulaField(text, parameters, null);
+    static FormulaField text(String text, Supplier<ParameterSet> parameters, TranslationService translations) {
+        return new FormulaField(text, parameters, null, translations);
     }
 
     static ParameterUnit unit(String label) {
@@ -63,10 +79,15 @@ final class FormulaField extends TextField {
         }
     }
 
-    private FormulaField(String text, @NonNull Supplier<ParameterSet> parameters, Supplier<ParameterUnit> unit) {
+    private FormulaField(
+            String text,
+            @NonNull Supplier<ParameterSet> parameters,
+            Supplier<ParameterUnit> unit,
+            @NonNull TranslationService translations) {
         super(text);
         this.parameters = parameters;
         this.unit = unit;
+        this.translations = translations;
         expressionType = unit == null ? ExpressionType.STRING : ExpressionType.NUMBER;
         getStyleClass().addAll("formula-field", expressionType.styleClass);
         setTooltip(preview);
@@ -80,7 +101,7 @@ final class FormulaField extends TextField {
             if (b != null) refreshFormula();
         });
         preview.setOnShowing(e -> refreshFormula());
-        new ParameterSuggestions(this, parameters, () -> translations);
+        new ParameterSuggestions(this, parameters, translations);
         if (expressionType == ExpressionType.NUMBER) new NumericFieldDrag(this);
     }
 
@@ -88,16 +109,13 @@ final class FormulaField extends TextField {
         return expressionType;
     }
 
-    FormulaField localized(@NonNull dev.voxelbrew.util.i18n.Translations translations) {
-        this.translations = translations;
-        localizeHelp();
-        refreshFormula();
-        return this;
-    }
-
     private void localizeHelp() {
-        setPromptText(translations.text(unit == null ? "formula.textPrompt" : "formula.numberPrompt"));
-        syntax.setText(translations.text(unit == null ? "formula.textSyntax" : "formula.numberSyntax"));
+        setPromptText(translations
+                .translate(unit == null ? "formula.textPrompt" : "formula.numberPrompt")
+                .orElseThrow());
+        syntax.setText(translations
+                .translate(unit == null ? "formula.textSyntax" : "formula.numberSyntax")
+                .orElseThrow());
         setAccessibleHelp(syntax.getText());
     }
 
@@ -107,8 +125,12 @@ final class FormulaField extends TextField {
         double result = parameters.get().value(getText(), selected);
         double displayed = selected.displayValue(Measurements.quantity(result, selected.canonicalUnit()));
         if (!bounds.get().accepts(displayed))
-            throw new IllegalArgumentException(translations.text(
-                    "formula.bounds", bounds.get().minimumHint(), bounds.get().maximumHint()));
+            throw new IllegalArgumentException(translations
+                    .translate(
+                            "formula.bounds",
+                            bounds.get().minimumHint(),
+                            bounds.get().maximumHint())
+                    .orElseThrow());
         validation.accept(result);
         return result;
     }
@@ -167,7 +189,9 @@ final class FormulaField extends TextField {
     int integer() {
         double result = value();
         if (result != Math.rint(result) || result < Integer.MIN_VALUE || result > Integer.MAX_VALUE)
-            throw new IllegalArgumentException(translations.text("gui.expected_a_whole_number_in_the_supported_range"));
+            throw new IllegalArgumentException(translations
+                    .translate("gui.expected_a_whole_number_in_the_supported_range")
+                    .orElseThrow());
         return (int) result;
     }
 
@@ -200,8 +224,12 @@ final class FormulaField extends TextField {
             preview.setText(expressionType.mark
                     + "  "
                     + (formula
-                            ? translations.text("formula.result", result, suffix)
-                            : translations.text("gui.supports_formulas_and_parameters")));
+                            ? translations
+                                    .translate("formula.result", result, suffix)
+                                    .orElseThrow()
+                            : translations
+                                    .translate("gui.supports_formulas_and_parameters")
+                                    .orElseThrow()));
             pseudoClassStateChanged(INVALID, false);
         } catch (RuntimeException failure) {
             preview.setText(expressionType.mark + "  " + failure.getMessage());

@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.util.i18n.Translations;
+import dev.voxelbrew.api.i18n.TranslationService;
 import java.util.function.Function;
 import javafx.scene.control.ComboBox;
 import javafx.util.StringConverter;
@@ -23,13 +23,13 @@ final class UiText {
         });
     }
 
-    static <E extends Enum<E>> void enums(ComboBox<E> control, Translations translations, String prefix) {
-        choices(control, value -> translations.text(prefix + value.name()));
+    static <E extends Enum<E>> void enums(ComboBox<E> control, TranslationService translations, String prefix) {
+        choices(control, value -> translations.translate(prefix + value.name()).orElseThrow());
     }
 
-    static String view(Translations translations, String name) {
+    static String view(TranslationService translations, String name) {
         return java.util.Arrays.stream(name.split(" "))
-                .map(part -> translations.textOrDefault("view." + part, part))
+                .map(part -> translations.translate("view." + part).orElse(part))
                 .collect(java.util.stream.Collectors.joining(" "));
     }
 

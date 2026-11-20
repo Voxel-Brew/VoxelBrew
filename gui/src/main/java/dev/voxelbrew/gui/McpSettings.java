@@ -1,14 +1,13 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.util.config.UserConfiguration;
-import java.io.IOException;
+import dev.voxelbrew.api.userconfig.UserConfigService;
 import java.util.Map;
 import java.util.Set;
 
 /** Persistent, CAD-independent preferences for the embedded listener. */
 record McpSettings(boolean autoStart, int port, int maxConnections, int idleTimeoutMinutes, int activityHistorySize) {
-    static McpSettings load(UserConfiguration store) throws IOException {
-        var values = store.read();
+    static McpSettings load(UserConfigService store) {
+        var values = store.readUserConfig();
         String auto = values.getOrDefault("mcp.autoStart", "false");
         if (!auto.equals("true") && !auto.equals("false")) throw new IllegalArgumentException("Invalid mcp.autoStart");
         return new McpSettings(
@@ -33,7 +32,7 @@ record McpSettings(boolean autoStart, int port, int maxConnections, int idleTime
             throw new IllegalArgumentException("History size must be 10–1000");
     }
 
-    void save(UserConfiguration store) throws IOException {
+    void save(UserConfigService store) {
         store.update(
                 Map.of(
                         "mcp.autoStart",

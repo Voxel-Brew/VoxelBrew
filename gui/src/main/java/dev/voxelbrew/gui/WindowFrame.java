@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.util.i18n.Translations;
+import dev.voxelbrew.api.i18n.TranslationService;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
@@ -25,16 +25,24 @@ import javafx.stage.WindowEvent;
 /** Persistent client-side window frame; modal editors replace only its content. */
 final class WindowFrame extends BorderPane {
     static final int LEFT = 1, RIGHT = 2, TOP = 4, BOTTOM = 8;
+
     private final Stage stage;
-    private final Translations translations;
+
+    private final TranslationService translations;
+
     private final Button maximize;
+
     private final javafx.beans.value.ChangeListener<Boolean> windowState =
             (observable, before, after) -> updateMaximize();
+
     private final javafx.beans.value.ChangeListener<Boolean> windowFocus = (observable, before, focused) ->
             pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("inactive"), !focused);
+
     private Rectangle2D restoreBounds, pressedBounds;
     private double pressX, pressY, dragOffsetX, dragOffsetY;
+
     private int resizeEdges;
+
     private boolean moving, expanded;
 
     private static double intersection(Rectangle2D a, Rectangle2D b) {
@@ -85,7 +93,7 @@ final class WindowFrame extends BorderPane {
         else scene.setRoot(content);
     }
 
-    WindowFrame(Stage stage, HBox header, Parent content, Translations translations) {
+    WindowFrame(Stage stage, HBox header, Parent content, TranslationService translations) {
         this.stage = stage;
         this.translations = translations;
         if (stage.getStyle() != StageStyle.UNDECORATED) stage.initStyle(StageStyle.UNDECORATED);
@@ -170,7 +178,7 @@ final class WindowFrame extends BorderPane {
         var button = new Button("", icon);
         button.setId(id);
         button.getStyleClass().add("window-control");
-        button.setAccessibleText(translations.text("help." + id));
+        button.setAccessibleText(translations.translate("help." + id).orElseThrow());
         UiHelp.install(button, translations);
         button.setOnAction(e -> action.run());
         return button;
@@ -212,7 +220,9 @@ final class WindowFrame extends BorderPane {
     private void updateMaximize() {
         boolean restored = !maximized();
         ((SVGPath) maximize.getGraphic()).setContent(restored ? "M2 2 H12 V12 H2 Z" : "M4 1 H13 V10 M1 4 H10 V13 H1 Z");
-        String help = translations.text(restored ? "help.window-maximize" : "help.window-restore");
+        String help = translations
+                .translate(restored ? "help.window-maximize" : "help.window-restore")
+                .orElseThrow();
         maximize.setAccessibleText(help);
         UiHelp.describe(maximize, help);
         maximize.setDisable(!stage.isResizable() || stage.isFullScreen());

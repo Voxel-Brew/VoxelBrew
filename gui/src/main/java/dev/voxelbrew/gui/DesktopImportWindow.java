@@ -1,12 +1,12 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.importer.ImportDialog;
 import dev.voxelbrew.api.importer.ImportWindow;
 import dev.voxelbrew.api.model.vui.Component;
 import dev.voxelbrew.api.model.vui.FileSource;
 import dev.voxelbrew.api.model.vui.HorizontalLayout;
 import dev.voxelbrew.api.model.vui.VerticalLayout;
-import dev.voxelbrew.util.i18n.Translations;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -32,8 +32,11 @@ public final class DesktopImportWindow implements ImportWindow {
     private final Window owner;
 
     private final Path current;
-    private final Translations translations;
+
+    private final TranslationService translations;
+
     private Path suggestedSource;
+
     private String importerVersion;
 
     private record InputBinding(Supplier<String> value, Node control, Label caption, Label message) {
@@ -146,7 +149,8 @@ public final class DesktopImportWindow implements ImportWindow {
         } else {
             dialog.getDialogPane().setContent(content);
         }
-        var confirm = new ButtonType(translations.text("action.import"), ButtonBar.ButtonData.OK_DONE);
+        var confirm =
+                new ButtonType(translations.translate("action.import").orElseThrow(), ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(confirm, ButtonType.CANCEL);
         var button = dialog.getDialogPane().lookupButton(confirm);
         button.setId("import-confirm");
@@ -203,12 +207,12 @@ public final class DesktopImportWindow implements ImportWindow {
                     ? source.defaultPath()
                     : suggestedSource == null ? current : suggestedSource;
             if (suggestion != null) path.setText(suggestion.toString());
-            var browse = new Button(translations.text("gui.browse"));
+            var browse = new Button(translations.translate("gui.browse").orElseThrow());
             browse.setId("file-browse");
             UiHelp.install(browse, translations);
             browse.setOnAction(event -> {
                 var chooser = new FileChooser();
-                chooser.setTitle(translations.text("import.source"));
+                chooser.setTitle(translations.translate("import.source").orElseThrow());
                 chooser.getExtensionFilters()
                         .add(new FileChooser.ExtensionFilter("*." + source.extension(), "*." + source.extension()));
                 if (!path.getText().isBlank()) {
@@ -226,7 +230,7 @@ public final class DesktopImportWindow implements ImportWindow {
                     source.id(),
                     path::getText,
                     path,
-                    field(translations.text("import.source"), Dialogs.pathRow(path, browse)),
+                    field(translations.translate("import.source").orElseThrow(), Dialogs.pathRow(path, browse)),
                     path.textProperty(),
                     onChange);
         }
@@ -272,7 +276,8 @@ public final class DesktopImportWindow implements ImportWindow {
         if (component instanceof dev.voxelbrew.api.model.vui.CheckBox box) {
             var input = new javafx.scene.control.CheckBox(box.label());
             input.setId("import-" + box.id());
-            UiHelp.describe(input, translations.textOrDefault("help.import-" + box.id(), box.label()));
+            UiHelp.describe(
+                    input, translations.translate("help.import-" + box.id()).orElse(box.label()));
             input.setSelected(box.selected());
             input.getStyleClass().add("import-dialog-choice");
             return bind(

@@ -4,7 +4,7 @@ import dev.voxelbrew.api.exporter.ExportDialog;
 import dev.voxelbrew.api.exporter.ExportWindow;
 import dev.voxelbrew.api.exporter.FileExportDialog;
 import dev.voxelbrew.api.model.vui.*;
-import dev.voxelbrew.util.config.PluginDirectorySource;
+import dev.voxelbrew.util.preferences.PluginDirectorySource;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -19,15 +19,25 @@ import lombok.NonNull;
 /** Resolves exporter inputs from namespaced CLI arguments and optional terminal prompts. */
 final class CliExportWindow implements ExportWindow, PluginDirectorySource {
     private final String exporterId;
+
     private final Path pluginDirectory;
+
     private final Map<String, String> supplied;
+
     private final String[] arguments;
+
     private final PrintWriter out;
+
     private final PrintWriter err;
+
     private final BufferedReader in;
+
     private final boolean promptForMissing;
+
     private final boolean failOnMissing;
+
     private final boolean meshFlagsProvided;
+
     private Map<String, String> values = Map.of();
 
     private static IllegalArgumentException validationFailure(

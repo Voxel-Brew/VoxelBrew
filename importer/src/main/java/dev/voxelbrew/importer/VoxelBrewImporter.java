@@ -1,11 +1,17 @@
 package dev.voxelbrew.importer;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.importer.*;
+import dev.voxelbrew.util.services.Services;
 import java.io.*;
 
 public final class VoxelBrewImporter extends FileImporter {
     public VoxelBrewImporter() {
-        super("VoxelBrew document", "vxb");
+        this(Services.load(TranslationService.class));
+    }
+
+    public VoxelBrewImporter(@lombok.NonNull TranslationService translations) {
+        super(translations.translate("import.vxb.title").orElseThrow(), "vxb");
     }
 
     @Override

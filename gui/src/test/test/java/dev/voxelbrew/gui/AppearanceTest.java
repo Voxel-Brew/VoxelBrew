@@ -1,7 +1,8 @@
 package dev.voxelbrew.gui;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.voxelbrew.util.preferences.UserConfigServiceImpl;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -11,27 +12,23 @@ class AppearanceTest {
     Path directory;
 
     @Test
-    void migratesExistingPreferenceOnceAndPreservesUnrelatedConfiguration() throws Exception {
-        var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
-        config.set("language", "pl");
-        var appearance = new Appearance(config, () -> "DARK");
-        assertThat(appearance.load()).isEqualTo(Appearance.Choice.DARK);
-        assertThat(config.get("appearance", "")).isEqualTo("DARK");
+    void savesAppearanceAndPreservesUnrelatedConfiguration() {
+        var config = new UserConfigServiceImpl(directory, "config.properties");
+        config.saveUserConfig("language", "pl");
+        var appearance = new Appearance(config);
         appearance.save(Appearance.Choice.LIGHT);
-        var reopened = new Appearance(new dev.voxelbrew.util.config.FileUserConfiguration(config.path()), () -> {
-            fail("Legacy preference should not be consulted again");
-            return null;
-        });
+        var reopened = new Appearance(new UserConfigServiceImpl(config.homeFolder(), "config.properties"));
         assertThat(reopened.load()).isEqualTo(Appearance.Choice.LIGHT);
-        assertThat(config.get("language", "")).isEqualTo("pl");
+        assertThat(config.readUserConfig()).containsEntry("language", "pl");
     }
 
     @Test
-    void missingOrInvalidPreferenceUsesSystemAndAllowsRepair() throws Exception {
-        var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
-        var appearance = new Appearance(config, () -> null);
+    void missingOrInvalidPreferenceUsesSystemAndAllowsRepair() {
+        var config = new UserConfigServiceImpl(directory, "config.properties");
+        var appearance = new Appearance(config);
         assertThat(appearance.load()).isEqualTo(Appearance.Choice.SYSTEM);
-        config.set("appearance", "UNKNOWN");
+        assertThat(config.homeFolder().resolve("config.properties")).doesNotExist();
+        config.saveUserConfig("appearance", "UNKNOWN");
         assertThat(appearance.load()).isEqualTo(Appearance.Choice.SYSTEM);
         appearance.save(Appearance.Choice.DARK);
         assertThat(appearance.load()).isEqualTo(Appearance.Choice.DARK);

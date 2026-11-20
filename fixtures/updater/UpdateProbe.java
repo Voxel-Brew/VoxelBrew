@@ -1,3 +1,6 @@
+import dev.voxelbrew.api.i18n.TranslationService;
+import dev.voxelbrew.api.userconfig.UserConfigService;
+import dev.voxelbrew.util.services.Services;
 import dev.voxelbrew.util.update.*;
 import java.nio.file.*;
 
@@ -46,21 +49,18 @@ public final class UpdateProbe {
         var polish = java.util.Locale.forLanguageTag("pl-PL");
         if (!"1,5".equals(java.text.NumberFormat.getInstance(polish).format(1.5)))
             throw new IllegalStateException("Bundled runtime is missing Polish locale data");
-        var messages = new dev.voxelbrew.util.i18n.Translations(polish);
-        if (!"Otwórz…".equals(messages.text("action.open")))
-            throw new IllegalStateException("Bundled translations are missing or incorrectly encoded");
-        var configuration = dev.voxelbrew.util.config.UserConfiguration.user();
-        configuration.set("verification.text", "Zażółć ☕");
+        verifyPolishTranslations();
+        var configuration = Services.load(UserConfigService.class);
+        configuration.saveUserConfig("verification.text", "Zażółć ☕");
         if (!"Zażółć ☕"
-                .equals(dev.voxelbrew.util.config.UserConfiguration.user().get("verification.text", "")))
-            throw new IllegalStateException("Bundled configuration did not round-trip UTF-8");
-        configuration.remove("verification.text");
+                .equals(Services.load(UserConfigService.class)
+                        .readUserConfig("verification.text")
+                        .orElse(""))) throw new IllegalStateException("Bundled configuration did not round-trip UTF-8");
+        configuration.clearUserConfig("verification.text");
         dev.voxelbrew.util.logging.Logging.initialize(component.name().toLowerCase(java.util.Locale.ROOT));
         java.util.logging.Logger.getLogger("dev.voxelbrew.verification").info("UTILITY_RUNTIME_LOG");
         dev.voxelbrew.util.logging.Logging.close();
-        Path activeLog = dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
-                .home()
-                .resolve("log/app.log");
+        Path activeLog = configuration.logsFolder().resolve("app.log");
         boolean logged =
                 Files.isRegularFile(activeLog) && Files.readString(activeLog).contains("UTILITY_RUNTIME_LOG");
         if (!logged) throw new IllegalStateException("Bundled file logging is unavailable");
@@ -80,6 +80,29 @@ public final class UpdateProbe {
         if (!document.equals(dev.voxelbrew.importer.DocumentReader.load(path)))
             throw new IllegalStateException("Packaged document did not round-trip");
         System.out.println("DOCUMENT_VERSION_PASS " + expectedVersion);
+    }
+
+    private static void verifyPolishTranslations() throws java.io.IOException {
+        Path home = Files.createTempDirectory("voxelbrew-translation-probe");
+        Path preferences = home.resolve("config.properties");
+        String previousHome = System.getProperty("voxelbrew.home");
+        String previous = System.getProperty("voxelbrew.config");
+        try {
+            Files.writeString(preferences, "language=pl\n");
+            System.setProperty("voxelbrew.home", home.toString());
+            System.setProperty("voxelbrew.config", preferences.getFileName().toString());
+            var messages = Services.load(TranslationService.class);
+            if (!"Otwórz…".equals(messages.translate("action.open").orElse(null)))
+                throw new IllegalStateException("Bundled translations are missing or incorrectly encoded");
+        } finally {
+            if (previous == null) System.clearProperty("voxelbrew.config");
+            else System.setProperty("voxelbrew.config", previous);
+            if (previousHome == null) System.clearProperty("voxelbrew.home");
+            else System.setProperty("voxelbrew.home", previousHome);
+            Files.deleteIfExists(preferences);
+            Files.deleteIfExists(home.resolve("config.properties.lock"));
+            Files.deleteIfExists(home);
+        }
     }
 
     private UpdateProbe() {}

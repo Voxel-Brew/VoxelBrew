@@ -1,5 +1,6 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.Feature;
 import dev.voxelbrew.api.model.parameters.ParameterSet;
 import dev.voxelbrew.engine.feature.*;
@@ -18,11 +19,11 @@ final class FeatureDialog {
             Path directory,
             FeatureRegistry.Factory features,
             ParameterSet parameters,
-            dev.voxelbrew.util.i18n.Translations translations)
+            TranslationService translations)
             throws IOException {
         try (var registry = features.open(directory)) {
             var dialog = new Dialog<Feature.Custom>();
-            dialog.setTitle(translations.text("gui.add_feature"));
+            dialog.setTitle(translations.translate("gui.add_feature").orElseThrow());
             var type = new ComboBox<FeatureDescriptor>();
             type.setId("custom-type");
             type.getItems().setAll(registry.descriptors());
@@ -35,7 +36,8 @@ final class FeatureDialog {
             errors.getStyleClass().add("error");
             var diagnostics = new Label(String.join("\n", registry.diagnostics()));
             diagnostics.setWrapText(true);
-            var details = new TitledPane(translations.text("gui.plugin_diagnostics"), diagnostics);
+            var details = new TitledPane(
+                    translations.translate("gui.plugin_diagnostics").orElseThrow(), diagnostics);
             details.setExpanded(false);
             type.setOnAction(e -> {
                 fields.clear();
@@ -44,10 +46,10 @@ final class FeatureDialog {
                 if (type.getValue() != null)
                     for (var p : type.getValue().parameters()) {
                         var input = FormulaField.number(
-                                        Double.toString(p.defaultValue()),
-                                        () -> parameters,
-                                        FormulaField.unit(p.unit()))
-                                .localized(translations);
+                                Double.toString(p.defaultValue()),
+                                () -> parameters,
+                                FormulaField.unit(p.unit()),
+                                translations);
                         input.setId("custom-" + p.key());
                         fields.put(p.key(), input);
                         form.getChildren().addAll(new Label(p.label()), input);
@@ -57,20 +59,29 @@ final class FeatureDialog {
             var scroll = new ScrollPane(form);
             scroll.setFitToWidth(true);
             scroll.setPrefViewportHeight(230);
-            var location = new Label(translations.text("plugin.directory", directory));
+            var location = new Label(
+                    translations.translate("plugin.directory", directory).orElseThrow());
             location.setWrapText(true);
             var content = new VBox(
-                    10, new Label(translations.text("gui.feature_type")), type, scroll, errors, location, details);
+                    10,
+                    new Label(translations.translate("gui.feature_type").orElseThrow()),
+                    type,
+                    scroll,
+                    errors,
+                    location,
+                    details);
             content.setPrefWidth(440);
             dialog.getDialogPane().setContent(content);
-            var add = new ButtonType(translations.text("gui.add"), ButtonBar.ButtonData.OK_DONE);
+            var add = new ButtonType(translations.translate("gui.add").orElseThrow(), ButtonBar.ButtonData.OK_DONE);
             dialog.getDialogPane().getButtonTypes().setAll(add, ButtonType.CANCEL);
             var button = (Button) dialog.getDialogPane().lookupButton(add);
             button.setId("custom-add");
             button.setDisable(type.getItems().isEmpty());
             if (type.getItems().isEmpty())
-                errors.setText(translations.text(
-                        "gui.no_feature_providers_installed_add_a_trusted_jar_to_this_directory_and_reopen_features"));
+                errors.setText(translations
+                        .translate(
+                                "gui.no_feature_providers_installed_add_a_trusted_jar_to_this_directory_and_reopen_features")
+                        .orElseThrow());
             dialog.getDialogPane().lookupButton(ButtonType.CANCEL).setId("custom-cancel");
             Feature.Custom[] result = new Feature.Custom[1];
             button.addEventFilter(ActionEvent.ACTION, e -> {

@@ -4,7 +4,8 @@ import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.printer.*;
 import dev.voxelbrew.api.printer.driver.*;
-import dev.voxelbrew.util.config.UserConfiguration;
+import dev.voxelbrew.api.userconfig.UserConfigService;
+import dev.voxelbrew.util.services.Services;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.file.*;
@@ -70,8 +71,8 @@ class PrinterConfigurationStoreTest {
     void storesKeepConstructorInjectedDirectoriesIndependent() throws Exception {
         Path firstDirectory = directory.resolve("first/printers");
         Path secondDirectory = directory.resolve("second");
-        var first = new FilePrinterStore(new dev.voxelbrew.util.config.FileUserConfiguration(
-                firstDirectory.resolveSibling("config.properties")));
+        var first = new FilePrinterStore(new dev.voxelbrew.util.preferences.UserConfigServiceImpl(
+                firstDirectory.getParent(), "config.properties"));
         var second = new FilePrinterStore(secondDirectory);
         assertThat(first.load().devices()).isEmpty();
         assertThat(second.load().devices()).isEmpty();
@@ -92,15 +93,20 @@ class PrinterConfigurationStoreTest {
     @org.junit.jupiter.api.parallel.ResourceLock(org.junit.jupiter.api.parallel.Resources.SYSTEM_PROPERTIES)
     void defaultConstructorUsesUserConfigurationAndDelegatesToTheSameDirectory() throws Exception {
         String previous = System.getProperty("voxelbrew.config");
+        String previousHome = System.getProperty("voxelbrew.home");
         Path configurationFile = directory.resolve("user/config.properties");
         Path printers = configurationFile.resolveSibling("printers");
         try {
-            System.setProperty("voxelbrew.config", configurationFile.toString());
+            System.setProperty("voxelbrew.home", configurationFile.getParent().toString());
+            System.setProperty(
+                    "voxelbrew.config", configurationFile.getFileName().toString());
             var store = new FilePrinterStore();
             assertThat(printers).doesNotExist();
             var profile = profile();
             store.save(new Printer("id", "Default", "external", new DriverConfiguration(Map.of()), profile));
-            assertThat(new FilePrinterStore(UserConfiguration.user()).load().devices())
+            assertThat(new FilePrinterStore(Services.load(UserConfigService.class))
+                            .load()
+                            .devices())
                     .extracting(Printer::name)
                     .containsExactly("Default");
             assertThat(new FilePrinterStore(printers).load().devices())
@@ -110,6 +116,8 @@ class PrinterConfigurationStoreTest {
         } finally {
             if (previous == null) System.clearProperty("voxelbrew.config");
             else System.setProperty("voxelbrew.config", previous);
+            if (previousHome == null) System.clearProperty("voxelbrew.home");
+            else System.setProperty("voxelbrew.home", previousHome);
         }
     }
 

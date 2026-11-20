@@ -15,6 +15,7 @@ import picocli.CommandLine.Model.*;
 @lombok.RequiredArgsConstructor
 final class WorkspaceEdits {
     private final DocumentSource documents;
+
     private final DocumentSave writer;
 
     @FunctionalInterface
@@ -54,8 +55,8 @@ final class WorkspaceEdits {
                     "--plugin-dir",
                     Path.class,
                     false,
-                    dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
-                            .plugins()
+                    dev.voxelbrew.util.services.Services.load(dev.voxelbrew.api.userconfig.UserConfigService.class)
+                            .pluginsFolder()
                             .toString(),
                     "Trusted plugins directory");
             option(

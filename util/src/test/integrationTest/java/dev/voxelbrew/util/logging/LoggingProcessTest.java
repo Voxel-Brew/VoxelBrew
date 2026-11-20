@@ -20,8 +20,8 @@ class LoggingProcessTest {
             Logging.initialize(args[0]);
             try {
                 Files.writeString(
-                        dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
-                                .home()
+                        dev.voxelbrew.util.services.Services.load(dev.voxelbrew.api.userconfig.UserConfigService.class)
+                                .homeFolder()
                                 .resolve(args[0] + ".ready"),
                         "ready");
                 if (System.in.read() < 0) throw new IllegalStateException("Missing start signal");
@@ -40,7 +40,7 @@ class LoggingProcessTest {
     @Timeout(60)
     void liveApplicationsShareTheActiveFileAcrossStartupAndSizeRotation() throws Exception {
         Path home = directory.resolve("user home with % spaces");
-        new dev.voxelbrew.util.config.FileUserConfiguration(home.resolve("config.properties"))
+        new dev.voxelbrew.util.preferences.UserConfigServiceImpl(home, "config.properties")
                 .update(
                         Map.of(
                                 "logging.level",
@@ -140,6 +140,7 @@ class LoggingProcessTest {
         var locations = new ArrayList<String>();
         for (var type : List.of(
                 Logging.class,
+                dev.voxelbrew.api.userconfig.UserConfigService.class,
                 Writer.class,
                 org.slf4j.LoggerFactory.class,
                 Class.forName("org.slf4j.jul.JULServiceProvider"))) {
@@ -149,6 +150,7 @@ class LoggingProcessTest {
                             .toURI())
                     .toString());
         }
+        locations.add(System.getProperty("voxelbrew.test.utilJar"));
         return new ProcessBuilder(
                         Path.of(System.getProperty("java.home"), "bin", "java").toString(),
                         "-Dvoxelbrew.home=" + home,

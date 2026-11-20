@@ -21,7 +21,7 @@ class LoggingTest {
 
     @Test
     void configurationWritesUtf8RotatingLogsWithoutChangingHostHandlers() throws Exception {
-        var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
+        var config = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties");
         config.update(
                 Map.of(
                         "logging.level",
@@ -54,7 +54,7 @@ class LoggingTest {
 
     @Test
     void slf4jRespectsConfiguredLevelsAndRoutesExceptionsOnlyToStderrAndFiles() throws Exception {
-        var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
+        var config = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties");
         config.update(Map.of("logging.level", "DEBUG", "logging.console.level", "WARN"), Set.of());
         Path logs = directory.resolve("logs");
         var stdout = new ByteArrayOutputStream();
@@ -101,8 +101,8 @@ class LoggingTest {
 
     @Test
     void rejectsInvalidConfigurationBeforeOpeningLogFiles() throws Exception {
-        var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
-        config.set("logging.file.count", "0");
+        var config = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties");
+        config.saveUserConfig("logging.file.count", "0");
         assertThatThrownBy(() -> Logging.configure(config, directory.resolve("logs"), "cli"))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(Files.exists(directory.resolve("logs"))).isFalse();
@@ -110,8 +110,8 @@ class LoggingTest {
 
     @Test
     void restartArchivesThePreviousSessionAndUsesTheExactActiveFilename() throws Exception {
-        var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
-        config.set("logging.console.level", "OFF");
+        var config = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties");
+        config.saveUserConfig("logging.console.level", "OFF");
         Path logs = directory.resolve("log");
         try {
             Logging.configure(config, logs, "gui");
@@ -137,8 +137,8 @@ class LoggingTest {
 
     @Test
     void defaultsRotateAtTwentyMebibytesWithoutSplittingRecords() throws Exception {
-        var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
-        config.set("logging.console.level", "OFF");
+        var config = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties");
+        config.saveUserConfig("logging.console.level", "OFF");
         Path logs = directory.resolve("log");
         String payload = ".".repeat(1024 * 1024);
         try {
@@ -165,7 +165,7 @@ class LoggingTest {
 
     @Test
     void consoleCanBeMoreVerboseThanFileAndUnrelatedArchivesArePreserved() throws Exception {
-        var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
+        var config = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties");
         config.update(
                 Map.of("logging.level", "ERROR", "logging.console.level", "DEBUG", "logging.file.count", "1"),
                 Set.of());

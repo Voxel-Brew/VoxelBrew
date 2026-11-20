@@ -1,5 +1,6 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import java.util.LinkedHashMap;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -32,7 +33,7 @@ final class Dialogs {
     }
 
     @SuppressWarnings("unchecked") // Dialog's default result type is ButtonType, matching Alert.
-    static <T> Optional<T> show(Dialog<T> dialog, Window owner, dev.voxelbrew.util.i18n.Translations translations) {
+    static <T> Optional<T> show(Dialog<T> dialog, Window owner, TranslationService translations) {
         var scene = owner.getScene();
         var content = WindowFrame.content(scene);
         var previousFocus = scene.getFocusOwner();
@@ -54,7 +55,8 @@ final class Dialogs {
                                             : type == ButtonType.YES
                                                     ? "dialog.yes"
                                                     : type == ButtonType.NO ? "dialog.no" : null;
-            if (key != null) buttons.get(type).setText(translations.text(key));
+            if (key != null)
+                buttons.get(type).setText(translations.translate(key).orElseThrow());
             buttons.get(type).setMinWidth(Region.USE_PREF_SIZE);
             UiHelp.dialogButton(buttons.get(type), type, translations);
         }

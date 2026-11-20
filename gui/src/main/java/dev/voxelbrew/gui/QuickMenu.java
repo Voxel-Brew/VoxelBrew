@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.util.i18n.Translations;
+import dev.voxelbrew.api.i18n.TranslationService;
 import java.util.*;
 import java.util.function.*;
 import javafx.beans.binding.Bindings;
@@ -23,30 +23,44 @@ final class QuickMenu implements AutoCloseable {
 
     private final Parent theme;
 
-    private final Translations text;
+    private final TranslationService text;
+
     private final Supplier<Content> content;
+
     private final Supplier<List<Action>> workspaces;
+
     private final BiConsumer<Double, Double> pan;
+
     private final Predicate<Node> accepts;
+
     private final MiddleGesture gesture = new MiddleGesture();
+
     private final Popup popup = new Popup();
+
     private final List<ButtonBase> buttons = new ArrayList<>();
+
     private final List<MenuItem> menuItems = new ArrayList<>();
+
     private final EventHandler<MouseEvent> mouse = this::mouse;
+
     private final javafx.beans.value.ChangeListener<Boolean> focusChanged = (o, a, focused) -> {
         if (!focused)
             javafx.application.Platform.runLater(() -> {
                 if (this.owner != null && !this.owner.isFocused() && !popup.isFocused()) hide();
             });
     };
+
     private final javafx.beans.value.ChangeListener<javafx.stage.Window> windowChanged = (o, a, b) -> observeWindow(b);
+
     private final javafx.beans.value.ChangeListener<javafx.scene.Scene> sceneChanged = (o, a, b) -> {
         hide();
         if (a != null) a.windowProperty().removeListener(windowChanged);
         if (b != null) b.windowProperty().addListener(windowChanged);
         observeWindow(b == null ? null : b.getWindow());
     };
+
     private javafx.stage.Window owner;
+
     private boolean active;
 
     record Action(
@@ -85,18 +99,25 @@ final class QuickMenu implements AutoCloseable {
         return result;
     }
 
-    static List<Action> sketchWorkspaces(Translations text) {
+    static List<Action> sketchWorkspaces(TranslationService text) {
         var disabled = new javafx.beans.property.SimpleBooleanProperty(true);
         return List.of(
                 new Action(
                         "workspace-design",
-                        text.text("tab.Designer"),
+                        text.translate("tab.Designer").orElseThrow(),
                         "▣",
                         disabled,
                         new javafx.beans.property.SimpleBooleanProperty(true),
                         () -> {}),
-                new Action("workspace-print", text.text("tab.Slicer"), "▣", disabled, null, () -> {}),
-                new Action("workspace-printer", text.text("tab.Printer"), "▣", disabled, null, () -> {}));
+                new Action(
+                        "workspace-print", text.translate("tab.Slicer").orElseThrow(), "▣", disabled, null, () -> {}),
+                new Action(
+                        "workspace-printer",
+                        text.translate("tab.Printer").orElseThrow(),
+                        "▣",
+                        disabled,
+                        null,
+                        () -> {}));
     }
 
     private static String icon(String id) {
@@ -117,7 +138,7 @@ final class QuickMenu implements AutoCloseable {
     QuickMenu(
             Node surface,
             Parent theme,
-            Translations text,
+            TranslationService text,
             Supplier<Content> content,
             Supplier<List<Action>> workspaces,
             BiConsumer<Double, Double> pan,
@@ -225,7 +246,7 @@ final class QuickMenu implements AutoCloseable {
                         .toExternalForm());
         root.setAlignment(Pos.TOP_CENTER);
         root.setPadding(new Insets(14));
-        var heading = new Label(text.text("quick.actions"));
+        var heading = new Label(text.translate("quick.actions").orElseThrow());
         heading.getStyleClass().add("quick-menu-heading");
         root.getChildren().add(heading);
         var ring = new GridPane();
@@ -241,7 +262,7 @@ final class QuickMenu implements AutoCloseable {
             button.setWrapText(true);
             ring.add(button, slots[index][0], slots[index][1]);
         }
-        var workspaceButton = new MenuButton(text.text("quick.workspace"));
+        var workspaceButton = new MenuButton(text.translate("quick.workspace").orElseThrow());
         workspaceButton.setId("quick-workspaces");
         workspaceButton.getStyleClass().add("quick-menu-workspace");
         workspaceButton.setMaxWidth(Double.MAX_VALUE);
@@ -267,12 +288,12 @@ final class QuickMenu implements AutoCloseable {
         ring.add(workspaceButton, 1, 1);
         root.getChildren().add(ring);
         if (workspaceActions.stream().allMatch(action -> action.disabled().get())) {
-            var hint = new Label(text.text("quick.finishSketchFirst"));
+            var hint = new Label(text.translate("quick.finishSketchFirst").orElseThrow());
             hint.setWrapText(true);
             hint.getStyleClass().add("quick-menu-hint");
             root.getChildren().add(hint);
         }
-        var more = new Label(text.text("quick.more"));
+        var more = new Label(text.translate("quick.more").orElseThrow());
         more.getStyleClass().add("quick-menu-heading");
         var extras = new GridPane();
         extras.getStyleClass().add("quick-menu-extras");

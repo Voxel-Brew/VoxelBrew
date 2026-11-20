@@ -9,7 +9,7 @@ import dev.voxelbrew.api.model.sketch.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.engine.sketch.*;
-import dev.voxelbrew.util.concurrent.CpuWork;
+import dev.voxelbrew.util.concurrent.ParallelWork;
 import java.util.*;
 import java.util.function.Supplier;
 
@@ -74,7 +74,7 @@ public final class ComputeBenchmark {
                 Locale.ROOT,
                 "BENCH %s threads=%d median_ms=%.3f min_ms=%.3f max_ms=%.3f%n",
                 name,
-                CpuWork.parallelism(),
+                ParallelWork.parallelism(),
                 times[4],
                 times[0],
                 times[8]);
@@ -87,7 +87,7 @@ public final class ComputeBenchmark {
                 System.getProperty("os.arch"),
                 System.getProperty("java.version"),
                 Runtime.getRuntime().availableProcessors(),
-                CpuWork.parallelism());
+                ParallelWork.parallelism());
         if (args.length > 0 && args[0].equals("sketch")) {
             for (int lines : new int[] {24, 48}) {
                 var input = sketch(lines);

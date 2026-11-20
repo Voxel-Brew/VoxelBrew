@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.util.i18n.Translations;
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.util.update.*;
 import java.io.IOException;
 import java.util.concurrent.CancellationException;
@@ -17,21 +17,35 @@ import javafx.stage.Window;
 final class UpdateDialog {
     private final UpdateServiceFactory factory;
 
-    private final Translations translations;
+    private final TranslationService translations;
+
     private final Consumer<Runnable> beforeInstall;
+
     private final ExecutorService worker;
+
     private final UpdateCancellation cancellation = new UpdateCancellation();
+
     private final Dialog<ButtonType> dialog = new Dialog<>();
+
     private final TextField version = new TextField();
+
     private final CheckBox force;
+
     private final Label status;
+
     private final ProgressIndicator progress = new ProgressIndicator();
+
     private final Button check, download;
     private final Button install, cancel;
+
     private final ButtonType installType;
+
     private UpdateService service;
+
     private UpdateService.Check selected;
+
     private UpdateService.Prepared prepared;
+
     private boolean busy, closed, scheduled;
 
     interface Factory {
@@ -62,41 +76,44 @@ final class UpdateDialog {
 
     UpdateDialog(
             UpdateServiceFactory factory,
-            Translations translations,
+            TranslationService translations,
             java.util.function.Supplier<ExecutorService> workers,
             Consumer<Runnable> beforeInstall) {
         this.factory = factory;
         this.translations = translations;
         this.beforeInstall = beforeInstall;
         this.worker = workers.get();
-        this.force = new CheckBox(translations.text("update.reinstall"));
-        this.status = new Label(translations.text("update.intro"));
-        this.check = new Button(translations.text("update.check"));
-        this.download = new Button(translations.text("update.download"));
-        this.installType = new ButtonType(translations.text("update.install"), ButtonBar.ButtonData.OK_DONE);
-        dialog.setTitle(translations.text("update.title"));
-        dialog.setHeaderText(translations.text("update.heading"));
+        this.force = new CheckBox(translations.translate("update.reinstall").orElseThrow());
+        this.status = new Label(translations.translate("update.intro").orElseThrow());
+        this.check = new Button(translations.translate("update.check").orElseThrow());
+        this.download = new Button(translations.translate("update.download").orElseThrow());
+        this.installType =
+                new ButtonType(translations.translate("update.install").orElseThrow(), ButtonBar.ButtonData.OK_DONE);
+        dialog.setTitle(translations.translate("update.title").orElseThrow());
+        dialog.setHeaderText(translations.translate("update.heading").orElseThrow());
         dialog.getDialogPane().getButtonTypes().setAll(installType, ButtonType.CANCEL);
         install = (Button) dialog.getDialogPane().lookupButton(installType);
         cancel = (Button) dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
         install.setId("update-install");
         cancel.setId("update-cancel");
-        cancel.setText(translations.text("action.cancel"));
+        cancel.setText(translations.translate("action.cancel").orElseThrow());
         check.setId("update-check");
         download.setId("update-download");
         version.setId("update-version");
         force.setId("update-force");
         for (var control : java.util.List.of(force, check, download)) UiHelp.install(control, translations);
         status.setId("update-status");
-        version.setPromptText(translations.text("update.versionPrompt"));
+        version.setPromptText(translations.translate("update.versionPrompt").orElseThrow());
         status.setWrapText(true);
         progress.setMaxSize(26, 26);
         progress.setVisible(false);
         progress.managedProperty().bind(progress.visibleProperty());
         var content = new VBox(
                 12,
-                new Label(translations.text("update.installed", BuildVersion.current())),
-                new Label(translations.text("update.version")),
+                new Label(translations
+                        .translate("update.installed", BuildVersion.current())
+                        .orElseThrow()),
+                new Label(translations.translate("update.version").orElseThrow()),
                 version,
                 force,
                 check,
@@ -151,7 +168,7 @@ final class UpdateDialog {
         }
         selected = null;
         busy(true);
-        status.setText(translations.text("update.checking"));
+        status.setText(translations.translate("update.checking").orElseThrow());
         worker.execute(() -> {
             try {
                 var created = factory.create();
@@ -187,9 +204,10 @@ final class UpdateDialog {
                         return;
                     }
                     prepared = ready;
-                    status.setText(
-                            translations.text(
-                                    "gui.verified_and_ready_install_and_quit_will_close_this_application_and_retain_the_previous_install"));
+                    status.setText(translations
+                            .translate(
+                                    "gui.verified_and_ready_install_and_quit_will_close_this_application_and_retain_the_previous_install")
+                            .orElseThrow());
                     busy(false);
                 });
             } catch (Exception failure) {
@@ -201,7 +219,7 @@ final class UpdateDialog {
     private void handOff() {
         busy(true);
         cancel.setDisable(true);
-        status.setText(translations.text("update.starting"));
+        status.setText(translations.translate("update.starting").orElseThrow());
         worker.execute(() -> {
             try {
                 prepared.handOff();
@@ -226,8 +244,10 @@ final class UpdateDialog {
             if (closed) return;
             status.setText(
                     failure instanceof CancellationException
-                            ? translations.text("gui.update_cancelled")
-                            : translations.text("update.failed", failure.getMessage()));
+                            ? translations.translate("gui.update_cancelled").orElseThrow()
+                            : translations
+                                    .translate("update.failed", failure.getMessage())
+                                    .orElseThrow());
             cancel.setDisable(false);
             busy(false);
         });

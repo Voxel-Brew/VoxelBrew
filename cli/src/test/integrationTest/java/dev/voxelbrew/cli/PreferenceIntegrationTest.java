@@ -21,7 +21,7 @@ class PreferenceIntegrationTest {
     private int run(String... args) {
         var root = new CommandLine(CommandLine.Model.CommandSpec.create().name("test"));
         new PreferenceCommands(
-                        new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties")),
+                        new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties"),
                         new dev.voxelbrew.printer.DefaultPrinterProfileCatalog(directory.resolve("printers")),
                         () -> ServiceLoader.load(SlicerProviderRegistry.class)
                                 .findFirst()
@@ -45,7 +45,8 @@ class PreferenceIntegrationTest {
         assertThat(run("settings", "set", "--key", "appearance", "--value", "dark"))
                 .isEqualTo(0);
         assertThat(run("settings", "reset", "--key", "language")).isEqualTo(0);
-        var saved = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties")).read();
+        var saved = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties")
+                .readUserConfig();
         assertThat(saved.containsKey("language")).isFalse();
         assertThat(saved.get("appearance")).isEqualTo("dark");
         assertThat(run("settings", "show")).isEqualTo(0);
@@ -54,7 +55,7 @@ class PreferenceIntegrationTest {
 
     @Test
     void visibilityOperationsApplyToAllDefaultsAndRejectCustomOrUnknownIdsWithoutWriting() throws Exception {
-        var config = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
+        var config = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties");
         var catalog = new dev.voxelbrew.printer.DefaultPrinterProfileCatalog(directory.resolve("printers")).load();
         var ids = catalog.entries().stream()
                 .filter(PrinterProfileCatalog.Entry::bundled)
@@ -63,10 +64,11 @@ class PreferenceIntegrationTest {
         assertThat(ids.isEmpty()).isFalse();
         assertThat(run("slicer", "profile", "visibility", "--operation", "deselect-all"))
                 .isEqualTo(0);
-        assertThat(Set.of(config.get("printers.hiddenDefaults", "").split(","))).isEqualTo(ids);
+        assertThat(Set.of(config.readUserConfig().get("printers.hiddenDefaults").split(",")))
+                .isEqualTo(ids);
         assertThat(run("slicer", "profile", "visibility", "--operation", "invert"))
                 .isEqualTo(0);
-        assertThat(config.get("printers.hiddenDefaults", "")).isEqualTo("");
+        assertThat(config.readUserConfig()).containsEntry("printers.hiddenDefaults", "");
         assertThat(run(
                         "slicer",
                         "profile",
@@ -76,17 +78,18 @@ class PreferenceIntegrationTest {
                         "--id",
                         ids.iterator().next()))
                 .isEqualTo(0);
-        byte[] before = Files.readAllBytes(config.path());
+        Path file = config.homeFolder().resolve("config.properties");
+        byte[] before = Files.readAllBytes(file);
         assertThat(run("slicer", "profile", "visibility", "--operation", "hide", "--id", "missing-profile"))
                 .isEqualTo(1);
-        assertThat(Files.readAllBytes(config.path())).containsExactly(before);
+        assertThat(Files.readAllBytes(file)).containsExactly(before);
         assertThat(run("slicer", "profile", "visibility", "--operation", "select-all"))
                 .isEqualTo(0);
-        assertThat(config.get("printers.hiddenDefaults", "")).isEqualTo("");
+        assertThat(config.readUserConfig()).containsEntry("printers.hiddenDefaults", "");
     }
 
     @Test
-    void providerOptionsPersistInSharedSectionAndUnknownOptionsCannotOverwriteIt() throws Exception {
+    void providerOptionsPersistAndUnknownOptionsCannotOverwriteThem() throws Exception {
         String executable = directory.resolve("slicer executable").toString();
         assertThat(run(
                         "slicer",
@@ -98,13 +101,14 @@ class PreferenceIntegrationTest {
                         "executable=" + executable))
                 .as(output)
                 .isEqualTo(0);
-        var section = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"))
-                .section("slicer", "prusa-slicer");
-        assertThat(section.get("executable", "")).isEqualTo(executable);
-        byte[] before = Files.readAllBytes(section.path());
+        Path defaults = directory.resolve("slicers/prusa-slicer.properties");
+        var store = new dev.voxelbrew.slicer.SlicerInstallationStore(
+                new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties"));
+        assertThat(store.providerDefaults("prusa-slicer")).containsEntry("executable", executable);
+        byte[] before = Files.readAllBytes(defaults);
         assertThat(run("slicer", "backend", "configure", "--id", "prusa-slicer", "--option", "invalid"))
                 .isEqualTo(1);
-        assertThat(Files.readAllBytes(section.path())).containsExactly(before);
+        assertThat(Files.readAllBytes(defaults)).containsExactly(before);
         assertThat(run("slicer", "backend", "describe", "--id", "prusa-slicer")).isEqualTo(0);
         assertThat(output.contains("executable=" + executable)).isTrue();
     }

@@ -14,11 +14,25 @@ class PrinterProviderTest {
         try (var registry =
                 java.util.ServiceLoader.load(DriverRegistry.class).findFirst().orElseThrow()) {
             assertThat(registry.drivers()).extracting(Driver::id).containsExactly("bambulab", "moonraker");
-            assertThat(registry.drivers())
-                    .extracting(Driver::name)
-                    .containsExactly("BambuLab Configuration", "Moonraker Configuration");
             for (var driver : registry.drivers()) assertThat(driver.gui()).isNotNull();
         }
+    }
+
+    @Test
+    void driversUseInjectedPolishCatalogForNamesAndForms(
+            @org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) {
+        var translations =
+                dev.voxelbrew.util.i18n.TranslationCatalogs.forLocale(java.util.Locale.forLanguageTag("pl"), directory);
+        var bambu = new dev.voxelbrew.printer.bambulab.BambuLabDriver(translations);
+        var moonraker = new dev.voxelbrew.printer.moonraker.MoonrakerDriver(translations);
+        assertThat(bambu.name()).isEqualTo("Konfiguracja BambuLab");
+        assertThat(moonraker.name()).isEqualTo("Konfiguracja Moonraker");
+        assertThat(bambu.gui().validate(Map.of()))
+                .containsEntry(BambuLabDriverGui.BAMBU_SERIAL_ID, "Wprowadź numer seryjny drukarki");
+        assertThat(moonraker.gui().validate(Map.of()))
+                .containsEntry(
+                        MoonrakerDriverGui.MOONRAKER_URL_ID,
+                        "Wprowadź poprawny adres HTTP(S) bez danych logowania, zapytania i fragmentu");
     }
 
     @Test

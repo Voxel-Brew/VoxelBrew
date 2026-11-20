@@ -1,0 +1,38 @@
+name: Check out shared runtime APIs
+description: Use the coordinated API revisions in the shared runtime services pull request
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v4
+      with:
+        repository: Voxel-Brew/api-model
+        ref: master
+        path: .tools/api/model
+        persist-credentials: false
+    - uses: actions/checkout@v4
+      with:
+        repository: Voxel-Brew/api-import
+        ref: dfe274b3da3ec2b6e972c56d0960b51dec652094
+        path: .tools/api/import
+        persist-credentials: false
+    - uses: actions/checkout@v4
+      with:
+        repository: Voxel-Brew/api-export
+        ref: 46e43ccc97ac1935710c4caf806d8e42093d5402
+        path: .tools/api/export
+        persist-credentials: false
+    - uses: actions/checkout@v4
+      with:
+        repository: Voxel-Brew/api-printer
+        ref: 315f2aee1cb957662a1db23165314cc8d75ce799
+        path: .tools/api/printer
+        persist-credentials: false
+    - uses: actions/checkout@v4
+      with:
+        repository: Voxel-Brew/api-slicer
+        ref: 99e4a8250053ea7069f3646c6e6b015cba78678c
+        path: .tools/api/slicer
+        persist-credentials: false
+    - name: Share the BOM checkout with included API builds
+      shell: bash
+      run: printf 'VOXELBREW_BOM_DIR=%s\n' "$GITHUB_WORKSPACE/.tools/bom" >> "$GITHUB_ENV"

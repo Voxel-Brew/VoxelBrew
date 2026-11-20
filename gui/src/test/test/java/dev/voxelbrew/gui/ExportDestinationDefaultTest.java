@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 
 class ExportDestinationDefaultTest {
     @Test
-    void usesDefaultSaveFolderAndProjectNameForExport() {
+    void usesHomeFolderAndProjectNameForExport() {
         var folder = Path.of("designs");
 
         assertThat(ExportDialog.destinationForFormat(

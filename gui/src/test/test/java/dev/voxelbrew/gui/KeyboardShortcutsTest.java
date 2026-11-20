@@ -2,15 +2,20 @@ package dev.voxelbrew.gui;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.util.i18n.Translations;
+import dev.voxelbrew.util.i18n.TranslationCatalogs;
+import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class KeyboardShortcutsTest {
+    @TempDir
+    Path directory;
+
     private static String match(KeyCode code, boolean shift, boolean control, boolean alt) {
         return KeyboardShortcuts.match(
                 KeyboardShortcuts.Scope.DESIGN,
@@ -112,11 +117,12 @@ class KeyboardShortcutsTest {
                 for (var key : binding.keys())
                     assertThat(combinations.add(key)).as(binding.id()).isTrue();
                 for (var language : List.of(Locale.ENGLISH, Locale.forLanguageTag("pl"))) {
-                    var translations = new Translations(language);
+                    var translations = TranslationCatalogs.forLocale(language, directory);
                     assertThat(UiHelp.description(translations, binding.id()).isBlank())
                             .isFalse();
                     assertThat(translations
-                                    .text("shortcuts.section." + scope.name())
+                                    .translate("shortcuts.section." + scope.name())
+                                    .orElseThrow()
                                     .isBlank())
                             .isFalse();
                 }

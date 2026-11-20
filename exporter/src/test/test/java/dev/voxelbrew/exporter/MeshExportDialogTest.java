@@ -2,10 +2,13 @@ package dev.voxelbrew.exporter;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.util.i18n.TranslationCatalogs;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class MeshExportDialogTest {
     @Test
@@ -36,7 +39,7 @@ class MeshExportDialogTest {
     }
 
     @Test
-    void acceptedSettingsUseDefaultsAndRejectUnknownOptions() {
+    void acceptedSettingsUseDefaultsAndRejectUnknownOptions(@TempDir Path directory) {
         var format = new MeshFormat(
                 "mesh",
                 "Mesh",
@@ -44,7 +47,7 @@ class MeshExportDialogTest {
                 true,
                 List.of(new MeshExportOption(
                         "mode", "Mode", MeshExportOption.Type.CHOICE, "fast", List.of("fast", "fine"))));
-        var dialog = new MeshExportDialog(format);
+        var dialog = new MeshExportDialog(format, TranslationCatalogs.forLocale(Locale.ENGLISH, directory));
         var path = Path.of("part.stl");
         var settings = dialog.buildSettings(Map.of("destination", path.toString()));
 

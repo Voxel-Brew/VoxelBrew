@@ -186,6 +186,25 @@ configure(libraryProjects) {
         }
     }
     val sources = extensions.getByType<SourceSetContainer>()
+    if (
+        name in
+            setOf(
+                "util",
+                "cli",
+                "gui",
+                "slicer-impl",
+                "exporter-impl",
+                "importer-impl",
+                "printer-impl",
+            )
+    ) {
+        sources.configureEach {
+            project.dependencies.add(
+                compileOnlyConfigurationName,
+                "com.github.spotbugs:spotbugs-annotations:4.10.5",
+            )
+        }
+    }
     if (name == "engine") {
         tasks.named<SpotBugsTask>("spotbugsMain") {
             // Keep generated Protobuf classes available to callers without analyzing them.

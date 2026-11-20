@@ -1,6 +1,6 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.util.i18n.Translations;
+import dev.voxelbrew.api.i18n.TranslationService;
 import java.util.Locale;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
@@ -11,43 +11,53 @@ import javafx.util.Duration;
 
 /** Descriptions are keyed by stable control identities, independently of their display captions. */
 final class UiHelp {
-    static String description(Translations translations, String id) {
+    static String description(TranslationService translations, String id) {
         return KeyboardShortcuts.describe(translations, id, baseDescription(translations, id));
     }
 
-    static String baseDescription(Translations translations, String id) {
+    static String baseDescription(TranslationService translations, String id) {
         String key = id;
-        if (id.startsWith("print-remove-plate-")) return translations.text("help.print-remove-plate");
-        if (id.startsWith("choose-plane-")) return translations.text("help.choose-plane");
-        if (id.startsWith("view-") && !id.startsWith("view-cube-")) return translations.text("help.standard-view");
+        if (id.startsWith("print-remove-plate-"))
+            return translations.translate("help.print-remove-plate").orElseThrow();
+        if (id.startsWith("choose-plane-"))
+            return translations.translate("help.choose-plane").orElseThrow();
+        if (id.startsWith("view-") && !id.startsWith("view-cube-"))
+            return translations.translate("help.standard-view").orElseThrow();
         if (id.equals("menu-undo") || id.equals("menu-redo") || id.equals("menu-parameters") || id.equals("menu-fit"))
             key = id.substring(5);
         if (id.startsWith("history-") && !id.equals("history-cursor")) key = "history-feature";
         else if (id.startsWith("apply-")) key = "apply-dimension";
         else if (id.startsWith("print-role-")) key = "print-role";
         else if (id.startsWith("constraint-menu-"))
-            return translations.text("constraint.hint." + id.substring(16).toUpperCase(Locale.ROOT));
+            return translations
+                    .translate("constraint.hint." + id.substring(16).toUpperCase(Locale.ROOT))
+                    .orElseThrow();
         else if (id.startsWith("constraint-") && !id.equals("constraint-finish") && !id.equals("constraint-cancel"))
-            return translations.text("constraint.hint." + id.substring(11).toUpperCase(Locale.ROOT));
-        return translations.text("help." + key);
+            return translations
+                    .translate("constraint.hint." + id.substring(11).toUpperCase(Locale.ROOT))
+                    .orElseThrow();
+        return translations.translate("help." + key).orElseThrow();
     }
 
-    static void dialogButton(ButtonBase button, ButtonType type, Translations translations) {
+    static void dialogButton(ButtonBase button, ButtonType type, TranslationService translations) {
         String key = button.getId() == null ? null : "help." + button.getId();
-        String description = key == null ? null : translations.textOrDefault(key, null);
+        String description = key == null ? null : translations.translate(key).orElse(null);
         if (description == null)
-            description = translations.text(
-                    switch (type.getButtonData()) {
-                        case CANCEL_CLOSE -> "help.dialog-cancel";
-                        case NO -> "help.dialog-no";
-                        case YES, OK_DONE, APPLY -> "help.dialog-apply";
-                        default -> "help.dialog-close";
-                    });
-        if (type == ButtonType.CLOSE) description = translations.text("help.dialog-close");
+            description = translations
+                    .translate(
+                            switch (type.getButtonData()) {
+                                case CANCEL_CLOSE -> "help.dialog-cancel";
+                                case NO -> "help.dialog-no";
+                                case YES, OK_DONE, APPLY -> "help.dialog-apply";
+                                default -> "help.dialog-close";
+                            })
+                    .orElseThrow();
+        if (type == ButtonType.CLOSE)
+            description = translations.translate("help.dialog-close").orElseThrow();
         describe(button, description);
     }
 
-    static void install(Control control, Translations translations) {
+    static void install(Control control, TranslationService translations) {
         describe(control, description(translations, control.getId()));
         if (control instanceof ButtonBase button) ShortcutLabels.install(button);
     }
@@ -80,13 +90,13 @@ final class UiHelp {
         item.getProperties().put(UiHelp.class, description);
     }
 
-    static void menu(Menu menu, Translations translations) {
+    static void menu(Menu menu, TranslationService translations) {
         menuItem(menu, description(translations, menu.getId()));
         menu.addEventHandler(
                 Menu.ON_SHOWN, event -> Platform.runLater(() -> menu.getItems().forEach(UiHelp::attach)));
     }
 
-    static void menu(MenuButton menu, Translations translations) {
+    static void menu(MenuButton menu, TranslationService translations) {
         install(menu, translations);
         observeMenu(menu);
     }

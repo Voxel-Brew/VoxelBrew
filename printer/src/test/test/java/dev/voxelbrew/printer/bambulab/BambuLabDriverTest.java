@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.*;
 import dev.voxelbrew.api.model.printing.PrintArtifact;
 import dev.voxelbrew.api.printer.driver.*;
 import dev.voxelbrew.printer.internal.*;
+import dev.voxelbrew.util.i18n.TranslationCatalogs;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.NoRouteToHostException;
@@ -14,8 +15,12 @@ import java.util.*;
 import java.util.logging.*;
 import javax.net.ssl.SSLHandshakeException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class BambuLabDriverTest {
+    @TempDir
+    Path directory;
+
     private static final class Fixture implements DeviceTransport {
         final List<String> calls = new ArrayList<>();
         final IOException startFailure = new IOException("Disconnected");
@@ -61,6 +66,10 @@ class BambuLabDriverTest {
         }
     }
 
+    private BambuLabDriver driver(TransportFactory transports) {
+        return new BambuLabDriver(TranslationCatalogs.forLocale(Locale.ENGLISH, directory), transports);
+    }
+
     private DriverConfiguration config() {
         return new BambuLabDriverGui()
                 .buildConfiguration(Map.of(
@@ -79,7 +88,7 @@ class BambuLabDriverTest {
     @Test
     void submitsOnceAndClosesOperationResources() throws Exception {
         var transport = new Fixture();
-        var driver = new BambuLabDriver(c -> transport);
+        var driver = driver(c -> transport);
         assertThat(driver.print(config(), artifact())).isEqualTo(Driver.PrintResult.Success.SUCCESS);
         assertThat(transport.calls).containsExactly("status", "upload", "start", "close");
         assertThat(transport.file).doesNotExist();
@@ -89,8 +98,7 @@ class BambuLabDriverTest {
     void rejectsBusyJobsAndClosesResources() throws Exception {
         var transport = new Fixture();
         transport.busy = true;
-        assertThat(new BambuLabDriver(c -> transport).print(config(), artifact()))
-                .isInstanceOf(Driver.PrintResult.Failure.class);
+        assertThat(driver(c -> transport).print(config(), artifact())).isInstanceOf(Driver.PrintResult.Failure.class);
         assertThat(transport.calls).containsExactly("status", "close");
     }
 
@@ -98,7 +106,7 @@ class BambuLabDriverTest {
     void uncertainStartIsNeverRetriedAndCleansArtifact() {
         var transport = new Fixture();
         transport.failStart = true;
-        assertThat(new BambuLabDriver(configuration -> transport).print(config(), artifact()))
+        assertThat(driver(configuration -> transport).print(config(), artifact()))
                 .isInstanceOfSatisfying(Driver.PrintResult.Failure.class, failure -> {
                     assertThat(failure.submissionUncertain()).isTrue();
                     assertThat(failure.messages())
@@ -112,7 +120,7 @@ class BambuLabDriverTest {
     void monitoringFailureReturnsErrorAndClosesResources() {
         var transport = new Fixture();
         transport.failStatus = true;
-        var status = new BambuLabDriver(configuration -> transport).readPrinterStatus(config());
+        var status = driver(configuration -> transport).readPrinterStatus(config());
         assertThat(status.state()).isEqualTo(DriverStatus.State.ERROR);
         assertThat(status.detail()).contains("Cannot read", "Monitoring unavailable");
         assertThat(status.canStart()).isFalse();
@@ -144,7 +152,7 @@ class BambuLabDriverTest {
                     new NoRouteToHostException(),
                     new SocketTimeoutException(),
                     new SSLHandshakeException("Certificate rejected"))) {
-                var driver = new BambuLabDriver(configuration -> {
+                var driver = driver(configuration -> {
                     throw new IOException("Cannot connect to Bambu device", new IllegalStateException(cause));
                 });
                 var status = driver.readPrinterStatus(config());
@@ -164,8 +172,7 @@ class BambuLabDriverTest {
     void definiteRejectionIsReportedWithoutRetry() throws Exception {
         var transport = new Fixture();
         transport.reject = true;
-        assertThat(new BambuLabDriver(c -> transport).print(config(), artifact()))
-                .isInstanceOf(Driver.PrintResult.Failure.class);
+        assertThat(driver(c -> transport).print(config(), artifact())).isInstanceOf(Driver.PrintResult.Failure.class);
         assertThat(transport.calls).containsExactly("status", "upload", "start", "close");
         assertThat(transport.file).doesNotExist();
     }
@@ -174,7 +181,7 @@ class BambuLabDriverTest {
     void failedTransferReturnsFailureAndClosesResourcesAndCleansArtifact() {
         var transport = new Fixture();
         transport.failUpload = true;
-        assertThat(new BambuLabDriver(configuration -> transport).print(config(), artifact()))
+        assertThat(driver(configuration -> transport).print(config(), artifact()))
                 .isInstanceOfSatisfying(Driver.PrintResult.Failure.class, failure -> {
                     assertThat(failure.submissionUncertain()).isFalse();
                     assertThat(failure.messages())
@@ -194,7 +201,7 @@ class BambuLabDriverTest {
                 return "Localized transport failure";
             }
         };
-        var driver = new BambuLabDriver(configuration -> {
+        var driver = driver(configuration -> {
             throw cause;
         });
         var status = driver.readPrinterStatus(config());
@@ -214,7 +221,7 @@ class BambuLabDriverTest {
     void uncertainRuntimeSubmissionReturnsFailureAndDoesNotRetry() {
         var transport = new Fixture();
         transport.runtimeStartFailure = new IllegalStateException("Connection lost during submission");
-        assertThat(new BambuLabDriver(configuration -> transport).print(config(), artifact()))
+        assertThat(driver(configuration -> transport).print(config(), artifact()))
                 .isInstanceOfSatisfying(Driver.PrintResult.Failure.class, failure -> {
                     assertThat(failure.submissionUncertain()).isTrue();
                     assertThat(failure.messages())
@@ -227,7 +234,7 @@ class BambuLabDriverTest {
 
     @Test
     void invalidConfigurationReturnsFailureWithoutOpeningTransport() {
-        var driver = new BambuLabDriver(configuration -> {
+        var driver = driver(configuration -> {
             throw new AssertionError("Must validate first");
         });
         assertThat(driver.print(new DriverConfiguration(Map.of()), artifact()))
@@ -240,7 +247,7 @@ class BambuLabDriverTest {
 
     @Test
     void missingExceptionMessageHasMeaningfulFallback() {
-        var driver = new BambuLabDriver(configuration -> {
+        var driver = driver(configuration -> {
             throw new IOException();
         });
         assertThat(driver.readPrinterStatus(config()).detail()).contains("Cannot read");
@@ -254,7 +261,7 @@ class BambuLabDriverTest {
     void cleanupFailureAfterAcceptedSubmissionDoesNotTurnItIntoAFailedJob() {
         var transport = new Fixture();
         transport.runtimeCloseFailure = new IllegalStateException("Cleanup failed");
-        assertThat(new BambuLabDriver(configuration -> transport).print(config(), artifact()))
+        assertThat(driver(configuration -> transport).print(config(), artifact()))
                 .isEqualTo(Driver.PrintResult.Success.SUCCESS);
         assertThat(transport.calls).containsExactly("status", "upload", "start", "close");
         assertThat(transport.file).doesNotExist();

@@ -12,10 +12,9 @@ class ExportNotificationDurationTest {
 
     @Test
     void defaultsToThreeSecondsAndLoadsConfiguredMilliseconds() throws Exception {
-        var configuration =
-                new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("settings.properties"));
+        var configuration = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "settings.properties");
         assertThat(Workbench.loadNotificationDuration(configuration)).isEqualTo(3000);
-        configuration.set("export.notification.duration-ms", "750");
+        configuration.saveUserConfig("export.notification.duration-ms", "750");
         assertThat(Workbench.loadNotificationDuration(configuration)).isEqualTo(750);
     }
 
@@ -24,9 +23,8 @@ class ExportNotificationDurationTest {
         assertThatThrownBy(() -> Workbench.parseNotificationDuration("0")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> Workbench.parseNotificationDuration("1.5"))
                 .isInstanceOf(IllegalArgumentException.class);
-        var configuration =
-                new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("settings.properties"));
-        configuration.set("export.notification.duration-ms", "invalid");
+        var configuration = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "settings.properties");
+        configuration.saveUserConfig("export.notification.duration-ms", "invalid");
         assertThat(Workbench.loadNotificationDuration(configuration)).isEqualTo(3000);
     }
 }

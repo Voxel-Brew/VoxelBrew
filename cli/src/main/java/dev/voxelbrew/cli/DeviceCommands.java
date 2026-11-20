@@ -7,7 +7,6 @@ import dev.voxelbrew.api.printer.*;
 import dev.voxelbrew.api.printer.driver.*;
 import dev.voxelbrew.importer.DocumentSource;
 import dev.voxelbrew.printer.ProfileHardware;
-import dev.voxelbrew.util.config.ApplicationPaths;
 import java.nio.file.*;
 import java.util.*;
 import picocli.CommandLine;
@@ -28,6 +27,7 @@ final class DeviceCommands {
     private final DocumentSource documents;
 
     private final DocumentSave writer;
+
     private final dev.voxelbrew.api.printer.PrinterProfileCatalog printers;
 
     private static Object operationLock(Printer printer) {
@@ -216,8 +216,9 @@ final class DeviceCommands {
     private DriverRegistry registry() throws java.io.IOException {
         var registry = driverRegistries.get();
         try {
-            return registry.withDirectory(dev.voxelbrew.util.services.Services.load(ApplicationPaths.class)
-                    .plugins());
+            return registry.withDirectory(
+                    dev.voxelbrew.util.services.Services.load(dev.voxelbrew.api.userconfig.UserConfigService.class)
+                            .pluginsFolder());
         } catch (java.io.IOException | RuntimeException failure) {
             try {
                 registry.close();

@@ -248,8 +248,8 @@ class InjectedDocumentIoTest {
 
     @Test
     void injectedFileFailuresPreserveTheDocumentAndShutdownDrainsCapturedWrites() throws Exception {
-        var rebuild = WindowResources.worker("test-rebuild");
-        var files = WindowResources.worker("test-files");
+        var rebuild = WindowResources.worker();
+        var files = WindowResources.worker();
         var loaded = CadDocument.empty();
         var written = new AtomicReference<CadDocument>();
         var entered = new CountDownLatch(1);

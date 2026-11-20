@@ -1,11 +1,11 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.ConstructionFeature;
 import dev.voxelbrew.api.model.ConstructionFeature.Input;
 import dev.voxelbrew.api.model.ConstructionFeature.Selection;
 import dev.voxelbrew.api.model.construction.ConstructionGeometry.Vector;
 import dev.voxelbrew.api.model.construction.ConstructionTools.Tool;
-import dev.voxelbrew.util.i18n.Translations;
 import java.util.ArrayList;
 import java.util.List;
 import javafx.application.Platform;
@@ -15,18 +15,31 @@ import javafx.scene.layout.*;
 /** Window-local draft: preview never changes the document or its undo stack. */
 final class ConstructionEditor extends VBox {
     private final List<ComboBox<Input>> selectors = new ArrayList<>();
+
     private final List<List<TextField>> coordinates = new ArrayList<>();
+
     private final DocumentController controller;
+
     private final Viewport viewport;
-    private final Translations translations;
+
+    private final TranslationService translations;
+
     private final ConstructionFeature original;
+
     private final String id;
+
     private final Tool tool;
+
     private final TextField value = new TextField("0");
+
     private final CheckBox alternate = new CheckBox();
+
     private final Label error = new Label();
+
     private int active;
+
     private long generation;
+
     private boolean closed;
 
     private static double number(TextField field) {
@@ -38,7 +51,7 @@ final class ConstructionEditor extends VBox {
             ConstructionFeature original,
             DocumentController controller,
             Viewport viewport,
-            Translations translations,
+            TranslationService translations,
             Runnable finished) {
         super(8);
         this.tool = tool;
@@ -50,8 +63,10 @@ final class ConstructionEditor extends VBox {
                 ? "construction-"
                         + controller.snapshot().document().uuidGenerator().next()
                 : original.id();
-        getChildren().add(new Label(translations.text("construction." + tool.name())));
-        var hint = new Label(translations.text("construction.select"));
+        getChildren()
+                .add(new Label(
+                        translations.translate("construction." + tool.name()).orElseThrow()));
+        var hint = new Label(translations.translate("construction.select").orElseThrow());
         hint.setWrapText(true);
         getChildren().add(hint);
         var choices = new ArrayList<Input>();
@@ -105,8 +120,10 @@ final class ConstructionEditor extends VBox {
             getChildren()
                     .addAll(
                             new Label((i + 1) + ". "
-                                    + translations.text(
-                                            "construction.role." + tool.inputs().get(i))),
+                                    + translations
+                                            .translate("construction.role."
+                                                    + tool.inputs().get(i))
+                                            .orElseThrow()),
                             selector,
                             row);
             if (original != null) {
@@ -127,18 +144,18 @@ final class ConstructionEditor extends VBox {
             String key = tool == Tool.OFFSET_PLANE
                     ? "construction.distance"
                     : tool == Tool.ANGLED_PLANE ? "construction.angle" : "construction.fraction";
-            getChildren().addAll(new Label(translations.text(key)), value);
+            getChildren().addAll(new Label(translations.translate(key).orElseThrow()), value);
         }
         value.setId("construction-value");
         if (original != null) value.setText(Double.toString(original.value()));
-        alternate.setText(translations.text("construction.alternate"));
+        alternate.setText(translations.translate("construction.alternate").orElseThrow());
         if (original != null) alternate.setSelected(original.alternate());
         if (tool == Tool.MIDPLANE) getChildren().add(alternate);
-        var preview = new Button(translations.text("construction.preview"));
+        var preview = new Button(translations.translate("construction.preview").orElseThrow());
         preview.setId("construction-preview");
-        var apply = new Button(translations.text("dialog.apply"));
+        var apply = new Button(translations.translate("dialog.apply").orElseThrow());
         apply.setId("construction-apply");
-        var cancel = new Button(translations.text("action.cancel"));
+        var cancel = new Button(translations.translate("action.cancel").orElseThrow());
         cancel.setId("construction-cancel");
         preview.setOnAction(event -> evaluate(false, finished));
         apply.setOnAction(event -> evaluate(true, finished));
@@ -171,7 +188,9 @@ final class ConstructionEditor extends VBox {
                                     dev.voxelbrew.api.model.construction.ConstructionGeometry.CoordinateSystem
                             ? " · " + new String[] {"O", "X", "Y", "Z", "YZ", "XZ", "XY"}[input.index()]
                             : "");
-        String name = translations.text("construction.selection." + input.selection());
+        String name = translations
+                .translate("construction.selection." + input.selection())
+                .orElseThrow();
         return input.source().isEmpty()
                 ? name
                 : name + " " + (input.index() + 1) + " · " + input.source() + "/" + input.output();
@@ -220,7 +239,9 @@ final class ConstructionEditor extends VBox {
         var inputs = new ArrayList<Input>();
         for (int i = 0; i < selectors.size(); i++) {
             var input = selectors.get(i).getValue();
-            if (input == null) throw new IllegalArgumentException(translations.text("construction.select"));
+            if (input == null)
+                throw new IllegalArgumentException(
+                        translations.translate("construction.select").orElseThrow());
             if (input.selection() == Selection.POSITION) {
                 var xyz = coordinates.get(i);
                 input = new Input(
@@ -246,7 +267,9 @@ final class ConstructionEditor extends VBox {
                     .whenComplete((datum, failure) -> Platform.runLater(() -> {
                         if (closed || request != generation) return;
                         if (!controller.snapshot().equals(snapshot)) {
-                            error.setText(translations.text("construction.changed"));
+                            error.setText(translations
+                                    .translate("construction.changed")
+                                    .orElseThrow());
                             return;
                         }
                         if (failure != null) {

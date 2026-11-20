@@ -1,9 +1,9 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.CadDocument;
 import dev.voxelbrew.api.model.Feature;
 import dev.voxelbrew.engine.model.Evaluation;
-import dev.voxelbrew.util.i18n.Translations;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -27,25 +27,44 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 final class FeatureTimeline extends HBox implements AutoCloseable {
     private static final double STEP = 38, INSET = 16, HEIGHT = 56;
-    private final Translations translations;
+
+    private final TranslationService translations;
+
     private final IntConsumer moveCursor;
+
     private final Consumer<String> select;
+
     private final java.util.function.BiConsumer<Integer, Integer> delete;
+
     private final Function<Feature, String> name;
+
     private final Pane track = new Pane();
+
     private final Pane ticks = new Pane();
+
     private final Pane features = new Pane();
+
     private final Region rail = new Region();
+
     private final Button marker = new Button();
+
     private final Label empty = new Label(), count = new Label();
+
     private final ScrollPane scroll = new ScrollPane(track);
+
     private final Button first, previous, play, next, last;
+
     private final PauseTransition playback = new PauseTransition(Duration.millis(650));
+
     private List<Feature> definitions = List.of();
+
     private String documentId;
+
     private int position, playbackPosition;
     private boolean unavailable, rebuilding, failed, playing, closed, dragging;
+
     private double dragStartX;
+
     private int dragStartPosition;
 
     private static SVGPath path(String content, String style) {
@@ -78,7 +97,7 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
     }
 
     FeatureTimeline(
-            Translations translations,
+            TranslationService translations,
             IntConsumer moveCursor,
             Consumer<String> select,
             Function<Feature, String> name,
@@ -115,7 +134,7 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
         count.setId("timeline-position");
         count.getStyleClass().add("timeline-count");
         count.setMinWidth(Region.USE_PREF_SIZE);
-        UiHelp.describe(count, translations.text("timeline.positionHelp"));
+        UiHelp.describe(count, translations.translate("timeline.positionHelp").orElseThrow());
         getChildren().addAll(navigation, divider, scroll, count);
         track.setMinHeight(HEIGHT);
         track.getStyleClass().add("timeline-track");
@@ -123,7 +142,7 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
         features.setPickOnBounds(false);
         rail.setMouseTransparent(true);
         rail.getStyleClass().add("timeline-rail");
-        empty.setText(translations.text("timeline.empty"));
+        empty.setText(translations.translate("timeline.empty").orElseThrow());
         empty.getStyleClass().add("timeline-empty");
         empty.setMouseTransparent(true);
         empty.relocate(INSET + 12, 18);
@@ -131,7 +150,7 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
         marker.getStyleClass().add("timeline-marker");
         marker.setGraphic(path("M1 0H13V6L8 11V44H6V11L1 6Z", "timeline-marker-shape"));
         marker.setCursor(Cursor.H_RESIZE);
-        marker.setAccessibleText(translations.text("timeline.marker"));
+        marker.setAccessibleText(translations.translate("timeline.marker").orElseThrow());
         UiHelp.install(marker, translations);
         marker.setOnMousePressed(e -> {
             if (e.getButton() != MouseButton.PRIMARY) return;
@@ -152,7 +171,8 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
         marker.setOnMouseReleased(e -> dragging = false);
         marker.setOnContextMenuRequested(e -> {
             stop();
-            var item = new MenuItem(translations.text("timeline.deleteBefore"));
+            var item =
+                    new MenuItem(translations.translate("timeline.deleteBefore").orElseThrow());
             item.setDisable(unavailable || rebuilding || position == 0);
             item.setOnAction(action -> delete.accept(0, position));
             new ContextMenu(item).show(marker, e.getScreenX(), e.getScreenY());
@@ -217,9 +237,11 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
         }
         count.setText(position + " / " + definitions.size());
         marker.resizeRelocate(INSET + position * STEP - 7, 3, 14, 48);
-        marker.setAccessibleHelp(translations.text("timeline.markerPosition", position, definitions.size())
+        marker.setAccessibleHelp(translations
+                        .translate("timeline.markerPosition", position, definitions.size())
+                        .orElseThrow()
                 + " "
-                + translations.text("help.history-cursor"));
+                + translations.translate("help.history-cursor").orElseThrow());
         marker.setDisable(unavailable || definitions.isEmpty());
         first.setDisable(unavailable || position == 0);
         previous.setDisable(unavailable || position == 0);
@@ -243,10 +265,12 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
                     + " · "
                     + name.apply(feature)
                     + "\n"
-                    + translations.text(i < position ? "timeline.evaluated" : "timeline.rolledBack")
+                    + translations
+                            .translate(i < position ? "timeline.evaluated" : "timeline.rolledBack")
+                            .orElseThrow()
                     + (broken ? "\n" + diagnostic.orElseThrow().message() : "")
                     + "\n"
-                    + translations.text("help.history-feature");
+                    + translations.translate("help.history-feature").orElseThrow();
             UiHelp.describe(button, description);
             button.setDisable(unavailable);
         }
@@ -266,10 +290,12 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
             final int index = i;
             button.setOnContextMenuRequested(e -> {
                 stop();
-                var remove = new MenuItem(translations.text("timeline.deleteFeature"));
+                var remove = new MenuItem(
+                        translations.translate("timeline.deleteFeature").orElseThrow());
                 remove.setDisable(unavailable || rebuilding || index >= position);
                 remove.setOnAction(action -> delete.accept(index, index + 1));
-                var after = new MenuItem(translations.text("timeline.deleteAfter"));
+                var after = new MenuItem(
+                        translations.translate("timeline.deleteAfter").orElseThrow());
                 after.setDisable(unavailable || rebuilding || index + 1 == definitions.size());
                 after.setOnAction(action -> delete.accept(index + 1, definitions.size()));
                 new ContextMenu(remove, after).show(button, e.getScreenX(), e.getScreenY());
@@ -303,7 +329,7 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
         button.setId(id);
         button.getStyleClass().add("timeline-transport");
         button.setGraphic(path(shape, "timeline-transport-icon"));
-        button.setAccessibleText(translations.text("help." + id));
+        button.setAccessibleText(translations.translate("help." + id).orElseThrow());
         UiHelp.install(button, translations);
         button.setOnAction(e -> action.run());
         return button;
@@ -365,7 +391,9 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
 
     private void showPlaybackState() {
         play.setGraphic(path(playing ? "M4 3H8V17H4Z M12 3H16V17H12Z" : "M5 3L17 10L5 17Z", "timeline-transport-icon"));
-        String text = translations.text(playing ? "help.timeline-pause" : "help.timeline-play");
+        String text = translations
+                .translate(playing ? "help.timeline-pause" : "help.timeline-play")
+                .orElseThrow();
         play.setAccessibleText(text);
         UiHelp.describe(play, text);
         play.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("playing"), playing);

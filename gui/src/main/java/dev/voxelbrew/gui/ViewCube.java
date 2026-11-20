@@ -1,5 +1,6 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -36,7 +37,7 @@ final class ViewCube extends Pane {
     private final Group surface = new Group(), axes = new Group(), labels = new Group();
     private final List<Patch> patches = new ArrayList<>();
     private final Consumer<ViewOrientation> navigate;
-    private final dev.voxelbrew.util.i18n.Translations translations;
+    private final TranslationService translations;
     private ViewOrientation orientation = ViewOrientation.HOME;
     private boolean dark;
     private double lastX, lastY;
@@ -56,7 +57,7 @@ final class ViewCube extends Pane {
             BiConsumer<Double, Double> orbit,
             Runnable home,
             Runnable fit,
-            dev.voxelbrew.util.i18n.Translations translations) {
+            TranslationService translations) {
         this.navigate = navigate;
         this.translations = translations;
         setId("view-cube");
@@ -98,7 +99,8 @@ final class ViewCube extends Pane {
         var homeButton = new Button("", homeIcon);
         homeButton.setId("view-cube-home");
         homeButton.getStyleClass().add("view-cube-control");
-        homeButton.setAccessibleText(translations.text("gui.home_view_and_fit_model"));
+        homeButton.setAccessibleText(
+                translations.translate("gui.home_view_and_fit_model").orElseThrow());
         UiHelp.install(homeButton, translations);
         homeButton.setOnAction(e -> home.run());
         homeButton.relocate(8, 6);
@@ -108,16 +110,16 @@ final class ViewCube extends Pane {
         var menu = new MenuButton("", menuIcon);
         menu.setId("view-cube-menu");
         menu.getStyleClass().add("view-cube-control");
-        menu.setAccessibleText(translations.text("gui.standard_views"));
+        menu.setAccessibleText(translations.translate("gui.standard_views").orElseThrow());
         UiHelp.menu(menu, translations);
         for (String name : new String[] {"Isometric", "Top", "Front", "Right", "Back", "Left", "Bottom"}) {
             var item = new MenuItem(UiText.view(translations, name));
-            UiHelp.menuItem(item, translations.text("help.standard-view"));
+            UiHelp.menuItem(item, translations.translate("help.standard-view").orElseThrow());
             item.setOnAction(e -> navigate.accept(ViewOrientation.named(name)));
             menu.getItems().add(item);
         }
-        var fitItem = new MenuItem(translations.text("gui.fit_model"));
-        UiHelp.menuItem(fitItem, translations.text("help.fit"));
+        var fitItem = new MenuItem(translations.translate("gui.fit_model").orElseThrow());
+        UiHelp.menuItem(fitItem, translations.translate("help.fit").orElseThrow());
         fitItem.setOnAction(e -> fit.run());
         menu.getItems().add(fitItem);
         menu.relocate(WIDTH - 36, 6);
@@ -170,10 +172,17 @@ final class ViewCube extends Pane {
         polygon.setCursor(Cursor.HAND);
         polygon.setFocusTraversable(true);
         polygon.setAccessibleRole(AccessibleRole.BUTTON);
-        polygon.setAccessibleText(translations.text("view.accessible", UiText.view(translations, name)));
-        Tooltip.install(polygon, UiHelp.tooltip(translations.text("view.orbit", UiText.view(translations, name))));
-        Text label =
-                fixed.size() == 1 ? new Text(UiText.view(translations, name).toUpperCase(translations.locale())) : null;
+        polygon.setAccessibleText(translations
+                .translate("view.accessible", UiText.view(translations, name))
+                .orElseThrow());
+        Tooltip.install(
+                polygon,
+                UiHelp.tooltip(translations
+                        .translate("view.orbit", UiText.view(translations, name))
+                        .orElseThrow()));
+        Text label = fixed.size() == 1
+                ? new Text(UiText.view(translations, name).toUpperCase(translations.currentLocale()))
+                : null;
         if (label != null) {
             label.setFont(Font.font("SansSerif", FontWeight.SEMI_BOLD, 10));
             labels.getChildren().add(label);

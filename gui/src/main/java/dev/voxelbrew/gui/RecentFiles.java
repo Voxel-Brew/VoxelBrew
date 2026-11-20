@@ -1,7 +1,7 @@
 package dev.voxelbrew.gui;
 
-import dev.voxelbrew.util.config.UserConfiguration;
-import java.io.IOException;
+import dev.voxelbrew.api.userconfig.UserConfigException;
+import dev.voxelbrew.api.userconfig.UserConfigService;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
@@ -15,13 +15,13 @@ import lombok.extern.slf4j.Slf4j;
 final class RecentFiles {
     private static final int LIMIT = 10;
     private static final String PREFIX = "recent.file.";
-    private final UserConfiguration configuration;
+    private final UserConfigService configuration;
     private final List<Path> paths = new ArrayList<>();
 
-    RecentFiles(UserConfiguration configuration) {
+    RecentFiles(UserConfigService configuration) {
         this.configuration = configuration;
         try {
-            var values = configuration.read();
+            var values = configuration.readUserConfig();
             for (int i = 0; i < LIMIT; i++) {
                 String value = values.getOrDefault(PREFIX + i, "");
                 if (value.isBlank()) continue;
@@ -32,7 +32,7 @@ final class RecentFiles {
                     log.warn("Ignoring invalid recent file path", invalid);
                 }
             }
-        } catch (IOException | SecurityException failure) {
+        } catch (UserConfigException | SecurityException failure) {
             log.warn("Cannot load recent files", failure);
         }
     }
@@ -55,7 +55,7 @@ final class RecentFiles {
             values.put(PREFIX + i, i < snapshot.size() ? snapshot.get(i).toString() : "");
         try {
             configuration.update(values, java.util.Set.of());
-        } catch (IOException | SecurityException failure) {
+        } catch (UserConfigException | SecurityException failure) {
             log.warn("Cannot save recent files", failure);
         }
     }

@@ -1,7 +1,10 @@
 package dev.voxelbrew.gui;
 
 import dev.voxelbrew.api.exporter.ExporterProviderRegistry;
+import dev.voxelbrew.api.multithread.MultithreadService;
 import dev.voxelbrew.api.slicer.SlicerProviderRegistry;
+import dev.voxelbrew.util.concurrent.SerialExecutor;
+import dev.voxelbrew.util.services.Services;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -13,15 +16,23 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 final class WindowResources implements AutoCloseable {
     final ExporterProviderRegistry exporters;
+
     final dev.voxelbrew.api.printer.driver.DriverRegistry printers;
+
     final SlicerProviderRegistry slicers;
-    final ExecutorService rebuild, files, slicing, validation, appearance, printer;
+
+    final SerialExecutor rebuild, files, slicing, validation, appearance, printer;
+
     private final CompletableFuture<Void> disposal = new CompletableFuture<>();
+
     private boolean closed;
 
-    static ExecutorService worker(String role) {
-        return Executors.newSingleThreadExecutor(
-                Thread.ofPlatform().daemon().name("voxelbrew-" + role).factory());
+    static ExecutorService commonExecutor() {
+        return Services.load(MultithreadService.class).commonExecutorService();
+    }
+
+    static SerialExecutor worker() {
+        return new SerialExecutor(commonExecutor());
     }
 
     WindowResources(
@@ -65,12 +76,12 @@ final class WindowResources implements AutoCloseable {
             if (failure instanceof RuntimeException runtime) throw runtime;
             throw (Error) failure;
         }
-        rebuild = worker("rebuild");
-        files = worker("file-io");
-        slicing = worker("slicer");
-        validation = worker("print-validation");
-        appearance = worker("appearance");
-        printer = worker("printer");
+        rebuild = worker();
+        files = worker();
+        slicing = worker();
+        validation = worker();
+        appearance = worker();
+        printer = worker();
     }
 
     @Override
@@ -80,22 +91,10 @@ final class WindowResources implements AutoCloseable {
         // Drain captured file writes and cancelled native/slicer work on their owning threads.
         var workers = List.of(rebuild, files, slicing, validation, appearance, printer);
         for (var worker : workers) worker.shutdown();
-        if (workers.stream().allMatch(ExecutorService::isTerminated)) closeLoaders();
-        else
-            Thread.ofVirtual().name("voxelbrew-window-cleanup").start(() -> {
-                boolean interrupted = false;
-                for (var worker : workers) {
-                    while (!worker.isTerminated()) {
-                        try {
-                            worker.awaitTermination(1, TimeUnit.DAYS);
-                        } catch (InterruptedException failure) {
-                            interrupted = true;
-                        }
-                    }
-                }
-                closeLoaders();
-                if (interrupted) Thread.currentThread().interrupt();
-            });
+        CompletableFuture.allOf(workers.stream()
+                        .map(worker -> worker.whenTerminated().toCompletableFuture())
+                        .toArray(CompletableFuture<?>[]::new))
+                .thenRun(this::closeLoaders);
     }
 
     CompletionStage<Void> whenClosed() {

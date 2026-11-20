@@ -49,10 +49,15 @@ public final class DocumentController implements AutoCloseable {
     private final AtomicLong documentGeneration = new AtomicLong();
 
     private Request pending;
+
     private boolean running;
+
     private volatile boolean closed;
+
     private ModelSession session = new ModelSession(newDesktopDocument());
+
     private CadDocument saved = session.document();
+
     private volatile boolean unsavedImport;
 
     @Getter
@@ -60,6 +65,7 @@ public final class DocumentController implements AutoCloseable {
     private Path path;
 
     private Feature.Extrude preview;
+
     private String previewExpression = "";
 
     @Getter
@@ -194,7 +200,7 @@ public final class DocumentController implements AutoCloseable {
         try (var evaluation = Evaluator.evaluate(document, pluginDirectory)) {
             if (!evaluation.valid())
                 return new Build(List.of(), evaluation.diagnostics(), false, evaluation.resolvedFeatures());
-            var bodies = dev.voxelbrew.util.concurrent.CpuWork.map(
+            var bodies = dev.voxelbrew.util.concurrent.ParallelWork.map(
                     evaluation.bodies(),
                     b -> new Body(
                             b.id(),
@@ -251,8 +257,8 @@ public final class DocumentController implements AutoCloseable {
                 dispatch,
                 evaluator,
                 pluginDirectory,
-                WindowResources.worker("rebuild"),
-                WindowResources.worker("file-io"),
+                WindowResources.worker(),
+                WindowResources.worker(),
                 ImportRuntime.load().documents(),
                 dev.voxelbrew.exporter.DocumentWriter::save);
     }
@@ -632,7 +638,8 @@ public final class DocumentController implements AutoCloseable {
         var result = new CompletableFuture<Void>();
         var selectedPath = new java.util.concurrent.atomic.AtomicReference<Path>();
         class TrackingWindow
-                implements dev.voxelbrew.api.exporter.ExportWindow, dev.voxelbrew.util.config.PluginDirectorySource {
+                implements dev.voxelbrew.api.exporter.ExportWindow,
+                        dev.voxelbrew.util.preferences.PluginDirectorySource {
             @Override
             public Path pluginDirectory() {
                 return pluginDirectory;

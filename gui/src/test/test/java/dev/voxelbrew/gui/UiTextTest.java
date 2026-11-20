@@ -2,33 +2,40 @@ package dev.voxelbrew.gui;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.api.model.sketch.*;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.engine.sketch.*;
 import dev.voxelbrew.exporter.ExportSelection;
-import dev.voxelbrew.util.i18n.Translations;
+import dev.voxelbrew.util.i18n.TranslationCatalogs;
 import java.nio.file.*;
 import java.util.*;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class UiTextTest {
-    private static void choices(Translations t, String prefix, Enum<?>[] values) {
+    @TempDir
+    Path directory;
+
+    private static void choices(TranslationService t, String prefix, Enum<?>[] values) {
         for (var value : values)
-            assertThat(t.text(prefix + value.name()).isBlank()).isFalse();
+            assertThat(t.translate(prefix + value.name()).orElseThrow().isBlank())
+                    .isFalse();
     }
 
     @Test
     void aboutMessagesFormatVersionsAndPolishLegalHelpWithoutAWindow() {
-        var en = new Translations(Locale.ENGLISH);
-        var pl = new Translations(Locale.forLanguageTag("pl"));
-        assertThat(en.text("about.version", "1.2.3")).isEqualTo("Version 1.2.3");
-        assertThat(pl.text("about.version", "1.2.3")).isEqualTo("Wersja 1.2.3");
-        assertThat(en.text("about.available", "1.1.0")).isEqualTo("New version available: 1.1.0");
-        assertThat(pl.text("about.available", "1.1.0")).isEqualTo("Dostępna nowa wersja: 1.1.0");
-        assertThat(pl.text("about.updates")).isEqualTo("Otwórz aktualizator…");
-        assertThat(pl.text("help.about-license").contains("licencję")).isTrue();
+        var en = TranslationCatalogs.forLocale(Locale.ENGLISH, directory);
+        var pl = TranslationCatalogs.forLocale(Locale.forLanguageTag("pl"), directory);
+        assertThat(en.translate("about.version", "1.2.3").orElseThrow()).isEqualTo("Version 1.2.3");
+        assertThat(pl.translate("about.version", "1.2.3").orElseThrow()).isEqualTo("Wersja 1.2.3");
+        assertThat(en.translate("about.available", "1.1.0").orElseThrow()).isEqualTo("New version available: 1.1.0");
+        assertThat(pl.translate("about.available", "1.1.0").orElseThrow()).isEqualTo("Dostępna nowa wersja: 1.1.0");
+        assertThat(pl.translate("about.updates").orElseThrow()).isEqualTo("Otwórz aktualizator…");
+        assertThat(pl.translate("help.about-license").orElseThrow().contains("licencję"))
+                .isTrue();
     }
 
     @Test
@@ -49,14 +56,14 @@ class UiTextTest {
     @Test
     void everyGuiMessageAndEnumChoiceExistsInBothCatalogs() throws Exception {
         for (var locale : List.of(Locale.ENGLISH, Locale.forLanguageTag("pl"))) {
-            var t = new Translations(locale);
+            var t = TranslationCatalogs.forLocale(locale, directory);
             try (var sources = Files.list(Path.of("src/main/java/dev/voxelbrew/gui"))) {
                 for (var file :
                         sources.filter(p -> p.toString().endsWith(".java")).toList()) {
-                    var matcher = Pattern.compile("translations\\.text\\(\"([^\"]+)\"\\s*[,)]")
+                    var matcher = Pattern.compile("translations\\s*\\.translate\\(\\s*\"([^\"]+)\"\\s*[,)]")
                             .matcher(Files.readString(file));
                     while (matcher.find())
-                        assertThat(t.text(matcher.group(1)).isBlank())
+                        assertThat(t.translate(matcher.group(1)).orElseThrow().isBlank())
                                 .as(file + ": " + matcher.group(1))
                                 .isFalse();
                 }
@@ -72,17 +79,19 @@ class UiTextTest {
             choices(t, "export.contents.", ExportSelection.Contents.values());
             for (var style : Rendering.Style.values()) {
                 String name = style.name().toLowerCase(Locale.ROOT);
-                assertThat(t.text("rendering." + name).isBlank()).isFalse();
-                assertThat(t.text("help.rendering-" + name).isBlank()).isFalse();
+                assertThat(t.translate("rendering." + name).orElseThrow().isBlank())
+                        .isFalse();
+                assertThat(t.translate("help.rendering-" + name).orElseThrow().isBlank())
+                        .isFalse();
             }
         }
     }
 
     @Test
     void compositeViewNamesTranslateWithoutChangingNavigationIdentifiers() {
-        var pl = new Translations(Locale.forLanguageTag("pl"));
+        var pl = TranslationCatalogs.forLocale(Locale.forLanguageTag("pl"), directory);
         assertThat(UiText.view(pl, "Top Front Right")).isEqualTo("Góra Przód Prawo");
-        assertThat(UiText.view(new Translations(Locale.ENGLISH), "Top Front Right"))
+        assertThat(UiText.view(TranslationCatalogs.forLocale(Locale.ENGLISH, directory), "Top Front Right"))
                 .isEqualTo("Top Front Right");
     }
 
@@ -92,7 +101,7 @@ class UiTextTest {
         try (var sources = Files.list(Path.of("src/main/java/dev/voxelbrew/gui"))) {
             for (var file : sources.filter(p -> p.toString().endsWith(".java")).toList()) {
                 var matcher = Pattern.compile(
-                                "button\\(\\s*(?:translations\\.text\\(\"[^\"]+\"\\)|\"[^\"]*\"),\\s*\"([^\"]+)\"\\s*,")
+                                "button\\(\\s*(?:translations\\s*\\.translate\\(\\s*\"[^\"]+\"\\s*\\)\\s*\\.orElseThrow\\(\\)|\"[^\"]*\"),\\s*\"([^\"]+)\"\\s*,")
                         .matcher(Files.readString(file));
                 while (matcher.find()) ids.add(matcher.group(1));
             }
@@ -110,7 +119,7 @@ class UiTextTest {
                 "timeline-last",
                 "history-cursor"));
         for (var locale : List.of(Locale.ENGLISH, Locale.forLanguageTag("pl"))) {
-            var translations = new Translations(locale);
+            var translations = TranslationCatalogs.forLocale(locale, directory);
             for (var id : ids)
                 assertThat(UiHelp.description(translations, id).isBlank())
                         .as(id)

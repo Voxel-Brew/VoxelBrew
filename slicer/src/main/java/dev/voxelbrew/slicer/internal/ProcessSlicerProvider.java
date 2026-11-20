@@ -1,5 +1,6 @@
 package dev.voxelbrew.slicer.internal;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.mesh.MeshOptions;
 import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.api.model.vui.*;
@@ -8,6 +9,7 @@ import dev.voxelbrew.exporter.*;
 import dev.voxelbrew.exporter.printing.PrusaProjectExporter;
 import dev.voxelbrew.importer.GcodeReader;
 import dev.voxelbrew.slicer.SliceService;
+import dev.voxelbrew.util.services.Services;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
@@ -19,11 +21,14 @@ import lombok.RequiredArgsConstructor;
 public abstract class ProcessSlicerProvider implements SlicerProvider {
     private final Supplier<ProcessSlicer> processes;
 
+    private final TranslationService translations;
+
     @RequiredArgsConstructor
     private static final class SettingsDialog implements SlicerDialog<Map<String, String>> {
         private static final List<String> FIELD_ORDER =
                 List.of("executable", "definition", "machine", "process", "filament", "profile", "settings");
         private final ProcessSlicer process;
+        private final TranslationService translations;
 
         @Override
         public String title() {
@@ -56,7 +61,7 @@ public abstract class ProcessSlicerProvider implements SlicerProvider {
                 if (value.isBlank()
                         && Set.of("definition", "machine", "process", "filament")
                                 .contains(key)) {
-                    errors.put(key, "Enter a path");
+                    errors.put(key, translations.translate("slicer.config.path").orElseThrow());
                 } else if (!value.isBlank()) {
                     try {
                         Path.of(value);
@@ -179,6 +184,10 @@ public abstract class ProcessSlicerProvider implements SlicerProvider {
         return executable.getParent() != null || Files.exists(executable) ? executable.toAbsolutePath() : executable;
     }
 
+    protected ProcessSlicerProvider(Supplier<ProcessSlicer> processes) {
+        this(processes, Services.load(TranslationService.class));
+    }
+
     @Override
     public final SlicerDescriptor descriptor() {
         var descriptor = processes.get().descriptor();
@@ -188,7 +197,7 @@ public abstract class ProcessSlicerProvider implements SlicerProvider {
 
     @Override
     public final Optional<SlicerDialog<?>> settingsDialog() {
-        return Optional.of(new SettingsDialog(processes.get()));
+        return Optional.of(new SettingsDialog(processes.get(), translations));
     }
 
     @Override
@@ -196,11 +205,12 @@ public abstract class ProcessSlicerProvider implements SlicerProvider {
             throws IOException, SlicerException {
         cancellation.check();
         var process = processes.get();
-        var settings =
-                window.show(new SettingsDialog(process)).orElseThrow(java.util.concurrent.CancellationException::new);
+        var settings = window.show(new SettingsDialog(process, translations))
+                .orElseThrow(java.util.concurrent.CancellationException::new);
         if (process.configurationOptions().containsKey("executable")
                 && settings.getOrDefault("executable", "").isBlank())
-            throw new SlicerException.Configuration("Choose a slicer executable");
+            throw new SlicerException.Configuration(
+                    translations.translate("slicer.config.executable").orElseThrow());
         var configured = process.configure(settings);
         return configured.probe(command(configured), cancellation).actualVersion();
     }
@@ -216,7 +226,7 @@ public abstract class ProcessSlicerProvider implements SlicerProvider {
                     return Optional.of(run(configured, model, cancellation, diagnostics));
                 }
             }
-            var settings = window.show(new SettingsDialog(process));
+            var settings = window.show(new SettingsDialog(process, translations));
             cancellation.check();
             if (settings.isEmpty()) return Optional.empty();
             return Optional.of(run(process.configure(settings.get()), model, cancellation, diagnostics));

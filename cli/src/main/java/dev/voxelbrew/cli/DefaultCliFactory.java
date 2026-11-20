@@ -1,11 +1,12 @@
 package dev.voxelbrew.cli;
 
+import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.printer.PrinterProfileCatalog;
 import dev.voxelbrew.api.printer.PrinterStore;
 import dev.voxelbrew.api.printer.driver.DriverRegistry;
 import dev.voxelbrew.engine.feature.FeatureRegistry;
 import dev.voxelbrew.util.di.ApplicationModule;
-import dev.voxelbrew.util.i18n.Translations;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.HashMap;
 import java.util.function.Supplier;
 
@@ -13,10 +14,15 @@ import java.util.function.Supplier;
 public final class DefaultCliFactory implements CliComponent.Factory {
     private static final class Scope implements CliComponent {
         private final ApplicationModule application;
+
         private final FileIoModule files;
-        private final Translations translations;
+
+        private final TranslationService translations;
+
         private final CommandFactory commands;
+
         private final PrinterStore printerStore;
+
         private final PrinterProfileCatalog profiles;
 
         Scope(ApplicationModule application, FileIoModule files) {
@@ -24,8 +30,8 @@ public final class DefaultCliFactory implements CliComponent.Factory {
             this.files = files;
             this.printerStore = new dev.voxelbrew.printer.FilePrinterStore(application.configuration());
             this.profiles = new dev.voxelbrew.printer.DefaultPrinterProfileCatalog(
-                    application.paths().profiles());
-            this.translations = new Translations(application.configuration(), application.paths());
+                    application.configuration().profilesFolder());
+            this.translations = application.translations();
             var commands = new HashMap<Class<?>, Supplier<Object>>();
             commands.put(ReportBugCommand.class, () -> reportBugCommand());
             commands.put(PreferenceCommands.class, () -> preferenceCommands());
@@ -103,7 +109,10 @@ public final class DefaultCliFactory implements CliComponent.Factory {
         }
 
         @Override
-        public Translations translations() {
+        @SuppressFBWarnings(
+                value = "EI_EXPOSE_REP",
+                justification = "Commands share the CLI scope's translation service.")
+        public TranslationService translations() {
             return translations;
         }
 

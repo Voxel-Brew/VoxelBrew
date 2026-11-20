@@ -1,4 +1,4 @@
-package dev.voxelbrew.util.config;
+package dev.voxelbrew.util.preferences;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -14,17 +14,26 @@ class ConfigurationProcessTest {
 
     public static final class Writer {
         public static void main(String[] args) throws Exception {
-            var config = new dev.voxelbrew.util.config.FileUserConfiguration(Path.of(args[0]));
-            for (int index = 0; index < 20; index++) config.set(args[1] + "." + index, "value." + index);
+            Path file = Path.of(args[0]);
+            var config = new UserConfigServiceImpl(
+                    file.getParent(), file.getFileName().toString());
+            for (int index = 0; index < 20; index++) config.saveUserConfig(args[1] + "." + index, "value." + index);
         }
     }
 
     @Test
     void independentApplicationsMergeEditsInTheSameConfiguration() throws Exception {
         Path file = directory.resolve("shared settings/config.properties");
-        var config = new dev.voxelbrew.util.config.FileUserConfiguration(file);
-        config.set("unrelated", "preserved");
-        String classpath = Path.of(UserConfiguration.class
+        var config = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(
+                file.getParent(), file.getFileName().toString());
+        config.saveUserConfig("unrelated", "preserved");
+        String classpath = Path.of(UserConfigServiceImpl.class
+                        .getProtectionDomain()
+                        .getCodeSource()
+                        .getLocation()
+                        .toURI())
+                + java.io.File.pathSeparator
+                + Path.of(dev.voxelbrew.api.userconfig.UserConfigService.class
                         .getProtectionDomain()
                         .getCodeSource()
                         .getLocation()
@@ -70,11 +79,12 @@ class ConfigurationProcessTest {
                         .as(Files.readString(directory.resolve("writer-" + index + ".log")))
                         .isEqualTo(0);
             }
-            assertThat(config.read().size()).isEqualTo(81);
-            assertThat(config.get("unrelated", "")).isEqualTo("preserved");
+            assertThat(config.readUserConfig().size()).isEqualTo(81);
+            assertThat(config.readUserConfig("unrelated").orElse("")).isEqualTo("preserved");
             for (int process = 0; process < 4; process++) {
                 for (int index = 0; index < 20; index++)
-                    assertThat(config.get("process." + process + "." + index, ""))
+                    assertThat(config.readUserConfig("process." + process + "." + index)
+                                    .orElse(""))
                             .isEqualTo("value." + index);
             }
         } finally {

@@ -24,7 +24,7 @@ public final class ManufacturingModels {
     public static ManufacturingModel from(CadDocument document, Evaluation evaluation, MeshOptions options) {
         var meshes = new LinkedHashMap<String, MeshData>();
         var bodies = evaluation.requireCompleteDocument();
-        var detached = dev.voxelbrew.util.concurrent.CpuWork.map(
+        var detached = dev.voxelbrew.util.concurrent.ParallelWork.map(
                 bodies, body -> body.solid().tessellate(options));
         for (int i = 0; i < bodies.size(); i++) meshes.put(bodies.get(i).id(), detached.get(i));
         return new ManufacturingModel(

@@ -5,6 +5,7 @@ import dev.voxelbrew.api.model.mesh.MeshOptions;
 import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.api.printer.PrinterProfileCatalog;
 import dev.voxelbrew.api.slicer.SlicerProviderRegistry;
+import dev.voxelbrew.api.userconfig.UserConfigService;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.printing.*;
 import dev.voxelbrew.importer.DocumentSource;
@@ -12,7 +13,6 @@ import dev.voxelbrew.printer.ProfileHardware;
 import dev.voxelbrew.slicer.SliceService;
 import dev.voxelbrew.slicer.SlicerInstallation;
 import dev.voxelbrew.slicer.SlicerInstallationStore;
-import dev.voxelbrew.util.config.UserConfiguration;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
@@ -473,8 +473,8 @@ final class PrintingCommands {
         private final Supplier<SlicerProviderRegistry> slicers;
 
         @Option(names = "--plugin-dir")
-        Path plugins = dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
-                .plugins();
+        Path plugins = dev.voxelbrew.util.services.Services.load(dev.voxelbrew.api.userconfig.UserConfigService.class)
+                .pluginsFolder();
 
         @Spec
         CommandLine.Model.CommandSpec spec;
@@ -496,8 +496,10 @@ final class PrintingCommands {
                     "Slice the complete persisted build setup with its explicit profiles; publish text G-code atomically.")
     static final class Slice extends VoxelBrew.FileCommand {
         private final Supplier<SlicerProviderRegistry> slicers;
+
         private final dev.voxelbrew.api.printer.PrinterStore printerStore;
-        private final UserConfiguration configuration;
+
+        private final UserConfigService configuration;
 
         @Option(names = "--output", description = "Optional output file; directory with --all")
         Path output;
@@ -542,7 +544,7 @@ final class PrintingCommands {
                 DocumentSave documentWriter,
                 Supplier<SlicerProviderRegistry> slicers,
                 dev.voxelbrew.api.printer.PrinterStore printerStore,
-                UserConfiguration configuration) {
+                UserConfigService configuration) {
             super(documents, documentWriter);
             this.slicers = slicers;
             this.printerStore = printerStore;
@@ -604,12 +606,12 @@ final class PrintingCommands {
                 var options = new LinkedHashMap<>(slicerOptions);
                 if (executable != null) options.put("executable", executable.toString());
                 String installationId = SlicerInstallation.selectedId(setup);
+                var store = new SlicerInstallationStore(configuration);
                 dev.voxelbrew.api.slicer.SlicerWindow window;
                 if (installationId.isBlank()) {
-                    window = new CliSlicerWindow(
-                            configuration, provider.descriptor().id(), options);
+                    window = new CliSlicerWindow(store, provider.descriptor().id(), options);
                 } else {
-                    var installation = new SlicerInstallationStore(configuration.path()).require(installationId);
+                    var installation = store.require(installationId);
                     if (!installation.operational()
                             || !installation
                                     .providerId()

@@ -16,8 +16,8 @@ final class ImportCommands {
         private final java.util.function.Supplier<ImporterProviderRegistry> importers;
 
         @Option(names = "--plugin-dir")
-        Path plugins = dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
-                .plugins();
+        Path plugins = dev.voxelbrew.util.services.Services.load(dev.voxelbrew.api.userconfig.UserConfigService.class)
+                .pluginsFolder();
 
         @Spec
         CommandLine.Model.CommandSpec spec;
@@ -54,8 +54,8 @@ final class ImportCommands {
         Map<String, String> options = new LinkedHashMap<>();
 
         @Option(names = "--plugin-dir")
-        Path plugins = dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
-                .plugins();
+        Path plugins = dev.voxelbrew.util.services.Services.load(dev.voxelbrew.api.userconfig.UserConfigService.class)
+                .pluginsFolder();
 
         @Option(names = "--overwrite")
         boolean overwrite;

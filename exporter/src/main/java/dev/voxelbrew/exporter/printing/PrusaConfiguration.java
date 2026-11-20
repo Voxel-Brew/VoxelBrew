@@ -11,8 +11,6 @@ import java.util.stream.Collectors;
 
 /** Pinned, fully resolved base profile plus explicit document-owned overrides. */
 public final class PrusaConfiguration {
-    private PrusaConfiguration() {}
-
     private static String amount(javax.measure.Quantity<?> quantity, javax.measure.Unit<?> unit) {
         return Double.toString(value(quantity, unit));
     }
@@ -85,4 +83,6 @@ public final class PrusaConfiguration {
             out.append(entry.getKey()).append(" = ").append(entry.getValue()).append('\n');
         return out.toString();
     }
+
+    private PrusaConfiguration() {}
 }

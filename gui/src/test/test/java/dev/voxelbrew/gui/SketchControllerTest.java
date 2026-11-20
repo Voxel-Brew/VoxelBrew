@@ -11,6 +11,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class SketchControllerTest {
+    private static void await(SketchController controller, ConcurrentLinkedQueue<Runnable> queue) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (controller.busy() && System.nanoTime() < deadline) {
+            Runnable event;
+            while ((event = queue.poll()) != null) event.run();
+            Thread.sleep(5);
+        }
+        assertThat(controller.busy()).as("Sketch worker completed").isFalse();
+    }
+
     @Test
     void textFormulaDraftsRebuildAndKeepBindingsInUndoHistory() throws Exception {
         var queue = new ConcurrentLinkedQueue<Runnable>();
@@ -42,16 +52,6 @@ class SketchControllerTest {
             await(controller, queue);
             assertThat(controller.parameters().bindings()).isEqualTo(parameters.bindings());
         }
-    }
-
-    private static void await(SketchController controller, ConcurrentLinkedQueue<Runnable> queue) throws Exception {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-        while (controller.busy() && System.nanoTime() < deadline) {
-            Runnable event;
-            while ((event = queue.poll()) != null) event.run();
-            Thread.sleep(5);
-        }
-        assertThat(controller.busy()).as("Sketch worker completed").isFalse();
     }
 
     @Test

@@ -29,6 +29,13 @@ final class AboutDialog {
     private final Button close;
     private boolean closed, openUpdates;
 
+    private static Label label(String text, String id) {
+        var label = new Label(text);
+        label.setId(id);
+        label.setWrapText(true);
+        return label;
+    }
+
     AboutDialog(UpdateServiceFactory factory, Translations translations, Supplier<ExecutorService> workers) {
         this.factory = factory;
         this.translations = translations;
@@ -158,12 +165,5 @@ final class AboutDialog {
         link.setWrapText(true);
         UiHelp.install(link, translations);
         return link;
-    }
-
-    private static Label label(String text, String id) {
-        var label = new Label(text);
-        label.setId(id);
-        label.setWrapText(true);
-        return label;
     }
 }

@@ -49,6 +49,102 @@ import org.junit.jupiter.api.io.TempDir;
 /** Actual JavaFX windows, rendering, picking, keyboard input and mouse gestures on both OSes. */
 @ExtendWith(UiTestShard.class)
 class WorkbenchUiTest {
+    private static Robot robot;
+
+    private static Appearance.Choice originalAppearance;
+
+    @TempDir
+    Path directory;
+
+    private Stage stage;
+
+    private Workbench workbench;
+
+    private UpdateFixture updates;
+
+    private dev.voxelbrew.util.config.UserConfiguration configuration;
+
+    @BeforeAll
+    static void toolkit() throws Exception {
+        originalAppearance = new Appearance().load();
+        var started = new CountDownLatch(1);
+        Launcher.configureGraphics();
+        Platform.startup(() -> {
+            Platform.setImplicitExit(false);
+            started.countDown();
+        });
+        assertThat(started.await(20, TimeUnit.SECONDS)).isTrue();
+        fx(() -> {
+            assertThat(Platform.isSupported(ConditionalFeature.SCENE3D))
+                    .as("Real JavaFX 3D is required; use WSLg or Xvfb/Mesa")
+                    .isTrue();
+            robot = new Robot();
+            return null;
+        });
+    }
+
+    @AfterAll
+    static void shutdown() {
+        new Appearance().save(originalAppearance);
+        Platform.exit();
+    }
+
+    private static <T> T fx(Callable<T> action) throws Exception {
+        if (Platform.isFxApplicationThread()) return action.call();
+        var task = new FutureTask<>(action);
+        Platform.runLater(task);
+        return task.get(20, TimeUnit.SECONDS);
+    }
+
+    private static javafx.scene.shape.MeshView findBodyView(Node node, String id) {
+        if (node instanceof javafx.scene.shape.MeshView mesh && id.equals(mesh.getId())) return mesh;
+        if (node instanceof SubScene scene) return findBodyView(scene.getRoot(), id);
+        if (node instanceof Parent parent) {
+            for (var child : parent.getChildrenUnmodifiable()) {
+                var found = findBodyView(child, id);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    private static MenuItem command(Workbench workbench, String id) {
+        return ((MenuBar) workbench.getScene().lookup("#main-menu"))
+                .getMenus().stream()
+                        .flatMap(WorkbenchUiTest::menuItems)
+                        .filter(item -> id.equals(item.getId()))
+                        .findFirst()
+                        .orElseThrow(() -> new AssertionError("Missing command: " + id));
+    }
+
+    private static java.util.stream.Stream<MenuItem> menuItems(Menu menu) {
+        return menu.getItems().stream()
+                .flatMap(item -> item instanceof Menu child
+                        ? java.util.stream.Stream.concat(java.util.stream.Stream.of(item), menuItems(child))
+                        : java.util.stream.Stream.of(item));
+    }
+
+    private static <T> String selectedText(ComboBox<T> choice) {
+        return choice.getConverter().toString(choice.getValue());
+    }
+
+    private static boolean treeVisible(Node node) {
+        for (Node current = node; current != null; current = current.getParent())
+            if (!current.isVisible()) return false;
+        return true;
+    }
+
+    private static byte[] versionedDocument(DocumentProto.Document document, String version) throws Exception {
+        byte[] payload =
+                document.toBuilder().setApplicationVersion(version).build().toByteArray();
+        return ByteBuffer.allocate(44 + payload.length)
+                .put(new byte[] {'J', 'C', 'A', 'D', 13, 37, 13, 37})
+                .putInt(payload.length)
+                .put(MessageDigest.getInstance("SHA-256").digest(payload))
+                .put(payload)
+                .array();
+    }
+
     @Test
     void readmeLightSketchScreenshots() throws Exception {
         ready();
@@ -3479,41 +3575,6 @@ class WorkbenchUiTest {
         assertThat(document().features().get(2)).isEqualTo(repaired);
     }
 
-    @TempDir
-    Path directory;
-
-    private Stage stage;
-    private Workbench workbench;
-    private static Robot robot;
-    private static Appearance.Choice originalAppearance;
-    private UpdateFixture updates;
-    private dev.voxelbrew.util.config.UserConfiguration configuration;
-
-    @BeforeAll
-    static void toolkit() throws Exception {
-        originalAppearance = new Appearance().load();
-        var started = new CountDownLatch(1);
-        Launcher.configureGraphics();
-        Platform.startup(() -> {
-            Platform.setImplicitExit(false);
-            started.countDown();
-        });
-        assertThat(started.await(20, TimeUnit.SECONDS)).isTrue();
-        fx(() -> {
-            assertThat(Platform.isSupported(ConditionalFeature.SCENE3D))
-                    .as("Real JavaFX 3D is required; use WSLg or Xvfb/Mesa")
-                    .isTrue();
-            robot = new Robot();
-            return null;
-        });
-    }
-
-    @AfterAll
-    static void shutdown() {
-        new Appearance().save(originalAppearance);
-        Platform.exit();
-    }
-
     @BeforeEach
     void window(TestInfo info) throws Exception {
         updates = new UpdateFixture(directory.resolve("update fixture"));
@@ -3593,13 +3654,6 @@ class WorkbenchUiTest {
         } finally {
             if (updates != null) updates.close();
         }
-    }
-
-    private static <T> T fx(Callable<T> action) throws Exception {
-        if (Platform.isFxApplicationThread()) return action.call();
-        var task = new FutureTask<>(action);
-        Platform.runLater(task);
-        return task.get(20, TimeUnit.SECONDS);
     }
 
     @Test
@@ -4099,18 +4153,6 @@ class WorkbenchUiTest {
         assertThat(document().bodyStyle("solid0.body")).isEqualTo(red);
     }
 
-    private static javafx.scene.shape.MeshView findBodyView(Node node, String id) {
-        if (node instanceof javafx.scene.shape.MeshView mesh && id.equals(mesh.getId())) return mesh;
-        if (node instanceof SubScene scene) return findBodyView(scene.getRoot(), id);
-        if (node instanceof Parent parent) {
-            for (var child : parent.getChildrenUnmodifiable()) {
-                var found = findBodyView(child, id);
-                if (found != null) return found;
-            }
-        }
-        return null;
-    }
-
     private void pickBodyColor(javafx.scene.paint.Color color) throws Exception {
         click("body-color");
         fx(() -> {
@@ -4363,15 +4405,6 @@ class WorkbenchUiTest {
         ready();
     }
 
-    private static MenuItem command(Workbench workbench, String id) {
-        return ((MenuBar) workbench.getScene().lookup("#main-menu"))
-                .getMenus().stream()
-                        .flatMap(WorkbenchUiTest::menuItems)
-                        .filter(item -> id.equals(item.getId()))
-                        .findFirst()
-                        .orElseThrow(() -> new AssertionError("Missing command: " + id));
-    }
-
     @Test
     void recentMenuReopensSavedDocument() throws Exception {
         ready();
@@ -4512,13 +4545,6 @@ class WorkbenchUiTest {
         key(KeyCode.ESCAPE);
     }
 
-    private static java.util.stream.Stream<MenuItem> menuItems(Menu menu) {
-        return menu.getItems().stream()
-                .flatMap(item -> item instanceof Menu child
-                        ? java.util.stream.Stream.concat(java.util.stream.Stream.of(item), menuItems(child))
-                        : java.util.stream.Stream.of(item));
-    }
-
     private void assertButtonDescriptions() throws Exception {
         fx(() -> {
             for (var node : stage.getScene().getRoot().lookupAll("*")) {
@@ -4550,10 +4576,6 @@ class WorkbenchUiTest {
         throw new AssertionError("Missing printer control " + selector);
     }
 
-    private static <T> String selectedText(ComboBox<T> choice) {
-        return choice.getConverter().toString(choice.getValue());
-    }
-
     private Node node(String selector) {
         var windows = new ArrayList<>(Window.getWindows());
         Collections.reverse(windows);
@@ -4565,12 +4587,6 @@ class WorkbenchUiTest {
         if (selector.equals("#file-path")) return node("#export-path");
         if (selector.equals("#file-confirm")) return node("#export-confirm");
         throw new AssertionError("Missing control " + selector);
-    }
-
-    private static boolean treeVisible(Node node) {
-        for (Node current = node; current != null; current = current.getParent())
-            if (!current.isVisible()) return false;
-        return true;
     }
 
     private void chooseCurrentProjectWindow() throws Exception {
@@ -7939,17 +7955,6 @@ class WorkbenchUiTest {
         assertThat(document()).isEqualTo(before);
         assertThat(fx(() -> workbench.controller().path())).isEqualTo(file.toAbsolutePath());
         assertThat(fx(() -> workbench.controller().dirty())).isFalse();
-    }
-
-    private static byte[] versionedDocument(DocumentProto.Document document, String version) throws Exception {
-        byte[] payload =
-                document.toBuilder().setApplicationVersion(version).build().toByteArray();
-        return ByteBuffer.allocate(44 + payload.length)
-                .put(new byte[] {'J', 'C', 'A', 'D', 13, 37, 13, 37})
-                .putInt(payload.length)
-                .put(MessageDigest.getInstance("SHA-256").digest(payload))
-                .put(payload)
-                .array();
     }
 
     private String cli(String... arguments) throws Exception {

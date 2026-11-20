@@ -11,6 +11,12 @@ import java.util.*;
 /** Isolated class loader for trusted feature JARs; a broken provider does not disable others. */
 @lombok.extern.slf4j.Slf4j
 public final class FeatureRegistry implements AutoCloseable {
+    private final Map<String, Entry> entries = new LinkedHashMap<>();
+
+    private final List<String> diagnostics = new ArrayList<>();
+
+    private final URLClassLoader loader;
+
     @FunctionalInterface
     public interface Factory {
         FeatureRegistry open(Path directory) throws IOException;
@@ -18,13 +24,28 @@ public final class FeatureRegistry implements AutoCloseable {
 
     private record Entry(FeatureDescriptor descriptor, FeatureProvider provider) {}
 
-    private final Map<String, Entry> entries = new LinkedHashMap<>();
-    private final List<String> diagnostics = new ArrayList<>();
-    private final URLClassLoader loader;
-
     public static Path defaultDirectory() {
         return dev.voxelbrew.util.services.Services.load(dev.voxelbrew.util.config.ApplicationPaths.class)
                 .plugins();
+    }
+
+    private static Map<String, Double> normalize(
+            FeatureDescriptor descriptor, Map<String, Double> values, boolean defaults) {
+        var result = new LinkedHashMap<String, Double>();
+        for (var parameter : descriptor.parameters()) {
+            Double value = values.get(parameter.key());
+            if (value == null && defaults && !values.containsKey(parameter.key())) value = parameter.defaultValue();
+            if (value == null) throw new IllegalArgumentException("Missing parameter " + parameter.key());
+            parameter.validate(value);
+            result.put(parameter.key(), value);
+        }
+        for (var key : values.keySet())
+            if (!result.containsKey(key)) throw new IllegalArgumentException("Unknown parameter " + key);
+        return Collections.unmodifiableMap(result);
+    }
+
+    private static ModelException failure(String id, Throwable failure) {
+        return failure instanceof ModelException model ? model : new ModelException(id, "Feature provider: " + failure);
     }
 
     public FeatureRegistry(Path directory) throws IOException {
@@ -154,25 +175,6 @@ public final class FeatureRegistry implements AutoCloseable {
         } catch (RuntimeException | LinkageError | ServiceConfigurationError | AssertionError failure) {
             throw failure(feature.id(), failure);
         }
-    }
-
-    private static Map<String, Double> normalize(
-            FeatureDescriptor descriptor, Map<String, Double> values, boolean defaults) {
-        var result = new LinkedHashMap<String, Double>();
-        for (var parameter : descriptor.parameters()) {
-            Double value = values.get(parameter.key());
-            if (value == null && defaults && !values.containsKey(parameter.key())) value = parameter.defaultValue();
-            if (value == null) throw new IllegalArgumentException("Missing parameter " + parameter.key());
-            parameter.validate(value);
-            result.put(parameter.key(), value);
-        }
-        for (var key : values.keySet())
-            if (!result.containsKey(key)) throw new IllegalArgumentException("Unknown parameter " + key);
-        return Collections.unmodifiableMap(result);
-    }
-
-    private static ModelException failure(String id, Throwable failure) {
-        return failure instanceof ModelException model ? model : new ModelException(id, "Feature provider: " + failure);
     }
 
     @Override

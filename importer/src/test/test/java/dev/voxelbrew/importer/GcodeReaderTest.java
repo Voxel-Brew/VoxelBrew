@@ -9,6 +9,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class GcodeReaderTest {
+    @TempDir
+    Path directory;
+
     @Test
     void orcaFeatureMarkersAndQuarterCircleRetainExtrusionAndLayer() throws Exception {
         var input =
@@ -27,9 +30,6 @@ class GcodeReaderTest {
         assertThat(job.segments().getLast().x1()).isEqualTo(1);
         assertThat(job.segments().getLast().y1()).isEqualTo(1);
     }
-
-    @TempDir
-    Path directory;
 
     @Test
     void curaRolesSeparateModelFromSupportAndTravel() throws Exception {

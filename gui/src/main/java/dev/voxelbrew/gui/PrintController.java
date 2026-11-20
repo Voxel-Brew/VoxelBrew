@@ -21,47 +21,33 @@ import lombok.experimental.Accessors;
 /** Owner-thread state with cancellable worker execution and revision-guarded publication. */
 @lombok.extern.slf4j.Slf4j
 public final class PrintController implements AutoCloseable {
-    public enum State {
-        IDLE,
-        SLICING,
-        SUCCEEDED,
-        CANCELLED,
-        FAILED,
-        OUTDATED
-    }
-
     private final ExecutorService worker;
+
     private final Consumer<Runnable> dispatch;
     private final Supplier<CadDocument> current;
     private final Path pluginDirectory;
     private final dev.voxelbrew.importer.GcodeSource gcodeReader;
+    private final List<String> diagnostics = new ArrayList<>();
     private Map<String, List<String>> completedGcode = Map.of();
     private Map<String, dev.voxelbrew.api.model.printing.PrintArtifact> completedArtifacts = Map.of();
 
-    Map<String, dev.voxelbrew.api.model.printing.PrintArtifact> completedArtifacts() {
-        return completedArtifacts;
-    }
-
     private String restoredRevision = "";
-    private List<String> restoredLines = List.of();
 
-    public Map<String, List<String>> completedGcode() {
-        return completedGcode;
-    }
+    private List<String> restoredLines = List.of();
 
     @Getter
     @Accessors(fluent = true)
     private State state = State.IDLE;
 
     private Cancellation cancellation;
+
     private String revision = "";
+
     private String installationId = "";
 
     @Getter
     @Accessors(fluent = true)
     private String message = "Ready to slice";
-
-    private final List<String> diagnostics = new ArrayList<>();
 
     @Getter
     @Accessors(fluent = true)
@@ -72,11 +58,21 @@ public final class PrintController implements AutoCloseable {
     private Runnable onChanged = () -> {};
 
     private long generation;
+
     private boolean closed;
 
     @Getter
     @Accessors(fluent = true)
     private boolean running;
+
+    public enum State {
+        IDLE,
+        SLICING,
+        SUCCEEDED,
+        CANCELLED,
+        FAILED,
+        OUTDATED
+    }
 
     public PrintController(Consumer<Runnable> dispatch, Supplier<CadDocument> current) {
         this(dispatch, current, dev.voxelbrew.engine.feature.FeatureRegistry.defaultDirectory());
@@ -102,6 +98,14 @@ public final class PrintController implements AutoCloseable {
         this.pluginDirectory = pluginDirectory;
         this.worker = worker;
         this.gcodeReader = gcodeReader;
+    }
+
+    Map<String, dev.voxelbrew.api.model.printing.PrintArtifact> completedArtifacts() {
+        return completedArtifacts;
+    }
+
+    public Map<String, List<String>> completedGcode() {
+        return completedGcode;
     }
 
     public List<String> diagnostics() {

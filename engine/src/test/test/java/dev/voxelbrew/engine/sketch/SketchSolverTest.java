@@ -8,6 +8,34 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class SketchSolverTest {
+    private static Entity line(String id, double x, double y, double xx, double yy) {
+        return Sketches.entity(id, Kind.LINE, false, x, y, xx, yy);
+    }
+
+    private static Entity circle(String id, double x, double y, double radius) {
+        return Sketches.entity(id, Kind.CIRCLE, false, x, y, radius);
+    }
+
+    private static SketchGeometry geometry(Entity... entities) {
+        return new SketchGeometry(List.of(entities), List.of(), List.of());
+    }
+
+    private static SketchGeometry add(SketchGeometry g, String id, Type type, double value, Ref... refs) {
+        return g.add(SketchConstraints.create(g, id, type, List.of(refs), value));
+    }
+
+    private static SketchGeometry solve(SketchGeometry g) {
+        var result = SketchSolver.solve(g);
+        assertThat(result.solved()).as(result.problems().toString()).isTrue();
+        SketchConstraints.requireSatisfied(result.geometry());
+        return result.geometry();
+    }
+
+    private static void point(Vec actual, double x, double y) {
+        assertThat(actual.x()).isCloseTo(x, org.assertj.core.data.Offset.offset(1e-6));
+        assertThat(actual.y()).isCloseTo(y, org.assertj.core.data.Offset.offset(1e-6));
+    }
+
     @Test
     void mobilityClassifiesIndividualPointsAndLinesInsteadOfOnlyWholeSketchDof() {
         var a = line("a", 10, 10, 30, 10);
@@ -60,34 +88,6 @@ class SketchSolverTest {
                 .isCloseTo(solved.entity("b").at(0).x(), org.assertj.core.data.Offset.offset(1e-6));
         var edited = Sketches.editDimension(solved, "distance", 25);
         assertThat(Math.abs(edited.entity("b").at(0).x())).isCloseTo(25, org.assertj.core.data.Offset.offset(1e-6));
-    }
-
-    private static Entity line(String id, double x, double y, double xx, double yy) {
-        return Sketches.entity(id, Kind.LINE, false, x, y, xx, yy);
-    }
-
-    private static Entity circle(String id, double x, double y, double radius) {
-        return Sketches.entity(id, Kind.CIRCLE, false, x, y, radius);
-    }
-
-    private static SketchGeometry geometry(Entity... entities) {
-        return new SketchGeometry(List.of(entities), List.of(), List.of());
-    }
-
-    private static SketchGeometry add(SketchGeometry g, String id, Type type, double value, Ref... refs) {
-        return g.add(SketchConstraints.create(g, id, type, List.of(refs), value));
-    }
-
-    private static SketchGeometry solve(SketchGeometry g) {
-        var result = SketchSolver.solve(g);
-        assertThat(result.solved()).as(result.problems().toString()).isTrue();
-        SketchConstraints.requireSatisfied(result.geometry());
-        return result.geometry();
-    }
-
-    private static void point(Vec actual, double x, double y) {
-        assertThat(actual.x()).isCloseTo(x, org.assertj.core.data.Offset.offset(1e-6));
-        assertThat(actual.y()).isCloseTo(y, org.assertj.core.data.Offset.offset(1e-6));
     }
 
     @Test

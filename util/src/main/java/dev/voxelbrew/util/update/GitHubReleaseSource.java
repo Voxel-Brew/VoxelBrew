@@ -25,6 +25,139 @@ public final class GitHubReleaseSource implements ReleaseSource {
     private final URI releases, downloads;
     private final Duration metadataTimeout, downloadTimeout;
 
+    private record RejectedBody<T>(IOException failure) implements HttpResponse.BodySubscriber<T> {
+        @Override
+        public CompletionStage<T> getBody() {
+            return CompletableFuture.failedFuture(failure);
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+            subscription.cancel();
+        }
+
+        @Override
+        public void onNext(List<ByteBuffer> buffers) {}
+
+        @Override
+        public void onError(Throwable throwable) {}
+
+        @Override
+        public void onComplete() {}
+    }
+
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+    private static final class LimitedBody<T> implements HttpResponse.BodySubscriber<T> {
+        private final HttpResponse.BodySubscriber<T> delegate;
+        private final long limit;
+        private Flow.Subscription subscription;
+        private long received;
+        private boolean failed;
+
+        @Override
+        public CompletionStage<T> getBody() {
+            return delegate.getBody();
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+            this.subscription = subscription;
+            delegate.onSubscribe(subscription);
+        }
+
+        @Override
+        public void onNext(List<ByteBuffer> buffers) {
+            if (failed) return;
+            for (var buffer : buffers) received += buffer.remaining();
+            if (received > limit) {
+                failed = true;
+                subscription.cancel();
+                delegate.onError(new IOException("GitHub response exceeds size limit"));
+            } else delegate.onNext(buffers);
+        }
+
+        @Override
+        public void onError(Throwable throwable) {
+            if (!failed) delegate.onError(throwable);
+        }
+
+        @Override
+        public void onComplete() {
+            if (!failed) delegate.onComplete();
+        }
+    }
+
+    static Release parse(String output, ReleaseVersion requested) throws IOException {
+        try (var reader = new JsonReader(new StringReader(output))) {
+            reader.setStrictness(Strictness.STRICT);
+            var root = JsonParser.parseReader(reader).getAsJsonObject();
+            if (reader.peek() != JsonToken.END_DOCUMENT) throw new IOException("Invalid GitHub release metadata");
+            if (booleanField(root, "draft") || booleanField(root, "prerelease"))
+                throw new IOException("Only published stable releases can be installed");
+            String tag = stringField(root, "tag_name");
+            var version = ReleaseVersion.release(tag);
+            if (!tag.equals("v" + version) || requested != null && !version.equals(requested))
+                throw new IOException("GitHub returned a different release tag");
+            var assets = new HashSet<String>();
+            for (var entry : root.getAsJsonArray("assets")) {
+                String asset = stringField(entry.getAsJsonObject(), "name");
+                if (!asset.matches("[A-Za-z0-9._-]+") || !assets.add(asset))
+                    throw new IOException("Invalid or duplicate release asset");
+            }
+            return new Release(version, assets);
+        } catch (RuntimeException failure) {
+            throw new IOException("Invalid GitHub release metadata", failure);
+        }
+    }
+
+    private static String stringField(JsonObject object, String name) throws IOException {
+        var value = object.get(name);
+        if (value == null
+                || !value.isJsonPrimitive()
+                || !value.getAsJsonPrimitive().isString())
+            throw new IOException("Invalid GitHub release field: " + name);
+        return value.getAsString();
+    }
+
+    private static boolean booleanField(JsonObject object, String name) throws IOException {
+        var value = object.get(name);
+        if (value == null
+                || !value.isJsonPrimitive()
+                || !value.getAsJsonPrimitive().isBoolean())
+            throw new IOException("Invalid GitHub release field: " + name);
+        return value.getAsBoolean();
+    }
+
+    private static IOException responseFailure(HttpResponse.ResponseInfo info, long limit) {
+        int status = info.statusCode();
+        if (status == 404)
+            return new IOException(
+                    "Published VoxelBrew release or asset not found (HTTP 404). Check the selected version or try again after a release is published.");
+        if (status == 429
+                || status == 403
+                        && (info.headers()
+                                        .firstValue("X-RateLimit-Remaining")
+                                        .orElse("")
+                                        .equals("0")
+                                || info.headers().firstValue("Retry-After").isPresent())) {
+            String retry = info.headers()
+                    .firstValue("Retry-After")
+                    .map(s -> " Retry-After: " + s + ".")
+                    .orElse("");
+            return new IOException(
+                    "GitHub's public download rate limit was reached (HTTP " + status + "). Try again later." + retry);
+        }
+        if (status != 200)
+            return new IOException("Public GitHub update request failed (HTTP " + status + "); try again later.");
+        try {
+            if (info.headers().firstValueAsLong("Content-Length").orElse(0) > limit)
+                return new IOException("GitHub response exceeds size limit");
+        } catch (NumberFormatException invalid) {
+            return new IOException("Invalid GitHub response length", invalid);
+        }
+        return null;
+    }
+
     public GitHubReleaseSource() {
         this(System.getProperty(FIXTURE_PROPERTY));
     }
@@ -70,47 +203,6 @@ public final class GitHubReleaseSource implements ReleaseSource {
                 HttpResponse.BodySubscribers::ofByteArray,
                 cancellation);
         return parse(new String(data, StandardCharsets.UTF_8), requested);
-    }
-
-    static Release parse(String output, ReleaseVersion requested) throws IOException {
-        try (var reader = new JsonReader(new StringReader(output))) {
-            reader.setStrictness(Strictness.STRICT);
-            var root = JsonParser.parseReader(reader).getAsJsonObject();
-            if (reader.peek() != JsonToken.END_DOCUMENT) throw new IOException("Invalid GitHub release metadata");
-            if (booleanField(root, "draft") || booleanField(root, "prerelease"))
-                throw new IOException("Only published stable releases can be installed");
-            String tag = stringField(root, "tag_name");
-            var version = ReleaseVersion.release(tag);
-            if (!tag.equals("v" + version) || requested != null && !version.equals(requested))
-                throw new IOException("GitHub returned a different release tag");
-            var assets = new HashSet<String>();
-            for (var entry : root.getAsJsonArray("assets")) {
-                String asset = stringField(entry.getAsJsonObject(), "name");
-                if (!asset.matches("[A-Za-z0-9._-]+") || !assets.add(asset))
-                    throw new IOException("Invalid or duplicate release asset");
-            }
-            return new Release(version, assets);
-        } catch (RuntimeException failure) {
-            throw new IOException("Invalid GitHub release metadata", failure);
-        }
-    }
-
-    private static String stringField(JsonObject object, String name) throws IOException {
-        var value = object.get(name);
-        if (value == null
-                || !value.isJsonPrimitive()
-                || !value.getAsJsonPrimitive().isString())
-            throw new IOException("Invalid GitHub release field: " + name);
-        return value.getAsString();
-    }
-
-    private static boolean booleanField(JsonObject object, String name) throws IOException {
-        var value = object.get(name);
-        if (value == null
-                || !value.isJsonPrimitive()
-                || !value.getAsJsonPrimitive().isBoolean())
-            throw new IOException("Invalid GitHub release field: " + name);
-        return value.getAsBoolean();
     }
 
     @Override
@@ -190,98 +282,6 @@ public final class GitHubReleaseSource implements ReleaseSource {
                 pending.cancel(true);
                 client.shutdownNow();
             }
-        }
-    }
-
-    private static IOException responseFailure(HttpResponse.ResponseInfo info, long limit) {
-        int status = info.statusCode();
-        if (status == 404)
-            return new IOException(
-                    "Published VoxelBrew release or asset not found (HTTP 404). Check the selected version or try again after a release is published.");
-        if (status == 429
-                || status == 403
-                        && (info.headers()
-                                        .firstValue("X-RateLimit-Remaining")
-                                        .orElse("")
-                                        .equals("0")
-                                || info.headers().firstValue("Retry-After").isPresent())) {
-            String retry = info.headers()
-                    .firstValue("Retry-After")
-                    .map(s -> " Retry-After: " + s + ".")
-                    .orElse("");
-            return new IOException(
-                    "GitHub's public download rate limit was reached (HTTP " + status + "). Try again later." + retry);
-        }
-        if (status != 200)
-            return new IOException("Public GitHub update request failed (HTTP " + status + "); try again later.");
-        try {
-            if (info.headers().firstValueAsLong("Content-Length").orElse(0) > limit)
-                return new IOException("GitHub response exceeds size limit");
-        } catch (NumberFormatException invalid) {
-            return new IOException("Invalid GitHub response length", invalid);
-        }
-        return null;
-    }
-
-    private record RejectedBody<T>(IOException failure) implements HttpResponse.BodySubscriber<T> {
-        @Override
-        public CompletionStage<T> getBody() {
-            return CompletableFuture.failedFuture(failure);
-        }
-
-        @Override
-        public void onSubscribe(Flow.Subscription subscription) {
-            subscription.cancel();
-        }
-
-        @Override
-        public void onNext(List<ByteBuffer> buffers) {}
-
-        @Override
-        public void onError(Throwable throwable) {}
-
-        @Override
-        public void onComplete() {}
-    }
-
-    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-    private static final class LimitedBody<T> implements HttpResponse.BodySubscriber<T> {
-        private final HttpResponse.BodySubscriber<T> delegate;
-        private final long limit;
-        private Flow.Subscription subscription;
-        private long received;
-        private boolean failed;
-
-        @Override
-        public CompletionStage<T> getBody() {
-            return delegate.getBody();
-        }
-
-        @Override
-        public void onSubscribe(Flow.Subscription subscription) {
-            this.subscription = subscription;
-            delegate.onSubscribe(subscription);
-        }
-
-        @Override
-        public void onNext(List<ByteBuffer> buffers) {
-            if (failed) return;
-            for (var buffer : buffers) received += buffer.remaining();
-            if (received > limit) {
-                failed = true;
-                subscription.cancel();
-                delegate.onError(new IOException("GitHub response exceeds size limit"));
-            } else delegate.onNext(buffers);
-        }
-
-        @Override
-        public void onError(Throwable throwable) {
-            if (!failed) delegate.onError(throwable);
-        }
-
-        @Override
-        public void onComplete() {
-            if (!failed) delegate.onComplete();
         }
     }
 }

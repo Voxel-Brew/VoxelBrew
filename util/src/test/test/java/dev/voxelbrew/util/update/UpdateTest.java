@@ -13,11 +13,34 @@ import org.junit.jupiter.api.io.TempDir;
 
 @SuppressWarnings("deprecation")
 class UpdateTest {
+    private final UpdateCancellation cancellation = new UpdateCancellation();
+
+    private final ReleaseVersion current = ReleaseVersion.release("1.2.3");
+
     @TempDir
     Path directory;
 
-    private final UpdateCancellation cancellation = new UpdateCancellation();
-    private final ReleaseVersion current = ReleaseVersion.release("1.2.3");
+    private static String metadata(String tag, String draft, String prerelease, String... assets) {
+        return "{\"tag_name\":\""
+                + tag
+                + "\",\"draft\":"
+                + draft
+                + ",\"prerelease\":"
+                + prerelease
+                + ",\"assets\":["
+                + Arrays.stream(assets)
+                        .map(name -> "{\"name\":\"" + name + "\"}")
+                        .collect(java.util.stream.Collectors.joining(","))
+                + "]}";
+    }
+
+    private static void jar(Path path, String entry, String content) throws IOException {
+        try (var jar = new JarOutputStream(Files.newOutputStream(path))) {
+            jar.putNextEntry(new JarEntry(entry));
+            jar.write(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            jar.closeEntry();
+        }
+    }
 
     @Test
     void declaredFileIoModulesMustExistAndMatchTheInstallationVersion() throws Exception {
@@ -235,20 +258,6 @@ class UpdateTest {
                         cancellation);
     }
 
-    private static String metadata(String tag, String draft, String prerelease, String... assets) {
-        return "{\"tag_name\":\""
-                + tag
-                + "\",\"draft\":"
-                + draft
-                + ",\"prerelease\":"
-                + prerelease
-                + ",\"assets\":["
-                + Arrays.stream(assets)
-                        .map(name -> "{\"name\":\"" + name + "\"}")
-                        .collect(java.util.stream.Collectors.joining(","))
-                + "]}";
-    }
-
     @Test
     void cancelledStageCleanupHandlesReadOnlyFilesAndRejectsOtherDirectories() throws Exception {
         Path stage = Files.createTempDirectory(directory, ".VoxelBrew-update-");
@@ -322,13 +331,5 @@ class UpdateTest {
         jar(image.appDirectory().resolve("engine.jar"), "voxelbrew-engine-version.properties", "version=" + version);
         jar(image.appDirectory().resolve("cli.jar"), "dev/voxelbrew/cli/VoxelBrew.class", "class");
         return ApplicationImage.open(root, ApplicationImage.Component.CLI, "linux-x64");
-    }
-
-    private static void jar(Path path, String entry, String content) throws IOException {
-        try (var jar = new JarOutputStream(Files.newOutputStream(path))) {
-            jar.putNextEntry(new JarEntry(entry));
-            jar.write(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            jar.closeEntry();
-        }
     }
 }

@@ -51,6 +51,22 @@ public interface ProcessSlicer {
         }
     }
 
+    /** Private input serialization used by this process. */
+    record InputFormat(String exporterId, String extension, Map<String, String> options) {
+        public InputFormat(String exporterId, String extension) {
+            this(exporterId, extension, Map.of());
+        }
+
+        public InputFormat {
+            options = Map.copyOf(options);
+            if (exporterId == null
+                    || !exporterId.matches("[a-z0-9][a-z0-9.-]*")
+                    || extension == null
+                    || !extension.matches("[a-zA-Z0-9]+"))
+                throw new IllegalArgumentException("Invalid slicer input format");
+        }
+    }
+
     Descriptor descriptor();
 
     /** Provider-owned option names and defaults; hosts can render these like file-I/O options. */
@@ -68,22 +84,6 @@ public interface ProcessSlicer {
     default Path executable() {
         throw new IllegalStateException(
                 "Configure an executable for " + descriptor().id());
-    }
-
-    /** Private input serialization used by this process. */
-    record InputFormat(String exporterId, String extension, Map<String, String> options) {
-        public InputFormat(String exporterId, String extension) {
-            this(exporterId, extension, Map.of());
-        }
-
-        public InputFormat {
-            options = Map.copyOf(options);
-            if (exporterId == null
-                    || !exporterId.matches("[a-z0-9][a-z0-9.-]*")
-                    || extension == null
-                    || !extension.matches("[a-zA-Z0-9]+"))
-                throw new IllegalArgumentException("Invalid slicer input format");
-        }
     }
 
     default InputFormat inputFormat() {

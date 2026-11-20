@@ -26,9 +26,8 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 class ServiceLoaderDriverRegistry implements DriverRegistry {
-    private record Jar(Path path, long size, FileTime modified) {}
-
     private final ClassLoader parent;
+
     private final List<Driver> supplied;
     private final List<Driver> classpath = new ArrayList<>();
     private final Map<String, Driver> entries = new LinkedHashMap<>();
@@ -36,6 +35,8 @@ class ServiceLoaderDriverRegistry implements DriverRegistry {
     private List<Jar> loadedJars;
     private Path directory;
     private boolean closed;
+
+    private record Jar(Path path, long size, FileTime modified) {}
 
     /** Discovers classpath drivers using this API's class loader; no plugin directory is scanned. */
     ServiceLoaderDriverRegistry() {

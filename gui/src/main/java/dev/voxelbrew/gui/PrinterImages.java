@@ -10,8 +10,6 @@ import javax.imageio.stream.MemoryCacheImageInputStream;
 
 /** Decodes custom WebP thumbnails without requiring native codecs or JavaFX Swing. */
 final class PrinterImages {
-    private PrinterImages() {}
-
     static Image load(String location) {
         try {
             if (!location.toLowerCase(Locale.ROOT).endsWith(".webp")) {
@@ -48,4 +46,6 @@ final class PrinterImages {
             return null;
         }
     }
+
+    private PrinterImages() {}
 }

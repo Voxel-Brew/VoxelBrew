@@ -19,6 +19,36 @@ import javafx.stage.Screen;
 
 /** Window-owned command popup. Actions share the controls' validation and availability. */
 final class QuickMenu implements AutoCloseable {
+    private final Node surface;
+
+    private final Parent theme;
+
+    private final Translations text;
+    private final Supplier<Content> content;
+    private final Supplier<List<Action>> workspaces;
+    private final BiConsumer<Double, Double> pan;
+    private final Predicate<Node> accepts;
+    private final MiddleGesture gesture = new MiddleGesture();
+    private final Popup popup = new Popup();
+    private final List<ButtonBase> buttons = new ArrayList<>();
+    private final List<MenuItem> menuItems = new ArrayList<>();
+    private final EventHandler<MouseEvent> mouse = this::mouse;
+    private final javafx.beans.value.ChangeListener<Boolean> focusChanged = (o, a, focused) -> {
+        if (!focused)
+            javafx.application.Platform.runLater(() -> {
+                if (this.owner != null && !this.owner.isFocused() && !popup.isFocused()) hide();
+            });
+    };
+    private final javafx.beans.value.ChangeListener<javafx.stage.Window> windowChanged = (o, a, b) -> observeWindow(b);
+    private final javafx.beans.value.ChangeListener<javafx.scene.Scene> sceneChanged = (o, a, b) -> {
+        hide();
+        if (a != null) a.windowProperty().removeListener(windowChanged);
+        if (b != null) b.windowProperty().addListener(windowChanged);
+        observeWindow(b == null ? null : b.getWindow());
+    };
+    private javafx.stage.Window owner;
+    private boolean active;
+
     record Action(
             String id,
             String label,
@@ -41,33 +71,48 @@ final class QuickMenu implements AutoCloseable {
 
     record Content(List<Action> radial, List<Action> additional) {}
 
-    private final Node surface;
-    private final Parent theme;
-    private final Translations text;
-    private final Supplier<Content> content;
-    private final Supplier<List<Action>> workspaces;
-    private final BiConsumer<Double, Double> pan;
-    private final Predicate<Node> accepts;
-    private final MiddleGesture gesture = new MiddleGesture();
-    private final Popup popup = new Popup();
-    private final List<ButtonBase> buttons = new ArrayList<>();
-    private final List<MenuItem> menuItems = new ArrayList<>();
-    private final EventHandler<MouseEvent> mouse = this::mouse;
-    private javafx.stage.Window owner;
-    private final javafx.beans.value.ChangeListener<Boolean> focusChanged = (o, a, focused) -> {
-        if (!focused)
-            javafx.application.Platform.runLater(() -> {
-                if (owner != null && !owner.isFocused() && !popup.isFocused()) hide();
-            });
-    };
-    private final javafx.beans.value.ChangeListener<javafx.stage.Window> windowChanged = (o, a, b) -> observeWindow(b);
-    private final javafx.beans.value.ChangeListener<javafx.scene.Scene> sceneChanged = (o, a, b) -> {
-        hide();
-        if (a != null) a.windowProperty().removeListener(windowChanged);
-        if (b != null) b.windowProperty().addListener(windowChanged);
-        observeWindow(b == null ? null : b.getWindow());
-    };
-    private boolean active;
+    static List<Action> controls(Parent root, String... ids) {
+        return controls(id -> (ButtonBase) root.lookup("#" + id), ids);
+    }
+
+    static List<Action> controls(Function<String, ? extends ButtonBase> commands, String... ids) {
+        var result = new ArrayList<Action>();
+        for (String id : ids) {
+            var button = commands.apply(id);
+            if (button != null) result.add(Action.button(button, icon(id)));
+            else throw new IllegalStateException("Missing quick-menu command: " + id);
+        }
+        return result;
+    }
+
+    static List<Action> sketchWorkspaces(Translations text) {
+        var disabled = new javafx.beans.property.SimpleBooleanProperty(true);
+        return List.of(
+                new Action(
+                        "workspace-design",
+                        text.text("tab.Designer"),
+                        "▣",
+                        disabled,
+                        new javafx.beans.property.SimpleBooleanProperty(true),
+                        () -> {}),
+                new Action("workspace-print", text.text("tab.Slicer"), "▣", disabled, null, () -> {}),
+                new Action("workspace-printer", text.text("tab.Printer"), "▣", disabled, null, () -> {}));
+    }
+
+    private static String icon(String id) {
+        if (id.contains("undo")) return "↶";
+        if (id.contains("redo")) return "↷";
+        if (id.contains("cancel") || id.contains("remove")) return "×";
+        if (id.contains("finish") || id.contains("commit")) return "✓";
+        if (id.contains("fit")) return "⛶";
+        if (id.contains("circle")) return "○";
+        if (id.contains("rectangle")) return "▭";
+        if (id.contains("slice")) return "▤";
+        if (id.contains("sketch")) return "✎";
+        if (id.contains("pause")) return "Ⅱ";
+        if (id.contains("print") || id.contains("resume")) return "▷";
+        return "◇";
+    }
 
     QuickMenu(
             Node surface,
@@ -114,49 +159,6 @@ final class QuickMenu implements AutoCloseable {
         if (owner != null) owner.focusedProperty().removeListener(focusChanged);
         owner = next;
         if (owner != null) owner.focusedProperty().addListener(focusChanged);
-    }
-
-    static List<Action> controls(Parent root, String... ids) {
-        return controls(id -> (ButtonBase) root.lookup("#" + id), ids);
-    }
-
-    static List<Action> controls(Function<String, ? extends ButtonBase> commands, String... ids) {
-        var result = new ArrayList<Action>();
-        for (String id : ids) {
-            var button = commands.apply(id);
-            if (button != null) result.add(Action.button(button, icon(id)));
-            else throw new IllegalStateException("Missing quick-menu command: " + id);
-        }
-        return result;
-    }
-
-    static List<Action> sketchWorkspaces(Translations text) {
-        var disabled = new javafx.beans.property.SimpleBooleanProperty(true);
-        return List.of(
-                new Action(
-                        "workspace-design",
-                        text.text("tab.Designer"),
-                        "▣",
-                        disabled,
-                        new javafx.beans.property.SimpleBooleanProperty(true),
-                        () -> {}),
-                new Action("workspace-print", text.text("tab.Slicer"), "▣", disabled, null, () -> {}),
-                new Action("workspace-printer", text.text("tab.Printer"), "▣", disabled, null, () -> {}));
-    }
-
-    private static String icon(String id) {
-        if (id.contains("undo")) return "↶";
-        if (id.contains("redo")) return "↷";
-        if (id.contains("cancel") || id.contains("remove")) return "×";
-        if (id.contains("finish") || id.contains("commit")) return "✓";
-        if (id.contains("fit")) return "⛶";
-        if (id.contains("circle")) return "○";
-        if (id.contains("rectangle")) return "▭";
-        if (id.contains("slice")) return "▤";
-        if (id.contains("sketch")) return "✎";
-        if (id.contains("pause")) return "Ⅱ";
-        if (id.contains("print") || id.contains("resume")) return "▷";
-        return "◇";
     }
 
     private void mouse(MouseEvent event) {

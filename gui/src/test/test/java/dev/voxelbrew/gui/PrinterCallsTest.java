@@ -12,6 +12,51 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class PrinterCallsTest {
+    private static final class Fixture implements Driver {
+        final CountDownLatch monitoringEntered = new CountDownLatch(1);
+        final CountDownLatch releaseMonitoring = new CountDownLatch(1);
+        final CountDownLatch submissionEntered = new CountDownLatch(1);
+        final AtomicInteger active = new AtomicInteger(), maximum = new AtomicInteger();
+        final AtomicInteger reads = new AtomicInteger(), prints = new AtomicInteger();
+
+        @Override
+        public String id() {
+            return "fixture";
+        }
+
+        @Override
+        public String name() {
+            return "Fixture";
+        }
+
+        @Override
+        public DriverGui gui() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public DriverStatus readPrinterStatus(DriverConfiguration configuration) throws Exception {
+            reads.incrementAndGet();
+            maximum.accumulateAndGet(active.incrementAndGet(), Math::max);
+            monitoringEntered.countDown();
+            try {
+                if (!releaseMonitoring.await(5, TimeUnit.SECONDS)) throw new AssertionError("Monitoring timed out");
+                return DriverStatus.unknown("");
+            } finally {
+                active.decrementAndGet();
+            }
+        }
+
+        @Override
+        public PrintResult print(DriverConfiguration configuration, PrintArtifact artifact) {
+            prints.incrementAndGet();
+            maximum.accumulateAndGet(active.incrementAndGet(), Math::max);
+            submissionEntered.countDown();
+            active.decrementAndGet();
+            return PrintResult.Success.SUCCESS;
+        }
+    }
+
     private Printer printer(String id) {
         var hardware = PrintProfile.resolve(PrintSetup.empty()).printer();
         var profile = new Profile(
@@ -94,50 +139,5 @@ class PrinterCallsTest {
         assertThat(driver.reads.get()).isEqualTo(1);
         assertThat(driver.prints.get()).isEqualTo(1);
         assertThat(driver.maximum.get()).isEqualTo(1);
-    }
-
-    private static final class Fixture implements Driver {
-        final CountDownLatch monitoringEntered = new CountDownLatch(1);
-        final CountDownLatch releaseMonitoring = new CountDownLatch(1);
-        final CountDownLatch submissionEntered = new CountDownLatch(1);
-        final AtomicInteger active = new AtomicInteger(), maximum = new AtomicInteger();
-        final AtomicInteger reads = new AtomicInteger(), prints = new AtomicInteger();
-
-        @Override
-        public String id() {
-            return "fixture";
-        }
-
-        @Override
-        public String name() {
-            return "Fixture";
-        }
-
-        @Override
-        public DriverGui gui() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public DriverStatus readPrinterStatus(DriverConfiguration configuration) throws Exception {
-            reads.incrementAndGet();
-            maximum.accumulateAndGet(active.incrementAndGet(), Math::max);
-            monitoringEntered.countDown();
-            try {
-                if (!releaseMonitoring.await(5, TimeUnit.SECONDS)) throw new AssertionError("Monitoring timed out");
-                return DriverStatus.unknown("");
-            } finally {
-                active.decrementAndGet();
-            }
-        }
-
-        @Override
-        public PrintResult print(DriverConfiguration configuration, PrintArtifact artifact) {
-            prints.incrementAndGet();
-            maximum.accumulateAndGet(active.incrementAndGet(), Math::max);
-            submissionEntered.countDown();
-            active.decrementAndGet();
-            return PrintResult.Success.SUCCESS;
-        }
     }
 }

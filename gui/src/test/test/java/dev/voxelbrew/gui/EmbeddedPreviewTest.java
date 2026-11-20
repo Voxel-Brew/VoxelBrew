@@ -16,7 +16,6 @@ class EmbeddedPreviewTest {
     private final Queue<Runnable> work = new ArrayDeque<>(), ui = new ArrayDeque<>();
     private final AtomicReference<CadDocument> current =
             new AtomicReference<>(CadDocument.empty().withGcode(Map.of("plate-1", List.of("G90"))));
-    private boolean failRead;
     private final ExecutorService worker = new AbstractExecutorService() {
         @Override
         public void execute(Runnable task) {
@@ -46,6 +45,7 @@ class EmbeddedPreviewTest {
             return true;
         }
     };
+    private boolean failRead;
 
     private PrintController controller() {
         return new PrintController(ui::add, current::get, Path.of("."), worker, new GcodeSource() {

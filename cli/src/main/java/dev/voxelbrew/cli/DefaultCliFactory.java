@@ -11,13 +11,6 @@ import java.util.function.Supplier;
 
 /** Service-discovered factory; each invocation owns an independent constructor graph. */
 public final class DefaultCliFactory implements CliComponent.Factory {
-    public DefaultCliFactory() {}
-
-    @Override
-    public CliComponent create(ApplicationModule application, FileIoModule files) {
-        return new Scope(application, files);
-    }
-
     private static final class Scope implements CliComponent {
         private final ApplicationModule application;
         private final FileIoModule files;
@@ -25,16 +18,6 @@ public final class DefaultCliFactory implements CliComponent.Factory {
         private final CommandFactory commands;
         private final PrinterStore printerStore;
         private final PrinterProfileCatalog profiles;
-
-        @Override
-        public CommandFactory commands() {
-            return commands;
-        }
-
-        @Override
-        public Translations translations() {
-            return translations;
-        }
 
         Scope(ApplicationModule application, FileIoModule files) {
             this.application = application;
@@ -112,6 +95,16 @@ public final class DefaultCliFactory implements CliComponent.Factory {
             commands.put(UpdateCommands.Update.class, () -> updateCommandsUpdate());
             commands.put(UpdateCommands.Check.class, () -> updateCommandsCheck());
             this.commands = new CommandFactory(commands);
+        }
+
+        @Override
+        public CommandFactory commands() {
+            return commands;
+        }
+
+        @Override
+        public Translations translations() {
+            return translations;
         }
 
         private ReportBugCommand reportBugCommand() {
@@ -390,5 +383,12 @@ public final class DefaultCliFactory implements CliComponent.Factory {
         private UpdateCommands.Check updateCommandsCheck() {
             return new UpdateCommands.Check(application.updates());
         }
+    }
+
+    public DefaultCliFactory() {}
+
+    @Override
+    public CliComponent create(ApplicationModule application, FileIoModule files) {
+        return new Scope(application, files);
     }
 }

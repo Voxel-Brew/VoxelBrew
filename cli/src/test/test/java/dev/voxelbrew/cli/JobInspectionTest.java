@@ -14,8 +14,8 @@ import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
 
 class JobInspectionTest {
-    private String output;
     private final List<String> reads = new ArrayList<>();
+    private String output;
 
     private GcodeJob.Segment segment(double z, GcodeJob.Role role) {
         return new GcodeJob.Segment(0, 0, z, 10, 0, z, 1, .4, .2, role);

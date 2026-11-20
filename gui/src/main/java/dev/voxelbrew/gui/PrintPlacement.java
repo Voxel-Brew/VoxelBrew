@@ -5,8 +5,6 @@ import dev.voxelbrew.api.model.Transform;
 
 /** Screen projection and hit testing for transient plate placement. */
 final class PrintPlacement {
-    private PrintPlacement() {}
-
     static BodyInstance move(BodyInstance source, double dx, double dy, boolean isometric, boolean snap) {
         double x = isometric ? dy + dx / 2 : dx;
         double y = isometric ? dy - dx / 2 : dy;
@@ -54,4 +52,6 @@ final class PrintPlacement {
         double b = ((x[2] - px) * (y[0] - py) - (y[2] - py) * (x[0] - px)) / area;
         return a >= 0 && b >= 0 && a + b <= 1;
     }
+
+    private PrintPlacement() {}
 }

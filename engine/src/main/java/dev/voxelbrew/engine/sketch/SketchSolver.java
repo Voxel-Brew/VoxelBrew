@@ -15,8 +15,6 @@ import org.apache.commons.math3.linear.SingularValueDecomposition;
  * Damped least-squares constraint solver. No native kernel, UI toolkit, or mutable global state.
  */
 public final class SketchSolver {
-    private SketchSolver() {}
-
     public record Problem(String constraintId, String message) {}
 
     public record Result(
@@ -245,4 +243,6 @@ public final class SketchSolver {
         for (double value : values) result += value * value;
         return result;
     }
+
+    private SketchSolver() {}
 }

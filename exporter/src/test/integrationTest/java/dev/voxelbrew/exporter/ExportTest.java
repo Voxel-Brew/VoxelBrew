@@ -44,6 +44,85 @@ class ExportTest {
                 4);
     }
 
+    private static List<double[][]> triangles(MeshData mesh) {
+        var result = new ArrayList<double[][]>();
+        for (int t = 0; t < mesh.triangleCount(); t++) {
+            double[][] points = new double[3][3];
+            for (int c = 0; c < 3; c++)
+                for (int a = 0; a < 3; a++) points[c][a] = mesh.coordinate(mesh.vertexIndex(t, c), a);
+            result.add(points);
+        }
+        return result;
+    }
+
+    /** Reader-side checks deliberately do not call production preflight or geometry exporters. */
+    private static void verifyTriangles(List<double[][]> triangles, double dx, double dy, double dz) {
+        double[] min = {1e99, 1e99, 1e99}, max = {-1e99, -1e99, -1e99};
+        double volume = 0;
+        int holeSegments = 0;
+        Map<String, Integer> directed = new HashMap<>();
+        Map<String, Integer> undirected = new HashMap<>();
+        for (var world : triangles) {
+            double[][] p = new double[3][3];
+            for (int c = 0; c < 3; c++)
+                for (int a = 0; a < 3; a++) {
+                    assertThat(Double.isFinite(world[c][a])).isTrue();
+                    p[c][a] = world[c][a] - new double[] {dx, dy, dz}[a];
+                    min[a] = Math.min(min[a], p[c][a]);
+                    max[a] = Math.max(max[a], p[c][a]);
+                }
+            double[] cross = cross(p);
+            assertThat(dot(cross, cross) > 1e-20).isTrue();
+            volume += dot(p[0], new double[] {
+                        p[1][1] * p[2][2] - p[1][2] * p[2][1],
+                        p[1][2] * p[2][0] - p[1][0] * p[2][2],
+                        p[1][0] * p[2][1] - p[1][1] * p[2][0]
+                    })
+                    / 6;
+            var section = new ArrayList<double[]>();
+            for (int c = 0; c < 3; c++) {
+                var a = p[c];
+                var b = p[(c + 1) % 3];
+                String ka = key(a), kb = key(b);
+                String edge = ka.compareTo(kb) < 0 ? ka + "/" + kb : kb + "/" + ka;
+                undirected.merge(edge, 1, Integer::sum);
+                directed.merge(edge, ka.compareTo(kb) < 0 ? 1 : -1, Integer::sum);
+                if ((a[2] < 4 && b[2] > 4) || (a[2] > 4 && b[2] < 4)) {
+                    double f = (4 - a[2]) / (b[2] - a[2]);
+                    section.add(new double[] {a[0] + f * (b[0] - a[0]), a[1] + f * (b[1] - a[1])});
+                }
+            }
+            if (section.size() == 2 && section.stream().allMatch(q -> Math.hypot(q[0] - 10, q[1] - 10) < 3)) {
+                holeSegments++;
+                for (double fraction : new double[] {0, 0.5, 1}) {
+                    double x = section.get(0)[0] * (1 - fraction) + section.get(1)[0] * fraction,
+                            y = section.get(0)[1] * (1 - fraction) + section.get(1)[1] * fraction;
+                    assertThat(Math.hypot(x - 10, y - 10)).isCloseTo(2, org.assertj.core.data.Offset.offset(0.021));
+                }
+            }
+        }
+        assertThat(min).usingComparatorWithPrecision(0.001).containsExactly(new double[] {0, 0, 0});
+        assertThat(max).usingComparatorWithPrecision(0.001).containsExactly(new double[] {60, 40, 8});
+        assertThat(volume).isCloseTo(19099.469035085127, org.assertj.core.data.Offset.offset(0.5));
+        assertThat(holeSegments >= 16).isTrue();
+        assertThat(undirected.values().stream().allMatch(n -> n == 2)).isTrue();
+        assertThat(directed.values().stream().allMatch(n -> n == 0)).isTrue();
+    }
+
+    private static String key(double[] p) {
+        return Math.round(p[0] * 1e6) + "," + Math.round(p[1] * 1e6) + "," + Math.round(p[2] * 1e6);
+    }
+
+    private static double[] cross(double[][] p) {
+        double[] a = {p[1][0] - p[0][0], p[1][1] - p[0][1], p[1][2] - p[0][2]},
+                b = {p[2][0] - p[0][0], p[2][1] - p[0][1], p[2][2] - p[0][2]};
+        return new double[] {a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]};
+    }
+
+    private static double dot(double[] a, double[] b) {
+        return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    }
+
     @Test
     void tessellationIsDetachedClosedAndDoesNotModifySource() {
         MeshData detached;
@@ -227,84 +306,5 @@ class ExportTest {
                 "bad", List.of(new Feature.Extrude("bad", new Feature.ProfileRef("missing", "p"), 8)), 1))) {
             assertThatThrownBy(() -> ModelViews.from(evaluation)).isInstanceOf(IllegalStateException.class);
         }
-    }
-
-    private static List<double[][]> triangles(MeshData mesh) {
-        var result = new ArrayList<double[][]>();
-        for (int t = 0; t < mesh.triangleCount(); t++) {
-            double[][] points = new double[3][3];
-            for (int c = 0; c < 3; c++)
-                for (int a = 0; a < 3; a++) points[c][a] = mesh.coordinate(mesh.vertexIndex(t, c), a);
-            result.add(points);
-        }
-        return result;
-    }
-
-    /** Reader-side checks deliberately do not call production preflight or geometry exporters. */
-    private static void verifyTriangles(List<double[][]> triangles, double dx, double dy, double dz) {
-        double[] min = {1e99, 1e99, 1e99}, max = {-1e99, -1e99, -1e99};
-        double volume = 0;
-        int holeSegments = 0;
-        Map<String, Integer> directed = new HashMap<>();
-        Map<String, Integer> undirected = new HashMap<>();
-        for (var world : triangles) {
-            double[][] p = new double[3][3];
-            for (int c = 0; c < 3; c++)
-                for (int a = 0; a < 3; a++) {
-                    assertThat(Double.isFinite(world[c][a])).isTrue();
-                    p[c][a] = world[c][a] - new double[] {dx, dy, dz}[a];
-                    min[a] = Math.min(min[a], p[c][a]);
-                    max[a] = Math.max(max[a], p[c][a]);
-                }
-            double[] cross = cross(p);
-            assertThat(dot(cross, cross) > 1e-20).isTrue();
-            volume += dot(p[0], new double[] {
-                        p[1][1] * p[2][2] - p[1][2] * p[2][1],
-                        p[1][2] * p[2][0] - p[1][0] * p[2][2],
-                        p[1][0] * p[2][1] - p[1][1] * p[2][0]
-                    })
-                    / 6;
-            var section = new ArrayList<double[]>();
-            for (int c = 0; c < 3; c++) {
-                var a = p[c];
-                var b = p[(c + 1) % 3];
-                String ka = key(a), kb = key(b);
-                String edge = ka.compareTo(kb) < 0 ? ka + "/" + kb : kb + "/" + ka;
-                undirected.merge(edge, 1, Integer::sum);
-                directed.merge(edge, ka.compareTo(kb) < 0 ? 1 : -1, Integer::sum);
-                if ((a[2] < 4 && b[2] > 4) || (a[2] > 4 && b[2] < 4)) {
-                    double f = (4 - a[2]) / (b[2] - a[2]);
-                    section.add(new double[] {a[0] + f * (b[0] - a[0]), a[1] + f * (b[1] - a[1])});
-                }
-            }
-            if (section.size() == 2 && section.stream().allMatch(q -> Math.hypot(q[0] - 10, q[1] - 10) < 3)) {
-                holeSegments++;
-                for (double fraction : new double[] {0, 0.5, 1}) {
-                    double x = section.get(0)[0] * (1 - fraction) + section.get(1)[0] * fraction,
-                            y = section.get(0)[1] * (1 - fraction) + section.get(1)[1] * fraction;
-                    assertThat(Math.hypot(x - 10, y - 10)).isCloseTo(2, org.assertj.core.data.Offset.offset(0.021));
-                }
-            }
-        }
-        assertThat(min).usingComparatorWithPrecision(0.001).containsExactly(new double[] {0, 0, 0});
-        assertThat(max).usingComparatorWithPrecision(0.001).containsExactly(new double[] {60, 40, 8});
-        assertThat(volume).isCloseTo(19099.469035085127, org.assertj.core.data.Offset.offset(0.5));
-        assertThat(holeSegments >= 16).isTrue();
-        assertThat(undirected.values().stream().allMatch(n -> n == 2)).isTrue();
-        assertThat(directed.values().stream().allMatch(n -> n == 0)).isTrue();
-    }
-
-    private static String key(double[] p) {
-        return Math.round(p[0] * 1e6) + "," + Math.round(p[1] * 1e6) + "," + Math.round(p[2] * 1e6);
-    }
-
-    private static double[] cross(double[][] p) {
-        double[] a = {p[1][0] - p[0][0], p[1][1] - p[0][1], p[1][2] - p[0][2]},
-                b = {p[2][0] - p[0][0], p[2][1] - p[0][1], p[2][2] - p[0][2]};
-        return new double[] {a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]};
-    }
-
-    private static double dot(double[] a, double[] b) {
-        return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
     }
 }

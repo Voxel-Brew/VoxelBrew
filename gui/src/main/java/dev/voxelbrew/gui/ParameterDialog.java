@@ -14,7 +14,6 @@ import javafx.stage.Window;
  * One cancellable parameter/configuration transaction, usable from the workbench or sketch draft.
  */
 final class ParameterDialog {
-    private ParameterSet draft;
     private final dev.voxelbrew.util.i18n.Translations translations;
     private final List<Feature> features;
     private final TableView<ParameterSet.Parameter> parameters = new TableView<>();
@@ -30,6 +29,7 @@ final class ParameterDialog {
     private final ComboBox<ParameterUnit> unit = new ComboBox<>();
     private final ComboBox<ParameterSet.Parameter> overrideParameter = new ComboBox<>();
     private final Label error = new Label(), active = new Label();
+    private ParameterSet draft;
     private boolean refreshing;
     private String selectedParameter;
 
@@ -57,6 +57,29 @@ final class ParameterDialog {
         return Dialogs.show(dialog, owner, translations);
     }
 
+    private static TextField textField(String id) {
+        var field = new TextField();
+        field.setId(id);
+        return field;
+    }
+
+    private static <T> TableColumn<T, String> column(String title, double width, Function<T, String> value) {
+        var c = new TableColumn<T, String>(title);
+        c.setPrefWidth(width);
+        c.setCellValueFactory(v -> new ReadOnlyStringWrapper(value.apply(v.getValue())));
+        return c;
+    }
+
+    static List<ParameterSet.Parameter> groupedParameters(ParameterSet set) {
+        return set.allParameters().stream()
+                .sorted(Comparator.comparing((ParameterSet.Parameter p) -> {
+                            int dot = p.name().indexOf('.');
+                            return dot < 0 ? "" : p.name().substring(0, dot);
+                        })
+                        .thenComparing(ParameterSet.Parameter::name))
+                .toList();
+    }
+
     private ParameterDialog(
             List<Feature> features, ParameterSet initial, dev.voxelbrew.util.i18n.Translations translations) {
         this.translations = translations;
@@ -64,12 +87,6 @@ final class ParameterDialog {
         draft = initial;
         for (var field : List.of(expression, stringExpression, comment, override, binding))
             field.localized(translations);
-    }
-
-    private static TextField textField(String id) {
-        var field = new TextField();
-        field.setId(id);
-        return field;
     }
 
     private FormulaField field(String id) {
@@ -91,13 +108,6 @@ final class ParameterDialog {
         };
         field.setId(id);
         return field;
-    }
-
-    private static <T> TableColumn<T, String> column(String title, double width, Function<T, String> value) {
-        var c = new TableColumn<T, String>(title);
-        c.setPrefWidth(width);
-        c.setCellValueFactory(v -> new ReadOnlyStringWrapper(value.apply(v.getValue())));
-        return c;
     }
 
     private Button button(String label, String id, Runnable action) {
@@ -403,16 +413,6 @@ final class ParameterDialog {
         var p = overrideParameter.getValue();
         var id = configurations.getSelectionModel().getSelectedItem();
         if (p != null && id != null) override.setText(draft.expression(p, id));
-    }
-
-    static List<ParameterSet.Parameter> groupedParameters(ParameterSet set) {
-        return set.allParameters().stream()
-                .sorted(Comparator.comparing((ParameterSet.Parameter p) -> {
-                            int dot = p.name().indexOf('.');
-                            return dot < 0 ? "" : p.name().substring(0, dot);
-                        })
-                        .thenComparing(ParameterSet.Parameter::name))
-                .toList();
     }
 
     private void refresh() {

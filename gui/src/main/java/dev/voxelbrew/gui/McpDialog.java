@@ -8,8 +8,6 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
 final class McpDialog {
-    private McpDialog() {}
-
     static void show(Window owner, McpServerHost server, UserConfiguration store, Translations text) {
         var dialog = new Dialog<Void>();
         dialog.initOwner(owner);
@@ -96,4 +94,6 @@ final class McpDialog {
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
         dialog.showAndWait();
     }
+
+    private McpDialog() {}
 }

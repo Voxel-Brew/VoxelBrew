@@ -15,6 +15,51 @@ import java.util.logging.*;
 import org.junit.jupiter.api.Test;
 
 class MoonrakerDriverTest {
+    private static final class Fixture implements DeviceTransport {
+        final List<String> calls = new ArrayList<>();
+        final IOException startFailure = new IOException("Disconnected");
+        boolean busy, failStart, failStatus, reject, failUpload;
+        Path file;
+        RuntimeException runtimeStartFailure;
+        RuntimeException runtimeCloseFailure;
+
+        @Override
+        public DriverStatus status() throws IOException {
+            calls.add("status");
+            if (failStatus) throw new IOException("Monitoring unavailable");
+            return new DriverStatus(
+                    busy ? DriverStatus.State.PRINTING : DriverStatus.State.IDLE,
+                    "",
+                    OptionalDouble.empty(),
+                    OptionalDouble.empty(),
+                    OptionalDouble.empty(),
+                    OptionalDouble.empty(),
+                    "");
+        }
+
+        @Override
+        public Upload upload(Path artifact, java.util.function.DoubleConsumer progress) throws IOException {
+            calls.add("upload");
+            file = artifact;
+            if (failUpload) throw new IOException("Transfer failed");
+            return new Upload("job", "hash");
+        }
+
+        @Override
+        public void start(Upload upload) throws IOException {
+            calls.add("start");
+            if (reject) throw new JobRejectedException("Rejected by printer");
+            if (runtimeStartFailure != null) throw runtimeStartFailure;
+            if (failStart) throw startFailure;
+        }
+
+        @Override
+        public void close() {
+            calls.add("close");
+            if (runtimeCloseFailure != null) throw runtimeCloseFailure;
+        }
+    }
+
     private DriverConfiguration config() {
         return new MoonrakerDriverGui()
                 .buildConfiguration(Map.of(MoonrakerDriverGui.MOONRAKER_URL_ID, "http://localhost:7125"));
@@ -209,50 +254,5 @@ class MoonrakerDriverTest {
                 .isEqualTo(Driver.PrintResult.Success.SUCCESS);
         assertThat(transport.calls).containsExactly("status", "upload", "start", "close");
         assertThat(transport.file).doesNotExist();
-    }
-
-    private static final class Fixture implements DeviceTransport {
-        final List<String> calls = new ArrayList<>();
-        boolean busy, failStart, failStatus, reject, failUpload;
-        Path file;
-        final IOException startFailure = new IOException("Disconnected");
-        RuntimeException runtimeStartFailure;
-        RuntimeException runtimeCloseFailure;
-
-        @Override
-        public DriverStatus status() throws IOException {
-            calls.add("status");
-            if (failStatus) throw new IOException("Monitoring unavailable");
-            return new DriverStatus(
-                    busy ? DriverStatus.State.PRINTING : DriverStatus.State.IDLE,
-                    "",
-                    OptionalDouble.empty(),
-                    OptionalDouble.empty(),
-                    OptionalDouble.empty(),
-                    OptionalDouble.empty(),
-                    "");
-        }
-
-        @Override
-        public Upload upload(Path artifact, java.util.function.DoubleConsumer progress) throws IOException {
-            calls.add("upload");
-            file = artifact;
-            if (failUpload) throw new IOException("Transfer failed");
-            return new Upload("job", "hash");
-        }
-
-        @Override
-        public void start(Upload upload) throws IOException {
-            calls.add("start");
-            if (reject) throw new JobRejectedException("Rejected by printer");
-            if (runtimeStartFailure != null) throw runtimeStartFailure;
-            if (failStart) throw startFailure;
-        }
-
-        @Override
-        public void close() {
-            calls.add("close");
-            if (runtimeCloseFailure != null) throw runtimeCloseFailure;
-        }
     }
 }

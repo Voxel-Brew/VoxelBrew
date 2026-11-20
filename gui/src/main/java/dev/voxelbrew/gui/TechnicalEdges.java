@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 
 /** Detached adjacency built on the rebuild worker, never from native handles on the UI thread. */
 final class TechnicalEdges {
+    private final List<Edge> edges;
+
     record Point(double x, double y, double z) {
         Point subtract(Point other) {
             return new Point(x - other.x, y - other.y, z - other.z);
@@ -40,16 +42,6 @@ final class TechnicalEdges {
         final int face;
         Point second;
         boolean boundary;
-    }
-
-    private final List<Edge> edges;
-
-    private TechnicalEdges(List<Edge> edges) {
-        this.edges = List.copyOf(edges);
-    }
-
-    List<Edge> edges() {
-        return edges;
     }
 
     static TechnicalEdges from(MeshData mesh) {
@@ -93,5 +85,13 @@ final class TechnicalEdges {
         return new TechnicalEdges(adjacent.values().stream()
                 .map(edge -> new Edge(edge.a, edge.b, edge.first, edge.second, edge.boundary || edge.second == null))
                 .toList());
+    }
+
+    private TechnicalEdges(List<Edge> edges) {
+        this.edges = List.copyOf(edges);
+    }
+
+    List<Edge> edges() {
+        return edges;
     }
 }

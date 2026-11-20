@@ -20,7 +20,13 @@ import java.util.function.Function;
 /** Deterministic full replay. Only earlier, named outputs can be referenced. */
 @lombok.extern.slf4j.Slf4j
 public final class Evaluator {
-    private Evaluator() {}
+    private static final class Blocked extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        Blocked(String message) {
+            super(message);
+        }
+    }
 
     public static Evaluation evaluate(CadDocument document) {
         return evaluate(document, FeatureRegistry.defaultDirectory());
@@ -364,11 +370,5 @@ public final class Evaluator {
         return List.of();
     }
 
-    private static final class Blocked extends RuntimeException {
-        private static final long serialVersionUID = 1L;
-
-        Blocked(String message) {
-            super(message);
-        }
-    }
+    private Evaluator() {}
 }

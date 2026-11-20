@@ -15,11 +15,8 @@ import javafx.stage.Window;
 /** Explicit updater. All network, archive and helper work stays off the JavaFX thread. */
 @lombok.extern.slf4j.Slf4j
 final class UpdateDialog {
-    interface Factory {
-        UpdateDialog create(Consumer<Runnable> beforeInstall);
-    }
-
     private final UpdateServiceFactory factory;
+
     private final Translations translations;
     private final Consumer<Runnable> beforeInstall;
     private final ExecutorService worker;
@@ -36,6 +33,32 @@ final class UpdateDialog {
     private UpdateService.Check selected;
     private UpdateService.Prepared prepared;
     private boolean busy, closed, scheduled;
+
+    interface Factory {
+        UpdateDialog create(Consumer<Runnable> beforeInstall);
+    }
+
+    static boolean show(Window owner, Factory factory, Consumer<Runnable> beforeInstall) {
+        var updates = factory.create(beforeInstall);
+        try {
+            Dialogs.show(updates.dialog, owner, updates.translations);
+            return updates.scheduled;
+        } finally {
+            updates.closed = true;
+            updates.cancellation.cancel();
+            var prepared = updates.prepared;
+            if (prepared != null) updates.worker.execute(() -> cleanup(prepared));
+            updates.worker.shutdown();
+        }
+    }
+
+    private static void cleanup(UpdateService.Prepared prepared) {
+        try {
+            prepared.close();
+        } catch (IOException failure) {
+            log.warn("Update staging cleanup failed", failure);
+        }
+    }
 
     UpdateDialog(
             UpdateServiceFactory factory,
@@ -95,20 +118,6 @@ final class UpdateDialog {
                     if (!closed && !busy) handOff();
                 });
         });
-    }
-
-    static boolean show(Window owner, Factory factory, Consumer<Runnable> beforeInstall) {
-        var updates = factory.create(beforeInstall);
-        try {
-            Dialogs.show(updates.dialog, owner, updates.translations);
-            return updates.scheduled;
-        } finally {
-            updates.closed = true;
-            updates.cancellation.cancel();
-            var prepared = updates.prepared;
-            if (prepared != null) updates.worker.execute(() -> cleanup(prepared));
-            updates.worker.shutdown();
-        }
     }
 
     private void invalidateSelection() {
@@ -222,13 +231,5 @@ final class UpdateDialog {
             cancel.setDisable(false);
             busy(false);
         });
-    }
-
-    private static void cleanup(UpdateService.Prepared prepared) {
-        try {
-            prepared.close();
-        } catch (IOException failure) {
-            log.warn("Update staging cleanup failed", failure);
-        }
     }
 }

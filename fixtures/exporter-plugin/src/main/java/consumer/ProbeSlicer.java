@@ -8,16 +8,6 @@ import java.util.function.Consumer;
 
 /** Independent API-only discovery fixture. */
 public final class ProbeSlicer implements SlicerProvider {
-    @Override
-    public SlicerDescriptor descriptor() {
-        return new SlicerDescriptor("probe-slicer", "API fixture slicer", "1");
-    }
-
-    @Override
-    public Slicer create() {
-        return new ProbeOperation();
-    }
-
     private static final class ProbeOperation implements Slicer {
         @Override
         public Optional<PrintArtifact> slice(
@@ -26,5 +16,15 @@ public final class ProbeSlicer implements SlicerProvider {
             cancellation.check();
             throw new IOException("Fixture slicer does not produce jobs");
         }
+    }
+
+    @Override
+    public SlicerDescriptor descriptor() {
+        return new SlicerDescriptor("probe-slicer", "API fixture slicer", "1");
+    }
+
+    @Override
+    public Slicer create() {
+        return new ProbeOperation();
     }
 }

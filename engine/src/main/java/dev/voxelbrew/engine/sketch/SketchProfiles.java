@@ -11,8 +11,6 @@ import java.util.*;
  * Resolves selected curves into exact regions; screen samples only classify nesting/orientation.
  */
 public final class SketchProfiles {
-    private SketchProfiles() {}
-
     public record Region(String id, PlanarProfile profile) {}
 
     private record Edge(Entity entity, boolean reversed) {
@@ -215,4 +213,6 @@ public final class SketchProfiles {
         }
         return result;
     }
+
+    private SketchProfiles() {}
 }

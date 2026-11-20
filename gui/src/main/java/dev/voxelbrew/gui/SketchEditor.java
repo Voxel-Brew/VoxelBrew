@@ -30,6 +30,67 @@ import javafx.stage.WindowEvent;
 final class SketchEditor extends BorderPane implements AutoCloseable {
     private static final PseudoClass ACTIVE_TOOL = PseudoClass.getPseudoClass("active-tool");
 
+    private final SketchController controller;
+
+    private final dev.voxelbrew.api.model.UuidGenerator uuidGenerator;
+
+    private final dev.voxelbrew.util.i18n.Translations translations;
+
+    private final Canvas canvas = new Canvas();
+
+    private final LinkedHashSet<Ref> selection = new LinkedHashSet<>();
+    private final List<Vec> drawing = new ArrayList<>();
+    private final List<Ref> snaps = new ArrayList<>();
+    private final List<Badge> badges = new ArrayList<>();
+    private final ListView<Constraint> constraints = new ListView<>();
+    private final ComboBox<Ref> references = new ComboBox<>();
+    private final ComboBox<Type> dimension = new ComboBox<>();
+    private final Button createType;
+    private final VBox toolOptions = new VBox(6);
+    private final FormulaField toolRadius = numeric("5", ParameterUnit.MM),
+            toolRho = numeric("0.5", ParameterUnit.NUMBER).dragStep(0.01),
+            textContent = FormulaField.text("Text", this::formulaParameters),
+            textFont = FormulaField.text("SansSerif", this::formulaParameters),
+            textHeight = numeric("10", ParameterUnit.MM),
+            textAngle = numeric("0", ParameterUnit.DEG),
+            textSpacing = numeric("0", ParameterUnit.NUMBER).dragStep(0.01),
+            pointX = numeric("0", ParameterUnit.MM),
+            pointY = numeric("0", ParameterUnit.MM);
+    private final ComboBox<Integer> splineDegree = new ComboBox<>();
+    private final ComboBox<String> textStyle = new ComboBox<>();
+    private final CheckBox closedCurve = new CheckBox("");
+    private final FormulaField dimensionValue = FormulaField.number("10", this::formulaParameters, this::dimensionUnit),
+            sides = numeric("6", ParameterUnit.NUMBER).dragStep(1);
+    private final CheckBox construction = new CheckBox(""), auto = new CheckBox(""), showBadges = new CheckBox("");
+    private final Label selected = new Label(""), status = new Label(""), error = new Label(), hint = new Label();
+    private final Button finish, undo, redo;
+    private final Map<String, Button> shortcutActions = new LinkedHashMap<>();
+    private final java.util.function.BiConsumer<Feature.Sketch, ParameterSet> accept;
+    private final Feature.Sketch original;
+    private final String featureId;
+    private final List<Feature> documentFeatures;
+    private final Map<String, Vec> dimensionPositions = new HashMap<>();
+    private final List<DimensionHit> dimensionHits = new ArrayList<>();
+    private final QuickMenu quickMenu;
+    private final boolean dark;
+    private final Feature.Plane selectedPlane;
+    private SketchSnapping.Snap hoverSnap;
+    private SketchTools.Tool advanced;
+    private Runnable dismiss = () -> {};
+    private Draw tool = Draw.SELECT;
+    private Type activeConstraint;
+    private boolean dimensionTool;
+    private HBox dimensionEntry;
+    private Vec dimensionEntryPosition;
+    private DimensionHit draggedDimension;
+    private Vec previousDimensionPosition;
+    private Ref dragPoint;
+    private boolean boxCandidate, boxSelecting, boxAdditive;
+    private Vec cursor = new Vec(0, 0);
+    private double centerX = 30, centerY = 20, scale = 4, lastX, lastY, pressX, pressY;
+    private boolean moving, panning, refreshing, closed;
+    private int nextId = 1;
+
     enum Draw {
         SELECT,
         POINT,
@@ -56,63 +117,6 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             double ay,
             double bx,
             double by) {}
-
-    private final SketchController controller;
-    private final dev.voxelbrew.api.model.UuidGenerator uuidGenerator;
-    private final dev.voxelbrew.util.i18n.Translations translations;
-    private final Canvas canvas = new Canvas();
-    private final LinkedHashSet<Ref> selection = new LinkedHashSet<>();
-    private final List<Vec> drawing = new ArrayList<>();
-    private final List<Ref> snaps = new ArrayList<>();
-    private SketchSnapping.Snap hoverSnap;
-    private final List<Badge> badges = new ArrayList<>();
-    private final ListView<Constraint> constraints = new ListView<>();
-    private final ComboBox<Ref> references = new ComboBox<>();
-    private final ComboBox<Type> dimension = new ComboBox<>();
-    private final Button createType;
-    private SketchTools.Tool advanced;
-    private final VBox toolOptions = new VBox(6);
-    private final FormulaField toolRadius = numeric("5", ParameterUnit.MM),
-            toolRho = numeric("0.5", ParameterUnit.NUMBER).dragStep(0.01),
-            textContent = FormulaField.text("Text", this::formulaParameters),
-            textFont = FormulaField.text("SansSerif", this::formulaParameters),
-            textHeight = numeric("10", ParameterUnit.MM),
-            textAngle = numeric("0", ParameterUnit.DEG),
-            textSpacing = numeric("0", ParameterUnit.NUMBER).dragStep(0.01),
-            pointX = numeric("0", ParameterUnit.MM),
-            pointY = numeric("0", ParameterUnit.MM);
-    private final ComboBox<Integer> splineDegree = new ComboBox<>();
-    private final ComboBox<String> textStyle = new ComboBox<>();
-    private final CheckBox closedCurve = new CheckBox("");
-    private final FormulaField dimensionValue = FormulaField.number("10", this::formulaParameters, this::dimensionUnit),
-            sides = numeric("6", ParameterUnit.NUMBER).dragStep(1);
-    private final CheckBox construction = new CheckBox(""), auto = new CheckBox(""), showBadges = new CheckBox("");
-    private final Label selected = new Label(""), status = new Label(""), error = new Label(), hint = new Label();
-    private final Button finish, undo, redo;
-    private final Map<String, Button> shortcutActions = new LinkedHashMap<>();
-    private final java.util.function.BiConsumer<Feature.Sketch, ParameterSet> accept;
-    private final Feature.Sketch original;
-    private final String featureId;
-    private final List<Feature> documentFeatures;
-    private Runnable dismiss = () -> {};
-    private Draw tool = Draw.SELECT;
-    private Type activeConstraint;
-    private boolean dimensionTool;
-    private HBox dimensionEntry;
-    private Vec dimensionEntryPosition;
-    private final Map<String, Vec> dimensionPositions = new HashMap<>();
-    private final List<DimensionHit> dimensionHits = new ArrayList<>();
-    private DimensionHit draggedDimension;
-    private Vec previousDimensionPosition;
-    private Ref dragPoint;
-    private boolean boxCandidate, boxSelecting, boxAdditive;
-    private Vec cursor = new Vec(0, 0);
-    private double centerX = 30, centerY = 20, scale = 4, lastX, lastY, pressX, pressY;
-    private boolean moving, panning, refreshing, closed;
-    private final QuickMenu quickMenu;
-    private final boolean dark;
-    private int nextId = 1;
-    private final Feature.Plane selectedPlane;
 
     static void show(
             Stage stage,
@@ -181,6 +185,52 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             editor.fit();
             editor.canvas.requestFocus();
         });
+    }
+
+    private static List<Entity> displayCurves(SketchGeometry geometry, Entity entity) {
+        try {
+            return geometry.curves(entity);
+        } catch (IllegalArgumentException invalid) {
+            return List.of(entity);
+        }
+    }
+
+    private static String symbol(Type type) {
+        return switch (type) {
+            case HORIZONTAL -> "—";
+            case VERTICAL -> "│";
+            case COINCIDENT -> "●";
+            case TANGENT -> "○/";
+            case EQUAL -> "=";
+            case PARALLEL -> "∥";
+            case PERPENDICULAR -> "⊥";
+            case FIX -> "▣";
+            case MIDPOINT -> "△";
+            case CONCENTRIC -> "◎";
+            case COLLINEAR -> "↗";
+            case SYMMETRY -> "││";
+            case CURVATURE -> "∿";
+            case POLYGON -> "⬡";
+            default -> "d";
+        };
+    }
+
+    private static String number(double value) {
+        return String.format(Locale.ROOT, "%.6g", value);
+    }
+
+    private static double value(TextField field, String label) {
+        try {
+            double v = field instanceof FormulaField formula
+                    ? formula.value()
+                    : Double.parseDouble(field.getText().strip());
+            if (!Double.isFinite(v)) throw new NumberFormatException();
+            field.getStyleClass().remove("invalid");
+            return v;
+        } catch (IllegalArgumentException failure) {
+            field.getStyleClass().add("invalid");
+            throw new IllegalArgumentException(label + ": " + failure.getMessage());
+        }
     }
 
     private SketchEditor(
@@ -1614,14 +1664,6 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         return null;
     }
 
-    private static List<Entity> displayCurves(SketchGeometry geometry, Entity entity) {
-        try {
-            return geometry.curves(entity);
-        } catch (IllegalArgumentException invalid) {
-            return List.of(entity);
-        }
-    }
-
     private void draw() {
         for (var candidate : Draw.values()) {
             Node control = candidate == Draw.ADVANCED
@@ -1889,44 +1931,6 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         var graphics = canvas.getGraphicsContext2D();
         for (double offset : new double[] {-0.4, 0.4})
             graphics.strokeLine(x, y, x + 8 * Math.cos(angle + offset), y + 8 * Math.sin(angle + offset));
-    }
-
-    private static String symbol(Type type) {
-        return switch (type) {
-            case HORIZONTAL -> "—";
-            case VERTICAL -> "│";
-            case COINCIDENT -> "●";
-            case TANGENT -> "○/";
-            case EQUAL -> "=";
-            case PARALLEL -> "∥";
-            case PERPENDICULAR -> "⊥";
-            case FIX -> "▣";
-            case MIDPOINT -> "△";
-            case CONCENTRIC -> "◎";
-            case COLLINEAR -> "↗";
-            case SYMMETRY -> "││";
-            case CURVATURE -> "∿";
-            case POLYGON -> "⬡";
-            default -> "d";
-        };
-    }
-
-    private static String number(double value) {
-        return String.format(Locale.ROOT, "%.6g", value);
-    }
-
-    private static double value(TextField field, String label) {
-        try {
-            double v = field instanceof FormulaField formula
-                    ? formula.value()
-                    : Double.parseDouble(field.getText().strip());
-            if (!Double.isFinite(v)) throw new NumberFormatException();
-            field.getStyleClass().remove("invalid");
-            return v;
-        } catch (IllegalArgumentException failure) {
-            field.getStyleClass().add("invalid");
-            throw new IllegalArgumentException(label + ": " + failure.getMessage());
-        }
     }
 
     private ParameterSet formulaParameters() {

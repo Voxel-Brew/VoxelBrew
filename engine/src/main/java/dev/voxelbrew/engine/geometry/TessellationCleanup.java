@@ -6,8 +6,6 @@ import java.util.Arrays;
 
 /** Removes collapsed facets emitted at curved-surface singularities by the native mesher. */
 final class TessellationCleanup {
-    private TessellationCleanup() {}
-
     static MeshData removeCollapsedTriangles(MeshData mesh) {
         int[] triangles = mesh.triangles();
         int[] faces = mesh.faceIndices();
@@ -39,4 +37,6 @@ final class TessellationCleanup {
         }
         return true;
     }
+
+    private TessellationCleanup() {}
 }

@@ -21,9 +21,9 @@ final class ApplicationIcon {
             })
             .toList();
 
-    private ApplicationIcon() {}
-
     static void install(Stage stage) {
         stage.getIcons().setAll(IMAGES);
     }
+
+    private ApplicationIcon() {}
 }

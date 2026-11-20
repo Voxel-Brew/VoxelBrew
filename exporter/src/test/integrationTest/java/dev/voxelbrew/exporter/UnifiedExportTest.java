@@ -16,6 +16,16 @@ class UnifiedExportTest {
     @TempDir
     Path directory;
 
+    private static ExportWindow window(Path target, boolean overwrite) {
+        return new ExportWindow() {
+            @Override
+            public <R> Optional<R> show(ExportDialog<R> dialog) {
+                return Optional.of(dialog.buildSettings(
+                        Map.of("destination", target.toString(), "overwrite", Boolean.toString(overwrite))));
+            }
+        };
+    }
+
     @Test
     void prusaProjectUsesSlicerProcessAndPlacementEvenWhenDesignSpaceWasRequested() throws Exception {
         var base = ExportTest.reference();
@@ -166,15 +176,5 @@ class UnifiedExportTest {
         assertThatThrownBy(() -> new BinaryStlExporter().export(CadDocument.empty(), window))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(Files.exists(target)).isFalse();
-    }
-
-    private static ExportWindow window(Path target, boolean overwrite) {
-        return new ExportWindow() {
-            @Override
-            public <R> Optional<R> show(ExportDialog<R> dialog) {
-                return Optional.of(dialog.buildSettings(
-                        Map.of("destination", target.toString(), "overwrite", Boolean.toString(overwrite))));
-            }
-        };
     }
 }

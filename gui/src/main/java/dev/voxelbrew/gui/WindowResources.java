@@ -16,8 +16,13 @@ final class WindowResources implements AutoCloseable {
     final dev.voxelbrew.api.printer.driver.DriverRegistry printers;
     final SlicerProviderRegistry slicers;
     final ExecutorService rebuild, files, slicing, validation, appearance, printer;
-    private boolean closed;
     private final CompletableFuture<Void> disposal = new CompletableFuture<>();
+    private boolean closed;
+
+    static ExecutorService worker(String role) {
+        return Executors.newSingleThreadExecutor(
+                Thread.ofPlatform().daemon().name("voxelbrew-" + role).factory());
+    }
 
     WindowResources(
             Path plugins,
@@ -66,11 +71,6 @@ final class WindowResources implements AutoCloseable {
         validation = worker("print-validation");
         appearance = worker("appearance");
         printer = worker("printer");
-    }
-
-    static ExecutorService worker(String role) {
-        return Executors.newSingleThreadExecutor(
-                Thread.ofPlatform().daemon().name("voxelbrew-" + role).factory());
     }
 
     @Override

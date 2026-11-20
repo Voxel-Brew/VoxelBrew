@@ -35,11 +35,112 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     private static final String EXPORT_NOTIFICATION_DURATION_KEY = "export.notification.duration-ms";
     private static final int DEFAULT_EXPORT_NOTIFICATION_DURATION_MS = 3000;
 
+    private static final List<String> STANDARD_VIEWS =
+            List.of("Isometric", "Top", "Front", "Right", "Back", "Left", "Bottom");
+
+    private final Stage stage;
+
+    private final WindowFrame window;
+
+    private final javafx.beans.value.ChangeListener<Boolean> windowFocus;
+
+    @Getter
+    @Accessors(fluent = true)
+    private final DocumentController controller;
+
+    private final Path pluginDirectory;
+    private final ExporterProviderRegistry registry;
+
+    private final java.util.function.Supplier<dev.voxelbrew.api.importer.ImporterProviderRegistry> importers;
+
+    @Getter
+    @Accessors(fluent = true)
+    private final Viewport viewport;
+
+    private final PrintingPane printing;
+    private final PrinterPane printer;
+
+    private final Tab printerTab;
+
+    private final Tab designTab;
+    private final Tab printTab;
+    private final TabPane workspaces;
+    private final TreeView<Entry> tree = new TreeView<>();
+    private final VBox inspector = new VBox(12), form = new VBox(9);
+    private final VBox featureDiagnostics = new VBox(6);
+    private final HBox toolActions = new HBox(8);
+    private final Label status, error, selectionLabel;
+    private final FeatureTimeline timeline;
+    private final Button undo, redo;
+    private final MenuItem export;
+    private final javafx.beans.property.BooleanProperty fileBusy = new javafx.beans.property.SimpleBooleanProperty();
+    private final Label documentTitle = new Label();
+    private final Button customFeature;
+    private final Button parameters;
+    private final ComboBox<String> configuration = new ComboBox<>();
+    private final Button constrainedSketch;
+    private final Button extrude;
+    private final Button cut;
+    private final Button splitBody;
+    private final Button fillet;
+    private final Button chamfer;
+    private final Button shell;
+    private final ProgressIndicator progress = new ProgressIndicator();
+    private final Appearance appearance;
+    private final ExecutorService preferencesWorker;
+    private final Translations translations;
+    private final dev.voxelbrew.util.config.UserConfiguration configurationStore;
+    private final RecentFiles recentFiles;
+    private final WindowResources resources;
+    private final FeatureRegistry.Factory featureProviders;
+    private final SketchController.Factory sketches;
+    private final McpServerHost mcpServer;
+    private final java.util.Set<Integer> modificationFaces = new java.util.TreeSet<>();
+    private final java.util.Set<Integer> modificationEdges = new java.util.TreeSet<>();
+    private final Map<String, TextField> fields = new LinkedHashMap<>();
+    private final List<QuickMenu> quickMenus = new ArrayList<>();
+    private final UpdateDialog.Factory updates;
+    private final java.util.function.Supplier<AboutDialog> about;
+    private ConstructionEditor constructionEditor;
+    private dev.voxelbrew.api.model.parameters.ParameterSet lastParameters =
+            dev.voxelbrew.api.model.parameters.ParameterSet.empty();
+    private Appearance.Choice appearanceChoice;
+    private long appearanceRequest;
+    private boolean closed, refreshing;
+    private Popup exportNotification;
+    private int exportNotificationDurationMillis = DEFAULT_EXPORT_NOTIFICATION_DURATION_MS;
+    private Tool tool = Tool.NONE;
+    private String modification;
+    private String modificationBody;
+    private Label modificationSelection;
+    private String selectedFeature, selectedBody;
+    private List<Feature> lastFeatures = List.of();
+    private Map<String, BodyStyle> lastBodyStyles = Map.of();
+    private Map<String, String> lastBodyNames = Map.of();
+    private Map<String, String> lastFeatureNames = Map.of();
+    private boolean lastRebuilding;
+    private boolean lastIoBusy;
+    private DocumentController.Build lastBuild;
+    private String lastDocument = "";
+    private boolean fitNext = true;
+    private Feature.Sketch extrusionSketch;
+    private ModelSession.Snapshot planeSnapshot;
+    private Feature.Sketch planeRepair;
+    private Button finish;
+
     private record Entry(String id, String label, boolean body) {
         @Override
         public String toString() {
             return label;
         }
+    }
+
+    private enum Tool {
+        NONE,
+        PLANE,
+        EXTRUDE,
+        MODIFY,
+        CONSTRUCTION
     }
 
     private final class BodyTreeCell extends TreeCell<Entry> {
@@ -260,101 +361,6 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         }
     }
 
-    private enum Tool {
-        NONE,
-        PLANE,
-        EXTRUDE,
-        MODIFY,
-        CONSTRUCTION
-    }
-
-    private final Stage stage;
-    private ConstructionEditor constructionEditor;
-    private final WindowFrame window;
-    private final javafx.beans.value.ChangeListener<Boolean> windowFocus;
-
-    @Getter
-    @Accessors(fluent = true)
-    private final DocumentController controller;
-
-    private final Path pluginDirectory;
-    private final ExporterProviderRegistry registry;
-    private final java.util.function.Supplier<dev.voxelbrew.api.importer.ImporterProviderRegistry> importers;
-
-    @Getter
-    @Accessors(fluent = true)
-    private final Viewport viewport;
-
-    private final PrintingPane printing;
-    private final PrinterPane printer;
-    private final Tab printerTab;
-    private final Tab designTab;
-    private final Tab printTab;
-    private final TabPane workspaces;
-    private final TreeView<Entry> tree = new TreeView<>();
-    private final VBox inspector = new VBox(12), form = new VBox(9);
-    private final VBox featureDiagnostics = new VBox(6);
-    private final HBox toolActions = new HBox(8);
-    private final Label status, error, selectionLabel;
-    private static final List<String> STANDARD_VIEWS =
-            List.of("Isometric", "Top", "Front", "Right", "Back", "Left", "Bottom");
-    private final FeatureTimeline timeline;
-    private final Button undo, redo;
-    private final MenuItem export;
-    private final javafx.beans.property.BooleanProperty fileBusy = new javafx.beans.property.SimpleBooleanProperty();
-    private final Label documentTitle = new Label();
-    private final Button customFeature;
-    private final Button parameters;
-    private final ComboBox<String> configuration = new ComboBox<>();
-    private dev.voxelbrew.api.model.parameters.ParameterSet lastParameters =
-            dev.voxelbrew.api.model.parameters.ParameterSet.empty();
-    private final Button constrainedSketch;
-    private final Button extrude;
-    private final Button cut;
-    private final Button splitBody;
-    private final Button fillet;
-    private final Button chamfer;
-    private final Button shell;
-    private final ProgressIndicator progress = new ProgressIndicator();
-    private final Appearance appearance;
-    private final ExecutorService preferencesWorker;
-    private final Translations translations;
-    private final dev.voxelbrew.util.config.UserConfiguration configurationStore;
-    private final RecentFiles recentFiles;
-    private final WindowResources resources;
-    private final FeatureRegistry.Factory featureProviders;
-    private final SketchController.Factory sketches;
-    private Appearance.Choice appearanceChoice;
-    private long appearanceRequest;
-    private boolean closed, refreshing;
-    private Popup exportNotification;
-    private int exportNotificationDurationMillis = DEFAULT_EXPORT_NOTIFICATION_DURATION_MS;
-    private Tool tool = Tool.NONE;
-    private final McpServerHost mcpServer;
-    private String modification;
-    private String modificationBody;
-    private final java.util.Set<Integer> modificationFaces = new java.util.TreeSet<>();
-    private final java.util.Set<Integer> modificationEdges = new java.util.TreeSet<>();
-    private Label modificationSelection;
-    private String selectedFeature, selectedBody;
-    private final Map<String, TextField> fields = new LinkedHashMap<>();
-    private List<Feature> lastFeatures = List.of();
-    private Map<String, BodyStyle> lastBodyStyles = Map.of();
-    private Map<String, String> lastBodyNames = Map.of();
-    private Map<String, String> lastFeatureNames = Map.of();
-    private boolean lastRebuilding;
-    private boolean lastIoBusy;
-    private DocumentController.Build lastBuild;
-    private String lastDocument = "";
-    private boolean fitNext = true;
-    private Feature.Sketch extrusionSketch;
-    private ModelSession.Snapshot planeSnapshot;
-    private Feature.Sketch planeRepair;
-    private Button finish;
-    private final List<QuickMenu> quickMenus = new ArrayList<>();
-    private final UpdateDialog.Factory updates;
-    private final java.util.function.Supplier<AboutDialog> about;
-
     public static Workbench create(Stage stage, Path plugins) throws IOException {
         return create(
                 stage,
@@ -393,6 +399,58 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             resources.close();
             throw failure;
         }
+    }
+
+    private static Label heading(String text) {
+        var label = new Label(text);
+        label.getStyleClass().add("eyebrow");
+        return label;
+    }
+
+    private static void fire(MenuItem item) {
+        if (!item.isDisable()) item.fire();
+    }
+
+    private static double number(TextField field, String name) {
+        try {
+            double value = field instanceof FormulaField formula
+                    ? formula.value()
+                    : Double.parseDouble(field.getText().trim());
+            if (!Double.isFinite(value)) throw new NumberFormatException();
+            field.getStyleClass().remove("invalid");
+            return value;
+        } catch (IllegalArgumentException failure) {
+            if (!field.getStyleClass().contains("invalid"))
+                field.getStyleClass().add("invalid");
+            throw new IllegalArgumentException(name + ": " + failure.getMessage(), failure);
+        }
+    }
+
+    private static String format(double value) {
+        return String.format(Locale.ROOT, "%.3f", value);
+    }
+
+    static int parseNotificationDuration(String value) {
+        int millis = Integer.parseInt(value.strip());
+        if (millis <= 0) throw new IllegalArgumentException("Notification duration must be positive");
+        return millis;
+    }
+
+    static int loadNotificationDuration(dev.voxelbrew.util.config.UserConfiguration configuration) {
+        try {
+            return parseNotificationDuration(configuration.get(
+                    EXPORT_NOTIFICATION_DURATION_KEY, Integer.toString(DEFAULT_EXPORT_NOTIFICATION_DURATION_MS)));
+        } catch (IOException | IllegalArgumentException failure) {
+            log.warn("Could not load export notification duration; using 3000 ms", failure);
+            return DEFAULT_EXPORT_NOTIFICATION_DURATION_MS;
+        }
+    }
+
+    static Path exportSuggestion(Path saveFolder, Path projectPath) {
+        return saveFolder.resolve(
+                projectPath == null
+                        ? "Untitled.vxb"
+                        : java.util.Objects.toString(projectPath.getFileName(), "Untitled.vxb"));
     }
 
     Workbench(
@@ -1000,12 +1058,6 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         return registry;
     }
 
-    private static Label heading(String text) {
-        var label = new Label(text);
-        label.getStyleClass().add("eyebrow");
-        return label;
-    }
-
     private Button button(String text, String id, Runnable action) {
         var button = new Button(text);
         button.setId(id);
@@ -1029,10 +1081,6 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         UiHelp.menuItem(item, UiHelp.description(translations, id));
         item.setOnAction(e -> attempt(action));
         return item;
-    }
-
-    private static void fire(MenuItem item) {
-        if (!item.isDisable()) item.fire();
     }
 
     private MenuItem mirror(Button button, boolean shortcut) {
@@ -1733,27 +1781,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         return text;
     }
 
-    private static double number(TextField field, String name) {
-        try {
-            double value = field instanceof FormulaField formula
-                    ? formula.value()
-                    : Double.parseDouble(field.getText().trim());
-            if (!Double.isFinite(value)) throw new NumberFormatException();
-            field.getStyleClass().remove("invalid");
-            return value;
-        } catch (IllegalArgumentException failure) {
-            if (!field.getStyleClass().contains("invalid"))
-                field.getStyleClass().add("invalid");
-            throw new IllegalArgumentException(name + ": " + failure.getMessage(), failure);
-        }
-    }
-
     private double value(String key) {
         return number(fields.get(key), key);
-    }
-
-    private static String format(double value) {
-        return String.format(Locale.ROOT, "%.3f", value);
     }
 
     private void editSketch(Feature.Sketch sketch) {
@@ -2421,22 +2450,6 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         popup.setY(stage.getY() + 70);
     }
 
-    static int parseNotificationDuration(String value) {
-        int millis = Integer.parseInt(value.strip());
-        if (millis <= 0) throw new IllegalArgumentException("Notification duration must be positive");
-        return millis;
-    }
-
-    static int loadNotificationDuration(dev.voxelbrew.util.config.UserConfiguration configuration) {
-        try {
-            return parseNotificationDuration(configuration.get(
-                    EXPORT_NOTIFICATION_DURATION_KEY, Integer.toString(DEFAULT_EXPORT_NOTIFICATION_DURATION_MS)));
-        } catch (IOException | IllegalArgumentException failure) {
-            log.warn("Could not load export notification duration; using 3000 ms", failure);
-            return DEFAULT_EXPORT_NOTIFICATION_DURATION_MS;
-        }
-    }
-
     private void configureExportNotificationDuration() {
         var dialog = new Dialog<Integer>();
         dialog.setTitle(translations.text("exportNotification.duration.title"));
@@ -2489,13 +2502,6 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         return new DesktopExportWindow(stage, format.equals("vxb") ? controller.path() : null, translations)
                 .exporterVersion(registry.require(format).descriptor().version())
                 .suggestDestination(exportSuggestion(saveFolder, controller.path()));
-    }
-
-    static Path exportSuggestion(Path saveFolder, Path projectPath) {
-        return saveFolder.resolve(
-                projectPath == null
-                        ? "Untitled.vxb"
-                        : java.util.Objects.toString(projectPath.getFileName(), "Untitled.vxb"));
     }
 
     private void saveFolder() {

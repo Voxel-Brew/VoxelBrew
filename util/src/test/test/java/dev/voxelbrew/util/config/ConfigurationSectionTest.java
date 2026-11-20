@@ -9,6 +9,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class ConfigurationSectionTest {
+    @TempDir
+    Path directory;
+
     @Test
     void migratesPreviousFileWithDestinationTakingPrecedence() throws Exception {
         var main = new dev.voxelbrew.util.config.FileUserConfiguration(directory.resolve("config.properties"));
@@ -35,9 +38,6 @@ class ConfigurationSectionTest {
         assertThatThrownBy(() -> main.section("slicer", "cura")).isInstanceOf(IOException.class);
         assertThat(previous.get("executable", "")).isEqualTo("kept");
     }
-
-    @TempDir
-    Path directory;
 
     @Test
     void migratesOnlyThisProviderAndKeepsDestinationValuesAndUnknownKeys() throws Exception {

@@ -8,8 +8,6 @@ import java.net.URI;
 public final class BugReport {
     public static final String URL = "https://github.com/Voxel-Brew/VoxelBrew/issues/new";
 
-    private BugReport() {}
-
     public static void open() {
         try {
             Desktop.getDesktop().browse(URI.create(URL));
@@ -17,4 +15,6 @@ public final class BugReport {
             throw new IllegalStateException("Could not open the browser. Report a bug at " + URL, failure);
         }
     }
+
+    private BugReport() {}
 }

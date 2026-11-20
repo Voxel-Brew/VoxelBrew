@@ -16,6 +16,39 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class SlicerExportPipelineTest {
+    private static ProcessSlicer process(String format, AtomicReference<Path> work) {
+        return new ProcessSlicer() {
+            @Override
+            public Descriptor descriptor() {
+                return new PrusaSlicerBackend().descriptor();
+            }
+
+            @Override
+            public Path executable() {
+                return Path.of("unused");
+            }
+
+            @Override
+            public Probe probe(Path executable, Cancellation cancellation) {
+                return new Probe("process double", descriptor().capabilities());
+            }
+
+            @Override
+            public InputFormat inputFormat() {
+                return new InputFormat(format, format.equals("stl") ? "stl" : "3mf");
+            }
+
+            @Override
+            public RunResult slice(Request request) throws IOException {
+                work.set(request.workingDirectory());
+                assertThat(request.input()).isRegularFile().hasParent(request.workingDirectory());
+                assertThat(Files.size(request.input())).isGreaterThan(100);
+                Files.writeString(request.output(), "partial");
+                throw new IOException("forced process failure");
+            }
+        };
+    }
+
     @Test
     void simultaneousOperationsOwnSeparateScratchAndCancellation() throws Exception {
         var model = ManufacturingModels.evaluate(SlicerAcceptanceTest.cube().document(), MeshOptions.DEFAULT);
@@ -84,38 +117,5 @@ class SlicerExportPipelineTest {
                     .hasMessage("forced process failure");
             assertThat(work.get()).isNotNull().doesNotExist();
         }
-    }
-
-    private static ProcessSlicer process(String format, AtomicReference<Path> work) {
-        return new ProcessSlicer() {
-            @Override
-            public Descriptor descriptor() {
-                return new PrusaSlicerBackend().descriptor();
-            }
-
-            @Override
-            public Path executable() {
-                return Path.of("unused");
-            }
-
-            @Override
-            public Probe probe(Path executable, Cancellation cancellation) {
-                return new Probe("process double", descriptor().capabilities());
-            }
-
-            @Override
-            public InputFormat inputFormat() {
-                return new InputFormat(format, format.equals("stl") ? "stl" : "3mf");
-            }
-
-            @Override
-            public RunResult slice(Request request) throws IOException {
-                work.set(request.workingDirectory());
-                assertThat(request.input()).isRegularFile().hasParent(request.workingDirectory());
-                assertThat(Files.size(request.input())).isGreaterThan(100);
-                Files.writeString(request.output(), "partial");
-                throw new IOException("forced process failure");
-            }
-        };
     }
 }

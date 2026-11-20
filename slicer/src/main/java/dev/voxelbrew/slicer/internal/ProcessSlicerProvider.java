@@ -19,50 +19,6 @@ import lombok.RequiredArgsConstructor;
 public abstract class ProcessSlicerProvider implements SlicerProvider {
     private final Supplier<ProcessSlicer> processes;
 
-    @Override
-    public final SlicerDescriptor descriptor() {
-        var descriptor = processes.get().descriptor();
-        return new SlicerDescriptor(
-                descriptor.id(), descriptor.name(), dev.voxelbrew.util.update.BuildVersion.current());
-    }
-
-    @Override
-    public final Optional<SlicerDialog<?>> settingsDialog() {
-        return Optional.of(new SettingsDialog(processes.get()));
-    }
-
-    @Override
-    public final String checkConfiguration(SlicerWindow window, Cancellation cancellation)
-            throws IOException, SlicerException {
-        cancellation.check();
-        var process = processes.get();
-        var settings =
-                window.show(new SettingsDialog(process)).orElseThrow(java.util.concurrent.CancellationException::new);
-        if (process.configurationOptions().containsKey("executable")
-                && settings.getOrDefault("executable", "").isBlank())
-            throw new SlicerException.Configuration("Choose a slicer executable");
-        var configured = process.configure(settings);
-        return configured.probe(command(configured), cancellation).actualVersion();
-    }
-
-    @Override
-    public final Slicer create() {
-        var process = processes.get();
-        return (model, window, cancellation, diagnostics) -> {
-            cancellation.check();
-            if (window instanceof BundledSlicers.Window bundled) {
-                try (var scratch = new Scratch(Files.createTempDirectory("voxelbrew-bundled-slicer-"))) {
-                    var configured = bundled.configure(process, model, scratch.directory(), cancellation);
-                    return Optional.of(run(configured, model, cancellation, diagnostics));
-                }
-            }
-            var settings = window.show(new SettingsDialog(process));
-            cancellation.check();
-            if (settings.isEmpty()) return Optional.empty();
-            return Optional.of(run(process.configure(settings.get()), model, cancellation, diagnostics));
-        };
-    }
-
     @RequiredArgsConstructor
     private static final class SettingsDialog implements SlicerDialog<Map<String, String>> {
         private static final List<String> FIELD_ORDER =
@@ -115,6 +71,17 @@ public abstract class ProcessSlicerProvider implements SlicerProvider {
         @Override
         public Map<String, String> buildSettings(Map<String, String> values) {
             return Map.copyOf(values);
+        }
+    }
+
+    private record Scratch(Path directory) implements AutoCloseable {
+        @Override
+        public void close() throws IOException {
+            List<Path> paths;
+            try (var walk = Files.walk(directory)) {
+                paths = walk.sorted(Comparator.reverseOrder()).toList();
+            }
+            for (var path : paths) Files.deleteIfExists(path);
         }
     }
 
@@ -212,14 +179,47 @@ public abstract class ProcessSlicerProvider implements SlicerProvider {
         return executable.getParent() != null || Files.exists(executable) ? executable.toAbsolutePath() : executable;
     }
 
-    private record Scratch(Path directory) implements AutoCloseable {
-        @Override
-        public void close() throws IOException {
-            List<Path> paths;
-            try (var walk = Files.walk(directory)) {
-                paths = walk.sorted(Comparator.reverseOrder()).toList();
+    @Override
+    public final SlicerDescriptor descriptor() {
+        var descriptor = processes.get().descriptor();
+        return new SlicerDescriptor(
+                descriptor.id(), descriptor.name(), dev.voxelbrew.util.update.BuildVersion.current());
+    }
+
+    @Override
+    public final Optional<SlicerDialog<?>> settingsDialog() {
+        return Optional.of(new SettingsDialog(processes.get()));
+    }
+
+    @Override
+    public final String checkConfiguration(SlicerWindow window, Cancellation cancellation)
+            throws IOException, SlicerException {
+        cancellation.check();
+        var process = processes.get();
+        var settings =
+                window.show(new SettingsDialog(process)).orElseThrow(java.util.concurrent.CancellationException::new);
+        if (process.configurationOptions().containsKey("executable")
+                && settings.getOrDefault("executable", "").isBlank())
+            throw new SlicerException.Configuration("Choose a slicer executable");
+        var configured = process.configure(settings);
+        return configured.probe(command(configured), cancellation).actualVersion();
+    }
+
+    @Override
+    public final Slicer create() {
+        var process = processes.get();
+        return (model, window, cancellation, diagnostics) -> {
+            cancellation.check();
+            if (window instanceof BundledSlicers.Window bundled) {
+                try (var scratch = new Scratch(Files.createTempDirectory("voxelbrew-bundled-slicer-"))) {
+                    var configured = bundled.configure(process, model, scratch.directory(), cancellation);
+                    return Optional.of(run(configured, model, cancellation, diagnostics));
+                }
             }
-            for (var path : paths) Files.deleteIfExists(path);
-        }
+            var settings = window.show(new SettingsDialog(process));
+            cancellation.check();
+            if (settings.isEmpty()) return Optional.empty();
+            return Optional.of(run(process.configure(settings.get()), model, cancellation, diagnostics));
+        };
     }
 }

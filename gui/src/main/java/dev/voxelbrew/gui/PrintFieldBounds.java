@@ -2,20 +2,6 @@ package dev.voxelbrew.gui;
 
 /** Input bounds matching manufacturing value contracts. */
 record PrintFieldBounds(double min, double max, boolean whole, double step) {
-    PrintFieldBounds(double min, double max, boolean whole) {
-        this(min, max, whole, whole ? 1 : 0.1);
-    }
-
-    String helpKey() {
-        if (!Double.isFinite(min)) return "print.finite";
-        if (!Double.isFinite(max)) return "print.atLeast";
-        return whole ? "print.wholeRange" : "print.range";
-    }
-
-    boolean accepts(double value) {
-        return Double.isFinite(value) && value >= min && value <= max && (!whole || value == Math.rint(value));
-    }
-
     static PrintFieldBounds forField(String id) {
         return switch (id) {
             case "print-layer-height" -> new PrintFieldBounds(0.05, 0.3, false, 0.01);
@@ -33,5 +19,19 @@ record PrintFieldBounds(double min, double max, boolean whole, double step) {
                 new PrintFieldBounds(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, false, 1);
             default -> null;
         };
+    }
+
+    PrintFieldBounds(double min, double max, boolean whole) {
+        this(min, max, whole, whole ? 1 : 0.1);
+    }
+
+    String helpKey() {
+        if (!Double.isFinite(min)) return "print.finite";
+        if (!Double.isFinite(max)) return "print.atLeast";
+        return whole ? "print.wholeRange" : "print.range";
+    }
+
+    boolean accepts(double value) {
+        return Double.isFinite(value) && value >= min && value <= max && (!whole || value == Math.rint(value));
     }
 }

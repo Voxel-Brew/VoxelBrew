@@ -9,8 +9,6 @@ import java.util.Optional;
 
 /** Headless local file selection for importer tests. */
 public final class FileImportWindows {
-    private FileImportWindows() {}
-
     public static ImportWindow source(Path path) {
         return new ImportWindow() {
             @Override
@@ -23,4 +21,6 @@ public final class FileImportWindows {
             }
         };
     }
+
+    private FileImportWindows() {}
 }

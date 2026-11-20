@@ -11,6 +11,13 @@ import javafx.scene.input.KeyEvent;
 import org.junit.jupiter.api.Test;
 
 class KeyboardShortcutsTest {
+    private static String match(KeyCode code, boolean shift, boolean control, boolean alt) {
+        return KeyboardShortcuts.match(
+                KeyboardShortcuts.Scope.DESIGN,
+                new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, shift, control, alt, false),
+                null);
+    }
+
     @Test
     void finishSketchLetterPreservesTypingAndModifiedEnter() {
         var binding = KeyboardShortcuts.BINDINGS.stream()
@@ -115,12 +122,5 @@ class KeyboardShortcutsTest {
                 }
             }
         }
-    }
-
-    private static String match(KeyCode code, boolean shift, boolean control, boolean alt) {
-        return KeyboardShortcuts.match(
-                KeyboardShortcuts.Scope.DESIGN,
-                new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, shift, control, alt, false),
-                null);
     }
 }

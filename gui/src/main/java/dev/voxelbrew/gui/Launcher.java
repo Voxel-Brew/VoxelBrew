@@ -7,8 +7,6 @@ import javafx.application.Application;
 /** Separate main class allows the non-modular development distribution to launch JavaFX. */
 @lombok.extern.slf4j.Slf4j
 public final class Launcher {
-    private Launcher() {}
-
     @SuppressWarnings("try") // The update helper waits until all app instances release this lease.
     public static void main(String[] args) throws java.io.IOException {
         dev.voxelbrew.util.logging.Logging.initialize("gui");
@@ -60,4 +58,6 @@ public final class Launcher {
             if (System.getProperty("prism.order") == null) System.setProperty("prism.order", "es2");
         }
     }
+
+    private Launcher() {}
 }

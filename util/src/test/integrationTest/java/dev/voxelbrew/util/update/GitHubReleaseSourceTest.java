@@ -17,17 +17,24 @@ import org.junit.jupiter.api.io.TempDir;
 
 @SuppressWarnings("deprecation")
 class GitHubReleaseSourceTest {
+    private final AtomicReference<HttpHandler> handler = new AtomicReference<>();
+
+    private final List<String> paths = new CopyOnWriteArrayList<>();
+    private final List<String> authentication = new CopyOnWriteArrayList<>();
+    private final ReleaseVersion version = ReleaseVersion.release("1.2.3");
+    private final String asset = "VoxelBrewCLI-1.2.3-linux-x64.zip";
+
     @TempDir
     Path directory;
 
     private HttpServer server;
     private ExecutorService workers;
     private URI root;
-    private final AtomicReference<HttpHandler> handler = new AtomicReference<>();
-    private final List<String> paths = new CopyOnWriteArrayList<>();
-    private final List<String> authentication = new CopyOnWriteArrayList<>();
-    private final ReleaseVersion version = ReleaseVersion.release("1.2.3");
-    private final String asset = "VoxelBrewCLI-1.2.3-linux-x64.zip";
+
+    private static void respond(HttpExchange exchange, int status, byte[] body) throws IOException {
+        exchange.sendResponseHeaders(status, body.length);
+        exchange.getResponseBody().write(body);
+    }
 
     @BeforeEach
     void start() throws Exception {
@@ -237,10 +244,5 @@ class GitHubReleaseSourceTest {
         return "{\"tag_name\":\"v1.2.3\",\"draft\":false,\"prerelease\":false,\"assets\":[{\"name\":\""
                 + asset
                 + "\"},{\"name\":\"SHA256SUMS\"}]}";
-    }
-
-    private static void respond(HttpExchange exchange, int status, byte[] body) throws IOException {
-        exchange.sendResponseHeaders(status, body.length);
-        exchange.getResponseBody().write(body);
     }
 }

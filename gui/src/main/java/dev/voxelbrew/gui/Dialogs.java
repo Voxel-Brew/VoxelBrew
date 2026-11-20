@@ -20,8 +20,6 @@ import javafx.stage.WindowEvent;
 
 /** Window-local modal controls keep keyboard focus within the document on WSLg. */
 final class Dialogs {
-    private Dialogs() {}
-
     /** Give the action its full translated label width; the editable path takes the remainder. */
     static HBox pathRow(TextField path, Button browse) {
         path.setMinWidth(0);
@@ -139,4 +137,6 @@ final class Dialogs {
             if (previousFocus != null) previousFocus.requestFocus();
         }
     }
+
+    private Dialogs() {}
 }

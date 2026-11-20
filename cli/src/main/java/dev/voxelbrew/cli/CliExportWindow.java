@@ -30,6 +30,63 @@ final class CliExportWindow implements ExportWindow, PluginDirectorySource {
     private final boolean meshFlagsProvided;
     private Map<String, String> values = Map.of();
 
+    private static IllegalArgumentException validationFailure(
+            Map<String, Input> inputs, Map<String, String> resolved, Map<String, String> errors, String prefix) {
+        var messages = new ArrayList<String>();
+        boolean invalid = false;
+        for (var input : inputs.values()) {
+            String name = prefix + input.id() + " (" + label(input) + ")";
+            if (errors.containsKey(input.id())) {
+                messages.add(name + ": " + errors.get(input.id()));
+                invalid = true;
+            } else if (!resolved.containsKey(input.id())) {
+                messages.add(name);
+            }
+        }
+        for (var error : errors.entrySet()) {
+            if (!inputs.containsKey(error.getKey())) {
+                messages.add(prefix + error.getKey() + ": " + error.getValue());
+                invalid = true;
+            }
+        }
+        if (messages.isEmpty()) return null;
+        return new IllegalArgumentException(
+                (invalid ? "Invalid export inputs: " : "Missing export inputs: ") + String.join(", ", messages));
+    }
+
+    private static void collect(Component component, Map<String, Input> inputs) {
+        if (component instanceof Input input) {
+            if (inputs.putIfAbsent(input.id(), input) != null)
+                throw new IllegalArgumentException("Duplicate export input: " + input.id());
+        } else if (component instanceof HorizontalLayout horizontal) {
+            horizontal.children().forEach(child -> collect(child, inputs));
+        } else if (component instanceof VerticalLayout vertical) {
+            vertical.children().forEach(child -> collect(child, inputs));
+        }
+    }
+
+    private static String label(Input input) {
+        if (input instanceof TextField field) return field.label();
+        if (input instanceof TextArea area) return area.label();
+        if (input instanceof CheckBox box) return box.label();
+        if (input instanceof ComboBox box) return box.label();
+        if (input instanceof RadioButtonGroup group) return group.label();
+        if (input instanceof Slider slider) return slider.label();
+        return "Destination";
+    }
+
+    private static String defaultValue(Input input) {
+        if (input instanceof TextField field) return field.value();
+        if (input instanceof TextArea area) return area.value();
+        if (input instanceof CheckBox box) return Boolean.toString(box.selected());
+        if (input instanceof ComboBox box) return box.selected();
+        if (input instanceof RadioButtonGroup group) return group.selected();
+        if (input instanceof Slider slider) return Double.toString(slider.value());
+        if (input instanceof FileDestination destination && destination.defaultPath() != null)
+            return destination.defaultPath().toString();
+        return null;
+    }
+
     CliExportWindow(
             @NonNull String exporterId,
             @NonNull Path pluginDirectory,
@@ -134,62 +191,5 @@ final class CliExportWindow implements ExportWindow, PluginDirectorySource {
             if (message == null) return true;
             err.println(label(input) + "[" + input.id() + "]: " + message);
         }
-    }
-
-    private static IllegalArgumentException validationFailure(
-            Map<String, Input> inputs, Map<String, String> resolved, Map<String, String> errors, String prefix) {
-        var messages = new ArrayList<String>();
-        boolean invalid = false;
-        for (var input : inputs.values()) {
-            String name = prefix + input.id() + " (" + label(input) + ")";
-            if (errors.containsKey(input.id())) {
-                messages.add(name + ": " + errors.get(input.id()));
-                invalid = true;
-            } else if (!resolved.containsKey(input.id())) {
-                messages.add(name);
-            }
-        }
-        for (var error : errors.entrySet()) {
-            if (!inputs.containsKey(error.getKey())) {
-                messages.add(prefix + error.getKey() + ": " + error.getValue());
-                invalid = true;
-            }
-        }
-        if (messages.isEmpty()) return null;
-        return new IllegalArgumentException(
-                (invalid ? "Invalid export inputs: " : "Missing export inputs: ") + String.join(", ", messages));
-    }
-
-    private static void collect(Component component, Map<String, Input> inputs) {
-        if (component instanceof Input input) {
-            if (inputs.putIfAbsent(input.id(), input) != null)
-                throw new IllegalArgumentException("Duplicate export input: " + input.id());
-        } else if (component instanceof HorizontalLayout horizontal) {
-            horizontal.children().forEach(child -> collect(child, inputs));
-        } else if (component instanceof VerticalLayout vertical) {
-            vertical.children().forEach(child -> collect(child, inputs));
-        }
-    }
-
-    private static String label(Input input) {
-        if (input instanceof TextField field) return field.label();
-        if (input instanceof TextArea area) return area.label();
-        if (input instanceof CheckBox box) return box.label();
-        if (input instanceof ComboBox box) return box.label();
-        if (input instanceof RadioButtonGroup group) return group.label();
-        if (input instanceof Slider slider) return slider.label();
-        return "Destination";
-    }
-
-    private static String defaultValue(Input input) {
-        if (input instanceof TextField field) return field.value();
-        if (input instanceof TextArea area) return area.value();
-        if (input instanceof CheckBox box) return Boolean.toString(box.selected());
-        if (input instanceof ComboBox box) return box.selected();
-        if (input instanceof RadioButtonGroup group) return group.selected();
-        if (input instanceof Slider slider) return Double.toString(slider.value());
-        if (input instanceof FileDestination destination && destination.defaultPath() != null)
-            return destination.defaultPath().toString();
-        return null;
     }
 }

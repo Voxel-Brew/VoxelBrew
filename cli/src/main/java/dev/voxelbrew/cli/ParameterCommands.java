@@ -7,13 +7,6 @@ import picocli.CommandLine;
 import picocli.CommandLine.*;
 
 final class ParameterCommands {
-    private ParameterCommands() {}
-
-    static void register(CommandLine cli) {
-        cli.addSubcommand("parameters", Parameters.class);
-        cli.addSubcommand("configurations", Configurations.class);
-    }
-
     @Command(
             name = "parameters",
             mixinStandardHelpOptions = true,
@@ -27,10 +20,10 @@ final class ParameterCommands {
             })
     static class Parameters implements Runnable {
 
-        Parameters() {}
-
         @Spec
         CommandLine.Model.CommandSpec spec;
+
+        Parameters() {}
 
         @java.lang.Override
         public void run() {
@@ -52,10 +45,10 @@ final class ParameterCommands {
             })
     static class Configurations implements Runnable {
 
-        Configurations() {}
-
         @Spec
         CommandLine.Model.CommandSpec spec;
+
+        Configurations() {}
 
         @java.lang.Override
         public void run() {
@@ -66,12 +59,12 @@ final class ParameterCommands {
     @Command(name = "list", mixinStandardHelpOptions = true)
     static class ListParameters extends VoxelBrew.FileCommand {
 
+        @Option(names = "--configuration")
+        String configuration;
+
         ListParameters(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
-
-        @Option(names = "--configuration")
-        String configuration;
 
         @java.lang.Override
         public Integer call() throws Exception {
@@ -106,10 +99,6 @@ final class ParameterCommands {
             description = "Create a parameter or edit its expression in the active configuration")
     static class SetParameter extends VoxelBrew.FileCommand {
 
-        SetParameter(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(names = "--name", required = true)
         String name;
 
@@ -122,6 +111,10 @@ final class ParameterCommands {
         @Option(names = "--comment", defaultValue = "")
         String comment;
 
+        SetParameter(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
+
         @java.lang.Override
         public Integer call() throws Exception {
             var s = session();
@@ -133,15 +126,15 @@ final class ParameterCommands {
     @Command(name = "rename", mixinStandardHelpOptions = true)
     static class RenameParameter extends VoxelBrew.FileCommand {
 
-        RenameParameter(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(names = "--name", required = true)
         String name;
 
         @Option(names = "--to", required = true)
         String next;
+
+        RenameParameter(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
 
         @java.lang.Override
         public Integer call() throws Exception {
@@ -157,12 +150,12 @@ final class ParameterCommands {
             description = "Remove an unused parameter; references prevent removal")
     static class RemoveParameter extends VoxelBrew.FileCommand {
 
+        @Option(names = "--name", required = true)
+        String name;
+
         RemoveParameter(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
-
-        @Option(names = "--name", required = true)
-        String name;
 
         @java.lang.Override
         public Integer call() throws Exception {
@@ -179,10 +172,6 @@ final class ParameterCommands {
                     "Bind a sketch/3D dimension to an expression; empty expression restores its stored numeric value")
     static class Bind extends VoxelBrew.FileCommand {
 
-        Bind(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(names = "--feature", required = true)
         String feature;
 
@@ -191,6 +180,10 @@ final class ParameterCommands {
 
         @Option(names = "--expression", required = true)
         String expression;
+
+        Bind(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
 
         @java.lang.Override
         public Integer call() throws Exception {
@@ -228,15 +221,15 @@ final class ParameterCommands {
     @Command(name = "add", mixinStandardHelpOptions = true)
     static class AddConfiguration extends VoxelBrew.FileCommand {
 
-        AddConfiguration(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(names = "--name", required = true)
         String name;
 
         @Option(names = "--copy-active", description = "Snapshot current expressions; otherwise inherit Default")
         boolean copy;
+
+        AddConfiguration(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
 
         @java.lang.Override
         public Integer call() throws Exception {
@@ -252,10 +245,6 @@ final class ParameterCommands {
             description = "Set an override; empty expression restores inheritance for a nondefault configuration")
     static class Override extends VoxelBrew.FileCommand {
 
-        Override(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(names = "--name", required = true)
         String name;
 
@@ -264,6 +253,10 @@ final class ParameterCommands {
 
         @Option(names = "--expression", required = true)
         String expression;
+
+        Override(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
 
         @java.lang.Override
         public Integer call() throws Exception {
@@ -276,12 +269,12 @@ final class ParameterCommands {
     @Command(name = "activate", mixinStandardHelpOptions = true)
     static class Activate extends VoxelBrew.FileCommand {
 
+        @Option(names = "--name", required = true)
+        String name;
+
         Activate(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
-
-        @Option(names = "--name", required = true)
-        String name;
 
         @java.lang.Override
         public Integer call() throws Exception {
@@ -294,15 +287,15 @@ final class ParameterCommands {
     @Command(name = "rename", mixinStandardHelpOptions = true)
     static class RenameConfiguration extends VoxelBrew.FileCommand {
 
-        RenameConfiguration(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(names = "--name", required = true)
         String name;
 
         @Option(names = "--to", required = true)
         String next;
+
+        RenameConfiguration(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
 
         @java.lang.Override
         public Integer call() throws Exception {
@@ -315,12 +308,12 @@ final class ParameterCommands {
     @Command(name = "remove", mixinStandardHelpOptions = true)
     static class RemoveConfiguration extends VoxelBrew.FileCommand {
 
+        @Option(names = "--name", required = true)
+        String name;
+
         RemoveConfiguration(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
-
-        @Option(names = "--name", required = true)
-        String name;
 
         @java.lang.Override
         public Integer call() throws Exception {
@@ -329,4 +322,11 @@ final class ParameterCommands {
             return save(s);
         }
     }
+
+    static void register(CommandLine cli) {
+        cli.addSubcommand("parameters", Parameters.class);
+        cli.addSubcommand("configurations", Configurations.class);
+    }
+
+    private ParameterCommands() {}
 }

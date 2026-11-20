@@ -11,35 +11,17 @@ import javafx.stage.Stage;
 
 /** Service-discovered factory; each invocation owns an independent constructor graph. */
 public final class DefaultGuiFactory implements GuiComponent.Factory {
-    public DefaultGuiFactory() {}
-
-    @Override
-    public GuiComponent create(Stage stage, Path plugins, ApplicationModule application, FileIoModule files) {
-        return new Scope(stage, plugins, application, files);
-    }
-
     private static final class Scope implements GuiComponent {
-        private PrinterStore printerRuntime;
-        private PrinterProfileCatalog profiles;
-
-        private PrinterStore printerRuntime() {
-            if (printerRuntime == null)
-                printerRuntime = new dev.voxelbrew.printer.FilePrinterStore(application.configuration());
-            return printerRuntime;
-        }
-
-        private PrinterProfileCatalog profiles() {
-            if (profiles == null)
-                profiles = new dev.voxelbrew.printer.DefaultPrinterProfileCatalog(
-                        application.paths().profiles());
-            return profiles;
-        }
-
         private final ApplicationModule application;
         private final FileIoModule files;
+
         private final Translations translations;
+
         private final Stage stage;
+
         private final Path plugins;
+        private PrinterStore printerRuntime;
+        private PrinterProfileCatalog profiles;
         private DocumentController documentController;
         private WindowResources windowResources;
         private McpAutomation mcpAutomation;
@@ -52,7 +34,6 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
         private Appearance appearance;
         private Rendering rendering;
         private RecentFiles recentFiles;
-
         private Workbench workbench;
 
         Scope(Stage stage, Path plugins, ApplicationModule application, FileIoModule files) {
@@ -61,6 +42,19 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
             this.translations = new Translations(application.configuration(), application.paths());
             this.stage = stage;
             this.plugins = plugins;
+        }
+
+        private PrinterStore printerRuntime() {
+            if (printerRuntime == null)
+                printerRuntime = new dev.voxelbrew.printer.FilePrinterStore(application.configuration());
+            return printerRuntime;
+        }
+
+        private PrinterProfileCatalog profiles() {
+            if (profiles == null)
+                profiles = new dev.voxelbrew.printer.DefaultPrinterProfileCatalog(
+                        application.paths().profiles());
+            return profiles;
         }
 
         private DocumentController documentController() {
@@ -193,5 +187,12 @@ public final class DefaultGuiFactory implements GuiComponent.Factory {
                                 new SketchController(geometry, parameters, id, Platform::runLater));
             return workbench;
         }
+    }
+
+    public DefaultGuiFactory() {}
+
+    @Override
+    public GuiComponent create(Stage stage, Path plugins, ApplicationModule application, FileIoModule files) {
+        return new Scope(stage, plugins, application, files);
     }
 }

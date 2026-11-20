@@ -9,6 +9,8 @@ import java.util.*;
 public final class PrinterResources {
     public static final String ROOT = "/dev/voxelbrew/printer/profiles/";
 
+    private final Path directory;
+
     public record Source(String name, String json, Path directory, boolean bundled) {}
 
     public record Result(List<Source> sources, List<String> diagnostics) {
@@ -16,60 +18,6 @@ public final class PrinterResources {
             sources = List.copyOf(sources);
             diagnostics = List.copyOf(diagnostics);
         }
-    }
-
-    private final Path directory;
-
-    public PrinterResources(Path directory) {
-        this.directory = directory.toAbsolutePath().normalize();
-    }
-
-    public Path directory() {
-        return directory;
-    }
-
-    public Result load() {
-        var sources = new ArrayList<Source>();
-        var diagnostics = new ArrayList<String>();
-        try (var input = PrinterResources.class.getResourceAsStream(ROOT + "index.txt")) {
-            if (input == null) throw new IOException("Missing bundled printer index");
-            for (String name : new String(input.readAllBytes(), StandardCharsets.UTF_8)
-                    .lines()
-                    .toList()) {
-                if (name.isBlank()) continue;
-                try (var preset = PrinterResources.class.getResourceAsStream(ROOT + name)) {
-                    if (preset == null) throw new IOException("Missing resource " + name);
-                    sources.add(
-                            new Source(name, new String(preset.readAllBytes(), StandardCharsets.UTF_8), null, true));
-                } catch (IOException ex) {
-                    diagnostics.add(name + ": " + ex.getMessage());
-                }
-            }
-        } catch (IOException ex) {
-            diagnostics.add(ex.getMessage());
-        }
-        if (Files.exists(directory)) {
-            try (var files = Files.list(directory)) {
-                for (var file : files.filter(p ->
-                                java.util.Objects.toString(p.getFileName(), "").endsWith(".json"))
-                        .sorted()
-                        .toList()) {
-                    try {
-                        if (Files.size(file) > 1024 * 1024) throw new IOException("Preset exceeds 1 MiB");
-                        sources.add(new Source(
-                                java.util.Objects.toString(file.getFileName(), ""),
-                                Files.readString(file),
-                                directory,
-                                false));
-                    } catch (IOException ex) {
-                        diagnostics.add(file + ": " + ex.getMessage());
-                    }
-                }
-            } catch (IOException ex) {
-                diagnostics.add(directory + ": " + ex.getMessage());
-            }
-        }
-        return new Result(sources, diagnostics);
     }
 
     public static String image(Source source, String name) {
@@ -122,5 +70,57 @@ public final class PrinterResources {
             return null;
         }
         return null;
+    }
+
+    public PrinterResources(Path directory) {
+        this.directory = directory.toAbsolutePath().normalize();
+    }
+
+    public Path directory() {
+        return directory;
+    }
+
+    public Result load() {
+        var sources = new ArrayList<Source>();
+        var diagnostics = new ArrayList<String>();
+        try (var input = PrinterResources.class.getResourceAsStream(ROOT + "index.txt")) {
+            if (input == null) throw new IOException("Missing bundled printer index");
+            for (String name : new String(input.readAllBytes(), StandardCharsets.UTF_8)
+                    .lines()
+                    .toList()) {
+                if (name.isBlank()) continue;
+                try (var preset = PrinterResources.class.getResourceAsStream(ROOT + name)) {
+                    if (preset == null) throw new IOException("Missing resource " + name);
+                    sources.add(
+                            new Source(name, new String(preset.readAllBytes(), StandardCharsets.UTF_8), null, true));
+                } catch (IOException ex) {
+                    diagnostics.add(name + ": " + ex.getMessage());
+                }
+            }
+        } catch (IOException ex) {
+            diagnostics.add(ex.getMessage());
+        }
+        if (Files.exists(directory)) {
+            try (var files = Files.list(directory)) {
+                for (var file : files.filter(p ->
+                                java.util.Objects.toString(p.getFileName(), "").endsWith(".json"))
+                        .sorted()
+                        .toList()) {
+                    try {
+                        if (Files.size(file) > 1024 * 1024) throw new IOException("Preset exceeds 1 MiB");
+                        sources.add(new Source(
+                                java.util.Objects.toString(file.getFileName(), ""),
+                                Files.readString(file),
+                                directory,
+                                false));
+                    } catch (IOException ex) {
+                        diagnostics.add(file + ": " + ex.getMessage());
+                    }
+                }
+            } catch (IOException ex) {
+                diagnostics.add(directory + ": " + ex.getMessage());
+            }
+        }
+        return new Result(sources, diagnostics);
     }
 }

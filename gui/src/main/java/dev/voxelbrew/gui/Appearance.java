@@ -16,53 +16,14 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 final class Appearance {
+    private final UserConfiguration configuration;
+
+    private final java.util.function.Supplier<String> legacyAppearance;
+
     enum Choice {
         SYSTEM,
         LIGHT,
         DARK
-    }
-
-    private final UserConfiguration configuration;
-    private final java.util.function.Supplier<String> legacyAppearance;
-
-    Appearance() {
-        this(
-                UserConfiguration.user(),
-                () -> Preferences.userNodeForPackage(Appearance.class).get("appearance", null));
-    }
-
-    Appearance(UserConfiguration configuration) {
-        this(
-                configuration,
-                () -> Preferences.userNodeForPackage(Appearance.class).get("appearance", null));
-    }
-
-    Choice load() {
-        try {
-            String value = configuration.get("appearance", null);
-            if (value == null) {
-                String legacy = legacyAppearance.get();
-                if (legacy != null) {
-                    Choice.valueOf(legacy);
-                    configuration.setIfAbsent("appearance", legacy);
-                    value = configuration.get("appearance", legacy);
-                }
-            }
-            return Choice.valueOf(value == null ? "SYSTEM" : value);
-        } catch (IllegalArgumentException ignored) {
-            return Choice.SYSTEM;
-        } catch (IOException | SecurityException failure) {
-            log.warn("Cannot load appearance preference", failure);
-            return Choice.SYSTEM;
-        }
-    }
-
-    void save(Choice choice) {
-        try {
-            configuration.set("appearance", choice.name());
-        } catch (IOException failure) {
-            log.warn("Cannot save appearance preference", failure);
-        }
     }
 
     static boolean systemDark() {
@@ -103,6 +64,46 @@ final class Appearance {
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
             return "";
+        }
+    }
+
+    Appearance() {
+        this(
+                UserConfiguration.user(),
+                () -> Preferences.userNodeForPackage(Appearance.class).get("appearance", null));
+    }
+
+    Appearance(UserConfiguration configuration) {
+        this(
+                configuration,
+                () -> Preferences.userNodeForPackage(Appearance.class).get("appearance", null));
+    }
+
+    Choice load() {
+        try {
+            String value = configuration.get("appearance", null);
+            if (value == null) {
+                String legacy = legacyAppearance.get();
+                if (legacy != null) {
+                    Choice.valueOf(legacy);
+                    configuration.setIfAbsent("appearance", legacy);
+                    value = configuration.get("appearance", legacy);
+                }
+            }
+            return Choice.valueOf(value == null ? "SYSTEM" : value);
+        } catch (IllegalArgumentException ignored) {
+            return Choice.SYSTEM;
+        } catch (IOException | SecurityException failure) {
+            log.warn("Cannot load appearance preference", failure);
+            return Choice.SYSTEM;
+        }
+    }
+
+    void save(Choice choice) {
+        try {
+            configuration.set("appearance", choice.name());
+        } catch (IOException failure) {
+            log.warn("Cannot save appearance preference", failure);
         }
     }
 }

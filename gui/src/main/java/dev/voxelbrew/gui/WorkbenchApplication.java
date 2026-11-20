@@ -18,6 +18,42 @@ import javafx.stage.Stage;
 public final class WorkbenchApplication extends Application {
     private Workbench workbench;
 
+    private static void checkForUpdates(Stage stage, Workbench workbench) {
+        Thread.ofVirtual().name("voxelbrew-startup-update").start(() -> {
+            try {
+                var result = UpdateService.system(ApplicationImage.Component.GUI)
+                        .check(new UpdateService.Request(null, false), new UpdateCancellation());
+                if (!result.available() || !result.installable()) return;
+                Platform.runLater(() -> {
+                    if (!stage.isShowing()) return;
+                    var translations = Translations.current();
+                    var download = new ButtonType(translations.text("update.download"));
+                    var prompt = new Alert(Alert.AlertType.INFORMATION, result.message(), download, ButtonType.CANCEL);
+                    prompt.setTitle(translations.text("update.title"));
+                    prompt.setHeaderText(translations.text("update.heading"));
+                    if (prompt.showAndWait().filter(download::equals).isPresent() && stage.isShowing())
+                        workbench.openUpdates();
+                });
+            } catch (Exception failure) {
+                log.warn("Startup update check failed", failure);
+            }
+        });
+    }
+
+    static Workbench openWindow(Stage stage, Path plugins, Path open) throws java.io.IOException {
+        var workbench = Workbench.create(stage, plugins);
+        var screen = Screen.getPrimary().getVisualBounds();
+        stage.setScene(
+                workbench.createScene(Math.min(1400, screen.getWidth() - 60), Math.min(900, screen.getHeight() - 80)));
+        stage.setMinWidth(Math.min(1100, screen.getWidth() - 60));
+        stage.setMinHeight(Math.min(700, screen.getHeight() - 80));
+        stage.show();
+        log.info("Workbench window opened with plugin directory {}", plugins);
+        if (open != null) workbench.controller().open(open).exceptionally(failure -> null);
+        stage.setOnHidden(event -> workbench.close());
+        return workbench;
+    }
+
     @Override
     public void start(Stage stage) throws java.io.IOException {
         if (!Platform.isSupported(ConditionalFeature.SCENE3D))
@@ -54,42 +90,6 @@ public final class WorkbenchApplication extends Application {
                     "cut", new Feature.ProfileRef("hole", "hole.profile"), new Feature.BodyRef("thickness", "body")));
             PackageSmoke.verify(workbench, stage, smokeOutput);
         }
-    }
-
-    private static void checkForUpdates(Stage stage, Workbench workbench) {
-        Thread.ofVirtual().name("voxelbrew-startup-update").start(() -> {
-            try {
-                var result = UpdateService.system(ApplicationImage.Component.GUI)
-                        .check(new UpdateService.Request(null, false), new UpdateCancellation());
-                if (!result.available() || !result.installable()) return;
-                Platform.runLater(() -> {
-                    if (!stage.isShowing()) return;
-                    var translations = Translations.current();
-                    var download = new ButtonType(translations.text("update.download"));
-                    var prompt = new Alert(Alert.AlertType.INFORMATION, result.message(), download, ButtonType.CANCEL);
-                    prompt.setTitle(translations.text("update.title"));
-                    prompt.setHeaderText(translations.text("update.heading"));
-                    if (prompt.showAndWait().filter(download::equals).isPresent() && stage.isShowing())
-                        workbench.openUpdates();
-                });
-            } catch (Exception failure) {
-                log.warn("Startup update check failed", failure);
-            }
-        });
-    }
-
-    static Workbench openWindow(Stage stage, Path plugins, Path open) throws java.io.IOException {
-        var workbench = Workbench.create(stage, plugins);
-        var screen = Screen.getPrimary().getVisualBounds();
-        stage.setScene(
-                workbench.createScene(Math.min(1400, screen.getWidth() - 60), Math.min(900, screen.getHeight() - 80)));
-        stage.setMinWidth(Math.min(1100, screen.getWidth() - 60));
-        stage.setMinHeight(Math.min(700, screen.getHeight() - 80));
-        stage.show();
-        log.info("Workbench window opened with plugin directory {}", plugins);
-        if (open != null) workbench.controller().open(open).exceptionally(failure -> null);
-        stage.setOnHidden(event -> workbench.close());
-        return workbench;
     }
 
     @Override

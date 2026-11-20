@@ -12,14 +12,15 @@ import lombok.RequiredArgsConstructor;
 /** Shared destination dialog and publication for document exporters. */
 @RequiredArgsConstructor
 abstract class FileExporter implements Exporter<FileExportDialog.Destination> {
+    private final String extension;
+
+    private final String title;
+    private final Writer writer;
+
     @FunctionalInterface
     interface Writer {
         void save(CadDocument document, Path path, boolean overwrite, ExportWindow window) throws IOException;
     }
-
-    private final String extension;
-    private final String title;
-    private final Writer writer;
 
     @Override
     public final Optional<FileExportDialog.Destination> export(CadDocument document, ExportWindow window)

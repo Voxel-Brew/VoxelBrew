@@ -29,6 +29,10 @@ final class ConstructionEditor extends VBox {
     private long generation;
     private boolean closed;
 
+    private static double number(TextField field) {
+        return Double.parseDouble(field.getText().trim().replace(',', '.'));
+    }
+
     ConstructionEditor(
             Tool tool,
             ConstructionFeature original,
@@ -229,10 +233,6 @@ final class ConstructionEditor extends VBox {
             inputs.add(input);
         }
         return new ConstructionFeature(id, tool, inputs, number(value), alternate.isSelected());
-    }
-
-    private static double number(TextField field) {
-        return Double.parseDouble(field.getText().trim().replace(',', '.'));
     }
 
     private void evaluate(boolean commit, Runnable finished) {

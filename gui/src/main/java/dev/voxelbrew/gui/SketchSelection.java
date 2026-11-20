@@ -8,8 +8,6 @@ import java.util.Set;
 
 /** Directional selection against the same sampled curves used by the sketch canvas. */
 final class SketchSelection {
-    private SketchSelection() {}
-
     static Set<Ref> inBox(SketchGeometry geometry, Vec start, Vec end, boolean crossing) {
         double minX = Math.min(start.x(), end.x()), maxX = Math.max(start.x(), end.x());
         double minY = Math.min(start.y(), end.y()), maxY = Math.max(start.y(), end.y());
@@ -52,4 +50,6 @@ final class SketchSelection {
         }
         return true;
     }
+
+    private SketchSelection() {}
 }

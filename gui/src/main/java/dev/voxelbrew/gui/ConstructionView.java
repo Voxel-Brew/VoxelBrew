@@ -12,27 +12,6 @@ import javafx.scene.shape.*;
 import javafx.scene.transform.Rotate;
 
 final class ConstructionView extends Group {
-    void show(Map<String, Datum> values, Consumer<String> selected) {
-        getChildren().clear();
-        values.forEach((id, value) -> {
-            var node = node(value, Color.web("#e6a347"));
-            node.setId("construction-" + id);
-            node.setOnMouseClicked(event -> {
-                if (event.getButton() == MouseButton.PRIMARY) {
-                    selected.accept(id);
-                    event.consume();
-                }
-            });
-            getChildren().add(node);
-        });
-    }
-
-    void preview(Datum datum) {
-        getChildren().clear();
-        setMouseTransparent(true);
-        if (datum != null) getChildren().add(node(datum, Color.CYAN));
-    }
-
     private static Point3D view(Vector vector) {
         return Viewport.toView(vector.x(), vector.y(), vector.z());
     }
@@ -90,5 +69,26 @@ final class ConstructionView extends Group {
         if (rotationAxis.magnitude() > 1e-9) cylinder.getTransforms().add(new Rotate(y.angle(direction), rotationAxis));
         cylinder.setMaterial(new PhongMaterial(color));
         return cylinder;
+    }
+
+    void show(Map<String, Datum> values, Consumer<String> selected) {
+        getChildren().clear();
+        values.forEach((id, value) -> {
+            var node = node(value, Color.web("#e6a347"));
+            node.setId("construction-" + id);
+            node.setOnMouseClicked(event -> {
+                if (event.getButton() == MouseButton.PRIMARY) {
+                    selected.accept(id);
+                    event.consume();
+                }
+            });
+            getChildren().add(node);
+        });
+    }
+
+    void preview(Datum datum) {
+        getChildren().clear();
+        setMouseTransparent(true);
+        if (datum != null) getChildren().add(node(datum, Color.CYAN));
     }
 }

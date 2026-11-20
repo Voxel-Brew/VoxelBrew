@@ -10,10 +10,6 @@ import picocli.CommandLine.Option;
         mixinStandardHelpOptions = true,
         description = "List or assign CAD body material and color; independent of slicer settings.")
 final class BodyStyleCommand extends VoxelBrew.FileCommand {
-    BodyStyleCommand(DocumentSource documents, DocumentSave documentWriter) {
-        super(documents, documentWriter);
-    }
-
     @Option(names = "--body", description = "Stable body ID from inspect, e.g. extrude.body")
     String body;
 
@@ -25,6 +21,10 @@ final class BodyStyleCommand extends VoxelBrew.FileCommand {
 
     @Option(names = "--reset", description = "Remove the override and inherit the source/default style")
     boolean reset;
+
+    BodyStyleCommand(DocumentSource documents, DocumentSave documentWriter) {
+        super(documents, documentWriter);
+    }
 
     @Override
     public Integer call() throws Exception {

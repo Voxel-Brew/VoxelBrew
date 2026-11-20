@@ -34,75 +34,16 @@ import javafx.util.StringConverter;
 final class PrintingPane extends BorderPane implements AutoCloseable {
     private final SlicerWorkspace workspace = new SlicerWorkspace();
     private final Map<String, ButtonBase> quickActions = new LinkedHashMap<>();
-    private Runnable export3mf = () -> {};
-
-    void onExport3mf(Runnable action) {
-        export3mf = Objects.requireNonNull(action);
-    }
-
-    void onConfigureDevices(Runnable action) {
-        configureDevicesAction = Objects.requireNonNull(action);
-    }
-
-    void configureDevices() {
-        var targetId = setup().workspaceSettings().get(PrintTarget.PRINTER_ID);
-        var before = printTargetDevices.get(targetId);
-        configureDevicesAction.run();
-        reloadPrinters();
-        var after = printTargetDevices.get(targetId);
-        if (before != null
-                && after != null
-                && !ProfileHardware.resolve(before.profile()).equals(ProfileHardware.resolve(after.profile())))
-            commit(setup().withPrinter(ProfileHardware.resolve(after.profile())).withPrintTarget(targetId));
-    }
-
-    QuickMenu quickMenu(javafx.scene.Parent theme, java.util.function.Supplier<List<QuickMenu.Action>> workspaces) {
-        return new QuickMenu(
-                canvas,
-                theme,
-                translations,
-                () -> {
-                    var radial = QuickMenu.controls(
-                            quickActions::get,
-                            "print-slice",
-                            "print-slice-all",
-                            "print-auto-arrange",
-                            "print-auto-orient",
-                            "print-fit-view",
-                            "print-view-2d",
-                            "print-view-3d",
-                            "print-preview");
-                    var additional = QuickMenu.controls(quickActions::get, "print-add", "print-lay-face");
-                    var remove = QuickMenu.Action.button(quickActions.get("print-remove"), "×");
-                    additional.add(new QuickMenu.Action(
-                            remove.id(),
-                            translations.text("quick.removeObject"),
-                            remove.icon(),
-                            remove.disabled(),
-                            remove.selected(),
-                            remove.invoke()));
-                    additional.addAll(QuickMenu.controls(quickActions::get, "print-cancel"));
-                    return new QuickMenu.Content(radial, additional);
-                },
-                workspaces,
-                (dx, dy) -> {
-                    cancelDrag();
-                    camera().pan(dx, dy);
-                    draw();
-                },
-                target -> true);
-    }
-
     private final PrinterProfileCatalog printers;
+
     private final PrinterVisibility printerVisibility;
-    private Set<String> hiddenPrinters = Set.of();
-    private PrinterProfileCatalog.Result printerCatalog;
+
     private final Button printerChoice = new Button();
+
     private final Label printerProfileLabel = new Label();
+
     private final ComboBox<String> printTarget = new ComboBox<>();
-    private Map<String, String> printTargetNames = Map.of();
-    private Map<String, dev.voxelbrew.api.printer.Printer> printTargetDevices = Map.of();
-    private Runnable configureDevicesAction = () -> {};
+
     private final dev.voxelbrew.api.printer.PrinterStore printerRuntime;
     private final Label printerDetails = new Label();
     private final FormulaField nozzle;
@@ -113,37 +54,16 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     private final SlicerSettings slicerSettings;
     private final ExecutorService validator;
     private final dev.voxelbrew.util.i18n.Translations translations;
-    private Future<?> validationTask;
-    private long validationSequence;
     private final Label plateSize = new Label();
-    private boolean threeDimensional;
-    private Button autoArrange;
-    private Button orientAll;
-    private boolean orienting;
     private final ToggleButton toolpathPreview = new ToggleButton();
-    private double plateWidth = 200, plateDepth = 200, plateMinX, plateMinY;
     private final Canvas canvas = new Canvas();
-    private ViewCube viewCube;
     private final HBox plateStrip = new HBox(6);
-    private TextField plateNameEditor;
     private final VBox previewControls = new VBox(10);
     private final Label placementHint = new Label();
-    private double viewScale, viewOx, viewOy;
-    private PrintDepthBuffer placementRaster;
-    private double placementRasterScale = 1;
     private final PrintCamera topCamera = new PrintCamera(false), spatialCamera = new PrintCamera(true);
-    private boolean navigating, primaryNavigation;
-    private double navigationX, navigationY;
-    private double dragX, dragY;
-    private BodyInstance dragSource, dragPreview;
-    private String dragRevision;
     private final ComboBox<PrintRotationGizmo.Space> rotationSpace = new ComboBox<>();
     private final CheckBox localGizmoAxes = new CheckBox();
     private final CheckBox showRotationGizmos = new CheckBox();
-    private List<PrintRotationGizmo.Ring> rotationRings = List.of();
-    private PrintRotationGizmo.Drag rotationDrag;
-    private PrintRotationGizmo.Axis hoveredRotation;
-    private double rotationDegrees;
     private final ComboBox<String> targetPlate = new ComboBox<>();
     private final ComboBox<String> bodies = new ComboBox<>(),
             instances = new ComboBox<>(),
@@ -164,23 +84,105 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     private final EnumMap<GcodeJob.Role, CheckBox> roles = new EnumMap<>(GcodeJob.Role.class);
     private final Button slice;
     private final Button sliceAll;
-    private Button export3mfButton;
     private final Button cleanSlicing;
     private final Button cancel;
     private final ProgressIndicator progress = new ProgressIndicator();
+    private final Tooltip selectedObjectTooltip = UiHelp.tooltip("");
+    private final Label selectedObjectName = new Label();
+    private final TabPane tabs = new TabPane();
+    private Runnable export3mf = () -> {};
+    private Set<String> hiddenPrinters = Set.of();
+    private PrinterProfileCatalog.Result printerCatalog;
+    private Map<String, String> printTargetNames = Map.of();
+    private Map<String, dev.voxelbrew.api.printer.Printer> printTargetDevices = Map.of();
+    private Runnable configureDevicesAction = () -> {};
+    private Future<?> validationTask;
+    private long validationSequence;
+    private boolean threeDimensional;
+    private Button autoArrange;
+    private Button orientAll;
+    private boolean orienting;
+    private double plateWidth = 200, plateDepth = 200, plateMinX, plateMinY;
+    private ViewCube viewCube;
+    private TextField plateNameEditor;
+    private double viewScale, viewOx, viewOy;
+    private PrintDepthBuffer placementRaster;
+    private double placementRasterScale = 1;
+    private boolean navigating, primaryNavigation;
+    private double navigationX, navigationY;
+    private double dragX, dragY;
+    private BodyInstance dragSource, dragPreview;
+    private String dragRevision;
+    private List<PrintRotationGizmo.Ring> rotationRings = List.of();
+    private PrintRotationGizmo.Drag rotationDrag;
+    private PrintRotationGizmo.Axis hoveredRotation;
+    private double rotationDegrees;
+    private Button export3mfButton;
     private ManufacturingModel model;
     private PrintValidation.Result validation;
     private PrintSetup lastSetup;
     private DocumentController.Build lastBuild;
     private String validatedRevision = "";
-    private final Tooltip selectedObjectTooltip = UiHelp.tooltip("");
-    private final Label selectedObjectName = new Label();
-    private final TabPane tabs = new TabPane();
     private int selectedFaceIndex;
     private String selectedFaceBody;
     private boolean updating, dark, closed;
     private List<Double> previewLayers = List.of();
     private SliceService.Result displayed;
+
+    private static Color rotationColor(PrintRotationGizmo.Axis axis) {
+        return switch (axis) {
+            case X -> Color.web("#e46969");
+            case Y -> Color.web("#57ad74");
+            case Z -> Color.web("#728ef5");
+        };
+    }
+
+    private static HBox equalRow(Button... buttons) {
+        var row = new HBox(6);
+        for (var button : buttons) {
+            button.setMinWidth(0);
+            button.setPrefWidth(0);
+            button.setMaxWidth(Double.MAX_VALUE);
+            button.setWrapText(true);
+            HBox.setHgrow(button, Priority.ALWAYS);
+            row.getChildren().add(button);
+        }
+        return row;
+    }
+
+    static Path jobDestination(Path project, String plateName, int plateNumber, int plateCount) {
+        if (plateNumber < 1 || plateNumber > plateCount) throw new IllegalArgumentException("Invalid plate number");
+        Path filename = project.getFileName();
+        if (filename == null) throw new IllegalArgumentException("Expected a project file: " + project);
+        String name = filename.toString();
+        int extension = name.lastIndexOf('.');
+        String number =
+                String.format(Locale.ROOT, "%0" + Integer.toString(plateCount).length() + "d", plateNumber);
+        StringBuilder escaped = new StringBuilder();
+        int trailing = plateName.length();
+        while (trailing > 0 && (plateName.charAt(trailing - 1) == '.' || plateName.charAt(trailing - 1) == ' '))
+            trailing--;
+        for (int i = 0; i < plateName.length(); i++) {
+            char character = plateName.charAt(i);
+            if (Character.isISOControl(character) || "<>:\"/\\|?*%".indexOf(character) >= 0 || i >= trailing)
+                escaped.append(String.format(Locale.ROOT, "%%%02X", (int) character));
+            else escaped.append(character);
+        }
+        return project.resolveSibling(
+                (extension > 0 ? name.substring(0, extension) : name) + "-" + number + "-" + escaped + ".gcode");
+    }
+
+    private static Color color(GcodeJob.Role role) {
+        return switch (role) {
+            case EXTERNAL_PERIMETER -> Color.DEEPSKYBLUE;
+            case PERIMETER -> Color.ROYALBLUE;
+            case INFILL, SOLID_INFILL, GAP_FILL, BRIDGE, IRONING -> Color.DARKORANGE;
+            case SUPPORT -> Color.LIMEGREEN;
+            case INTERFACE -> Color.MEDIUMPURPLE;
+            case SKIRT_BRIM -> Color.CRIMSON;
+            case TRAVEL, UNKNOWN -> Color.GRAY;
+        };
+    }
 
     PrintingPane(
             PrinterProfileCatalog printers,
@@ -772,6 +774,63 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         });
         jobs.onChanged(this::updateJob);
         updateJob();
+    }
+
+    void onExport3mf(Runnable action) {
+        export3mf = Objects.requireNonNull(action);
+    }
+
+    void onConfigureDevices(Runnable action) {
+        configureDevicesAction = Objects.requireNonNull(action);
+    }
+
+    void configureDevices() {
+        var targetId = setup().workspaceSettings().get(PrintTarget.PRINTER_ID);
+        var before = printTargetDevices.get(targetId);
+        configureDevicesAction.run();
+        reloadPrinters();
+        var after = printTargetDevices.get(targetId);
+        if (before != null
+                && after != null
+                && !ProfileHardware.resolve(before.profile()).equals(ProfileHardware.resolve(after.profile())))
+            commit(setup().withPrinter(ProfileHardware.resolve(after.profile())).withPrintTarget(targetId));
+    }
+
+    QuickMenu quickMenu(javafx.scene.Parent theme, java.util.function.Supplier<List<QuickMenu.Action>> workspaces) {
+        return new QuickMenu(
+                canvas,
+                theme,
+                translations,
+                () -> {
+                    var radial = QuickMenu.controls(
+                            quickActions::get,
+                            "print-slice",
+                            "print-slice-all",
+                            "print-auto-arrange",
+                            "print-auto-orient",
+                            "print-fit-view",
+                            "print-view-2d",
+                            "print-view-3d",
+                            "print-preview");
+                    var additional = QuickMenu.controls(quickActions::get, "print-add", "print-lay-face");
+                    var remove = QuickMenu.Action.button(quickActions.get("print-remove"), "×");
+                    additional.add(new QuickMenu.Action(
+                            remove.id(),
+                            translations.text("quick.removeObject"),
+                            remove.icon(),
+                            remove.disabled(),
+                            remove.selected(),
+                            remove.invoke()));
+                    additional.addAll(QuickMenu.controls(quickActions::get, "print-cancel"));
+                    return new QuickMenu.Content(radial, additional);
+                },
+                workspaces,
+                (dx, dy) -> {
+                    cancelDrag();
+                    camera().pan(dx, dy);
+                    draw();
+                },
+                target -> true);
     }
 
     private Tab tab(String name, VBox content) {
@@ -1768,14 +1827,6 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         }
     }
 
-    private static Color rotationColor(PrintRotationGizmo.Axis axis) {
-        return switch (axis) {
-            case X -> Color.web("#e46969");
-            case Y -> Color.web("#57ad74");
-            case Z -> Color.web("#728ef5");
-        };
-    }
-
     private PrintRotationGizmo.Hit rotationHit(double x, double y) {
         if (!showRotationGizmos.isSelected() || toolpathPreview.isSelected() || !document.canExport() || jobs.running())
             return null;
@@ -1887,19 +1938,6 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         var next = removing.removeActivePlate();
         if (!id.equals(setup().activePlateId())) next = next.selectPlate(setup().activePlateId());
         commit(next);
-    }
-
-    private static HBox equalRow(Button... buttons) {
-        var row = new HBox(6);
-        for (var button : buttons) {
-            button.setMinWidth(0);
-            button.setPrefWidth(0);
-            button.setMaxWidth(Double.MAX_VALUE);
-            button.setWrapText(true);
-            HBox.setHgrow(button, Priority.ALWAYS);
-            row.getChildren().add(button);
-        }
-        return row;
     }
 
     private void saveProcess() {
@@ -2166,28 +2204,6 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
             if (current && after != null && !before.equals(after)) replace(after);
             event.consume();
         });
-    }
-
-    static Path jobDestination(Path project, String plateName, int plateNumber, int plateCount) {
-        if (plateNumber < 1 || plateNumber > plateCount) throw new IllegalArgumentException("Invalid plate number");
-        Path filename = project.getFileName();
-        if (filename == null) throw new IllegalArgumentException("Expected a project file: " + project);
-        String name = filename.toString();
-        int extension = name.lastIndexOf('.');
-        String number =
-                String.format(Locale.ROOT, "%0" + Integer.toString(plateCount).length() + "d", plateNumber);
-        StringBuilder escaped = new StringBuilder();
-        int trailing = plateName.length();
-        while (trailing > 0 && (plateName.charAt(trailing - 1) == '.' || plateName.charAt(trailing - 1) == ' '))
-            trailing--;
-        for (int i = 0; i < plateName.length(); i++) {
-            char character = plateName.charAt(i);
-            if (Character.isISOControl(character) || "<>:\"/\\|?*%".indexOf(character) >= 0 || i >= trailing)
-                escaped.append(String.format(Locale.ROOT, "%%%02X", (int) character));
-            else escaped.append(character);
-        }
-        return project.resolveSibling(
-                (extension > 0 ? name.substring(0, extension) : name) + "-" + number + "-" + escaped + ".gcode");
     }
 
     private ListCell<String> namedCell(ComboBox<String> choice) {
@@ -2465,18 +2481,6 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
                         oy - projectY(x0, y0, z0) * scale,
                         ox + projectX(x1, y1) * scale,
                         oy - projectY(x1, y1, z1) * scale);
-    }
-
-    private static Color color(GcodeJob.Role role) {
-        return switch (role) {
-            case EXTERNAL_PERIMETER -> Color.DEEPSKYBLUE;
-            case PERIMETER -> Color.ROYALBLUE;
-            case INFILL, SOLID_INFILL, GAP_FILL, BRIDGE, IRONING -> Color.DARKORANGE;
-            case SUPPORT -> Color.LIMEGREEN;
-            case INTERFACE -> Color.MEDIUMPURPLE;
-            case SKIRT_BRIM -> Color.CRIMSON;
-            case TRAVEL, UNKNOWN -> Color.GRAY;
-        };
     }
 
     PrintController jobs() {

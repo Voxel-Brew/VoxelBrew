@@ -11,8 +11,6 @@ import org.apache.commons.math3.linear.*;
 
 /** Frontend-neutral construction methods for the 2D sketch Create tool families. */
 public final class SketchTools {
-    private SketchTools() {}
-
     @RequiredArgsConstructor
     public enum Tool {
         RECTANGLE_TWO_POINT("2-point rectangle", 2),
@@ -99,13 +97,13 @@ public final class SketchTools {
             double height,
             double angle,
             double spacing) {
+        public static Options defaults() {
+            return new Options(6, 3, false, false, 5, .5, "Text", "SansSerif", 0, 10, 0, 0);
+        }
+
         public Options {
             for (double v : new double[] {radius, rho, height, angle, spacing})
                 if (!Double.isFinite(v)) throw new IllegalArgumentException("Tool options must be finite");
-        }
-
-        public static Options defaults() {
-            return new Options(6, 3, false, false, 5, .5, "Text", "SansSerif", 0, 10, 0, 0);
         }
     }
 
@@ -526,4 +524,6 @@ public final class SketchTools {
         if (best == null) throw new IllegalArgumentException("No circle fits those tangent lines and radius");
         return best;
     }
+
+    private SketchTools() {}
 }

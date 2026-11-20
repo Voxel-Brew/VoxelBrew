@@ -14,8 +14,6 @@ import lombok.extern.slf4j.Slf4j;
 /** Support links shared by the Settings and About dialogs. */
 @Slf4j
 final class SupportDialog {
-    private SupportDialog() {}
-
     static void show(Window owner, Translations translations) {
         var dialog = new Dialog<ButtonType>();
         dialog.setTitle(translations.text("support.title"));
@@ -60,4 +58,6 @@ final class SupportDialog {
         });
         return button;
     }
+
+    private SupportDialog() {}
 }

@@ -33,6 +33,20 @@ import lombok.RequiredArgsConstructor;
 /** Renders exporter-owned component trees on the JavaFX application thread. */
 @RequiredArgsConstructor
 public final class DesktopExportWindow implements ExportWindow {
+    private final Window owner;
+
+    private final Path current;
+
+    private final Translations translations;
+
+    private Path suggestedDestination;
+    private String exporterVersion;
+    private String confirmLabel;
+    private String inputPrefix = "export-";
+    private Function<String, String> sourceCaption;
+    private PathAction pathAction;
+    private CheckAction checkAction;
+
     private record PathAction(String inputId, String label, Supplier<Optional<Path>> selectPath) {}
 
     private record CheckAction(
@@ -58,16 +72,75 @@ public final class DesktopExportWindow implements ExportWindow {
         }
     }
 
-    private final Window owner;
-    private final Path current;
-    private final Translations translations;
-    private Path suggestedDestination;
-    private String exporterVersion;
-    private String confirmLabel;
-    private String inputPrefix = "export-";
-    private Function<String, String> sourceCaption;
-    private PathAction pathAction;
-    private CheckAction checkAction;
+    record Embedded(Node node, Supplier<Map<String, String>> values) {}
+
+    private static void applyInitial(Map<String, InputBinding> inputs, Map<String, String> initial) {
+        initial.forEach((id, value) -> {
+            var binding = inputs.get(id);
+            if (binding == null) return;
+            switch (binding.control()) {
+                case TextInputControl input -> input.setText(value);
+                case CheckBox input -> input.setSelected(Boolean.parseBoolean(value));
+                case ComboBox<?> input ->
+                    input.getSelectionModel().select(input.getItems().indexOf(value));
+                case Slider input -> input.setValue(Double.parseDouble(value));
+                case VBox group ->
+                    group.getChildren().stream()
+                            .filter(RadioButton.class::isInstance)
+                            .map(RadioButton.class::cast)
+                            .filter(button -> Objects.equals(button.getUserData(), value))
+                            .findFirst()
+                            .ifPresent(button -> button.setSelected(true));
+                default -> {}
+            }
+        });
+    }
+
+    private static VBox field(String label, Node input) {
+        var caption = new Label(label);
+        caption.getStyleClass().add("export-dialog-field-label");
+        var column = new VBox(6, caption, input);
+        column.setMaxWidth(Double.MAX_VALUE);
+        return column;
+    }
+
+    private static VBox bind(
+            Map<String, InputBinding> inputs,
+            String id,
+            Supplier<String> value,
+            Node control,
+            VBox container,
+            ObservableValue<?> changed,
+            Runnable onChange) {
+        var message = new Label();
+        message.getStyleClass().add("export-dialog-inline-error");
+        message.setWrapText(true);
+        message.setVisible(false);
+        message.managedProperty().bind(message.visibleProperty());
+        container.getChildren().add(message);
+        Label caption = container.getChildren().getFirst() instanceof Label label ? label : null;
+        if (caption != null) caption.setLabelFor(control);
+        if (inputs.putIfAbsent(id, new InputBinding(value, control, caption, message)) != null)
+            throw new IllegalArgumentException("Duplicate export input: " + id);
+        changed.addListener((observable, before, after) -> onChange.run());
+        return container;
+    }
+
+    private static Map<String, String> readValues(Map<String, InputBinding> inputs) {
+        var values = new LinkedHashMap<String, String>();
+        inputs.forEach((id, input) -> values.put(id, input.value().get()));
+        return values;
+    }
+
+    private static void displayErrors(Map<String, InputBinding> inputs, Map<String, String> errors, Label general) {
+        inputs.forEach((id, input) -> input.display(errors.get(id)));
+        var unbound = new java.util.ArrayList<String>();
+        errors.forEach((id, message) -> {
+            if (!inputs.containsKey(id)) unbound.add(message);
+        });
+        general.setText(String.join("\n", unbound));
+        general.setVisible(!unbound.isEmpty());
+    }
 
     public DesktopExportWindow interaction(String label, String prefix) {
         confirmLabel = label;
@@ -106,35 +179,11 @@ public final class DesktopExportWindow implements ExportWindow {
         return this;
     }
 
-    record Embedded(Node node, Supplier<Map<String, String>> values) {}
-
     Embedded embed(dev.voxelbrew.api.printer.driver.DriverGui gui, Map<String, String> initial, Runnable changed) {
         var inputs = new LinkedHashMap<String, InputBinding>();
         var node = render(gui.layout(), inputs, changed);
         applyInitial(inputs, initial);
         return new Embedded(node, () -> readValues(inputs));
-    }
-
-    private static void applyInitial(Map<String, InputBinding> inputs, Map<String, String> initial) {
-        initial.forEach((id, value) -> {
-            var binding = inputs.get(id);
-            if (binding == null) return;
-            switch (binding.control()) {
-                case TextInputControl input -> input.setText(value);
-                case CheckBox input -> input.setSelected(Boolean.parseBoolean(value));
-                case ComboBox<?> input ->
-                    input.getSelectionModel().select(input.getItems().indexOf(value));
-                case Slider input -> input.setValue(Double.parseDouble(value));
-                case VBox group ->
-                    group.getChildren().stream()
-                            .filter(RadioButton.class::isInstance)
-                            .map(RadioButton.class::cast)
-                            .filter(button -> Objects.equals(button.getUserData(), value))
-                            .findFirst()
-                            .ifPresent(button -> button.setSelected(true));
-                default -> {}
-            }
-        });
     }
 
     @Override
@@ -463,51 +512,5 @@ public final class DesktopExportWindow implements ExportWindow {
         action.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
         action.setOnAction(event -> pathAction.selectPath().get().ifPresent(path -> input.setText(path.toString())));
         row.getChildren().add(action);
-    }
-
-    private static VBox field(String label, Node input) {
-        var caption = new Label(label);
-        caption.getStyleClass().add("export-dialog-field-label");
-        var column = new VBox(6, caption, input);
-        column.setMaxWidth(Double.MAX_VALUE);
-        return column;
-    }
-
-    private static VBox bind(
-            Map<String, InputBinding> inputs,
-            String id,
-            Supplier<String> value,
-            Node control,
-            VBox container,
-            ObservableValue<?> changed,
-            Runnable onChange) {
-        var message = new Label();
-        message.getStyleClass().add("export-dialog-inline-error");
-        message.setWrapText(true);
-        message.setVisible(false);
-        message.managedProperty().bind(message.visibleProperty());
-        container.getChildren().add(message);
-        Label caption = container.getChildren().getFirst() instanceof Label label ? label : null;
-        if (caption != null) caption.setLabelFor(control);
-        if (inputs.putIfAbsent(id, new InputBinding(value, control, caption, message)) != null)
-            throw new IllegalArgumentException("Duplicate export input: " + id);
-        changed.addListener((observable, before, after) -> onChange.run());
-        return container;
-    }
-
-    private static Map<String, String> readValues(Map<String, InputBinding> inputs) {
-        var values = new LinkedHashMap<String, String>();
-        inputs.forEach((id, input) -> values.put(id, input.value().get()));
-        return values;
-    }
-
-    private static void displayErrors(Map<String, InputBinding> inputs, Map<String, String> errors, Label general) {
-        inputs.forEach((id, input) -> input.display(errors.get(id)));
-        var unbound = new java.util.ArrayList<String>();
-        errors.forEach((id, message) -> {
-            if (!inputs.containsKey(id)) unbound.add(message);
-        });
-        general.setText(String.join("\n", unbound));
-        general.setVisible(!unbound.isEmpty());
     }
 }

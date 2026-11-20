@@ -6,8 +6,6 @@ import dev.voxelbrew.api.model.sketch.SketchGeometry;
 
 /** Screen-sized drawing snaps, evaluated on the actual curves rather than display chords. */
 final class SketchSnapping {
-    private SketchSnapping() {}
-
     record Snap(Ref ref, Vec position) {}
 
     static Snap find(SketchGeometry geometry, Vec pointer, double scale) {
@@ -74,4 +72,6 @@ final class SketchSnapping {
         }
         return best;
     }
+
+    private SketchSnapping() {}
 }

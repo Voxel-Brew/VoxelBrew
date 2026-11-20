@@ -65,8 +65,8 @@ final class PrintRotationGizmo {
         private final Ring ring;
         private final Point2D start;
         private final double startAngle;
-        private double lastAngle, accumulated;
         private final boolean edgeOn;
+        private double lastAngle, accumulated;
 
         Drag(Hit hit, Point2D start) {
             ring = hit.ring();
@@ -98,8 +98,6 @@ final class PrintRotationGizmo {
             return snap ? Math.rint(degrees / 15) * 15 : degrees;
         }
     }
-
-    private PrintRotationGizmo() {}
 
     static Ring ring(Axis axis, Point3D center, double radius, PrintCamera camera, double ox, double oy, double scale) {
         return ring(axis, center, radius, camera, ox, oy, scale, Transform.IDENTITY);
@@ -166,4 +164,6 @@ final class PrintRotationGizmo {
         return dev.voxelbrew.engine.printing.PrintOrientation.rotate(
                 source, mesh, axis.ordinal(), degrees, space == Space.LOCAL);
     }
+
+    private PrintRotationGizmo() {}
 }

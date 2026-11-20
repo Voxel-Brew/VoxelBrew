@@ -75,6 +75,51 @@ class SlicerAcceptanceTest {
                         new ProcessSettings(.2, walls, infill, auto, bed, 45, gap, interfaces, brim, raft)));
     }
 
+    static List<GcodeJob.Segment> support(GcodeJob job) {
+        return job.segments().stream()
+                .filter(s -> s.deposits() && (s.role() == GcodeJob.Role.SUPPORT || s.role() == GcodeJob.Role.INTERFACE))
+                .toList();
+    }
+
+    static boolean inside(GcodeJob.Segment s, double x0, double y0, double x1, double y1) {
+        double x = (s.x0() + s.x1()) / 2, y = (s.y0() + s.y1()) / 2;
+        return x > x0 && x < x1 && y > y0 && y < y1;
+    }
+
+    private static MeshData readStl(Path file) throws Exception {
+        var data = java.nio.ByteBuffer.wrap(Files.readAllBytes(file)).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        data.position(80);
+        int count = data.getInt();
+        assertThat(data.capacity()).isEqualTo(84 + 50 * count);
+        double[] vertices = new double[9 * count];
+        int[] triangles = new int[3 * count];
+        for (int t = 0; t < count; t++) {
+            data.position(data.position() + 12);
+            for (int n = 0; n < 9; n++) vertices[9 * t + n] = data.getFloat();
+            for (int n = 0; n < 3; n++) triangles[3 * t + n] = 3 * t + n;
+            data.getShort();
+        }
+        var mesh = new MeshData(vertices, triangles, new int[count]);
+        MeshValidation.requireClosed(mesh);
+        return mesh;
+    }
+
+    static List<GcodeJob.Segment> interior(GcodeJob job) {
+        return job.segments().stream()
+                .filter(s -> s.deposits() && Math.abs(s.z1() - 5) < 1e-6)
+                .toList();
+    }
+
+    static long wallCrossings(GcodeJob job) {
+        return interior(job).stream()
+                .filter(s -> (s.role() == GcodeJob.Role.PERIMETER || s.role() == GcodeJob.Role.EXTERNAL_PERIMETER)
+                        && s.x0() < 25
+                        && s.x1() < 25
+                        && Math.min(s.y0(), s.y1()) < 45
+                        && Math.max(s.y0(), s.y1()) > 45)
+                .count();
+    }
+
     GcodeJob slice(ModelSession s, String name) throws Exception {
         Files.createDirectories(artifacts);
         DocumentWriter.save(s.document(), artifacts.resolve(name + ".vxb"), true);
@@ -98,17 +143,6 @@ class SlicerAcceptanceTest {
                         .sorted()
                         .toList());
         return result.job();
-    }
-
-    static List<GcodeJob.Segment> support(GcodeJob job) {
-        return job.segments().stream()
-                .filter(s -> s.deposits() && (s.role() == GcodeJob.Role.SUPPORT || s.role() == GcodeJob.Role.INTERFACE))
-                .toList();
-    }
-
-    static boolean inside(GcodeJob.Segment s, double x0, double y0, double x1, double y1) {
-        double x = (s.x0() + s.x1()) / 2, y = (s.y0() + s.y1()) / 2;
-        return x > x0 && x < x1 && y > y0 && y < y1;
     }
 
     @Test
@@ -424,39 +458,5 @@ class SlicerAcceptanceTest {
                         .isTrue();
             }
         }
-    }
-
-    private static MeshData readStl(Path file) throws Exception {
-        var data = java.nio.ByteBuffer.wrap(Files.readAllBytes(file)).order(java.nio.ByteOrder.LITTLE_ENDIAN);
-        data.position(80);
-        int count = data.getInt();
-        assertThat(data.capacity()).isEqualTo(84 + 50 * count);
-        double[] vertices = new double[9 * count];
-        int[] triangles = new int[3 * count];
-        for (int t = 0; t < count; t++) {
-            data.position(data.position() + 12);
-            for (int n = 0; n < 9; n++) vertices[9 * t + n] = data.getFloat();
-            for (int n = 0; n < 3; n++) triangles[3 * t + n] = 3 * t + n;
-            data.getShort();
-        }
-        var mesh = new MeshData(vertices, triangles, new int[count]);
-        MeshValidation.requireClosed(mesh);
-        return mesh;
-    }
-
-    static List<GcodeJob.Segment> interior(GcodeJob job) {
-        return job.segments().stream()
-                .filter(s -> s.deposits() && Math.abs(s.z1() - 5) < 1e-6)
-                .toList();
-    }
-
-    static long wallCrossings(GcodeJob job) {
-        return interior(job).stream()
-                .filter(s -> (s.role() == GcodeJob.Role.PERIMETER || s.role() == GcodeJob.Role.EXTERNAL_PERIMETER)
-                        && s.x0() < 25
-                        && s.x1() < 25
-                        && Math.min(s.y0(), s.y1()) < 45
-                        && Math.max(s.y0(), s.y1()) > 45)
-                .count();
     }
 }

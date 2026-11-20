@@ -21,6 +21,10 @@ public final class FileUserConfiguration implements UserConfiguration {
     private final Path file;
     private final Path parent;
 
+    private static void checkKey(String key) {
+        if (key.isBlank()) throw new IllegalArgumentException("Configuration key cannot be blank");
+    }
+
     public FileUserConfiguration() {
         this(dev.voxelbrew.util.services.Services.load(ApplicationPaths.class));
     }
@@ -135,10 +139,6 @@ public final class FileUserConfiguration implements UserConfiguration {
         checkKey(key);
 
         change(properties -> properties.putIfAbsent(key, value));
-    }
-
-    private static void checkKey(String key) {
-        if (key.isBlank()) throw new IllegalArgumentException("Configuration key cannot be blank");
     }
 
     private Properties load() throws IOException {

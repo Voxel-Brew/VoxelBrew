@@ -7,6 +7,10 @@ record NumericFieldBounds(double min, boolean minInclusive, double max, boolean 
     static final NumericFieldBounds UNBOUNDED =
             new NumericFieldBounds(Double.NEGATIVE_INFINITY, false, Double.POSITIVE_INFINITY, false);
 
+    private static String format(double value) {
+        return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
+    }
+
     NumericFieldBounds {
         if (Double.isNaN(min)
                 || Double.isNaN(max)
@@ -30,9 +34,5 @@ record NumericFieldBounds(double min, boolean minInclusive, double max, boolean 
 
     String maximumHint() {
         return Double.isFinite(max) ? (maxInclusive ? "≤ " : "< ") + format(max) : "";
-    }
-
-    private static String format(double value) {
-        return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
     }
 }

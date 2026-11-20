@@ -11,8 +11,6 @@ import javafx.util.Duration;
 
 /** Descriptions are keyed by stable control identities, independently of their display captions. */
 final class UiHelp {
-    private UiHelp() {}
-
     static String description(Translations translations, String id) {
         return KeyboardShortcuts.describe(translations, id, baseDescription(translations, id));
     }
@@ -176,4 +174,6 @@ final class UiHelp {
             if (!showing) hide.run();
         });
     }
+
+    private UiHelp() {}
 }

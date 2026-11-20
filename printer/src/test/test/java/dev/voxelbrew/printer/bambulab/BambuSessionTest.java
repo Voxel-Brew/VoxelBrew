@@ -16,6 +16,90 @@ class BambuSessionTest {
     @TempDir
     Path directory;
 
+    private static final class Peer implements MqttPeer {
+        final IOException openFailure = new IOException("Connection rejected");
+        Consumer<byte[]> reports;
+        boolean connected = true, closed, reject, fail, failOpen, silent;
+        RuntimeException closeFailure;
+        int submissions;
+        JsonObject command;
+
+        @Override
+        public void open(Consumer<byte[]> reports) throws IOException {
+            if (failOpen) throw openFailure;
+            this.reports = reports;
+            if (silent) return;
+            reports.accept("{\"print\":{\"gcode_state\":\"IDLE\",\"mc_percent\":25}}"
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
+
+        @Override
+        public boolean connected() {
+            return connected;
+        }
+
+        @Override
+        public void submit(JsonObject command) throws IOException {
+            this.command = command;
+            submissions++;
+            if (reject)
+                reports.accept("{\"print\":{\"result\":\"FAIL\"}}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            if (fail) throw new IOException("Connection lost");
+        }
+
+        @Override
+        public void close() {
+            closed = true;
+            if (closeFailure != null) throw closeFailure;
+        }
+    }
+
+    private static final class Transfer extends FTPSClient {
+        boolean connected, disconnected, accept = true;
+        byte[] received;
+
+        @Override
+        public void connect(String host, int port) {
+            connected = true;
+        }
+
+        @Override
+        public boolean isConnected() {
+            return connected;
+        }
+
+        @Override
+        public boolean login(String username, String password) {
+            return true;
+        }
+
+        @Override
+        public void execPBSZ(long size) {}
+
+        @Override
+        public void execPROT(String protection) {}
+
+        @Override
+        public void enterLocalPassiveMode() {}
+
+        @Override
+        public boolean setFileType(int type) {
+            return true;
+        }
+
+        @Override
+        public boolean storeFile(String remote, InputStream input) throws IOException {
+            received = input.readAllBytes();
+            return accept;
+        }
+
+        @Override
+        public void disconnect() {
+            connected = false;
+            disconnected = true;
+        }
+    }
+
     private Path artifact() throws IOException {
         var file = directory.resolve("fixture.gcode.3mf");
         try (var zip = new ZipOutputStream(Files.newOutputStream(file))) {
@@ -118,89 +202,5 @@ class BambuSessionTest {
             }
         }
         assertThat(peer.closed).isTrue();
-    }
-
-    private static final class Peer implements MqttPeer {
-        Consumer<byte[]> reports;
-        boolean connected = true, closed, reject, fail, failOpen, silent;
-        final IOException openFailure = new IOException("Connection rejected");
-        RuntimeException closeFailure;
-        int submissions;
-        JsonObject command;
-
-        @Override
-        public void open(Consumer<byte[]> reports) throws IOException {
-            if (failOpen) throw openFailure;
-            this.reports = reports;
-            if (silent) return;
-            reports.accept("{\"print\":{\"gcode_state\":\"IDLE\",\"mc_percent\":25}}"
-                    .getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        }
-
-        @Override
-        public boolean connected() {
-            return connected;
-        }
-
-        @Override
-        public void submit(JsonObject command) throws IOException {
-            this.command = command;
-            submissions++;
-            if (reject)
-                reports.accept("{\"print\":{\"result\":\"FAIL\"}}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            if (fail) throw new IOException("Connection lost");
-        }
-
-        @Override
-        public void close() {
-            closed = true;
-            if (closeFailure != null) throw closeFailure;
-        }
-    }
-
-    private static final class Transfer extends FTPSClient {
-        boolean connected, disconnected, accept = true;
-        byte[] received;
-
-        @Override
-        public void connect(String host, int port) {
-            connected = true;
-        }
-
-        @Override
-        public boolean isConnected() {
-            return connected;
-        }
-
-        @Override
-        public boolean login(String username, String password) {
-            return true;
-        }
-
-        @Override
-        public void execPBSZ(long size) {}
-
-        @Override
-        public void execPROT(String protection) {}
-
-        @Override
-        public void enterLocalPassiveMode() {}
-
-        @Override
-        public boolean setFileType(int type) {
-            return true;
-        }
-
-        @Override
-        public boolean storeFile(String remote, InputStream input) throws IOException {
-            received = input.readAllBytes();
-            return accept;
-        }
-
-        @Override
-        public void disconnect() {
-            connected = false;
-            disconnected = true;
-        }
     }
 }

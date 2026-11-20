@@ -18,6 +18,21 @@ public final class SlicerInstallationStore {
 
     private final Path directory;
 
+    private static SlicerInstallation read(UUID id, Path path) throws IOException {
+        var values = new FileUserConfiguration(path).read();
+        var settings = new LinkedHashMap<String, String>();
+        values.forEach((key, value) -> {
+            if (key.startsWith(INPUT_PREFIX)) settings.put(key.substring(INPUT_PREFIX.length()), value);
+        });
+        return new SlicerInstallation(
+                id,
+                values.get("provider"),
+                values.get("name"),
+                values.getOrDefault("version", ""),
+                values.getOrDefault("failure", ""),
+                settings);
+    }
+
     public SlicerInstallationStore(Path configuration) {
         directory = configuration.resolveSibling("slicers");
     }
@@ -76,21 +91,6 @@ public final class SlicerInstallationStore {
     public void remove(@NonNull UUID id) throws IOException {
         if (BundledSlicers.reserved(id)) throw new IllegalArgumentException("Bundled slicer settings are read-only");
         Files.deleteIfExists(path(id));
-    }
-
-    private static SlicerInstallation read(UUID id, Path path) throws IOException {
-        var values = new FileUserConfiguration(path).read();
-        var settings = new LinkedHashMap<String, String>();
-        values.forEach((key, value) -> {
-            if (key.startsWith(INPUT_PREFIX)) settings.put(key.substring(INPUT_PREFIX.length()), value);
-        });
-        return new SlicerInstallation(
-                id,
-                values.get("provider"),
-                values.get("name"),
-                values.getOrDefault("version", ""),
-                values.getOrDefault("failure", ""),
-                settings);
     }
 
     private Path path(UUID id) {

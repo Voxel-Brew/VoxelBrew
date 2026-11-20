@@ -9,6 +9,20 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 @SuppressWarnings("deprecation")
 class NativeKernelTest {
+    private static final double VOLUME_TOLERANCE_MM3 = 0.01;
+
+    private static final double BOUNDS_TOLERANCE_MM = 0.001;
+
+    private static void assertBounds(Bounds expected, Bounds actual) {
+        assertThat(new double[] {
+                    actual.minX(), actual.minY(), actual.minZ(), actual.maxX(), actual.maxY(), actual.maxZ()
+                })
+                .usingComparatorWithPrecision(BOUNDS_TOLERANCE_MM)
+                .containsExactly(new double[] {
+                    expected.minX(), expected.minY(), expected.minZ(), expected.maxX(), expected.maxY(), expected.maxZ()
+                });
+    }
+
     @Test
     void bearingMountFilletsAndSubsequentCutsProducePrintableMeshes() {
         int before = NativeKernel.liveHandles();
@@ -33,9 +47,6 @@ class NativeKernelTest {
         }
         assertThat(NativeKernel.liveHandles()).isEqualTo(before);
     }
-
-    private static final double VOLUME_TOLERANCE_MM3 = 0.01;
-    private static final double BOUNDS_TOLERANCE_MM = 0.001;
 
     @Test
     void edgeFinishesAndShellProduceValidIndependentSolids() {
@@ -172,15 +183,5 @@ class NativeKernelTest {
             }
         }
         assertThat(NativeKernel.liveHandles()).isEqualTo(before);
-    }
-
-    private static void assertBounds(Bounds expected, Bounds actual) {
-        assertThat(new double[] {
-                    actual.minX(), actual.minY(), actual.minZ(), actual.maxX(), actual.maxY(), actual.maxZ()
-                })
-                .usingComparatorWithPrecision(BOUNDS_TOLERANCE_MM)
-                .containsExactly(new double[] {
-                    expected.minX(), expected.minY(), expected.minZ(), expected.maxX(), expected.maxY(), expected.maxZ()
-                });
     }
 }

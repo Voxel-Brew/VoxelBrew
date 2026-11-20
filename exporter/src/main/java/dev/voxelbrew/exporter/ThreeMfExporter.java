@@ -16,6 +16,19 @@ import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 
 public final class ThreeMfExporter extends MeshExporter {
+    private static String transformValues(Transform transform) {
+        var matrix = transform.matrix();
+        var values = new StringJoiner(" ");
+        for (int index : new int[] {0, 4, 8, 1, 5, 9, 2, 6, 10, 3, 7, 11}) values.add(Double.toString(matrix[index]));
+        return values.toString();
+    }
+
+    private static void text(ZipOutputStream zip, String name, String content) throws IOException {
+        zip.putNextEntry(new ZipEntry(name));
+        zip.write(content.getBytes(StandardCharsets.UTF_8));
+        zip.closeEntry();
+    }
+
     public ThreeMfExporter() {
         super();
     }
@@ -118,18 +131,5 @@ public final class ThreeMfExporter extends MeshExporter {
         } catch (XMLStreamException failure) {
             throw new IOException("3MF XML write failed", failure);
         }
-    }
-
-    private static String transformValues(Transform transform) {
-        var matrix = transform.matrix();
-        var values = new StringJoiner(" ");
-        for (int index : new int[] {0, 4, 8, 1, 5, 9, 2, 6, 10, 3, 7, 11}) values.add(Double.toString(matrix[index]));
-        return values.toString();
-    }
-
-    private static void text(ZipOutputStream zip, String name, String content) throws IOException {
-        zip.putNextEntry(new ZipEntry(name));
-        zip.write(content.getBytes(StandardCharsets.UTF_8));
-        zip.closeEntry();
     }
 }

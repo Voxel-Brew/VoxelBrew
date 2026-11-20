@@ -8,11 +8,6 @@ import java.nio.file.*;
 public class ImportInput {
     public static final long MAX_INPUT_BYTES = 256L * 1024 * 1024;
 
-    public static InputStream open(Path source) throws IOException {
-        if (Files.size(source) > MAX_INPUT_BYTES) throw new IOException("Import exceeds 256 MiB input limit");
-        return new BoundedInput(Files.newInputStream(source));
-    }
-
     private static final class BoundedInput extends FilterInputStream {
         private long count;
 
@@ -66,5 +61,10 @@ public class ImportInput {
         public void close() throws IOException {
             in.close();
         }
+    }
+
+    public static InputStream open(Path source) throws IOException {
+        if (Files.size(source) > MAX_INPUT_BYTES) throw new IOException("Import exceeds 256 MiB input limit");
+        return new BoundedInput(Files.newInputStream(source));
     }
 }

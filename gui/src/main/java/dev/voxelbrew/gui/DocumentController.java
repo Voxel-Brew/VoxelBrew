@@ -21,6 +21,78 @@ import lombok.experimental.Accessors;
 @lombok.extern.slf4j.Slf4j
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public final class DocumentController implements AutoCloseable {
+    @NonNull
+    private final Consumer<Runnable> dispatch;
+
+    @NonNull
+    private final Function<CadDocument, Build> evaluator;
+
+    @NonNull
+    private final Path pluginDirectory;
+
+    @NonNull
+    private final ExecutorService worker;
+
+    @NonNull
+    private final ExecutorService io;
+
+    @NonNull
+    private final dev.voxelbrew.importer.DocumentSource documents;
+
+    @NonNull
+    private final DocumentSave documentWriter;
+
+    private final Object queueLock = new Object();
+
+    private final AtomicLong sequence = new AtomicLong();
+
+    private final AtomicLong documentGeneration = new AtomicLong();
+
+    private Request pending;
+    private boolean running;
+    private volatile boolean closed;
+    private ModelSession session = new ModelSession(newDesktopDocument());
+    private CadDocument saved = session.document();
+    private volatile boolean unsavedImport;
+
+    @Getter
+    @Accessors(fluent = true)
+    private Path path;
+
+    private Feature.Extrude preview;
+    private String previewExpression = "";
+
+    @Getter
+    @Accessors(fluent = true)
+    private Build build = new Build(List.of(), List.of(), true);
+
+    @Getter
+    @Accessors(fluent = true)
+    private volatile boolean rebuilding;
+
+    @Getter
+    @Accessors(fluent = true)
+    private volatile boolean ioBusy;
+
+    @Getter
+    @Accessors(fluent = true)
+    private boolean displayedPreview;
+
+    @Getter
+    @Accessors(fluent = true)
+    private String error = "";
+
+    @Setter
+    @Accessors(fluent = true, chain = false)
+    private Runnable onChanged = () -> {};
+
+    @Setter
+    @Accessors(fluent = true, chain = false)
+    private Consumer<Path> onFileUsed = ignored -> {};
+
+    private java.util.function.Supplier<java.util.Map<String, String>> printWorkspace =
+            () -> session.document().printSetup().workspaceSettings();
+
     public record Body(
             String id,
             Feature.BodyRef output,
@@ -104,71 +176,62 @@ public final class DocumentController implements AutoCloseable {
 
     private record Request(long sequence, long generation, long revision, CadDocument document, boolean preview) {}
 
-    @NonNull
-    private final Consumer<Runnable> dispatch;
+    static CadDocument newDesktopDocument() {
+        var document = CadDocument.empty();
+        return new CadDocument(
+                document.id(),
+                document.features(),
+                document.cursor(),
+                document.printSetup().withSupportsDisabled(true),
+                document.parameters());
+    }
 
-    @NonNull
-    private final Function<CadDocument, Build> evaluator;
+    static Build evaluate(CadDocument document) {
+        return evaluate(document, dev.voxelbrew.engine.feature.FeatureRegistry.defaultDirectory());
+    }
 
-    @NonNull
-    private final Path pluginDirectory;
-
-    @NonNull
-    private final ExecutorService worker;
-
-    @NonNull
-    private final ExecutorService io;
-
-    @NonNull
-    private final dev.voxelbrew.importer.DocumentSource documents;
-
-    @NonNull
-    private final DocumentSave documentWriter;
-
-    private final Object queueLock = new Object();
-    private Request pending;
-    private boolean running;
-    private volatile boolean closed;
-    private final AtomicLong sequence = new AtomicLong();
-    private final AtomicLong documentGeneration = new AtomicLong();
-    private ModelSession session = new ModelSession(newDesktopDocument());
-    private CadDocument saved = session.document();
-    private volatile boolean unsavedImport;
-
-    @Getter
-    @Accessors(fluent = true)
-    private Path path;
-
-    private Feature.Extrude preview;
-    private String previewExpression = "";
-
-    @Getter
-    @Accessors(fluent = true)
-    private Build build = new Build(List.of(), List.of(), true);
-
-    @Getter
-    @Accessors(fluent = true)
-    private volatile boolean rebuilding;
-
-    @Getter
-    @Accessors(fluent = true)
-    private volatile boolean ioBusy;
-
-    @Getter
-    @Accessors(fluent = true)
-    private boolean displayedPreview;
-
-    @Getter
-    @Accessors(fluent = true)
-    private String error = "";
-
-    @Setter
-    @Accessors(fluent = true, chain = false)
-    private Runnable onChanged = () -> {};
-
-    @Setter
-    @Accessors(fluent = true, chain = false)
-    private Consumer<Path> onFileUsed = ignored -> {};
+    static Build evaluate(CadDocument document, Path pluginDirectory) {
+        try (var evaluation = Evaluator.evaluate(document, pluginDirectory)) {
+            if (!evaluation.valid())
+                return new Build(List.of(), evaluation.diagnostics(), false, evaluation.resolvedFeatures());
+            var bodies = dev.voxelbrew.util.concurrent.CpuWork.map(
+                    evaluation.bodies(),
+                    b -> new Body(
+                            b.id(),
+                            b.output(),
+                            b.solid().tessellate(MeshOptions.DEFAULT),
+                            b.solid().volume(),
+                            b.solid().planarFaces(),
+                            b.solid().faceEdges(),
+                            b.solid().edgeSamples()));
+            var inputs = new ArrayList<ConstructionFeature.Input>();
+            var zero = new dev.voxelbrew.api.model.construction.ConstructionGeometry.Vector(0, 0, 0);
+            for (var body : evaluation.bodies()) {
+                for (int kind = 0; kind < 3; kind++) {
+                    int count = (int) body.solid().constructionInput(kind, -1, .5)[0];
+                    var selection = switch (kind) {
+                        case 0 -> ConstructionFeature.Selection.FACE;
+                        case 1 -> ConstructionFeature.Selection.EDGE;
+                        default -> ConstructionFeature.Selection.VERTEX;
+                    };
+                    for (int index = 0; index < count; index++)
+                        inputs.add(new ConstructionFeature.Input(
+                                selection,
+                                body.output().featureId(),
+                                body.output().outputName(),
+                                index,
+                                zero));
+                }
+            }
+            return new Build(
+                    bodies,
+                    evaluation.diagnostics(),
+                    true,
+                    evaluation.resolvedFeatures(),
+                    evaluation.construction(),
+                    inputs);
+        }
+    }
 
     public DocumentController(Consumer<Runnable> dispatch) {
         this(dispatch, dev.voxelbrew.engine.feature.FeatureRegistry.defaultDirectory());
@@ -253,9 +316,6 @@ public final class DocumentController implements AutoCloseable {
         schedule(session.document(), false);
     }
 
-    private java.util.function.Supplier<java.util.Map<String, String>> printWorkspace =
-            () -> session.document().printSetup().workspaceSettings();
-
     void printWorkspace(java.util.function.Supplier<java.util.Map<String, String>> capture) {
         printWorkspace = capture;
     }
@@ -296,16 +356,6 @@ public final class DocumentController implements AutoCloseable {
 
     public void newDocument() {
         replace(newDesktopDocument(), null);
-    }
-
-    static CadDocument newDesktopDocument() {
-        var document = CadDocument.empty();
-        return new CadDocument(
-                document.id(),
-                document.features(),
-                document.cursor(),
-                document.printSetup().withSupportsDisabled(true),
-                document.parameters());
     }
 
     private void replace(CadDocument document, Path source) {
@@ -862,53 +912,6 @@ public final class DocumentController implements AutoCloseable {
                 error = failureMessage;
                 onChanged.run();
             });
-        }
-    }
-
-    static Build evaluate(CadDocument document) {
-        return evaluate(document, dev.voxelbrew.engine.feature.FeatureRegistry.defaultDirectory());
-    }
-
-    static Build evaluate(CadDocument document, Path pluginDirectory) {
-        try (var evaluation = Evaluator.evaluate(document, pluginDirectory)) {
-            if (!evaluation.valid())
-                return new Build(List.of(), evaluation.diagnostics(), false, evaluation.resolvedFeatures());
-            var bodies = dev.voxelbrew.util.concurrent.CpuWork.map(
-                    evaluation.bodies(),
-                    b -> new Body(
-                            b.id(),
-                            b.output(),
-                            b.solid().tessellate(MeshOptions.DEFAULT),
-                            b.solid().volume(),
-                            b.solid().planarFaces(),
-                            b.solid().faceEdges(),
-                            b.solid().edgeSamples()));
-            var inputs = new ArrayList<ConstructionFeature.Input>();
-            var zero = new dev.voxelbrew.api.model.construction.ConstructionGeometry.Vector(0, 0, 0);
-            for (var body : evaluation.bodies()) {
-                for (int kind = 0; kind < 3; kind++) {
-                    int count = (int) body.solid().constructionInput(kind, -1, .5)[0];
-                    var selection = switch (kind) {
-                        case 0 -> ConstructionFeature.Selection.FACE;
-                        case 1 -> ConstructionFeature.Selection.EDGE;
-                        default -> ConstructionFeature.Selection.VERTEX;
-                    };
-                    for (int index = 0; index < count; index++)
-                        inputs.add(new ConstructionFeature.Input(
-                                selection,
-                                body.output().featureId(),
-                                body.output().outputName(),
-                                index,
-                                zero));
-                }
-            }
-            return new Build(
-                    bodies,
-                    evaluation.diagnostics(),
-                    true,
-                    evaluation.resolvedFeatures(),
-                    evaluation.construction(),
-                    inputs);
         }
     }
 

@@ -6,8 +6,6 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.SVGPath;
 
 final class ConstructionIcons {
-    private ConstructionIcons() {}
-
     static Group icon(Tool tool) {
         var shape = new SVGPath();
         String name = tool.name();
@@ -26,4 +24,6 @@ final class ConstructionIcons {
         group.setMouseTransparent(true);
         return group;
     }
+
+    private ConstructionIcons() {}
 }

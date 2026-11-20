@@ -12,8 +12,6 @@ import javafx.stage.Window;
 
 /** Editable path plus native Browse keeps file operations accessible and keyboard friendly. */
 final class FileDialog {
-    private FileDialog() {}
-
     static Optional<Path> choose(
             Window owner,
             boolean save,
@@ -148,4 +146,6 @@ final class FileDialog {
                 b -> b == confirm ? Path.of(path.evaluatedText()).toAbsolutePath() : null);
         return Dialogs.show(dialog, owner, translations);
     }
+
+    private FileDialog() {}
 }

@@ -15,8 +15,6 @@ import java.util.function.Supplier;
 
 /** Opt-in, warmed wall-clock measurements; never a timing assertion in the regression suite. */
 public final class ComputeBenchmark {
-    private ComputeBenchmark() {}
-
     private static volatile Object sink;
 
     public static CadDocument document(int bodies, int holes) {
@@ -121,4 +119,6 @@ public final class ComputeBenchmark {
         SketchSolver.solve(sketch).requireSolved();
         measure("sketch_192_variables", () -> SketchSolver.solve(sketch));
     }
+
+    private ComputeBenchmark() {}
 }

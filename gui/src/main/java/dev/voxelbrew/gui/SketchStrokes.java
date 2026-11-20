@@ -6,8 +6,6 @@ import java.util.List;
 
 /** Detached six-sided strokes: one mesh replaces thousands of JavaFX Cylinder nodes for text. */
 final class SketchStrokes {
-    private SketchStrokes() {}
-
     record Segment(Vec a, Vec b) {}
 
     static MeshData mesh(List<Segment> segments, double z, double radius) {
@@ -51,4 +49,6 @@ final class SketchStrokes {
         }
         return new MeshData(points, triangles, faces);
     }
+
+    private SketchStrokes() {}
 }

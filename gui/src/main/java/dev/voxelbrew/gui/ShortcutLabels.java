@@ -12,8 +12,6 @@ import javafx.scene.text.Text;
  * Always-visible letter hints; original text, accessibility help and keyboard dispatch stay intact.
  */
 final class ShortcutLabels {
-    private ShortcutLabels() {}
-
     static void install(ButtonBase button) {
         var key = KeyboardShortcuts.letter(button.getId());
         // Menu buttons combine their icon with an underlined caption.
@@ -77,4 +75,6 @@ final class ShortcutLabels {
         if (underline) fragment.getStyleClass().add("shortcut-key");
         return fragment;
     }
+
+    private ShortcutLabels() {}
 }

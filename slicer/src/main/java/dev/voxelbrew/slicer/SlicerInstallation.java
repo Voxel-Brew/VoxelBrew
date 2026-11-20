@@ -11,6 +11,10 @@ public record SlicerInstallation(
         UUID id, String providerId, String name, String version, String failure, Map<String, String> settings) {
     public static final String SELECTION = "print.slicer.installation";
 
+    public static String selectedId(PrintSetup setup) {
+        return setup.workspaceSettings().getOrDefault(SELECTION, "");
+    }
+
     public SlicerInstallation {
         if (providerId == null || !providerId.matches("[a-z0-9][a-z0-9.-]*"))
             throw new IllegalArgumentException("Invalid slicer provider ID");
@@ -35,10 +39,6 @@ public record SlicerInstallation(
         if (!bundled()) return SlicerInputs.window(settings, overrides);
         if (!overrides.isEmpty()) throw new IllegalArgumentException("Bundled slicer settings are read-only");
         return BundledSlicers.window(id);
-    }
-
-    public static String selectedId(PrintSetup setup) {
-        return setup.workspaceSettings().getOrDefault(SELECTION, "");
     }
 
     public PrintSetup select(PrintSetup setup) {

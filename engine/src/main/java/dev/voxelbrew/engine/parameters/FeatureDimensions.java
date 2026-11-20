@@ -15,8 +15,6 @@ import javax.measure.Quantity;
  * worker.
  */
 public final class FeatureDimensions {
-    private FeatureDimensions() {}
-
     public record Dimension(ParameterSet.Target target, ParameterUnit unit, double value) {
         public javax.measure.Unit<?> measurementUnit() {
             return unit.unit();
@@ -31,6 +29,8 @@ public final class FeatureDimensions {
             return target + " (" + unit + ")";
         }
     }
+
+    public record Converted(SketchGeometry geometry, ParameterSet parameters) {}
 
     public static ParameterUnit unit(SketchGeometry.Type type) {
         return switch (type) {
@@ -273,8 +273,6 @@ public final class FeatureDimensions {
                 .toList());
     }
 
-    public record Converted(SketchGeometry geometry, ParameterSet parameters) {}
-
     public static Converted convert(Feature.Sketch sketch, ParameterSet parameters) {
         var g = Sketches.fromProfile(sketch.profile());
         if (sketch.profile() instanceof Feature.Constrained) return new Converted(g, parameters);
@@ -311,4 +309,6 @@ public final class FeatureDimensions {
                         parameters.uuidGenerator(),
                         parameters.builtins()));
     }
+
+    private FeatureDimensions() {}
 }

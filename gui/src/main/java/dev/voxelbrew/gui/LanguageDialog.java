@@ -12,8 +12,6 @@ import javafx.stage.Window;
 
 /** Persists display language independently of CAD documents; each window keeps its own catalog. */
 final class LanguageDialog {
-    private LanguageDialog() {}
-
     static void show(Window owner, Translations translations, UserConfiguration configuration, ExecutorService worker) {
         var dialog = new Dialog<Void>();
         dialog.setTitle(translations.text("language.title"));
@@ -72,4 +70,6 @@ final class LanguageDialog {
         dialog.getDialogPane().lookupButton(ButtonType.CLOSE).setId("language-close");
         Dialogs.show(dialog, owner, translations);
     }
+
+    private LanguageDialog() {}
 }

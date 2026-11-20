@@ -18,8 +18,6 @@ public final class Logging {
     private static Thread.UncaughtExceptionHandler previousUncaught;
     private static Thread.UncaughtExceptionHandler applicationUncaught;
 
-    private Logging() {}
-
     public static void initialize(String component) {
         synchronized (LOCK) {
             if (initialized) return;
@@ -117,4 +115,6 @@ public final class Logging {
             initialized = false;
         }
     }
+
+    private Logging() {}
 }

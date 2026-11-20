@@ -12,7 +12,26 @@ import java.nio.file.*;
 import java.util.*;
 
 public final class PrusaSlicerBackend implements ProcessSlicer {
+    private static final Set<Capability> CAPABILITIES = Set.of(
+            Capability.AUTOMATIC_SUPPORTS,
+            Capability.BUILD_PLATE_SUPPORTS,
+            Capability.SUPPORT_VOLUMES,
+            Capability.BRIM,
+            Capability.RAFT);
+
     private final Map<String, String> configuration;
+
+    public static Path defaultExecutable() {
+        String configured = System.getProperty("voxelbrew.slicer", System.getenv("VOXELBREW_SLICER"));
+        if (configured != null && !configured.isBlank()) return Path.of(configured);
+        if (System.getProperty("os.name").startsWith("Windows")) {
+            Path local = Path.of(
+                    ".tools", "PrusaSlicer-2.7.2", "PrusaSlicer-2.7.2+win64-202402291307", "prusa-slicer-console.exe");
+            if (Files.isRegularFile(local)) return local.toAbsolutePath();
+            return Path.of("prusa-slicer-console.exe");
+        }
+        return Path.of("prusa-slicer");
+    }
 
     public PrusaSlicerBackend() {
         this(Map.of());
@@ -41,13 +60,6 @@ public final class PrusaSlicerBackend implements ProcessSlicer {
         String value = configuration.getOrDefault("executable", "");
         return value.isBlank() ? defaultExecutable() : Path.of(value);
     }
-
-    private static final Set<Capability> CAPABILITIES = Set.of(
-            Capability.AUTOMATIC_SUPPORTS,
-            Capability.BUILD_PLATE_SUPPORTS,
-            Capability.SUPPORT_VOLUMES,
-            Capability.BRIM,
-            Capability.RAFT);
 
     @Override
     public Descriptor descriptor() {
@@ -111,17 +123,5 @@ public final class PrusaSlicerBackend implements ProcessSlicer {
                 project.toString()));
         ProcessRunner.run(arguments, request.workingDirectory(), request.cancellation(), request.diagnostics());
         return new RunResult(PrusaConfiguration.settings(request.model()));
-    }
-
-    public static Path defaultExecutable() {
-        String configured = System.getProperty("voxelbrew.slicer", System.getenv("VOXELBREW_SLICER"));
-        if (configured != null && !configured.isBlank()) return Path.of(configured);
-        if (System.getProperty("os.name").startsWith("Windows")) {
-            Path local = Path.of(
-                    ".tools", "PrusaSlicer-2.7.2", "PrusaSlicer-2.7.2+win64-202402291307", "prusa-slicer-console.exe");
-            if (Files.isRegularFile(local)) return local.toAbsolutePath();
-            return Path.of("prusa-slicer-console.exe");
-        }
-        return Path.of("prusa-slicer");
     }
 }

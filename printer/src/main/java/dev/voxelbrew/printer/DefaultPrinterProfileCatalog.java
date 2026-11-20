@@ -13,6 +13,66 @@ import lombok.NonNull;
 public final class DefaultPrinterProfileCatalog implements PrinterProfileCatalog {
     private final PrinterResources resources;
 
+    private static boolean copyNew(java.io.InputStream input, java.nio.file.Path target) throws java.io.IOException {
+        if (java.nio.file.Files.exists(target)) return false;
+        var parent = target.getParent();
+        if (parent == null) throw new java.io.IOException("Expected a profile destination file: " + target);
+        var temporary = java.nio.file.Files.createTempFile(parent, ".printer-export-", ".tmp");
+        try {
+            java.nio.file.Files.copy(input, temporary, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            try {
+                java.nio.file.Files.move(temporary, target);
+                return true;
+            } catch (java.nio.file.FileAlreadyExistsException ex) {
+                return false;
+            }
+        } finally {
+            java.nio.file.Files.deleteIfExists(temporary);
+        }
+    }
+
+    private static Profile parse(JsonObject p) {
+        var zones = new ArrayList<List<PrintProfile.Point>>();
+        for (var zone : p.getAsJsonArray("excludedZones")) zones.add(polygon(zone.getAsJsonArray()));
+        return new Profile(
+                p.get("id").getAsString(),
+                p.get("name").getAsString(),
+                p.get("manufacturer").getAsString(),
+                polygon(p.getAsJsonArray("bed")),
+                zones,
+                p.get("usableHeightMm").getAsDouble(),
+                p.get("nozzleMm").getAsDouble(),
+                p.get("filamentDiameterMm").getAsDouble(),
+                p.get("toolCount").getAsBigDecimal().intValueExact(),
+                p.get("firmware").getAsString(),
+                p.get("outputFormat").getAsString(),
+                p.get("genericGcode").getAsBoolean(),
+                null);
+    }
+
+    private static JsonArray points(List<PrintProfile.Point> points) {
+        var json = new JsonArray();
+        for (var point : points) {
+            var pair = new JsonArray();
+            pair.add(point.x());
+            pair.add(point.y());
+            json.add(pair);
+        }
+        return json;
+    }
+
+    private static List<PrintProfile.Point> polygon(JsonArray points) {
+        if (points.size() > 1024) throw new IllegalArgumentException("Too many polygon points");
+        var result = new ArrayList<PrintProfile.Point>();
+        for (var point : points) {
+            var pair = point.getAsJsonArray();
+            if (pair.size() != 2) throw new IllegalArgumentException("Expected [x, y] point");
+            result.add(new PrintProfile.Point(
+                    pair.get(0).getAsDouble(), pair.get(1).getAsDouble()));
+        }
+        return List.copyOf(result);
+    }
+
     public DefaultPrinterProfileCatalog() {
         this(dev.voxelbrew.util.services.Services.load(ApplicationPaths.class).profiles());
     }
@@ -78,24 +138,6 @@ public final class DefaultPrinterProfileCatalog implements PrinterProfileCatalog
         return exported;
     }
 
-    private static boolean copyNew(java.io.InputStream input, java.nio.file.Path target) throws java.io.IOException {
-        if (java.nio.file.Files.exists(target)) return false;
-        var parent = target.getParent();
-        if (parent == null) throw new java.io.IOException("Expected a profile destination file: " + target);
-        var temporary = java.nio.file.Files.createTempFile(parent, ".printer-export-", ".tmp");
-        try {
-            java.nio.file.Files.copy(input, temporary, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            try {
-                java.nio.file.Files.move(temporary, target);
-                return true;
-            } catch (java.nio.file.FileAlreadyExistsException ex) {
-                return false;
-            }
-        } finally {
-            java.nio.file.Files.deleteIfExists(temporary);
-        }
-    }
-
     @Override
     public Result load() {
         var loaded = resources.load();
@@ -154,25 +196,6 @@ public final class DefaultPrinterProfileCatalog implements PrinterProfileCatalog
                         .sorted(Comparator.comparing(Entry::bundled).thenComparing(Entry::name))
                         .toList(),
                 errors);
-    }
-
-    private static Profile parse(JsonObject p) {
-        var zones = new ArrayList<List<PrintProfile.Point>>();
-        for (var zone : p.getAsJsonArray("excludedZones")) zones.add(polygon(zone.getAsJsonArray()));
-        return new Profile(
-                p.get("id").getAsString(),
-                p.get("name").getAsString(),
-                p.get("manufacturer").getAsString(),
-                polygon(p.getAsJsonArray("bed")),
-                zones,
-                p.get("usableHeightMm").getAsDouble(),
-                p.get("nozzleMm").getAsDouble(),
-                p.get("filamentDiameterMm").getAsDouble(),
-                p.get("toolCount").getAsBigDecimal().intValueExact(),
-                p.get("firmware").getAsString(),
-                p.get("outputFormat").getAsString(),
-                p.get("genericGcode").getAsBoolean(),
-                null);
     }
 
     @Override
@@ -259,28 +282,5 @@ public final class DefaultPrinterProfileCatalog implements PrinterProfileCatalog
             java.nio.file.Files.deleteIfExists(temporary);
         }
         return load().require(profile.id());
-    }
-
-    private static JsonArray points(List<PrintProfile.Point> points) {
-        var json = new JsonArray();
-        for (var point : points) {
-            var pair = new JsonArray();
-            pair.add(point.x());
-            pair.add(point.y());
-            json.add(pair);
-        }
-        return json;
-    }
-
-    private static List<PrintProfile.Point> polygon(JsonArray points) {
-        if (points.size() > 1024) throw new IllegalArgumentException("Too many polygon points");
-        var result = new ArrayList<PrintProfile.Point>();
-        for (var point : points) {
-            var pair = point.getAsJsonArray();
-            if (pair.size() != 2) throw new IllegalArgumentException("Expected [x, y] point");
-            result.add(new PrintProfile.Point(
-                    pair.get(0).getAsDouble(), pair.get(1).getAsDouble()));
-        }
-        return List.copyOf(result);
     }
 }

@@ -34,6 +34,21 @@ public record ApplicationImage(
         }
     }
 
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+    public static final class Lease implements AutoCloseable {
+        private final FileChannel channel;
+        private final FileLock lock;
+
+        @Override
+        public void close() throws IOException {
+            try {
+                if (lock != null && lock.isValid()) lock.release();
+            } finally {
+                if (channel != null) channel.close();
+            }
+        }
+    }
+
     public static String currentPlatform() {
         String arch = System.getProperty("os.arch");
         if (!Set.of("amd64", "x86_64").contains(arch))
@@ -43,40 +58,6 @@ public record ApplicationImage(
         if (os.startsWith("Mac")) return "macos-x64";
         if (os.startsWith("Linux")) return "linux-x64";
         throw new IllegalArgumentException("Unsupported update platform: " + os);
-    }
-
-    public Path appDirectory() {
-        return root.resolve(
-                platform.startsWith("windows-") ? "app" : platform.startsWith("macos-") ? "Contents/app" : "lib/app");
-    }
-
-    public Path runtime() {
-        return root.resolve(
-                platform.startsWith("windows-")
-                        ? "runtime"
-                        : platform.startsWith("macos-") ? "Contents/runtime/Contents/Home" : "lib/runtime");
-    }
-
-    public Path launcher() {
-        return root.resolve(
-                platform.startsWith("windows-")
-                        ? component.applicationName + ".exe"
-                        : platform.startsWith("macos-")
-                                ? "Contents/MacOS/" + component.applicationName
-                                : "bin/" + component.applicationName);
-    }
-
-    public Path runningLock() {
-        return root.resolveSibling("." + root.getFileName() + ".running.lock");
-    }
-
-    public Path updateLock() {
-        return root.resolveSibling("." + root.getFileName() + ".update.lock");
-    }
-
-    /** Format-1 images predating util kept the standalone helper in engine. */
-    public String updaterJar() throws IOException {
-        return fileName(read(appDirectory().resolve(MARKER)).getProperty("utilJar", engineJar));
     }
 
     public static Optional<ApplicationImage> detect(Component component) throws IOException {
@@ -215,18 +196,37 @@ public record ApplicationImage(
         }
     }
 
-    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-    public static final class Lease implements AutoCloseable {
-        private final FileChannel channel;
-        private final FileLock lock;
+    public Path appDirectory() {
+        return root.resolve(
+                platform.startsWith("windows-") ? "app" : platform.startsWith("macos-") ? "Contents/app" : "lib/app");
+    }
 
-        @Override
-        public void close() throws IOException {
-            try {
-                if (lock != null && lock.isValid()) lock.release();
-            } finally {
-                if (channel != null) channel.close();
-            }
-        }
+    public Path runtime() {
+        return root.resolve(
+                platform.startsWith("windows-")
+                        ? "runtime"
+                        : platform.startsWith("macos-") ? "Contents/runtime/Contents/Home" : "lib/runtime");
+    }
+
+    public Path launcher() {
+        return root.resolve(
+                platform.startsWith("windows-")
+                        ? component.applicationName + ".exe"
+                        : platform.startsWith("macos-")
+                                ? "Contents/MacOS/" + component.applicationName
+                                : "bin/" + component.applicationName);
+    }
+
+    public Path runningLock() {
+        return root.resolveSibling("." + root.getFileName() + ".running.lock");
+    }
+
+    public Path updateLock() {
+        return root.resolveSibling("." + root.getFileName() + ".update.lock");
+    }
+
+    /** Format-1 images predating util kept the standalone helper in engine. */
+    public String updaterJar() throws IOException {
+        return fileName(read(appDirectory().resolve(MARKER)).getProperty("utilJar", engineJar));
     }
 }

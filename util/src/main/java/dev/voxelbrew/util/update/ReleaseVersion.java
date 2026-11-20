@@ -2,11 +2,6 @@ package dev.voxelbrew.util.update;
 
 /** Product semantic versions; a final release sorts after its development snapshot. */
 public record ReleaseVersion(int major, int minor, int patch, boolean snapshot) implements Comparable<ReleaseVersion> {
-    public ReleaseVersion {
-        if (major < 0 || minor < 0 || patch < 0 || major >= 65535 || minor >= 65535 || patch >= 65535)
-            throw new IllegalArgumentException("Version components must be between 0 and 65534");
-    }
-
     public static ReleaseVersion parse(String text) {
         if (text == null) throw new IllegalArgumentException("Expected version A.B.C");
         var match = java.util.regex.Pattern.compile("v?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-SNAPSHOT)?")
@@ -24,6 +19,11 @@ public record ReleaseVersion(int major, int minor, int patch, boolean snapshot) 
         if (version.snapshot)
             throw new IllegalArgumentException("Updates require a published A.B.C release, not a snapshot");
         return version;
+    }
+
+    public ReleaseVersion {
+        if (major < 0 || minor < 0 || patch < 0 || major >= 65535 || minor >= 65535 || patch >= 65535)
+            throw new IllegalArgumentException("Version components must be between 0 and 65534");
     }
 
     @Override

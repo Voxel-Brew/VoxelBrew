@@ -13,8 +13,6 @@ import javafx.stage.Window;
 import javafx.util.StringConverter;
 
 final class ExportDialog {
-    private ExportDialog() {}
-
     static void choose(
             Window owner,
             DocumentController controller,
@@ -66,4 +64,6 @@ final class ExportDialog {
         int dot = name.lastIndexOf('.');
         return source.resolveSibling((dot > 0 ? name.substring(0, dot) : name) + "." + extension);
     }
+
+    private ExportDialog() {}
 }

@@ -15,6 +15,75 @@ public final class FilePrinterStore implements PrinterStore {
     private static final Gson JSON = new GsonBuilder().setPrettyPrinting().create();
     private final Path directory;
 
+    static JsonObject encode(DriverConfiguration config) {
+        var result = new JsonObject();
+        config.properties().forEach((key, value) -> {
+            var item = new JsonObject();
+            String type;
+            if (value instanceof String v) {
+                type = "string";
+                item.addProperty("value", v);
+            } else if (value instanceof Integer v) {
+                type = "integer";
+                item.addProperty("value", v);
+            } else if (value instanceof Boolean v) {
+                type = "boolean";
+                item.addProperty("value", v);
+            } else if (value instanceof java.math.BigDecimal v) {
+                type = "decimal";
+                item.addProperty("value", v.toPlainString());
+            } else if (value instanceof URI v) {
+                type = "uri";
+                item.addProperty("value", v.toString());
+            } else if (value instanceof char[] v) {
+                type = "password";
+                item.addProperty("value", new String(v));
+                Arrays.fill(v, '\0');
+            } else throw new IllegalArgumentException("Unsupported configuration value");
+            item.addProperty("type", type);
+            result.add(key, item);
+        });
+        return result;
+    }
+
+    static DriverConfiguration decode(JsonObject json) {
+        var values = new LinkedHashMap<String, Object>();
+        json.entrySet().forEach(entry -> {
+            var item = entry.getValue().getAsJsonObject();
+            var value = item.get("value");
+            Object decoded = switch (item.get("type").getAsString()) {
+                case "string" -> value.getAsString();
+                case "integer" -> value.getAsBigDecimal().intValueExact();
+                case "boolean" -> {
+                    if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isBoolean())
+                        throw new IllegalArgumentException("Invalid boolean");
+                    yield value.getAsBoolean();
+                }
+                case "decimal" -> new java.math.BigDecimal(value.getAsString());
+                case "uri" -> URI.create(value.getAsString());
+                case "password" -> value.getAsString().toCharArray();
+                default -> throw new IllegalArgumentException("Unsupported configuration type");
+            };
+            values.put(entry.getKey(), decoded);
+        });
+        return new DriverConfiguration(values);
+    }
+
+    private static void restrict(Path file, boolean directory) throws IOException {
+        var posix = Files.getFileAttributeView(file, PosixFileAttributeView.class);
+        if (posix != null) posix.setPermissions(PosixFilePermissions.fromString(directory ? "rwx------" : "rw-------"));
+        else {
+            var acl = Files.getFileAttributeView(file, AclFileAttributeView.class);
+            if (acl == null) throw new IOException("Cannot restrict device credential permissions");
+            var entry = AclEntry.newBuilder()
+                    .setType(AclEntryType.ALLOW)
+                    .setPrincipal(Files.getOwner(file))
+                    .setPermissions(EnumSet.allOf(AclEntryPermission.class));
+            if (directory) entry.setFlags(AclEntryFlag.DIRECTORY_INHERIT, AclEntryFlag.FILE_INHERIT);
+            acl.setAcl(List.of(entry.build()));
+        }
+    }
+
     public FilePrinterStore() {
         this(UserConfiguration.user());
     }
@@ -95,74 +164,5 @@ public final class FilePrinterStore implements PrinterStore {
     private Path file(String id) {
         if (id == null || !id.matches("[a-zA-Z0-9-]{1,64}")) throw new IllegalArgumentException("Invalid printer ID");
         return directory.resolve(id + ".json");
-    }
-
-    static JsonObject encode(DriverConfiguration config) {
-        var result = new JsonObject();
-        config.properties().forEach((key, value) -> {
-            var item = new JsonObject();
-            String type;
-            if (value instanceof String v) {
-                type = "string";
-                item.addProperty("value", v);
-            } else if (value instanceof Integer v) {
-                type = "integer";
-                item.addProperty("value", v);
-            } else if (value instanceof Boolean v) {
-                type = "boolean";
-                item.addProperty("value", v);
-            } else if (value instanceof java.math.BigDecimal v) {
-                type = "decimal";
-                item.addProperty("value", v.toPlainString());
-            } else if (value instanceof URI v) {
-                type = "uri";
-                item.addProperty("value", v.toString());
-            } else if (value instanceof char[] v) {
-                type = "password";
-                item.addProperty("value", new String(v));
-                Arrays.fill(v, '\0');
-            } else throw new IllegalArgumentException("Unsupported configuration value");
-            item.addProperty("type", type);
-            result.add(key, item);
-        });
-        return result;
-    }
-
-    static DriverConfiguration decode(JsonObject json) {
-        var values = new LinkedHashMap<String, Object>();
-        json.entrySet().forEach(entry -> {
-            var item = entry.getValue().getAsJsonObject();
-            var value = item.get("value");
-            Object decoded = switch (item.get("type").getAsString()) {
-                case "string" -> value.getAsString();
-                case "integer" -> value.getAsBigDecimal().intValueExact();
-                case "boolean" -> {
-                    if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isBoolean())
-                        throw new IllegalArgumentException("Invalid boolean");
-                    yield value.getAsBoolean();
-                }
-                case "decimal" -> new java.math.BigDecimal(value.getAsString());
-                case "uri" -> URI.create(value.getAsString());
-                case "password" -> value.getAsString().toCharArray();
-                default -> throw new IllegalArgumentException("Unsupported configuration type");
-            };
-            values.put(entry.getKey(), decoded);
-        });
-        return new DriverConfiguration(values);
-    }
-
-    private static void restrict(Path file, boolean directory) throws IOException {
-        var posix = Files.getFileAttributeView(file, PosixFileAttributeView.class);
-        if (posix != null) posix.setPermissions(PosixFilePermissions.fromString(directory ? "rwx------" : "rw-------"));
-        else {
-            var acl = Files.getFileAttributeView(file, AclFileAttributeView.class);
-            if (acl == null) throw new IOException("Cannot restrict device credential permissions");
-            var entry = AclEntry.newBuilder()
-                    .setType(AclEntryType.ALLOW)
-                    .setPrincipal(Files.getOwner(file))
-                    .setPermissions(EnumSet.allOf(AclEntryPermission.class));
-            if (directory) entry.setFlags(AclEntryFlag.DIRECTORY_INHERIT, AclEntryFlag.FILE_INHERIT);
-            acl.setAcl(List.of(entry.build()));
-        }
     }
 }

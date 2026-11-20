@@ -12,8 +12,6 @@ import java.util.function.Consumer;
 
 @lombok.extern.slf4j.Slf4j
 public final class ProcessRunner {
-    private ProcessRunner() {}
-
     public static String run(List<String> arguments, Path directory, Cancellation cancellation, Consumer<String> sink)
             throws IOException, SlicerException.Execution {
         cancellation.check();
@@ -73,4 +71,6 @@ public final class ProcessRunner {
             unregister.run();
         }
     }
+
+    private ProcessRunner() {}
 }

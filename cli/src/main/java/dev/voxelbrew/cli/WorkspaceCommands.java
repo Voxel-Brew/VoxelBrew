@@ -9,8 +9,6 @@ import picocli.CommandLine.Model.OptionSpec;
 
 /** Workspace composition. Existing handlers remain ordinary injected commands. */
 final class WorkspaceCommands {
-    private WorkspaceCommands() {}
-
     enum OutputFormat {
         text,
         json
@@ -183,4 +181,6 @@ final class WorkspaceCommands {
                 document.gcode(),
                 document.printArtifacts());
     }
+
+    private WorkspaceCommands() {}
 }

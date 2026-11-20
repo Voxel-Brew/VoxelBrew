@@ -33,29 +33,14 @@ import picocli.CommandLine.*;
         })
 final class SketchCommands implements Runnable {
 
-    SketchCommands() {}
-
     @Spec
     CommandLine.Model.CommandSpec spec;
-
-    @Override
-    public void run() {
-        spec.commandLine().usage(spec.commandLine().getOut());
-    }
-
-    static void register(CommandLine cli) {
-        cli.addSubcommand("sketch", SketchCommands.class);
-    }
 
     @Command(
             name = "draw",
             mixinStandardHelpOptions = true,
             description = "Create a sketch type/variant; use --help for tools and numeric options")
     static final class Draw extends EditSketch {
-
-        Draw(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
 
         @Option(names = "--id", required = true)
         String id;
@@ -105,6 +90,10 @@ final class SketchCommands implements Runnable {
         @Option(names = "--spacing", defaultValue = "0", description = "Extra text character spacing in em")
         double spacing;
 
+        Draw(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
+
         @Override
         public Integer call() throws Exception {
             if (points.size() % 2 != 0) throw new IllegalArgumentException("Points must be x,y pairs");
@@ -141,10 +130,6 @@ final class SketchCommands implements Runnable {
             description = "Change persisted sketch text while preserving its identity and dimensions")
     static final class EditText extends EditSketch {
 
-        EditText(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(names = "--id", required = true)
         String id;
 
@@ -156,6 +141,10 @@ final class SketchCommands implements Runnable {
 
         @Option(names = "--path", description = "Replacement text path ID; an empty value detaches it")
         String path;
+
+        EditText(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
 
         @Override
         public Integer call() throws Exception {
@@ -182,12 +171,12 @@ final class SketchCommands implements Runnable {
 
     abstract static class EditSketch extends VoxelBrew.FileCommand {
 
+        @Option(names = "--sketch", required = true, description = "Stable sketch feature ID")
+        String sketchId;
+
         EditSketch(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
-
-        @Option(names = "--sketch", required = true, description = "Stable sketch feature ID")
-        String sketchId;
 
         Feature.Sketch selected(ModelSession session) {
             return session.document().features().stream()
@@ -265,10 +254,6 @@ final class SketchCommands implements Runnable {
                     "Add POINT x,y; LINE x1,y1,x2,y2; CIRCLE cx,cy,r; ARC cx,cy,r,start,sweep; ELLIPSE cx,cy,r1,r2,angle; CONIC startX,startY,vertexX,vertexY,endX,endY,rho; SPLINE four x,y pairs; FIT_SPLINE / CONTROL_SPLINE variable x,y pairs. Angles are radians. Use sketch draw for text.")
     static final class PutEntity extends EditSketch {
 
-        PutEntity(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(names = "--id", required = true)
         String id;
 
@@ -291,6 +276,10 @@ final class SketchCommands implements Runnable {
                 names = "--replace",
                 description = "Replace an existing entity; reject edits that conflict with constraints")
         boolean replace;
+
+        PutEntity(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
 
         @Override
         public Integer call() throws Exception {
@@ -332,15 +321,6 @@ final class SketchCommands implements Runnable {
                     "Add a geometric constraint or driving dimension; refs use entity.start/end/center/control1/control2 or origin.point")
     static final class Constrain extends EditSketch {
 
-        Constrain(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
-        enum Tangency {
-            EXTERNAL,
-            INTERNAL
-        }
-
         @Option(names = "--id", required = true)
         String id;
 
@@ -355,6 +335,15 @@ final class SketchCommands implements Runnable {
 
         @Option(names = "--tangency", description = "Optional circle/circle tangency branch")
         Tangency tangency;
+
+        enum Tangency {
+            EXTERNAL,
+            INTERNAL
+        }
+
+        Constrain(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
 
         @Override
         public Integer call() throws Exception {
@@ -381,12 +370,12 @@ final class SketchCommands implements Runnable {
             description = "Remove a constraint or unfix geometry by constraint ID")
     static final class RemoveConstraint extends EditSketch {
 
+        @Option(names = "--id", required = true)
+        String id;
+
         RemoveConstraint(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
-
-        @Option(names = "--id", required = true)
-        String id;
 
         @Override
         public Integer call() throws Exception {
@@ -408,12 +397,12 @@ final class SketchCommands implements Runnable {
             description = "Remove an entity and its dependent constraints")
     static final class RemoveEntity extends EditSketch {
 
+        @Option(names = "--id", required = true)
+        String id;
+
         RemoveEntity(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
-
-        @Option(names = "--id", required = true)
-        String id;
 
         @Override
         public Integer call() throws Exception {
@@ -428,12 +417,12 @@ final class SketchCommands implements Runnable {
             description = "Select one closed exterior and optional interior holes for extrusion/cutting")
     static final class Profile extends EditSketch {
 
+        @Option(names = "--entities", required = true, split = ",")
+        List<String> entities;
+
         Profile(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
-
-        @Option(names = "--entities", required = true, split = ",")
-        List<String> entities;
 
         @Override
         public Integer call() throws Exception {
@@ -501,10 +490,6 @@ final class SketchCommands implements Runnable {
             description = "Move a point while satisfying its constraints")
     static final class Move extends EditSketch {
 
-        Move(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(names = "--point", required = true)
         String point;
 
@@ -513,6 +498,10 @@ final class SketchCommands implements Runnable {
 
         @Option(names = "--y", required = true)
         double y;
+
+        Move(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
 
         @Override
         public Integer call() throws Exception {
@@ -530,10 +519,6 @@ final class SketchCommands implements Runnable {
             description = "Add a regular polygon with its persistent polygon constraint")
     static final class Polygon extends EditSketch {
 
-        Polygon(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(names = "--id", required = true)
         String id;
 
@@ -549,6 +534,10 @@ final class SketchCommands implements Runnable {
         @Option(names = "--sides", defaultValue = "6")
         int sides;
 
+        Polygon(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
+
         @Override
         public Integer call() throws Exception {
             var session = session();
@@ -562,5 +551,16 @@ final class SketchCommands implements Runnable {
             boundary.addAll(polygon.boundary());
             return publish(session, new SketchGeometry(entities, constraints, boundary));
         }
+    }
+
+    static void register(CommandLine cli) {
+        cli.addSubcommand("sketch", SketchCommands.class);
+    }
+
+    SketchCommands() {}
+
+    @Override
+    public void run() {
+        spec.commandLine().usage(spec.commandLine().getOut());
     }
 }

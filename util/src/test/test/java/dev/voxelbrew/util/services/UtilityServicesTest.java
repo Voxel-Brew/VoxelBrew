@@ -17,6 +17,39 @@ class UtilityServicesTest {
     @TempDir
     Path directory;
 
+    public static final class AlternativePaths implements ApplicationPaths {
+        public AlternativePaths() {}
+
+        @Override
+        public Path home() {
+            return Path.of("alternative-service-home").toAbsolutePath();
+        }
+
+        @Override
+        public Path configuration() {
+            return home().resolve("custom.properties");
+        }
+    }
+
+    public static final class AlternativeReleaseSource implements ReleaseSource {
+        public AlternativeReleaseSource() {}
+
+        @Override
+        public Release fetch(ReleaseVersion requested, UpdateCancellation cancellation) throws IOException {
+            throw new IOException("Alternative release service reached");
+        }
+
+        @Override
+        public void download(Release release, String asset, Path destination, UpdateCancellation cancellation) {
+            throw new AssertionError("No download expected");
+        }
+    }
+
+    private static void restore(String key, String previous) {
+        if (previous == null) System.clearProperty(key);
+        else System.setProperty(key, previous);
+    }
+
     @Test
     void defaultServicesAreDiscoverableWithoutCreatingFilesOrFetchingReleases() {
         assertThat(Services.load(ApplicationPaths.class)).isInstanceOf(SystemApplicationPaths.class);
@@ -67,20 +100,6 @@ class UtilityServicesTest {
         }
     }
 
-    public static final class AlternativePaths implements ApplicationPaths {
-        public AlternativePaths() {}
-
-        @Override
-        public Path home() {
-            return Path.of("alternative-service-home").toAbsolutePath();
-        }
-
-        @Override
-        public Path configuration() {
-            return home().resolve("custom.properties");
-        }
-    }
-
     @Test
     void configurationNoArgumentConstructorResolvesAnAlternativePathsProvider() throws Exception {
         var descriptorName = "META-INF/services/" + ApplicationPaths.class.getName();
@@ -103,20 +122,6 @@ class UtilityServicesTest {
             assertThat(Services.load(UserConfiguration.class).path()).isEqualTo(new AlternativePaths().configuration());
         } finally {
             thread.setContextClassLoader(previous);
-        }
-    }
-
-    public static final class AlternativeReleaseSource implements ReleaseSource {
-        public AlternativeReleaseSource() {}
-
-        @Override
-        public Release fetch(ReleaseVersion requested, UpdateCancellation cancellation) throws IOException {
-            throw new IOException("Alternative release service reached");
-        }
-
-        @Override
-        public void download(Release release, String asset, Path destination, UpdateCancellation cancellation) {
-            throw new AssertionError("No download expected");
         }
     }
 
@@ -145,10 +150,5 @@ class UtilityServicesTest {
         } finally {
             thread.setContextClassLoader(previous);
         }
-    }
-
-    private static void restore(String key, String previous) {
-        if (previous == null) System.clearProperty(key);
-        else System.setProperty(key, previous);
     }
 }

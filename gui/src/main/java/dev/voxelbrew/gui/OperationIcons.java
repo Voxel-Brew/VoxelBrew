@@ -5,8 +5,6 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.SVGPath;
 
 final class OperationIcons {
-    private OperationIcons() {}
-
     static Group icon(String command) {
         var shape = new SVGPath();
         shape.setContent(
@@ -27,4 +25,6 @@ final class OperationIcons {
         group.setMouseTransparent(true);
         return group;
     }
+
+    private OperationIcons() {}
 }

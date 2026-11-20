@@ -40,71 +40,8 @@ import picocli.CommandLine.Spec;
 @lombok.extern.slf4j.Slf4j
 public final class VoxelBrew implements Runnable {
 
-    VoxelBrew() {}
-
     @Spec
     private CommandSpec spec;
-
-    @Override
-    public void run() {
-        spec.commandLine().usage(spec.commandLine().getOut());
-    }
-
-    @SuppressWarnings("try") // Keep the app image in place until the process has finished.
-    public static void main(String[] args) {
-        dev.voxelbrew.util.logging.Logging.initialize("cli");
-        configureInstalledRuntime();
-        int result;
-        try (var lease = dev.voxelbrew.util.update.ApplicationImage.running(
-                dev.voxelbrew.util.update.ApplicationImage.Component.CLI)) {
-            result = commandLine().execute(args);
-        } catch (java.io.IOException | RuntimeException | LinkageError failure) {
-            log.error("CLI startup or execution failed", failure);
-            System.err.println("ERROR: " + failure.getMessage());
-            result = 1;
-        }
-        log.info("CLI finished with exit code {}", result);
-        dev.voxelbrew.util.logging.Logging.close();
-        System.exit(result);
-    }
-
-    public static CommandLine commandLine() {
-        return CliComponent.factory()
-                .create(
-                        dev.voxelbrew.util.di.ApplicationModule.system(
-                                dev.voxelbrew.util.update.ApplicationImage.Component.CLI),
-                        new dev.voxelbrew.cli.FileIoModule())
-                .commandLine();
-    }
-
-    static CommandLine commandLine(CommandLine.IFactory factory, dev.voxelbrew.util.i18n.Translations translations) {
-        var cliCommand = new CommandLine(VoxelBrew.class, factory)
-                .addSubcommand("exporters", Exporters.class)
-                .addSubcommand("export", Export.class)
-                .setExecutionExceptionHandler((failure, command, parsed) -> {
-                    if (failure instanceof IllegalArgumentException)
-                        log.warn("Command {} rejected: {}", command.getCommandName(), failure.getMessage());
-                    else log.error("Command {} failed", command.getCommandName(), failure);
-                    command.getErr().println("ERROR: " + failure.getMessage());
-                    return 1;
-                });
-        cliCommand.getCommandSpec().usageMessage().description(translations.text("app.description"));
-        PrintingCommands.register(cliCommand);
-        ImportCommands.register(cliCommand);
-        FeatureCommands.register(cliCommand);
-        SketchCommands.register(cliCommand);
-        ParameterCommands.register(cliCommand);
-        UpdateCommands.register(cliCommand);
-        cliCommand.setExecutionStrategy(parsed -> {
-            var selected = parsed;
-            while (selected.hasSubcommand()) selected = selected.subcommand();
-            String command = selected.commandSpec().name();
-            log.info("Executing CLI command {}", command);
-            return new CommandLine.RunLast().execute(parsed);
-        });
-        WorkspaceCommands.install(cliCommand);
-        return cliCommand;
-    }
 
     @Command(name = "exporters", mixinStandardHelpOptions = true, description = "List built-in and external exporters")
     @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
@@ -267,30 +204,6 @@ public final class VoxelBrew implements Runnable {
         }
     }
 
-    private static void configureInstalledRuntime() {
-        if (System.getProperty("voxelbrew.native.path") != null) {
-            return;
-        }
-        try {
-            Path jar = Path.of(VoxelBrew.class
-                    .getProtectionDomain()
-                    .getCodeSource()
-                    .getLocation()
-                    .toURI());
-            Path parent = jar.getParent();
-            Path runtime = parent == null ? null : parent.resolve("native");
-            if (runtime != null && !Files.isDirectory(runtime)) {
-                Path image = parent.getParent();
-                runtime = image == null ? null : image.resolve("native");
-            }
-            if (runtime != null && Files.isDirectory(runtime)) {
-                System.setProperty("voxelbrew.native.path", runtime.toString());
-            }
-        } catch (java.net.URISyntaxException ignored) {
-            /* NativeKernel supplies the load diagnostic. */
-        }
-    }
-
     @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     abstract static class FileCommand implements Callable<Integer> {
         final DocumentSource documents;
@@ -345,12 +258,12 @@ public final class VoxelBrew implements Runnable {
 
     abstract static class AddFeature extends FileCommand {
 
+        @Option(names = "--id", description = "Stable feature ID (default: generated UUID)")
+        String id;
+
         AddFeature(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
-
-        @Option(names = "--id", description = "Stable feature ID (default: generated UUID)")
-        String id;
 
         @Override
         ModelSession session() throws java.io.IOException {
@@ -375,10 +288,6 @@ public final class VoxelBrew implements Runnable {
         @Option(names = "--construction-plane", description = "Earlier construction plane feature ID")
         String constructionPlane;
 
-        AddSketch(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(names = "--offset-z", defaultValue = "0", description = "XY plane offset, mm")
         double z;
 
@@ -389,6 +298,10 @@ public final class VoxelBrew implements Runnable {
 
         @Option(names = "--profile-id", description = "Stable profile ID (default: <feature-id>.profile)")
         String profileId;
+
+        AddSketch(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
 
         int sketch(Feature.Profile profile) throws java.io.IOException {
             var session = session();
@@ -428,12 +341,12 @@ public final class VoxelBrew implements Runnable {
     @Command(name = "new", description = "Create an empty editable document.", mixinStandardHelpOptions = true)
     static final class Create extends FileCommand {
 
+        @Option(names = "--overwrite", description = "Explicitly replace an existing supported document")
+        boolean overwrite;
+
         Create(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
-
-        @Option(names = "--overwrite", description = "Explicitly replace an existing supported document")
-        boolean overwrite;
 
         @Override
         public Integer call() throws Exception {
@@ -448,10 +361,6 @@ public final class VoxelBrew implements Runnable {
             mixinStandardHelpOptions = true)
     static final class Rectangle extends AddSketch {
 
-        Rectangle(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(names = "--x", defaultValue = "0")
         double x;
 
@@ -464,6 +373,10 @@ public final class VoxelBrew implements Runnable {
         @Option(names = "--height", required = true)
         double height;
 
+        Rectangle(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
+
         @Override
         public Integer call() throws Exception {
             return sketch(new Feature.Rectangle(x, y, width, height));
@@ -473,10 +386,6 @@ public final class VoxelBrew implements Runnable {
     @Command(name = "circle", description = "Add a circle by center and diameter, mm.", mixinStandardHelpOptions = true)
     static final class Circle extends AddSketch {
 
-        Circle(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(names = "--center-x", required = true)
         double x;
 
@@ -485,6 +394,10 @@ public final class VoxelBrew implements Runnable {
 
         @Option(names = "--diameter", required = true)
         double diameter;
+
+        Circle(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
 
         @Override
         public Integer call() throws Exception {
@@ -498,10 +411,6 @@ public final class VoxelBrew implements Runnable {
             mixinStandardHelpOptions = true)
     static final class Extrude extends AddFeature {
 
-        Extrude(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(names = "--sketch", required = true)
         String sketch;
 
@@ -510,6 +419,10 @@ public final class VoxelBrew implements Runnable {
 
         @Option(names = "--region", description = "Stable region profile ID (default: whole sketch)")
         String region;
+
+        Extrude(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
 
         @Override
         public Integer call() throws Exception {
@@ -532,10 +445,6 @@ public final class VoxelBrew implements Runnable {
             mixinStandardHelpOptions = true)
     static final class Cut extends AddFeature {
 
-        Cut(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(names = "--sketch", required = true)
         String sketch;
 
@@ -547,6 +456,10 @@ public final class VoxelBrew implements Runnable {
                 defaultValue = "body",
                 description = "Named body output, including negative/positive split halves")
         String output;
+
+        Cut(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
 
         @Override
         public Integer call() throws Exception {
@@ -562,10 +475,6 @@ public final class VoxelBrew implements Runnable {
             mixinStandardHelpOptions = true)
     static final class Edit extends FileCommand {
 
-        Edit(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(names = "--feature", required = true)
         String feature;
 
@@ -580,6 +489,10 @@ public final class VoxelBrew implements Runnable {
 
         @Option(names = "--expression", description = "Formula or named parameter (instead of --value)")
         String expression;
+
+        Edit(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
 
         @Override
         public Integer call() throws Exception {
@@ -598,15 +511,15 @@ public final class VoxelBrew implements Runnable {
             mixinStandardHelpOptions = true)
     static final class Cursor extends FileCommand {
 
-        Cursor(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(
                 names = "--position",
                 required = true,
                 description = "Number of features to evaluate (0 through history size)")
         int position;
+
+        Cursor(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
 
         @Override
         public Integer call() throws Exception {
@@ -622,10 +535,6 @@ public final class VoxelBrew implements Runnable {
             mixinStandardHelpOptions = true)
     static final class Repair extends FileCommand {
 
-        Repair(DocumentSource documents, DocumentSave documentWriter) {
-            super(documents, documentWriter);
-        }
-
         @Option(names = "--feature", required = true)
         String feature;
 
@@ -637,6 +546,10 @@ public final class VoxelBrew implements Runnable {
 
         @Option(names = "--body-output", description = "Named output: body, negative or positive")
         String bodyOutput;
+
+        Repair(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
 
         @Override
         public Integer call() throws Exception {
@@ -712,12 +625,12 @@ public final class VoxelBrew implements Runnable {
             mixinStandardHelpOptions = true)
     static final class Inspect extends FileCommand {
 
+        @Option(names = "--point", split = ",", arity = "1", description = "Classify x,y,z in each body")
+        double[] point;
+
         Inspect(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
-
-        @Option(names = "--point", split = ",", arity = "1", description = "Classify x,y,z in each body")
-        double[] point;
 
         @Override
         public Integer call() throws Exception {
@@ -790,5 +703,92 @@ public final class VoxelBrew implements Runnable {
             }
             return 0;
         }
+    }
+
+    @SuppressWarnings("try") // Keep the app image in place until the process has finished.
+    public static void main(String[] args) {
+        dev.voxelbrew.util.logging.Logging.initialize("cli");
+        configureInstalledRuntime();
+        int result;
+        try (var lease = dev.voxelbrew.util.update.ApplicationImage.running(
+                dev.voxelbrew.util.update.ApplicationImage.Component.CLI)) {
+            result = commandLine().execute(args);
+        } catch (java.io.IOException | RuntimeException | LinkageError failure) {
+            log.error("CLI startup or execution failed", failure);
+            System.err.println("ERROR: " + failure.getMessage());
+            result = 1;
+        }
+        log.info("CLI finished with exit code {}", result);
+        dev.voxelbrew.util.logging.Logging.close();
+        System.exit(result);
+    }
+
+    public static CommandLine commandLine() {
+        return CliComponent.factory()
+                .create(
+                        dev.voxelbrew.util.di.ApplicationModule.system(
+                                dev.voxelbrew.util.update.ApplicationImage.Component.CLI),
+                        new dev.voxelbrew.cli.FileIoModule())
+                .commandLine();
+    }
+
+    static CommandLine commandLine(CommandLine.IFactory factory, dev.voxelbrew.util.i18n.Translations translations) {
+        var cliCommand = new CommandLine(VoxelBrew.class, factory)
+                .addSubcommand("exporters", Exporters.class)
+                .addSubcommand("export", Export.class)
+                .setExecutionExceptionHandler((failure, command, parsed) -> {
+                    if (failure instanceof IllegalArgumentException)
+                        log.warn("Command {} rejected: {}", command.getCommandName(), failure.getMessage());
+                    else log.error("Command {} failed", command.getCommandName(), failure);
+                    command.getErr().println("ERROR: " + failure.getMessage());
+                    return 1;
+                });
+        cliCommand.getCommandSpec().usageMessage().description(translations.text("app.description"));
+        PrintingCommands.register(cliCommand);
+        ImportCommands.register(cliCommand);
+        FeatureCommands.register(cliCommand);
+        SketchCommands.register(cliCommand);
+        ParameterCommands.register(cliCommand);
+        UpdateCommands.register(cliCommand);
+        cliCommand.setExecutionStrategy(parsed -> {
+            var selected = parsed;
+            while (selected.hasSubcommand()) selected = selected.subcommand();
+            String command = selected.commandSpec().name();
+            log.info("Executing CLI command {}", command);
+            return new CommandLine.RunLast().execute(parsed);
+        });
+        WorkspaceCommands.install(cliCommand);
+        return cliCommand;
+    }
+
+    private static void configureInstalledRuntime() {
+        if (System.getProperty("voxelbrew.native.path") != null) {
+            return;
+        }
+        try {
+            Path jar = Path.of(VoxelBrew.class
+                    .getProtectionDomain()
+                    .getCodeSource()
+                    .getLocation()
+                    .toURI());
+            Path parent = jar.getParent();
+            Path runtime = parent == null ? null : parent.resolve("native");
+            if (runtime != null && !Files.isDirectory(runtime)) {
+                Path image = parent.getParent();
+                runtime = image == null ? null : image.resolve("native");
+            }
+            if (runtime != null && Files.isDirectory(runtime)) {
+                System.setProperty("voxelbrew.native.path", runtime.toString());
+            }
+        } catch (java.net.URISyntaxException ignored) {
+            /* NativeKernel supplies the load diagnostic. */
+        }
+    }
+
+    VoxelBrew() {}
+
+    @Override
+    public void run() {
+        spec.commandLine().usage(spec.commandLine().getOut());
     }
 }

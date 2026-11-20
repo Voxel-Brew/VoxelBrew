@@ -22,7 +22,10 @@ import lombok.extern.slf4j.Slf4j;
 /** Thread-safe translation catalog. Missing languages fall back to English. */
 @Slf4j
 public final class TranslationServiceImpl implements TranslationService {
-    private static final Locale POLISH = Locale.forLanguageTag("pl");
+    private static final List<Locale> BUNDLED_LOCALES =
+            List.of("en", "pl", "fr", "it", "es", "pt", "de", "sv", "nb", "zh", "ja").stream()
+                    .map(Locale::forLanguageTag)
+                    .toList();
 
     private final Locale locale;
 
@@ -114,6 +117,8 @@ public final class TranslationServiceImpl implements TranslationService {
         if (external != null) return Locale.forLanguageTag(external.getProperty("language.i18n"));
         if (translations.containsKey(locale)) return locale;
         Locale language = Locale.forLanguageTag(locale.getLanguage());
+        // Older system locale settings use the Norwegian macrolanguage tag for Bokmål.
+        if (language.getLanguage().equals("no")) return Locale.forLanguageTag("nb");
         return translations.containsKey(language) ? language : Locale.ENGLISH;
     }
 
@@ -183,7 +188,9 @@ public final class TranslationServiceImpl implements TranslationService {
     }
 
     private void registerBundledCatalog(String catalog, ClassLoader loader, ResourceBundle.Control control) {
-        for (Locale language : List.of(defaultLocale(), POLISH)) {
+        for (Locale language : BUNDLED_LOCALES) {
+            String resource = control.toResourceName(control.toBundleName(catalog, language), "properties");
+            if (loader.getResource(resource) == null) continue;
             var bundle = ResourceBundle.getBundle(catalog, language, loader, control);
             bundle.keySet().forEach(key -> registerTranslation(language, key, bundle.getString(key)));
         }

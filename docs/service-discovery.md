@@ -37,7 +37,7 @@ inputs, without changing global service state.
   snapshot. Bulk reads and successful writes refresh it.
   The slicer store reads provider defaults from its preferences files and supports
   the older settings layouts.
-- `TranslationService` registers the English and Polish resource bundles at startup.
+- `TranslationService` registers the bundled language catalogs at startup.
   Application modules list bundles in `META-INF/voxelbrew/translations`. The service
   then discovers all `TranslationProvider` implementations, including the properties
   catalogs from the export, import, and printer APIs, and merges their messages.

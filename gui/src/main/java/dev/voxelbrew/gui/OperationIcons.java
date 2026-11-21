@@ -9,6 +9,7 @@ final class OperationIcons {
         var shape = new SVGPath();
         shape.setContent(
                 switch (command) {
+                    case "constrained-sketch" -> "M2 2H13V6 M2 2V18H13V14 M7 13L9 9L16 2L19 5L12 12Z";
                     case "extrude" ->
                         "M2 11L10 7L18 11V16L10 20L2 16Z M2 11L10 15L18 11 M10 15V20 M10 10V1 M6 5L10 1L14 5";
                     case "cut" -> "M2 8L10 4L18 8V16L10 20L2 16Z M2 8L10 12L18 8 M10 12V20 M10 1V10 M6 6L10 10L14 6";
@@ -19,7 +20,7 @@ final class OperationIcons {
                     default -> throw new IllegalArgumentException("Unknown operation: " + command);
                 });
         shape.setFill(Color.TRANSPARENT);
-        shape.setStroke(Color.web("#658dcc"));
+        shape.setStroke(command.equals("constrained-sketch") ? Color.WHITE : Color.web("#658dcc"));
         shape.setStrokeWidth(1.5);
         var group = new Group(shape);
         group.setMouseTransparent(true);

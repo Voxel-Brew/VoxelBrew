@@ -5396,10 +5396,14 @@ class WorkbenchUiTest {
             click("update-cancel");
             updates.slow = false;
             click("updates");
-            assertThat(fx(() -> workbench.lookup("#update-version"))).isNull();
+            assertThat(fx(() -> stage.getScene().lookup("#update-version"))).isNull();
+            assertThat(fx(() -> stage.getScene().lookup("#update-download").isVisible()))
+                    .isFalse();
             click("update-force");
             click("update-check");
             waitForUpdate("Update available");
+            assertThat(fx(() -> node("#update-download").getParent()))
+                    .isSameAs(fx(() -> node("#update-cancel").getParent()));
             assertThat(updates.requests.get() > request).isTrue();
             assertThat(updates.requested).isNull();
             fx(() -> {

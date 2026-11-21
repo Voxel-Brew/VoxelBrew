@@ -8,7 +8,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
@@ -35,8 +38,6 @@ final class UpdateDialog {
 
     private final Button check, download;
     private final Button install, cancel;
-
-    private final ButtonType installType;
 
     private UpdateService service;
 
@@ -83,13 +84,18 @@ final class UpdateDialog {
         this.worker = workers.get();
         this.force = new CheckBox(translations.translate("update.reinstall").orElseThrow());
         this.status = new Label();
-        this.check = new Button(translations.translate("update.check").orElseThrow());
-        this.download = new Button(translations.translate("update.download").orElseThrow());
-        this.installType =
-                new ButtonType(translations.translate("update.install").orElseThrow(), ButtonBar.ButtonData.OK_DONE);
+        var checkType =
+                new ButtonType(translations.translate("update.check").orElseThrow(), ButtonBar.ButtonData.OK_DONE);
+        var downloadType =
+                new ButtonType(translations.translate("update.download").orElseThrow(), ButtonBar.ButtonData.APPLY);
+        var installType =
+                new ButtonType(translations.translate("update.install").orElseThrow(), ButtonBar.ButtonData.APPLY);
         dialog.setTitle(translations.translate("update.title").orElseThrow());
         dialog.setHeaderText(translations.translate("update.heading").orElseThrow());
-        dialog.getDialogPane().getButtonTypes().setAll(installType, ButtonType.CANCEL);
+        dialog.getDialogPane().setPrefWidth(480);
+        dialog.getDialogPane().getButtonTypes().setAll(checkType, downloadType, installType, ButtonType.CANCEL);
+        check = (Button) dialog.getDialogPane().lookupButton(checkType);
+        download = (Button) dialog.getDialogPane().lookupButton(downloadType);
         install = (Button) dialog.getDialogPane().lookupButton(installType);
         cancel = (Button) dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
         install.setId("update-install");
@@ -98,30 +104,38 @@ final class UpdateDialog {
         check.setId("update-check");
         download.setId("update-download");
         force.setId("update-force");
-        for (var control : java.util.List.of(force, check, download)) UiHelp.install(control, translations);
+        UiHelp.install(force, translations);
+        for (var button : java.util.List.of(check, download, install)) {
+            button.getStyleClass().add("update-action");
+            button.managedProperty().bind(button.visibleProperty());
+        }
         status.setId("update-status");
         status.setWrapText(true);
-        status.visibleProperty().bind(status.textProperty().isNotEmpty());
-        status.managedProperty().bind(status.visibleProperty());
-        progress.setMaxSize(26, 26);
-        progress.setVisible(false);
+        status.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(status, Priority.ALWAYS);
+        progress.setMaxSize(20, 20);
+        progress.setMinSize(20, 20);
         progress.managedProperty().bind(progress.visibleProperty());
-        var content = new VBox(
-                12,
-                new Label(translations
-                        .translate("update.installed", BuildVersion.current())
-                        .orElseThrow()),
-                force,
-                check,
-                status,
-                progress,
-                download);
-        dialog.getDialogPane().setContent(content);
-        download.setDisable(true);
-        install.setDisable(true);
+        var feedback = new HBox(10, progress, status);
+        feedback.setAlignment(Pos.CENTER_LEFT);
+        feedback.getStyleClass().add("update-feedback");
+        feedback.visibleProperty().bind(status.textProperty().isNotEmpty());
+        feedback.managedProperty().bind(feedback.visibleProperty());
+        var installed = new Label(translations
+                .translate("update.installed", BuildVersion.current())
+                .orElseThrow());
+        installed.getStyleClass().add("update-installed");
+        dialog.getDialogPane().setContent(new VBox(14, installed, force, feedback));
+        busy(false);
         force.selectedProperty().addListener((observable, old, value) -> invalidateSelection());
-        check.setOnAction(e -> check());
-        download.setOnAction(e -> download());
+        check.addEventFilter(ActionEvent.ACTION, event -> {
+            event.consume();
+            check();
+        });
+        download.addEventFilter(ActionEvent.ACTION, event -> {
+            event.consume();
+            download();
+        });
         install.addEventFilter(ActionEvent.ACTION, e -> {
             if (scheduled) return;
             e.consume();
@@ -135,17 +149,29 @@ final class UpdateDialog {
 
     private void invalidateSelection() {
         selected = null;
-        download.setDisable(true);
+        status.setText("");
+        busy(false);
     }
 
     private void busy(boolean value) {
         busy = value;
+        boolean available = selected != null && selected.available() && selected.installable();
+        boolean ready = prepared != null;
         progress.setVisible(value);
-        check.setDisable(value || prepared != null);
-        force.setDisable(value || prepared != null);
-        download.setDisable(
-                value || selected == null || !selected.available() || !selected.installable() || prepared != null);
-        install.setDisable(value || prepared == null);
+        force.setDisable(value || ready);
+        check.setVisible(!ready);
+        check.setDisable(value);
+        download.setVisible(available && !ready);
+        download.setDisable(value);
+        install.setVisible(ready);
+        install.setDisable(value);
+        check.setDefaultButton(!available && !ready);
+        download.setDefaultButton(available && !ready);
+        install.setDefaultButton(ready);
+        var primary = javafx.css.PseudoClass.getPseudoClass("recommended");
+        check.pseudoClassStateChanged(primary, !available);
+        download.pseudoClassStateChanged(primary, true);
+        install.pseudoClassStateChanged(primary, true);
     }
 
     private void check() {

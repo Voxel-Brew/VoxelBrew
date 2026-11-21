@@ -23,25 +23,7 @@ final class McpDialog {
         var history = new TextField("100");
         var endpoint = new TextField(server.endpoint());
         endpoint.setEditable(false);
-        var token = new PasswordField();
-        token.setId("mcp-token");
-        token.setText(server.credential());
-        token.setEditable(false);
-        var visibleToken = new TextField();
-        visibleToken.setId("mcp-visible-token");
-        visibleToken.setEditable(false);
-        visibleToken.textProperty().bind(token.textProperty());
-        var reveal = new Button(text.translate("mcp.showToken").orElseThrow());
-        reveal.setId("mcp-toggle-token");
-        var credential = Dialogs.pathRow(token, reveal);
-        visibleToken.setMinWidth(0);
-        HBox.setHgrow(visibleToken, Priority.ALWAYS);
-        reveal.setOnAction(event -> {
-            boolean visible = credential.getChildren().getFirst() == token;
-            credential.getChildren().set(0, visible ? visibleToken : token);
-            reveal.setText(
-                    text.translate(visible ? "mcp.hideToken" : "mcp.showToken").orElseThrow());
-        });
+        var token = new RevealPasswordField("mcp-token", server.credential(), false, text);
         var status = new Label();
         status.setWrapText(true);
         var activity = new TextArea(
@@ -111,8 +93,8 @@ final class McpDialog {
         settings.addRow(2, new Label(text.translate("mcp.idle").orElseThrow()), idle);
         settings.addRow(3, new Label(text.translate("mcp.history").orElseThrow()), history);
         settings.addRow(4, new Label(text.translate("mcp.endpoint").orElseThrow()), endpoint);
-        settings.addRow(5, new Label(text.translate("mcp.token").orElseThrow()), credential);
-        GridPane.setHgrow(credential, Priority.ALWAYS);
+        settings.addRow(5, new Label(text.translate("mcp.token").orElseThrow()), token);
+        GridPane.setHgrow(token, Priority.ALWAYS);
         status.visibleProperty().bind(status.textProperty().isNotEmpty());
         status.managedProperty().bind(status.visibleProperty());
         dialog.getDialogPane()

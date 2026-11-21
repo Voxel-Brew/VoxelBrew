@@ -393,6 +393,34 @@
   -fx-background-radius: 4;
   -fx-padding: 4;
 }
+.reveal-password .text-field {
+  -fx-padding: 4 36 4 6;
+  -fx-min-height: 30;
+}
+.reveal-password .password-toggle {
+  -fx-background-color: transparent;
+  -fx-border-color: transparent;
+  -fx-padding: 4 8;
+}
+.reveal-password .password-toggle:hover,
+.reveal-password .password-toggle:focused {
+  -fx-background-color: -fx-base;
+  -fx-border-color: -fx-focus-color;
+}
+.password-eye {
+  -fx-fill: transparent;
+  -fx-stroke: -fx-text-background-color;
+  -fx-stroke-width: 1.4;
+}
+.reveal-password.export-dialog-invalid .text-field,
+.reveal-password.import-dialog-invalid .text-field {
+  -fx-border-color: #d65c46;
+  -fx-border-radius: 4;
+}
+.dark .reveal-password.export-dialog-invalid .text-field,
+.dark .reveal-password.import-dialog-invalid .text-field {
+  -fx-border-color: #ff897a;
+}
 .scroll-pane,
 .scroll-pane > .viewport {
   -fx-background-color: transparent;

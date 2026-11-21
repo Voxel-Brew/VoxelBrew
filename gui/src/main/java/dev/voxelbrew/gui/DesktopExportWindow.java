@@ -97,6 +97,7 @@ public final class DesktopExportWindow implements ExportWindow {
             if (binding == null) return;
             switch (binding.control()) {
                 case TextInputControl input -> input.setText(value);
+                case RevealPasswordField input -> input.setText(value);
                 case CheckBox input -> input.setSelected(Boolean.parseBoolean(value));
                 case ComboBox<?> input ->
                     input.getSelectionModel().select(input.getItems().indexOf(value));
@@ -323,9 +324,8 @@ public final class DesktopExportWindow implements ExportWindow {
             return renderFileDestination(destination, inputs, onChange);
         }
         if (component instanceof dev.voxelbrew.api.model.vui.PasswordField field) {
-            var input = new javafx.scene.control.PasswordField();
-            input.setText(field.value());
-            input.setId(inputPrefix + field.id().replace('.', '-'));
+            var input = new RevealPasswordField(
+                    inputPrefix + field.id().replace('.', '-'), field.value(), true, translations);
             return bind(
                     inputs,
                     field.id(),

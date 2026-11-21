@@ -205,9 +205,7 @@ public final class DesktopImportWindow implements ImportWindow {
         if (component instanceof dev.voxelbrew.api.model.vui.Separator) return new Separator();
         if (component instanceof FileSource source) return renderFileSource(source, inputs, onChange);
         if (component instanceof dev.voxelbrew.api.model.vui.PasswordField field) {
-            var input = new javafx.scene.control.PasswordField();
-            input.setText(field.value());
-            input.setId("import-" + field.id());
+            var input = new RevealPasswordField("import-" + field.id(), field.value(), true, translations);
             return bind(
                     inputs,
                     field.id(),

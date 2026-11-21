@@ -213,7 +213,7 @@ class FeatureProviderTest {
         var plugins = plugins();
         try (var registry = new FeatureRegistry(plugins)) {
             assertThat(registry.descriptors().size()).isEqualTo(2);
-            for (var word : List.of("Duplicate", "Incompatible", "MissingFeatureProvider")) {
+            for (var word : List.of("Duplicate", "MissingFeatureProvider")) {
                 assertThat(registry.diagnostics().stream().anyMatch(d -> d.contains(word)))
                         .as(registry.diagnostics().toString())
                         .isTrue();

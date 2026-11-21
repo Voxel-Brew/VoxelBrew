@@ -42,7 +42,7 @@ class CustomFeatureTest {
         for (double value : new double[] {Double.NaN, Double.POSITIVE_INFINITY, 0, 1001}) {
             assertThatThrownBy(() -> p.validate(value)).isInstanceOf(IllegalArgumentException.class);
         }
-        assertThatThrownBy(() -> new FeatureDescriptor("provider", "type", "Name", 1, 1, List.of(p, p)))
+        assertThatThrownBy(() -> new FeatureDescriptor("provider", "type", "Name", 1, List.of(p, p)))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new FeatureParameter("height", "Height", "mm", 8, 10, 20))
                 .isInstanceOf(IllegalArgumentException.class);

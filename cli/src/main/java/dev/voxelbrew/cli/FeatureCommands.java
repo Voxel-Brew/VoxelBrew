@@ -31,13 +31,7 @@ final class FeatureCommands {
                 for (var d : registry.descriptors()) {
                     spec.commandLine()
                             .getOut()
-                            .println(d
-                                    + " API="
-                                    + d.apiVersion()
-                                    + " payload="
-                                    + d.payloadVersion()
-                                    + " parameters="
-                                    + d.parameters());
+                            .println(d + " payload=" + d.payloadVersion() + " parameters=" + d.parameters());
                 }
                 registry.diagnostics().forEach(spec.commandLine().getErr()::println);
             }

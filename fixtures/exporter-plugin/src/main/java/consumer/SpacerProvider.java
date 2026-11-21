@@ -13,18 +13,11 @@ import javax.measure.quantity.Length;
 public class SpacerProvider implements FeatureProvider {
     public static final class Duplicate extends SpacerProvider {}
 
-    public static final class Incompatible extends SpacerProvider {
-        @Override
-        public FeatureDescriptor descriptor() {
-            return new FeatureDescriptor("example.future", "spacer", "Future spacer", 999, 1, List.of());
-        }
-    }
-
     public static final class Failing extends SpacerProvider {
         @Override
         public FeatureDescriptor descriptor() {
             var d = super.descriptor();
-            return new FeatureDescriptor("example.failed", d.type(), "Failed feature", API_VERSION, 1, d.parameters());
+            return new FeatureDescriptor("example.failed", d.type(), "Failed feature", 1, d.parameters());
         }
 
         @Override
@@ -44,7 +37,6 @@ public class SpacerProvider implements FeatureProvider {
                 "example.spacer",
                 "spacer",
                 "Spacer",
-                API_VERSION,
                 1,
                 List.of(
                         new FeatureParameter("outerDiameter", "Outer diameter", "mm", 20, 0.001, 1000),

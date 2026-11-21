@@ -6,12 +6,7 @@ import lombok.NonNull;
 
 /** One persistent operation type. Payload version is independent of SPI compatibility. */
 public record FeatureDescriptor(
-        String providerId,
-        String type,
-        @NonNull String name,
-        int apiVersion,
-        int payloadVersion,
-        List<FeatureParameter> parameters) {
+        String providerId, String type, @NonNull String name, int payloadVersion, List<FeatureParameter> parameters) {
     public FeatureDescriptor {
         CadDocument.identifier(providerId, "provider ID");
         CadDocument.identifier(type, "feature type");

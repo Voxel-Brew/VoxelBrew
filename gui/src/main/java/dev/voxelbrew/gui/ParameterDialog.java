@@ -513,8 +513,16 @@ final class ParameterDialog {
         }));
         parameters
                 .getColumns()
-                .add(column(translations.translate("gui.comment"), 130, ParameterSet.Parameter::comment));
+                .add(column(translations.translate("gui.comment").orElseThrow(), 130, this::parameterComment));
         parameters.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+    }
+
+    private String parameterComment(ParameterSet.Parameter parameter) {
+        if (!parameter.name().startsWith("vb.")) return parameter.comment();
+        return translations
+                .translate("parameter.builtin." + parameter.name().substring(3))
+                .flatMap(description -> translations.translate("parameter.builtin.readOnly", description))
+                .orElse(parameter.comment());
     }
 
     private void selectParameter(ParameterSet.Parameter p) {
@@ -534,7 +542,7 @@ final class ParameterDialog {
             else {
                 expression.setText(p.expression());
             }
-            comment.setText(p.comment());
+            comment.setText(parameterComment(p));
         }
         if (refreshing || p == null) return;
         if (p.name().startsWith("vb.")) return;

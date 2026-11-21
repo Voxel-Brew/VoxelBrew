@@ -762,6 +762,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         var configureDevices =
                 button(translations.translate("device.configure"), "print-configure-devices", this::configureDevices);
         configureDevices.setMinWidth(Region.USE_PREF_SIZE);
+        configureDevices.disableProperty().bind(printTarget.disableProperty());
         var deviceRow = new HBox(6, printTarget, configureDevices);
         HBox.setHgrow(printTarget, Priority.ALWAYS);
         var printerPanel = new VBox(
@@ -1515,7 +1516,8 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         configureDevicesAction.run();
         reloadPrinters();
         var after = printTargetDevices.get(targetId);
-        if (before != null
+        if (!printTarget.isDisabled()
+                && before != null
                 && after != null
                 && !ProfileHardware.resolve(before.profile()).equals(ProfileHardware.resolve(after.profile()))) {
             commit(setup().withPrinter(ProfileHardware.resolve(after.profile())).withPrintTarget(targetId));
@@ -2069,6 +2071,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         export3mfButton.setDisable(!document.canExport() || jobs.running());
         boolean sliced =
                 jobs.result() != null || !document.snapshot().document().gcode().isEmpty();
+        printTarget.setDisable(sliced || jobs.running());
         for (int i = 0; i < 3; i++) tabs.getTabs().get(i).setDisable(sliced);
         if (sliced) tabs.getSelectionModel().select(3);
         cleanSlicing.setDisable(!sliced || jobs.running());

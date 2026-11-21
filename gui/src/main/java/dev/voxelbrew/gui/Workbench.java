@@ -586,17 +586,22 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 translations.translate("action.export"),
                 "export",
                 true,
-                () -> ExportDialog.choose(stage(), controller(), registry(), translations, this::exportDocument));
-        this.customFeature = button(translations.translate("action.features"), "custom-feature", this::customFeature);
-        this.parameters = button(translations.translate("action.parameters"), "parameters", this::parameters);
-        this.constrainedSketch =
-                button(translations.translate("action.sketch"), "constrained-sketch", () -> beginPlaneSelection(null));
-        this.extrude = button(translations.translate("action.extrude"), "extrude", this::beginExtrusion);
-        this.cut = button(translations.translate("action.cut"), "cut", this::beginCut);
-        this.splitBody = button(translations.translate("action.split"), "split-body", this::beginSplit);
-        this.fillet = button(translations.translate("action.fillet"), "fillet", () -> beginFinish(true));
-        this.chamfer = button(translations.translate("action.chamfer"), "chamfer", () -> beginFinish(false));
-        this.shell = button(translations.translate("action.shell"), "shell", this::beginShell);
+                () -> ExportDialog.choose(stage(), registry(), translations, this::exportDocument));
+        this.customFeature =
+                button(translations.translate("action.features").orElseThrow(), "custom-feature", this::customFeature);
+        this.parameters =
+                button(translations.translate("action.parameters").orElseThrow(), "parameters", this::parameters);
+        this.constrainedSketch = button(
+                translations.translate("action.sketch").orElseThrow(),
+                "constrained-sketch",
+                () -> beginPlaneSelection(null));
+        this.extrude = button(translations.translate("action.extrude").orElseThrow(), "extrude", this::beginExtrusion);
+        this.cut = button(translations.translate("action.cut").orElseThrow(), "cut", this::beginCut);
+        this.splitBody = button(translations.translate("action.split").orElseThrow(), "split-body", this::beginSplit);
+        this.fillet = button(translations.translate("action.fillet").orElseThrow(), "fillet", () -> beginFinish(true));
+        this.chamfer =
+                button(translations.translate("action.chamfer").orElseThrow(), "chamfer", () -> beginFinish(false));
+        this.shell = button(translations.translate("action.shell").orElseThrow(), "shell", this::beginShell);
         appearanceChoice = appearance.load();
         setId("workbench");
         featureDiagnostics.setId("feature-diagnostics");

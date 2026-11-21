@@ -4414,6 +4414,14 @@ class WorkbenchUiTest {
         click("export");
         assertThat(fx(() -> ((Button) node("#export-confirm")).getText())).isEqualTo("Eksportuj");
         chooseExporter("3mf");
+        assertThat(fx(() -> ((Label) node("#export-notification-message")).getText()))
+                .contains("Slicer");
+        click("export");
+        chooseExporter("gcode");
+        assertThat(fx(() -> ((Label) node("#export-notification-message")).getText()))
+                .contains("G-code");
+        click("export");
+        chooseExporter("stl");
         assertPathRowLabels("export-path");
         assertThat(fx(() -> ((ComboBox<?>) node("#export-space")).getValue())).isEqualTo("DESIGN");
         key(KeyCode.ESCAPE);
@@ -7208,6 +7216,10 @@ class WorkbenchUiTest {
         ready();
         assertThat(document().features().stream().map(Feature::id).toList())
                 .isEqualTo(before.features().stream().map(Feature::id).toList());
+        click("workspace-print");
+        click("print-add");
+        ready();
+        click("workspace-design");
         Path exported = directory.resolve("GUI reference.3mf");
         click("export");
         chooseExporter("3mf");
@@ -7370,6 +7382,10 @@ class WorkbenchUiTest {
         assertThat(fx(() -> workbench.controller().canExport())).isTrue();
         assertThat(volume()).isCloseTo(Math.PI * 96 * 8, org.assertj.core.data.Offset.offset(0.01));
         assertThat(document()).isEqualTo(before);
+        click("workspace-print");
+        click("print-add");
+        ready();
+        click("workspace-design");
         Path exported = directory.resolve("GUI spacer.3mf");
         click("export");
         chooseExporter("3mf");

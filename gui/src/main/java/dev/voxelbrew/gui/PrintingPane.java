@@ -2633,7 +2633,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         var p = PrintProfile.resolve(setup()).printer();
         boolean deviceSelected = hasPrintDevice();
         printerProfileLabel.setText(translations
-                .translate(deviceSelected ? "print.deviceProfile" : "print.printerSelector")
+                .tryTranslate(deviceSelected ? "print.deviceProfile" : "print.printerSelector")
                 .orElseThrow());
         if (!nozzle.isFocused()) nozzle.setText(Double.toString(p.nozzleMm()));
         var entry = printerCatalog.entries().stream()

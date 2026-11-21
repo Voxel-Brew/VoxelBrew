@@ -47,7 +47,7 @@ final class LanguageDialog {
                     "language.readFailed", failure.getCause().getMessage()));
         }
         var saveType =
-                new ButtonType(translations.translate("action.save").orElseThrow(), ButtonBar.ButtonData.OK_DONE);
+                new ButtonType(translations.tryTranslate("action.save").orElseThrow(), ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().setAll(saveType, ButtonType.CLOSE);
         var save = (Button) dialog.getDialogPane().lookupButton(saveType);
         save.setId("language-save");

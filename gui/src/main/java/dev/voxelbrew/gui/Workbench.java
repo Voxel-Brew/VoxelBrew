@@ -584,21 +584,24 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 "export",
                 true,
                 () -> ExportDialog.choose(stage(), registry(), translations, this::exportDocument));
-        this.customFeature =
-                button(translations.translate("action.features").orElseThrow(), "custom-feature", this::customFeature);
+        this.customFeature = button(
+                translations.tryTranslate("action.features").orElseThrow(), "custom-feature", this::customFeature);
         this.parameters =
-                button(translations.translate("action.parameters").orElseThrow(), "parameters", this::parameters);
+                button(translations.tryTranslate("action.parameters").orElseThrow(), "parameters", this::parameters);
         this.constrainedSketch = button(
-                translations.translate("action.sketch").orElseThrow(),
+                translations.tryTranslate("action.sketch").orElseThrow(),
                 "constrained-sketch",
                 () -> beginPlaneSelection(null));
-        this.extrude = button(translations.translate("action.extrude").orElseThrow(), "extrude", this::beginExtrusion);
-        this.cut = button(translations.translate("action.cut").orElseThrow(), "cut", this::beginCut);
-        this.splitBody = button(translations.translate("action.split").orElseThrow(), "split-body", this::beginSplit);
-        this.fillet = button(translations.translate("action.fillet").orElseThrow(), "fillet", () -> beginFinish(true));
+        this.extrude =
+                button(translations.tryTranslate("action.extrude").orElseThrow(), "extrude", this::beginExtrusion);
+        this.cut = button(translations.tryTranslate("action.cut").orElseThrow(), "cut", this::beginCut);
+        this.splitBody =
+                button(translations.tryTranslate("action.split").orElseThrow(), "split-body", this::beginSplit);
+        this.fillet =
+                button(translations.tryTranslate("action.fillet").orElseThrow(), "fillet", () -> beginFinish(true));
         this.chamfer =
-                button(translations.translate("action.chamfer").orElseThrow(), "chamfer", () -> beginFinish(false));
-        this.shell = button(translations.translate("action.shell").orElseThrow(), "shell", this::beginShell);
+                button(translations.tryTranslate("action.chamfer").orElseThrow(), "chamfer", () -> beginFinish(false));
+        this.shell = button(translations.tryTranslate("action.shell").orElseThrow(), "shell", this::beginShell);
         appearanceChoice = appearance.load();
         setId("workbench");
         featureDiagnostics.setId("feature-diagnostics");
@@ -2135,7 +2138,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         close.setId("export-notification-close");
         close.getStyleClass().add("export-toast-close");
         close.setFocusTraversable(false);
-        var closeLabel = translations.translate("dialog.close").orElseThrow();
+        var closeLabel = translations.tryTranslate("dialog.close").orElseThrow();
         close.setAccessibleText(closeLabel);
         close.setTooltip(UiHelp.tooltip(closeLabel));
         var card = new HBox(12, icon, copy, close);

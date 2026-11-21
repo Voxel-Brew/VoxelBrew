@@ -2492,7 +2492,16 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 attempt(() -> controller.configuration(configuration.getValue()));
             }
         });
-        var configurationActions = new HBox(6, parameters, customFeature);
+        var configurationActions = new GridPane();
+        configurationActions.setHgap(6);
+        for (int column = 0; column < 2; column++) {
+            var half = new ColumnConstraints();
+            half.setPercentWidth(50);
+            configurationActions.getColumnConstraints().add(half);
+        }
+        parameters.setMaxWidth(Double.MAX_VALUE);
+        customFeature.setMaxWidth(Double.MAX_VALUE);
+        configurationActions.addRow(0, parameters, customFeature);
         var left = new VBox(
                 10,
                 heading(translations.translate("gui.model")),

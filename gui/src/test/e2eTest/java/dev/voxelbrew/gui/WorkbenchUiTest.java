@@ -4319,6 +4319,17 @@ class WorkbenchUiTest {
         assertThat(fx(() -> command(workbench, "save").getText())).isEqualTo("Zapisz");
         assertThat(fx(() -> node("#view-cube-top").getAccessibleText())).isEqualTo("Widok: Góra");
         assertThat(configuration.readUserConfig().containsKey("language")).isFalse();
+        fx(() -> {
+            var parameters = (Button) node("#parameters");
+            var operations = (Button) node("#custom-feature");
+            assertThat(parameters.getWidth())
+                    .isCloseTo(operations.getWidth(), org.assertj.core.data.Offset.offset(1.0));
+            assertThat(parameters.getWidth() + operations.getWidth() + 6)
+                    .isCloseTo(
+                            parameters.getParent().getLayoutBounds().getWidth(),
+                            org.assertj.core.data.Offset.offset(1.0));
+            return null;
+        });
         click("language");
         assertThat(fx(() -> ((ComboBox<?>) node("#language-choice")).getValue()))
                 .isEqualTo("system");

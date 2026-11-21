@@ -102,15 +102,16 @@ class TranslationServiceImplTest {
     void listsLocalesRegisteredAfterStartup() {
         var service = new TranslationServiceImpl(Locale.ENGLISH, directory);
         var snapshot = service.languages();
+        var testLocale = Locale.forLanguageTag("qaa");
 
         service.addSupportedLocale(Locale.CANADA_FRENCH);
-        service.registerTranslation(Locale.JAPANESE, "language.name", "日本語");
+        service.registerTranslation(testLocale, "language.name", "Test language");
 
         assertThat(service.languages())
                 .containsEntry("fr-CA", Locale.CANADA_FRENCH.getDisplayName(Locale.CANADA_FRENCH))
-                .containsEntry("ja", "日本語");
-        assertThat(snapshot).doesNotContainKeys("fr-CA", "ja");
-        assertThatThrownBy(() -> snapshot.put("ja", "Japanese")).isInstanceOf(UnsupportedOperationException.class);
+                .containsEntry("qaa", "Test language");
+        assertThat(snapshot).doesNotContainKeys("fr-CA", "qaa");
+        assertThatThrownBy(() -> snapshot.put("qaa", "Replacement")).isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test

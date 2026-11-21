@@ -4305,6 +4305,13 @@ class WorkbenchUiTest {
         assertThat(fx(() -> ((ComboBox<?>) node("#language-choice")).getValue()))
                 .isEqualTo("system");
         assertThat(fx(() -> ((Button) node("#language-save")).getText())).isEqualTo("Zapisz");
+        fx(() -> {
+            assertThat(node("#language-save").getParent())
+                    .isSameAs(node("#language-close").getParent());
+            Screenshot.save(
+                    stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "language-settings.png"));
+            return null;
+        });
         click("language-close");
         assertThat(configuration.readUserConfig().containsKey("language")).isFalse();
         assertThat(configuration.readUserConfig("external.setting").orElse("")).isEqualTo("preserve me");

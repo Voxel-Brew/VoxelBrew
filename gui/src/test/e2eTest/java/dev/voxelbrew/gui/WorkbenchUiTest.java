@@ -447,7 +447,12 @@ class WorkbenchUiTest {
             assertThat(node("#device-config-moonraker-apiKey")).isInstanceOf(PasswordField.class);
             ((TextField) node("#device-config-moonraker-url")).setText("http://localhost:1");
             ((TextField) node("#device-config-moonraker-serial")).setText("KLIPPER-123");
-            ((TextField) node("#device-config-moonraker-apiKey")).setText("private-key");
+            var reveal = (Button) node("#device-config-moonraker-apiKey-toggle");
+            reveal.fire();
+            ((TextField) node("#device-config-moonraker-apiKey-visible")).setText("private-key");
+            reveal.fire();
+            assertThat(((PasswordField) node("#device-config-moonraker-apiKey")).getText())
+                    .isEqualTo("private-key");
             return null;
         });
         Platform.runLater(() -> ((Button) node("#device-profile-new")).fire());
@@ -4290,12 +4295,14 @@ class WorkbenchUiTest {
         click("menu-settings");
         click("mcp-server");
         assertThat(fx(() -> node("#mcp-token"))).isInstanceOf(PasswordField.class);
-        assertThat(fx(() -> stage.getScene().lookup("#mcp-visible-token"))).isNull();
-        click("mcp-toggle-token");
-        assertThat(fx(() -> ((TextField) node("#mcp-visible-token")).getText().isBlank()))
+        assertThat(fx(() -> stage.getScene().lookup("#mcp-token-visible"))).isNull();
+        assertThat(fx(() -> ((Button) node("#mcp-token-toggle")).getGraphic()))
+                .isInstanceOf(javafx.scene.shape.SVGPath.class);
+        click("mcp-token-toggle");
+        assertThat(fx(() -> ((TextField) node("#mcp-token-visible")).getText().isBlank()))
                 .isFalse();
-        click("mcp-toggle-token");
-        assertThat(fx(() -> stage.getScene().lookup("#mcp-visible-token"))).isNull();
+        click("mcp-token-toggle");
+        assertThat(fx(() -> stage.getScene().lookup("#mcp-token-visible"))).isNull();
         fx(() -> {
             Screenshot.save(
                     stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "mcp-settings.png"));

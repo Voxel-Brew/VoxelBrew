@@ -61,7 +61,8 @@ class UiTextTest {
             try (var sources = Files.list(Path.of("src/main/java/dev/voxelbrew/gui"))) {
                 for (var file :
                         sources.filter(p -> p.toString().endsWith(".java")).toList()) {
-                    var matcher = Pattern.compile("translations\\s*\\.translate\\(\\s*\"([^\"]+)\"\\s*[,)]")
+                    var matcher = Pattern.compile(
+                                    "translations\\s*\\.(?:translate|tryTranslate)\\(\\s*\"([^\"]+)\"\\s*[,)]")
                             .matcher(Files.readString(file));
                     while (matcher.find()) {
                         assertThat(t.tryTranslate(matcher.group(1))
@@ -107,7 +108,8 @@ class UiTextTest {
         try (var sources = Files.list(Path.of("src/main/java/dev/voxelbrew/gui"))) {
             for (var file : sources.filter(p -> p.toString().endsWith(".java")).toList()) {
                 var matcher = Pattern.compile(
-                                "button\\(\\s*(?:translations\\s*\\.translate\\(\\s*\"[^\"]+\"\\s*\\)|\"[^\"]*\"),\\s*\"([^\"]+)\"\\s*,")
+                                "button\\(\\s*(?:translations\\s*\\.(?:translate|tryTranslate)\\(\\s*\"[^\"]+\"\\s*\\)"
+                                        + "(?:\\s*\\.orElseThrow\\(\\))?|\"[^\"]*\"),\\s*\"([^\"]+)\"\\s*,")
                         .matcher(Files.readString(file));
                 while (matcher.find()) ids.add(matcher.group(1));
             }
@@ -127,9 +129,10 @@ class UiTextTest {
         for (var locale : List.of(Locale.ENGLISH, Locale.forLanguageTag("pl"))) {
             var translations = TranslationCatalogs.forLocale(locale, directory);
             for (var id : ids) {
-                assertThat(UiHelp.description(translations, id).isBlank())
+                assertThat(UiHelp.description(translations, id))
                         .as(id)
-                        .isFalse();
+                        .isNotBlank()
+                        .doesNotStartWith(translations.currentLocale() + ":");
             }
             for (var draw : SketchEditor.Draw.values()) {
                 if (draw != SketchEditor.Draw.ADVANCED) {

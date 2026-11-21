@@ -622,32 +622,37 @@ public final class DocumentController implements AutoCloseable {
                             document, destination.path().toAbsolutePath().normalize(), destination.overwrite());
                     return selected;
                 };
-        return exportDocument(exporter, "vxb", true, parent);
+        return exportDocument(exporter, "vxb", true, parent, captureExportDocument());
     }
 
     public CompletableFuture<Void> exportDocument(
             dev.voxelbrew.api.exporter.ExporterProvider<?> provider, dev.voxelbrew.api.exporter.ExportWindow parent) {
         String id = provider.descriptor().id();
-        return exportDocument(provider.create(), id, id.equals("vxb"), parent);
+        var exporter = provider.create();
+        var captured = captureExportDocument();
+        if (id.equals("3mf") && captured.printSetup().instances().isEmpty()) {
+            return CompletableFuture.failedFuture(
+                    new java.io.IOException("No objects on the active plate; place a model in the Slicer first"));
+        }
+        if (id.equals("gcode") && captured.activeGcode().isEmpty()) {
+            return CompletableFuture.failedFuture(
+                    new java.io.IOException("No G-code for the active plate; slice it first"));
+        }
+        return exportDocument(exporter, id, id.equals("vxb"), parent, captured);
+    }
+
+    private CadDocument captureExportDocument() {
+        requireIdleIo();
+        capturePrintWorkspace();
+        return session.document();
     }
 
     private CompletableFuture<Void> exportDocument(
             dev.voxelbrew.api.exporter.Exporter<?> exporter,
             String exporterId,
             boolean savesDocument,
-            dev.voxelbrew.api.exporter.ExportWindow parent) {
-        requireIdleIo();
-
-        capturePrintWorkspace();
-        var captured = session.document();
-        if (exporterId.equals("3mf") && captured.printSetup().instances().isEmpty()) {
-            return CompletableFuture.failedFuture(
-                    new java.io.IOException("No objects on the active plate; place a model in the Slicer first"));
-        }
-        if (exporterId.equals("gcode") && captured.activeGcode().isEmpty()) {
-            return CompletableFuture.failedFuture(
-                    new java.io.IOException("No G-code for the active plate; slice it first"));
-        }
+            dev.voxelbrew.api.exporter.ExportWindow parent,
+            CadDocument captured) {
         long generation = documentGeneration.get();
         ioBusy = true;
         onChanged.run();

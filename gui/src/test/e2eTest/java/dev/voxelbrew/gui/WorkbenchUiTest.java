@@ -7232,6 +7232,7 @@ class WorkbenchUiTest {
         Path exported = directory.resolve("GUI reference.3mf");
         click("export");
         chooseExporter("3mf");
+        assertThat(fx(() -> ((ComboBox<?>) node("#export-space")).getValue())).isEqualTo("BUILD_PLATE");
         text("export-path", exported.toString());
         click("export-confirm");
         ready();
@@ -7398,6 +7399,7 @@ class WorkbenchUiTest {
         Path exported = directory.resolve("GUI spacer.3mf");
         click("export");
         chooseExporter("3mf");
+        assertThat(fx(() -> ((ComboBox<?>) node("#export-space")).getValue())).isEqualTo("BUILD_PLATE");
         text("export-path", exported.toString());
         click("export-confirm");
         ready();

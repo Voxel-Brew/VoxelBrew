@@ -69,7 +69,7 @@ configured printer. This example uses a profile-only job with no device connecte
 
 ## Bug reports and contributions
 
-Found a bug? [Open a GitHub issue](https://github.com/Voxel-Brew/VoxelBrew/issues/new)
+Found a bug? [Open a GitHub issue](https://github.com/Voxel-Brew/VoxelBrew/issues/new?template=bug_report.md)
 with the steps to reproduce it, what you expected to happen, and what happened
 instead. Include your VoxelBrew version, operating system, and any relevant logs
 or screenshots.

@@ -139,8 +139,7 @@ final class ViewCube extends Pane {
         var homeButton = new Button("", homeIcon);
         homeButton.setId("view-cube-home");
         homeButton.getStyleClass().add("view-cube-control");
-        homeButton.setAccessibleText(
-                translations.translate("gui.home_view_and_fit_model").orElseThrow());
+        homeButton.setAccessibleText(translations.translate("gui.home_view_and_fit_model"));
         UiHelp.install(homeButton, translations);
         homeButton.setOnAction(e -> home.run());
         homeButton.relocate(8, 6);
@@ -150,16 +149,16 @@ final class ViewCube extends Pane {
         var menu = new MenuButton("", menuIcon);
         menu.setId("view-cube-menu");
         menu.getStyleClass().add("view-cube-control");
-        menu.setAccessibleText(translations.translate("gui.standard_views").orElseThrow());
+        menu.setAccessibleText(translations.translate("gui.standard_views"));
         UiHelp.menu(menu, translations);
         for (String name : new String[] {"Isometric", "Top", "Front", "Right", "Back", "Left", "Bottom"}) {
             var item = new MenuItem(UiText.view(translations, name));
-            UiHelp.menuItem(item, translations.translate("help.standard-view").orElseThrow());
+            UiHelp.menuItem(item, translations.translate("help.standard-view"));
             item.setOnAction(e -> navigate.accept(ViewOrientation.named(name)));
             menu.getItems().add(item);
         }
-        var fitItem = new MenuItem(translations.translate("gui.fit_model").orElseThrow());
-        UiHelp.menuItem(fitItem, translations.translate("help.fit").orElseThrow());
+        var fitItem = new MenuItem(translations.translate("gui.fit_model"));
+        UiHelp.menuItem(fitItem, translations.translate("help.fit"));
         fitItem.setOnAction(e -> fit.run());
         menu.getItems().add(fitItem);
         menu.relocate(WIDTH - 36, 6);
@@ -189,14 +188,8 @@ final class ViewCube extends Pane {
         polygon.setCursor(Cursor.HAND);
         polygon.setFocusTraversable(true);
         polygon.setAccessibleRole(AccessibleRole.BUTTON);
-        polygon.setAccessibleText(translations
-                .translate("view.accessible", UiText.view(translations, name))
-                .orElseThrow());
-        Tooltip.install(
-                polygon,
-                UiHelp.tooltip(translations
-                        .translate("view.orbit", UiText.view(translations, name))
-                        .orElseThrow()));
+        polygon.setAccessibleText(translations.translate("view.accessible", UiText.view(translations, name)));
+        Tooltip.install(polygon, UiHelp.tooltip(translations.translate("view.orbit", UiText.view(translations, name))));
         Text label = fixed.size() == 1
                 ? new Text(UiText.view(translations, name).toUpperCase(translations.currentLocale()))
                 : null;

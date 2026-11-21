@@ -4061,7 +4061,7 @@ class WorkbenchUiTest {
         createRenameBodies();
         choice("appearance", 2);
         var translations = TranslationCatalogs.forLocale(Locale.forLanguageTag("pl"), directory);
-        bodyTreeClick(translations.translate("feature.body", 2).orElseThrow(), MouseButton.SECONDARY, 1);
+        bodyTreeClick(translations.tryTranslate("feature.body", 2).orElseThrow(), MouseButton.SECONDARY, 1);
         assertThat(fx(() -> ((Label) node("#body-rename").lookup(".label")).getText()))
                 .isEqualTo("Zmień nazwę");
         fx(() -> {
@@ -4482,7 +4482,7 @@ class WorkbenchUiTest {
                                 workbench.controller().snapshot().document().uuidGenerator());
                 assertThat(command(second, "save").getText())
                         .isEqualTo(TranslationCatalogs.forLocale(Locale.forLanguageTag("pl"), directory)
-                                .translate("action.save")
+                                .tryTranslate("action.save")
                                 .orElseThrow());
                 assertThat(second.getStyleClass().contains("dark")).isTrue();
                 second.close();

@@ -233,7 +233,7 @@ public final class TranslationServiceImpl implements TranslationService {
     }
 
     @Override
-    public Optional<String> translate(String key, Object... arguments) {
+    public Optional<String> tryTranslate(String key, Object... arguments) {
         return Optional.ofNullable(pattern(key))
                 .map(pattern -> arguments.length == 0 ? pattern : new MessageFormat(pattern, locale).format(arguments));
     }

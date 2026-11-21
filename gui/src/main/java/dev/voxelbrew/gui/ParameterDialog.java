@@ -46,8 +46,7 @@ final class ParameterDialog {
             Window owner, List<Feature> features, ParameterSet initial, TranslationService translations) {
         var editor = new ParameterDialog(features, initial, translations);
         var dialog = new Dialog<ParameterSet>();
-        dialog.setTitle(
-                translations.translate("gui.parameters_and_configurations").orElseThrow());
+        dialog.setTitle(translations.translate("gui.parameters_and_configurations"));
         dialog.getDialogPane().setContent(editor.content());
         dialog.getDialogPane().getButtonTypes().setAll(ButtonType.APPLY, ButtonType.CANCEL);
         dialog.getDialogPane().lookupButton(ButtonType.APPLY).setId("parameters-apply");
@@ -177,20 +176,20 @@ final class ParameterDialog {
         fields.setVgap(5);
         fields.addRow(
                 0,
-                new Label(translations.translate("gui.name").orElseThrow()),
+                new Label(translations.translate("gui.name")),
                 name,
-                new Label(translations.translate("gui.unit").orElseThrow()),
+                new Label(translations.translate("gui.unit")),
                 unit);
         fields.addRow(
                 1,
-                new Label(translations.translate("gui.expression").orElseThrow()),
+                new Label(translations.translate("gui.expression")),
                 expressionFields,
-                new Label(translations.translate("gui.comment").orElseThrow()),
+                new Label(translations.translate("gui.comment")),
                 comment);
         var parameterButtons = new FlowPane(
                 6,
                 6,
-                button(translations.translate("gui.add_update").orElseThrow(), "parameter-save", () -> {
+                button(translations.translate("gui.add_update"), "parameter-save", () -> {
                     ParameterSet next = draft;
                     if (selectedParameter != null
                             && !next.parameter(selectedParameter)
@@ -204,7 +203,7 @@ final class ParameterDialog {
                             expression.getText().strip(),
                             comment.evaluatedText()));
                 }),
-                button(translations.translate("action.new").orElseThrow(), "parameter-new", () -> {
+                button(translations.translate("action.new"), "parameter-new", () -> {
                     selectedParameter = null;
                     parameters.getSelectionModel().clearSelection();
                     name.clear();
@@ -212,16 +211,14 @@ final class ParameterDialog {
                     comment.clear();
                     name.requestFocus();
                 }),
-                button(translations.translate("gui.remove").orElseThrow(), "parameter-remove", () -> {
+                button(translations.translate("gui.remove"), "parameter-remove", () -> {
                     update(draft.remove(name.getText().strip()));
                     selectedParameter = null;
                 }));
         var parameterPane = new VBox(
                 7,
-                new Label(translations
-                        .translate(
-                                "gui.expressions_use_names_arithmetic_and_units_edits_affect_the_active_configuration")
-                        .orElseThrow()),
+                new Label(translations.translate(
+                        "gui.expressions_use_names_arithmetic_and_units_edits_affect_the_active_configuration")),
                 showBuiltins,
                 parameters,
                 fields,
@@ -244,27 +241,27 @@ final class ParameterDialog {
         var configButtons = new FlowPane(
                 6,
                 6,
-                new Label(translations.translate("gui.name").orElseThrow()),
+                new Label(translations.translate("gui.name")),
                 configName,
                 button(
-                        translations.translate("gui.add").orElseThrow(),
+                        translations.translate("gui.add"),
                         "configuration-add",
                         () -> update(draft.addConfiguration(configName.getText().strip(), false))),
                 button(
-                        translations.translate("gui.duplicate_active").orElseThrow(),
+                        translations.translate("gui.duplicate_active"),
                         "configuration-copy",
                         () -> update(draft.addConfiguration(configName.getText().strip(), true))),
                 button(
-                        translations.translate("gui.rename").orElseThrow(),
+                        translations.translate("gui.rename"),
                         "configuration-rename",
                         () -> update(draft.renameConfiguration(
                                 selectedConfig(), configName.getText().strip()))),
                 button(
-                        translations.translate("gui.remove").orElseThrow(),
+                        translations.translate("gui.remove"),
                         "configuration-remove",
                         () -> update(draft.removeConfiguration(selectedConfig()))),
                 button(
-                        translations.translate("gui.activate_selected").orElseThrow(),
+                        translations.translate("gui.activate_selected"),
                         "configuration-activate",
                         () -> update(draft.select(selectedConfig()))));
         var overrides = new FlowPane(
@@ -273,43 +270,37 @@ final class ParameterDialog {
                 overrideParameter,
                 override,
                 button(
-                        translations.translate("gui.set_override").orElseThrow(),
+                        translations.translate("gui.set_override"),
                         "configuration-set",
                         () -> update(draft.override(requiredParameter().id(), selectedConfig(), override.getText()))),
                 button(
-                        translations.translate("gui.inherit_default").orElseThrow(),
+                        translations.translate("gui.inherit_default"),
                         "configuration-inherit",
                         () -> update(draft.override(requiredParameter().id(), selectedConfig(), ""))));
         var configurationPane = new VBox(
                 7,
-                new Label(translations
-                        .translate(
-                                "gui.rows_are_variants_double_click_a_cell_to_edit_its_expression_blank_inherits_default")
-                        .orElseThrow()),
+                new Label(translations.translate(
+                        "gui.rows_are_variants_double_click_a_cell_to_edit_its_expression_blank_inherits_default")),
                 configurations,
                 configButtons,
                 overrides);
 
         dimensions.setId("parameter-dimensions");
-        dimensions.setPlaceholder(
-                new Label(translations.translate("dimensions.empty").orElseThrow()));
+        dimensions.setPlaceholder(new Label(translations.translate("dimensions.empty")));
         dimensions.setPrefHeight(205);
         dimensions
                 .getColumns()
                 .add(column(
-                        translations.translate("gui.feature_dimension").orElseThrow(),
+                        translations.translate("gui.feature_dimension"),
                         280,
                         d -> d.target().toString()));
         dimensions
                 .getColumns()
                 .add(column(
-                        translations.translate("gui.unit").orElseThrow(),
-                        60,
-                        d -> d.unit().toString()));
+                        translations.translate("gui.unit"), 60, d -> d.unit().toString()));
         dimensions
                 .getColumns()
-                .add(column(
-                        translations.translate("gui.expression").orElseThrow(), 220, d -> draft.binding(d.target())));
+                .add(column(translations.translate("gui.expression"), 220, d -> draft.binding(d.target())));
         dimensions
                 .getItems()
                 .setAll(features.stream()
@@ -321,20 +312,15 @@ final class ParameterDialog {
         });
         var dimensionsPane = new VBox(
                 7,
-                new Label(translations
-                        .translate(
-                                "gui.bind_driving_sketch_dimensions_extrusion_distances_and_offset_planes_to_parameters")
-                        .orElseThrow()),
+                new Label(translations.translate(
+                        "gui.bind_driving_sketch_dimensions_extrusion_distances_and_offset_planes_to_parameters")),
                 dimensions,
-                new Label(translations
-                        .translate("gui.expression_blank_restores_the_stored_numeric_value")
-                        .orElseThrow()),
+                new Label(translations.translate("gui.expression_blank_restores_the_stored_numeric_value")),
                 binding,
-                button(translations.translate("gui.bind_dimension").orElseThrow(), "parameter-bind", () -> {
+                button(translations.translate("gui.bind_dimension"), "parameter-bind", () -> {
                     var chosen = dimensions.getSelectionModel().getSelectedItem();
                     if (chosen == null) {
-                        throw new IllegalArgumentException(
-                                translations.translate("gui.select_a_dimension").orElseThrow());
+                        throw new IllegalArgumentException(translations.translate("gui.select_a_dimension"));
                     }
                     var doc = new dev.voxelbrew.api.model.CadDocument(
                             "parameter-editor",
@@ -345,9 +331,9 @@ final class ParameterDialog {
                     update(FeatureDimensions.bind(doc, chosen.target(), binding.getText()));
                 }));
         var tabs = new TabPane(
-                new Tab(translations.translate("gui.parameters").orElseThrow(), parameterPane),
-                new Tab(translations.translate("gui.configurations").orElseThrow(), configurationPane),
-                new Tab(translations.translate("gui.dimensions").orElseThrow(), dimensionsPane));
+                new Tab(translations.translate("gui.parameters"), parameterPane),
+                new Tab(translations.translate("gui.configurations"), configurationPane),
+                new Tab(translations.translate("gui.dimensions"), dimensionsPane));
         tabs.setId("parameters-tabs");
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         tabs.setPrefHeight(370);
@@ -363,15 +349,14 @@ final class ParameterDialog {
     private String selectedConfig() {
         String id = configurations.getSelectionModel().getSelectedItem();
         if (id == null) {
-            throw new IllegalArgumentException(
-                    translations.translate("gui.select_a_configuration_row").orElseThrow());
+            throw new IllegalArgumentException(translations.translate("gui.select_a_configuration_row"));
         }
         return id;
     }
 
     private String configLabel(String id) {
         return id.isEmpty()
-                ? translations.translate("configuration.default").orElseThrow()
+                ? translations.translate("configuration.default")
                 : draft.configurations().stream()
                         .filter(c -> c.id().equals(id))
                         .findFirst()
@@ -382,8 +367,7 @@ final class ParameterDialog {
     private ParameterSet.Parameter requiredParameter() {
         var p = overrideParameter.getValue();
         if (p == null) {
-            throw new IllegalArgumentException(
-                    translations.translate("gui.choose_a_parameter").orElseThrow());
+            throw new IllegalArgumentException(translations.translate("gui.choose_a_parameter"));
         }
         return p;
     }
@@ -424,7 +408,7 @@ final class ParameterDialog {
             configurations
                     .getColumns()
                     .add(column(
-                            translations.translate("gui.configuration").orElseThrow(),
+                            translations.translate("gui.configuration"),
                             160,
                             id -> (draft.active().equals(id) ? "● " : "") + configLabel(id)));
             for (var p : draft.parameters()) {
@@ -472,15 +456,9 @@ final class ParameterDialog {
             configurations
                     .getSelectionModel()
                     .select(config != null && configurations.getItems().contains(config) ? config : draft.active());
-            active.setText(translations
-                    .translate(
-                            "configuration.active",
-                            draft.active().isEmpty()
-                                    ? translations
-                                            .translate("configuration.default")
-                                            .orElseThrow()
-                                    : draft.activeName())
-                    .orElseThrow());
+            active.setText(translations.translate(
+                    "configuration.active",
+                    draft.active().isEmpty() ? translations.translate("configuration.default") : draft.activeName()));
             dimensions.refresh();
         } finally {
             refreshing = false;
@@ -490,7 +468,7 @@ final class ParameterDialog {
 
     private void configureParameterTable() {
         showBuiltins.setId("parameters-show-builtins");
-        showBuiltins.setText(translations.translate("parameters.showBuiltins").orElseThrow());
+        showBuiltins.setText(translations.translate("parameters.showBuiltins"));
         UiHelp.install(showBuiltins, translations);
         showBuiltins.setSelected(true);
         showBuiltins.selectedProperty().addListener((o, before, show) -> {
@@ -506,27 +484,21 @@ final class ParameterDialog {
             refresh();
         });
         parameters.setId("parameter-table");
-        parameters.setPlaceholder(
-                new Label(translations.translate("parameters.empty").orElseThrow()));
+        parameters.setPlaceholder(new Label(translations.translate("parameters.empty")));
         parameters.setPrefHeight(175);
-        parameters
-                .getColumns()
-                .add(column(translations.translate("gui.name").orElseThrow(), 110, ParameterSet.Parameter::name));
+        parameters.getColumns().add(column(translations.translate("gui.name"), 110, ParameterSet.Parameter::name));
         parameters
                 .getColumns()
                 .add(column(
-                        translations.translate("gui.unit").orElseThrow(),
+                        translations.translate("gui.unit"),
                         65,
                         p -> BuiltinParameters.isString(p.name())
                                 ? "string"
                                 : p.unit().toString()));
         parameters
                 .getColumns()
-                .add(column(
-                        translations.translate("gui.expression").orElseThrow(),
-                        180,
-                        p -> draft.expression(p, draft.active())));
-        parameters.getColumns().add(column(translations.translate("gui.value").orElseThrow(), 90, p -> {
+                .add(column(translations.translate("gui.expression"), 180, p -> draft.expression(p, draft.active())));
+        parameters.getColumns().add(column(translations.translate("gui.value"), 90, p -> {
             try {
                 if (p.name().startsWith("vb.")) {
                     return Expressions.format(draft.builtins().value(p.name()));
@@ -536,12 +508,12 @@ final class ParameterDialog {
                         "%.6g",
                         p.unit().displayValue(draft.values().get(p.name())));
             } catch (RuntimeException failure) {
-                return translations.translate("gui.error").orElseThrow();
+                return translations.translate("gui.error");
             }
         }));
         parameters
                 .getColumns()
-                .add(column(translations.translate("gui.comment").orElseThrow(), 130, ParameterSet.Parameter::comment));
+                .add(column(translations.translate("gui.comment"), 130, ParameterSet.Parameter::comment));
         parameters.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
     }
 

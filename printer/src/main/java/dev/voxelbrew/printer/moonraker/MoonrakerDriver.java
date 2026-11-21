@@ -66,7 +66,7 @@ public final class MoonrakerDriver implements Driver {
 
     @Override
     public String name() {
-        return translations.translate("printer.moonraker.name").orElseThrow();
+        return translations.translate("printer.moonraker.name");
     }
 
     @Override
@@ -79,8 +79,7 @@ public final class MoonrakerDriver implements Driver {
         var values = config.toInput();
         var errors = form.validate(values);
         if (!errors.isEmpty()) {
-            throw new IllegalArgumentException(
-                    translations.translate("printer.invalid", errors).orElseThrow());
+            throw new IllegalArgumentException(translations.translate("printer.invalid", errors));
         }
     }
 
@@ -106,7 +105,7 @@ public final class MoonrakerDriver implements Driver {
                     OptionalDouble.empty(),
                     OptionalDouble.empty(),
                     OptionalDouble.empty(),
-                    message(translations.translate("printer.moonraker.status").orElseThrow(), failure));
+                    message(translations.translate("printer.moonraker.status"), failure));
         }
     }
 
@@ -118,15 +117,13 @@ public final class MoonrakerDriver implements Driver {
         try {
             validate(config);
             if (!artifact.format().equals("gcode")) {
-                return new PrintResult.Failure(Set.of(
-                        translations.translate("printer.moonraker.format").orElseThrow()));
+                return new PrintResult.Failure(Set.of(translations.translate("printer.moonraker.format")));
             }
             temporary = Files.createTempFile("voxelbrew-job-", ".gcode");
             Files.write(temporary, artifact.bytes());
             try (var session = transports.open(config)) {
                 if (!session.status().canStart()) {
-                    return new PrintResult.Failure(Set.of(
-                            translations.translate("printer.moonraker.busy").orElseThrow()));
+                    return new PrintResult.Failure(Set.of(translations.translate("printer.moonraker.busy")));
                 }
                 var uploaded = session.upload(temporary, progress -> {});
                 submissionAttempted = true;
@@ -135,7 +132,7 @@ public final class MoonrakerDriver implements Driver {
                 return PrintResult.Success.SUCCESS;
             }
         } catch (JobRejectedException rejection) {
-            return failed(translations.translate("printer.moonraker.rejected").orElseThrow(), rejection, false);
+            return failed(translations.translate("printer.moonraker.rejected"), rejection, false);
         } catch (IOException | RuntimeException failure) {
             if (submitted) {
                 log.warn("Moonraker accepted the submission but transport cleanup failed", failure);
@@ -143,10 +140,8 @@ public final class MoonrakerDriver implements Driver {
             }
             return failed(
                     submissionAttempted
-                            ? translations
-                                    .translate("printer.moonraker.uncertain")
-                                    .orElseThrow()
-                            : translations.translate("printer.moonraker.failed").orElseThrow(),
+                            ? translations.translate("printer.moonraker.uncertain")
+                            : translations.translate("printer.moonraker.failed"),
                     failure,
                     submissionAttempted);
         } finally {

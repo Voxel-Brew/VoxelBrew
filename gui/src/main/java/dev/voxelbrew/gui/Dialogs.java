@@ -137,7 +137,7 @@ final class Dialogs {
             buttons.put(type, (ButtonBase) pane.lookupButton(type));
             String key = BUTTON_LABELS.get(type);
             if (key != null) {
-                buttons.get(type).setText(translations.translate(key).orElseThrow());
+                buttons.get(type).setText(translations.translate(key));
             }
             buttons.get(type).setMinWidth(Region.USE_PREF_SIZE);
             UiHelp.dialogButton(buttons.get(type), type, translations);

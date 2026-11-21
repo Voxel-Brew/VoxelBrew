@@ -23,7 +23,7 @@ final class FeatureDialog {
             throws IOException {
         try (var registry = features.open(directory)) {
             var dialog = new Dialog<Feature.Custom>();
-            dialog.setTitle(translations.translate("gui.add_feature").orElseThrow());
+            dialog.setTitle(translations.translate("gui.add_feature"));
             var type = new ComboBox<FeatureDescriptor>();
             type.setId("custom-type");
             type.getItems().setAll(registry.descriptors());
@@ -36,8 +36,7 @@ final class FeatureDialog {
             errors.getStyleClass().add("error");
             var diagnostics = new Label(String.join("\n", registry.diagnostics()));
             diagnostics.setWrapText(true);
-            var details = new TitledPane(
-                    translations.translate("gui.plugin_diagnostics").orElseThrow(), diagnostics);
+            var details = new TitledPane(translations.translate("gui.plugin_diagnostics"), diagnostics);
             details.setExpanded(false);
             type.setOnAction(e -> {
                 fields.clear();
@@ -60,29 +59,20 @@ final class FeatureDialog {
             var scroll = new ScrollPane(form);
             scroll.setFitToWidth(true);
             scroll.setPrefViewportHeight(230);
-            var location = new Label(
-                    translations.translate("plugin.directory", directory).orElseThrow());
+            var location = new Label(translations.translate("plugin.directory", directory));
             location.setWrapText(true);
             var content = new VBox(
-                    10,
-                    new Label(translations.translate("gui.feature_type").orElseThrow()),
-                    type,
-                    scroll,
-                    errors,
-                    location,
-                    details);
+                    10, new Label(translations.translate("gui.feature_type")), type, scroll, errors, location, details);
             content.setPrefWidth(440);
             dialog.getDialogPane().setContent(content);
-            var add = new ButtonType(translations.translate("gui.add").orElseThrow(), ButtonBar.ButtonData.OK_DONE);
+            var add = new ButtonType(translations.translate("gui.add"), ButtonBar.ButtonData.OK_DONE);
             dialog.getDialogPane().getButtonTypes().setAll(add, ButtonType.CANCEL);
             var button = (Button) dialog.getDialogPane().lookupButton(add);
             button.setId("custom-add");
             button.setDisable(type.getItems().isEmpty());
             if (type.getItems().isEmpty()) {
-                errors.setText(translations
-                        .translate(
-                                "gui.no_feature_providers_installed_add_a_trusted_jar_to_this_directory_and_reopen_features")
-                        .orElseThrow());
+                errors.setText(translations.translate(
+                        "gui.no_feature_providers_installed_add_a_trusted_jar_to_this_directory_and_reopen_features"));
             }
             dialog.getDialogPane().lookupButton(ButtonType.CANCEL).setId("custom-cancel");
             Feature.Custom[] result = new Feature.Custom[1];

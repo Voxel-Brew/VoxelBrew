@@ -21,7 +21,7 @@ final class ExportDialog {
             TranslationService translations,
             java.util.function.Consumer<String> documentExporter) {
         var dialog = new Dialog<ExporterDescriptor>();
-        dialog.setTitle(translations.translate("action.export").orElseThrow());
+        dialog.setTitle(translations.translate("action.export"));
         var format = new ComboBox<ExporterDescriptor>();
         format.setId("export-format");
         format.getItems()
@@ -35,10 +35,8 @@ final class ExportDialog {
                         .toList());
         format.getSelectionModel().selectFirst();
         format.setMaxWidth(Double.MAX_VALUE);
-        dialog.getDialogPane()
-                .setContent(new VBox(
-                        8, new Label(translations.translate("gui.format").orElseThrow()), format));
-        var confirm = new ButtonType(translations.translate("gui.export").orElseThrow(), ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().setContent(new VBox(8, new Label(translations.translate("gui.format")), format));
+        var confirm = new ButtonType(translations.translate("gui.export"), ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(confirm, ButtonType.CANCEL);
         var button = dialog.getDialogPane().lookupButton(confirm);
         button.setId("export-confirm");

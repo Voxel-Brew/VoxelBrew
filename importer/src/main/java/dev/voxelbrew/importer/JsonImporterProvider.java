@@ -22,9 +22,7 @@ public final class JsonImporterProvider implements ImporterProvider {
     @Override
     public ImporterDescriptor descriptor() {
         return new ImporterDescriptor(
-                "json",
-                translations.translate("import.json.title").orElseThrow(),
-                dev.voxelbrew.util.update.BuildVersion.current());
+                "json", translations.translate("import.json.title"), dev.voxelbrew.util.update.BuildVersion.current());
     }
 
     @Override

@@ -220,18 +220,18 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         private boolean renameRequested;
 
         BodyTreeCell() {
-            var rename = new MenuItem(translations.translate("body.rename").orElseThrow());
+            var rename = new MenuItem(translations.translate("body.rename"));
             rename.setId("body-rename");
-            UiHelp.menuItem(rename, translations.translate("help.body-rename").orElseThrow());
+            UiHelp.menuItem(rename, translations.translate("help.body-rename"));
             rename.setOnAction(event -> {
                 var item = getTreeItem();
                 Platform.runLater(() -> {
                     if (item == getTreeItem()) requestRename();
                 });
             });
-            var fit = new MenuItem(translations.translate("body.fit").orElseThrow());
+            var fit = new MenuItem(translations.translate("body.fit"));
             fit.setId("body-fit");
-            UiHelp.menuItem(fit, translations.translate("help.body-fit").orElseThrow());
+            UiHelp.menuItem(fit, translations.translate("help.body-fit"));
             fit.setOnAction(event -> {
                 var entry = getItem();
                 if (entry == null || entry.id() == null) return;
@@ -240,8 +240,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             });
             menu.getItems().addAll(rename, fit);
             UiHelp.menu(menu);
-            var featureRename =
-                    new MenuItem(translations.translate("body.rename").orElseThrow());
+            var featureRename = new MenuItem(translations.translate("body.rename"));
             featureRename.setId("feature-rename");
             featureRename.setOnAction(event -> {
                 var item = getTreeItem();
@@ -249,7 +248,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     if (item == getTreeItem()) requestRename();
                 });
             });
-            var featureFit = new MenuItem(translations.translate("body.fit").orElseThrow());
+            var featureFit = new MenuItem(translations.translate("body.fit"));
             featureFit.setId("feature-fit");
             featureFit.setOnAction(event -> {
                 var entry = getItem();
@@ -347,7 +346,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             editor.setId(editingEntry.body() ? "body-rename-field" : "feature-rename-field");
             editor.setMinWidth(0);
             editor.getStyleClass().add("body-rename-field");
-            editor.setAccessibleText(translations.translate("body.name").orElseThrow());
+            editor.setAccessibleText(translations.translate("body.name"));
             UiHelp.install(editor, translations);
             validation = new Label();
             validation.setId("body-rename-error");
@@ -398,7 +397,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 CadDocument.requireBodyName(name);
                 name = name.strip();
             } catch (IllegalArgumentException invalid) {
-                validation.setText(translations.translate("body.rename.invalid").orElseThrow());
+                validation.setText(translations.translate("body.rename.invalid"));
                 editor.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("invalid"), true);
                 focusEditor(false);
                 return;
@@ -572,38 +571,32 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         this.resources = resources;
         this.featureProviders = featureProviders;
         this.sketches = sketches;
-        this.status = new Label(translations.translate("status.ready").orElseThrow());
+        this.status = new Label(translations.translate("status.ready"));
         this.error = new Label();
-        this.selectionLabel =
-                new Label(translations.translate("status.noSelection").orElseThrow());
-        this.undo = button(translations.translate("action.undo").orElseThrow(), "undo", () -> {
+        this.selectionLabel = new Label(translations.translate("status.noSelection"));
+        this.undo = button(translations.translate("action.undo"), "undo", () -> {
             cancelTool();
             controller().undo();
         });
-        this.redo = button(translations.translate("action.redo").orElseThrow(), "redo", () -> {
+        this.redo = button(translations.translate("action.redo"), "redo", () -> {
             cancelTool();
             controller().redo();
         });
         this.export = menuItem(
-                translations.translate("action.export").orElseThrow(),
+                translations.translate("action.export"),
                 "export",
                 true,
                 () -> ExportDialog.choose(stage(), controller(), registry(), translations, this::exportDocument));
-        this.customFeature =
-                button(translations.translate("action.features").orElseThrow(), "custom-feature", this::customFeature);
-        this.parameters =
-                button(translations.translate("action.parameters").orElseThrow(), "parameters", this::parameters);
-        this.constrainedSketch = button(
-                translations.translate("action.sketch").orElseThrow(),
-                "constrained-sketch",
-                () -> beginPlaneSelection(null));
-        this.extrude = button(translations.translate("action.extrude").orElseThrow(), "extrude", this::beginExtrusion);
-        this.cut = button(translations.translate("action.cut").orElseThrow(), "cut", this::beginCut);
-        this.splitBody = button(translations.translate("action.split").orElseThrow(), "split-body", this::beginSplit);
-        this.fillet = button(translations.translate("action.fillet").orElseThrow(), "fillet", () -> beginFinish(true));
-        this.chamfer =
-                button(translations.translate("action.chamfer").orElseThrow(), "chamfer", () -> beginFinish(false));
-        this.shell = button(translations.translate("action.shell").orElseThrow(), "shell", this::beginShell);
+        this.customFeature = button(translations.translate("action.features"), "custom-feature", this::customFeature);
+        this.parameters = button(translations.translate("action.parameters"), "parameters", this::parameters);
+        this.constrainedSketch =
+                button(translations.translate("action.sketch"), "constrained-sketch", () -> beginPlaneSelection(null));
+        this.extrude = button(translations.translate("action.extrude"), "extrude", this::beginExtrusion);
+        this.cut = button(translations.translate("action.cut"), "cut", this::beginCut);
+        this.splitBody = button(translations.translate("action.split"), "split-body", this::beginSplit);
+        this.fillet = button(translations.translate("action.fillet"), "fillet", () -> beginFinish(true));
+        this.chamfer = button(translations.translate("action.chamfer"), "chamfer", () -> beginFinish(false));
+        this.shell = button(translations.translate("action.shell"), "shell", this::beginShell);
         appearanceChoice = appearance.load();
         setId("workbench");
         featureDiagnostics.setId("feature-diagnostics");
@@ -611,22 +604,15 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 .add(Objects.requireNonNull(getClass().getResource("workbench.css"))
                         .toExternalForm());
         UiText.choices(
-                configuration,
-                name -> name.equals("Default")
-                        ? translations.translate("configuration.default").orElseThrow()
-                        : name);
+                configuration, name -> name.equals("Default") ? translations.translate("configuration.default") : name);
         var fileMenu = menu("menu-file");
-        var newItem = menuItem(translations.translate("action.new").orElseThrow(), "new", true, this::newDocument);
-        var openItem = menuItem(translations.translate("action.open").orElseThrow(), "open", true, this::open);
+        var newItem = menuItem(translations.translate("action.new"), "new", true, this::newDocument);
+        var openItem = menuItem(translations.translate("action.open"), "open", true, this::open);
         var recentMenu = recentMenu();
-        var saveItem = menuItem(translations.translate("action.save").orElseThrow(), "save", true, () -> save(false));
+        var saveItem = menuItem(translations.translate("action.save"), "save", true, () -> save(false));
         var importItem = menuItem(
-                translations.translate("action.import").orElseThrow(),
-                "import",
-                true,
-                () -> requestChange(this::importFile));
-        var saveAsItem =
-                menuItem(translations.translate("action.saveAs").orElseThrow(), "save-as", true, () -> save(true));
+                translations.translate("action.import"), "import", true, () -> requestChange(this::importFile));
+        var saveAsItem = menuItem(translations.translate("action.saveAs"), "save-as", true, () -> save(true));
         for (var item : List.of(newItem, openItem, importItem, saveItem, saveAsItem)) {
             item.disableProperty().bind(disabledProperty().or(fileBusy));
         }
@@ -660,7 +646,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         settingsMenu
                 .getItems()
                 .add(menuItem(
-                        translations.translate("mcp.title").orElseThrow(),
+                        translations.translate("mcp.title"),
                         "mcp-server",
                         false,
                         () -> McpDialog.show(stage, mcpServer, configurationStore, translations)));
@@ -668,38 +654,32 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 .getItems()
                 .addAll(
                         menuItem(
-                                translations.translate("language.label").orElseThrow(),
+                                translations.translate("language.label"),
                                 "language",
                                 false,
                                 () -> LanguageDialog.show(stage, translations, configurationStore, preferencesWorker)),
                         menuItem(
-                                translations
-                                        .translate("exportNotification.duration.title")
-                                        .orElseThrow(),
+                                translations.translate("exportNotification.duration.title"),
                                 "export-notification-duration",
                                 false,
                                 this::configureExportNotificationDuration),
+                        menuItem(translations.translate("action.updates"), "updates", false, this::updates),
                         menuItem(
-                                translations.translate("action.updates").orElseThrow(),
-                                "updates",
-                                false,
-                                this::updates),
-                        menuItem(
-                                translations.translate("action.report-bug").orElseThrow(),
+                                translations.translate("action.report-bug"),
                                 "report-bug",
                                 false,
                                 dev.voxelbrew.util.BugReport::open),
                         menuItem(
-                                translations.translate("support.title").orElseThrow(),
+                                translations.translate("support.title"),
                                 "support",
                                 false,
                                 () -> SupportDialog.show(stage, translations)),
-                        menuItem(translations.translate("about.title").orElseThrow(), "about", false, () -> {
+                        menuItem(translations.translate("about.title"), "about", false, () -> {
                             if (about.get().show(stage)) updates();
                         }),
                         new SeparatorMenuItem(),
                         menuItem(
-                                translations.translate("shortcuts.title").orElseThrow(),
+                                translations.translate("shortcuts.title"),
                                 "keyboard-shortcuts",
                                 true,
                                 () -> KeyboardShortcuts.show(stage, translations)));
@@ -707,7 +687,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         slicersMenu
                 .getItems()
                 .add(menuItem(
-                        translations.translate("slicer.settings.title").orElseThrow(),
+                        translations.translate("slicer.settings.title"),
                         "slicer-settings",
                         false,
                         () -> slicerSettings.configure(
@@ -716,7 +696,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         printersMenu
                 .getItems()
                 .add(menuItem(
-                        translations.translate("device.configure").orElseThrow(),
+                        translations.translate("device.configure"),
                         "printers-configure-devices",
                         false,
                         printing::configureDevices));
@@ -724,22 +704,22 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 .getItems()
                 .addAll(
                         menuItem(
-                                translations.translate("print.exportPrinters").orElseThrow(),
+                                translations.translate("print.exportPrinters"),
                                 "printers-export-defaults",
                                 false,
                                 printing::exportDefaultPrinters),
                         menuItem(
-                                translations.translate("print.openPrinters").orElseThrow(),
+                                translations.translate("print.openPrinters"),
                                 "printers-open-folder",
                                 false,
                                 printing::openPrintersFolder),
                         menuItem(
-                                translations.translate("print.reloadPrinters").orElseThrow(),
+                                translations.translate("print.reloadPrinters"),
                                 "printers-reload",
                                 false,
                                 printing::reloadPrinters),
                         menuItem(
-                                translations.translate("print.visiblePrinters").orElseThrow(),
+                                translations.translate("print.visiblePrinters"),
                                 "printers-visibility",
                                 false,
                                 printing::manageVisiblePrinters));
@@ -765,8 +745,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         title.getStyleClass().add("title-strip");
         window = new WindowFrame(stage, title, this, translations);
         var sketchCommands = new HBox(2, constrainedSketch);
-        var solidCommands =
-                new MenuButton(translations.translate("action.operations").orElseThrow());
+        var solidCommands = new MenuButton(translations.translate("action.operations"));
         solidCommands.setId("operations-menu");
         var operationsIcon = new javafx.scene.shape.SVGPath();
         operationsIcon.setContent("M2 6L10 2L18 6V15L10 19L2 15Z M2 6L10 10L18 6 M10 10V19");
@@ -799,12 +778,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         error.visibleProperty().bind(error.managedProperty());
         inspector
                 .getChildren()
-                .addAll(
-                        heading(translations.translate("gui.properties").orElseThrow()),
-                        selectionLabel,
-                        scroll,
-                        error,
-                        toolActions);
+                .addAll(heading(translations.translate("gui.properties")), selectionLabel, scroll, error, toolActions);
         var center = new BorderPane(viewport);
         center.getStyleClass().add("viewport-panel");
         var split = new SplitPane(left, center, inspector);
@@ -812,13 +786,13 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         var design = new BorderPane(split);
         design.setId("design-workspace");
         design.setTop(toolbar);
-        designTab = new Tab(translations.translate("tab.Designer").orElseThrow(), design);
+        designTab = new Tab(translations.translate("tab.Designer"), design);
         designTab.setId("workspace-design");
         designTab.setClosable(false);
-        printTab = new Tab(translations.translate("tab.Slicer").orElseThrow(), printing);
+        printTab = new Tab(translations.translate("tab.Slicer"), printing);
         printTab.setId("workspace-print");
         printTab.setClosable(false);
-        printerTab = new Tab(translations.translate("tab.Printer").orElseThrow(), printer);
+        printerTab = new Tab(translations.translate("tab.Printer"), printer);
         printerTab.setId("workspace-printer");
         printerTab.setClosable(false);
         printerTab.setDisable(true);
@@ -841,11 +815,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         var statusSpacer = new Region();
         HBox.setHgrow(statusSpacer, Priority.ALWAYS);
         var statusbar = new HBox(
-                10,
-                progress,
-                status,
-                statusSpacer,
-                new Label(translations.translate("gui.mm_occt_7_9_grid_10_mm").orElseThrow()));
+                10, progress, status, statusSpacer, new Label(translations.translate("gui.mm_occt_7_9_grid_10_mm")));
         statusbar.getStyleClass().add("status-strip");
         design.setBottom(new VBox(timeline, statusbar));
         installViewportSelection();
@@ -887,7 +857,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     }
 
     private Menu menu(String id) {
-        var menu = new Menu(translations.translate(id).orElseThrow());
+        var menu = new Menu(translations.translate(id));
         menu.setId(id);
         UiHelp.menu(menu, translations);
         return menu;
@@ -932,7 +902,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 QuickMenu.Action.button(chamfer, "◩")));
         radial.add(new QuickMenu.Action(
                 "fit",
-                translations.translate("action.fit").orElseThrow(),
+                translations.translate("action.fit"),
                 "⛶",
                 disabledProperty(),
                 null,
@@ -1078,43 +1048,34 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private String defaultFeatureName(Feature feature) {
         if (feature instanceof ConstructionFeature construction) {
-            return translations
-                    .translate("construction." + construction.tool().name())
-                    .orElseThrow();
+            return translations.translate("construction." + construction.tool().name());
         }
         if (feature instanceof Feature.Custom custom) {
-            return translations.translate("feature.custom", custom.type()).orElseThrow();
+            return translations.translate("feature.custom", custom.type());
         }
         if (feature instanceof Feature.EdgeFinish finish) {
-            return translations
-                    .translate(finish.kind() == Feature.EdgeFinish.Kind.FILLET ? "action.fillet" : "action.chamfer")
-                    .orElseThrow();
+            return translations.translate(
+                    finish.kind() == Feature.EdgeFinish.Kind.FILLET ? "action.fillet" : "action.chamfer");
         }
         if (feature instanceof Feature.Shell) {
-            return translations.translate("action.shell").orElseThrow();
+            return translations.translate("action.shell");
         }
         if (feature instanceof Feature.Sketch s) {
             if (s.profile() instanceof Feature.Circle) {
-                return translations.translate("gui.circle").orElseThrow();
+                return translations.translate("gui.circle");
             }
-            return translations
-                    .translate(s.profile() instanceof Feature.Constrained ? "gui.sketch" : "gui.rectangle")
-                    .orElseThrow();
+            return translations.translate(s.profile() instanceof Feature.Constrained ? "gui.sketch" : "gui.rectangle");
         }
         if (feature instanceof Feature.Extrude) {
-            return translations.translate("gui.extrude").orElseThrow();
+            return translations.translate("gui.extrude");
         }
-        return translations
-                .translate(feature instanceof Feature.SplitBody ? "gui.split" : "action.cut")
-                .orElseThrow();
+        return translations.translate(feature instanceof Feature.SplitBody ? "gui.split" : "action.cut");
     }
 
     private void rebuildTree(CadDocument document) {
         tree.edit(null);
-        var root = new TreeItem<>(
-                new Entry(null, translations.translate("gui.document").orElseThrow(), false));
-        var features = new TreeItem<>(
-                new Entry(null, translations.translate("gui.features").orElseThrow(), false));
+        var root = new TreeItem<>(new Entry(null, translations.translate("gui.document"), false));
+        var features = new TreeItem<>(new Entry(null, translations.translate("gui.features"), false));
         features.setExpanded(true);
         for (int i = 0; i < document.features().size(); i++) {
             var feature = document.features().get(i);
@@ -1126,19 +1087,14 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             var item = new TreeItem<>(new Entry(feature.id(), (i + 1) + "  " + shortName(feature) + diagnostic, false));
             features.getChildren().add(item);
         }
-        var bodies = new TreeItem<>(
-                new Entry(null, translations.translate("gui.bodies").orElseThrow(), true));
+        var bodies = new TreeItem<>(new Entry(null, translations.translate("gui.bodies"), true));
         bodies.setExpanded(true);
         int index = 1;
         for (var body : controller.build().bodies()) {
             bodies.getChildren()
                     .add(new TreeItem<>(new Entry(
                             body.id(),
-                            document.bodyName(
-                                    body.id(),
-                                    translations
-                                            .translate("feature.body", index++)
-                                            .orElseThrow()),
+                            document.bodyName(body.id(), translations.translate("feature.body", index++)),
                             true)));
         }
         root.getChildren().add(features);
@@ -1169,12 +1125,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         int index = 1;
         for (var body : controller.build().bodies()) {
             if (body.id().equals(id)) {
-                return controller
-                        .snapshot()
-                        .document()
-                        .bodyName(
-                                id,
-                                translations.translate("feature.body", index).orElseThrow());
+                return controller.snapshot().document().bodyName(id, translations.translate("feature.body", index));
             }
             index++;
         }
@@ -1214,7 +1165,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         printing.selectedFace(id, face);
         inspect();
         if (face >= 0) {
-            selectionLabel.setText(translations.translate("feature.face", face).orElseThrow() + " · " + bodyLabel(id));
+            selectionLabel.setText(translations.translate("feature.face", face) + " · " + bodyLabel(id));
         }
         refresh();
     }
@@ -1227,11 +1178,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         error.setText("");
         var feature = selected();
         if (feature == null) {
-            selectionLabel.setText(translations.translate("gui.start_a_design").orElseThrow());
-            var hint = new Label(translations
-                    .translate(
-                            "gui.draw_a_rectangle_or_circle_on_xy_then_extrude_its_closed_profile_middle_drag_to_orbit_shift_mid")
-                    .orElseThrow());
+            selectionLabel.setText(translations.translate("gui.start_a_design"));
+            var hint = new Label(
+                    translations.translate(
+                            "gui.draw_a_rectangle_or_circle_on_xy_then_extrude_its_closed_profile_middle_drag_to_orbit_shift_mid"));
             hint.setWrapText(true);
             form.getChildren().add(hint);
             return;
@@ -1247,7 +1197,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private void inspectFeature(Feature feature) {
         if (feature instanceof ConstructionFeature construction) {
-            var edit = new Button(translations.translate("construction.edit").orElseThrow());
+            var edit = new Button(translations.translate("construction.edit"));
             edit.setId("construction-edit");
             edit.setOnAction(event -> beginConstruction(construction.tool(), construction));
             form.getChildren().add(edit);
@@ -1262,35 +1212,29 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 dimension(feature, "centerY", c.centerY());
                 dimension(feature, "diameter", c.diameter());
             } else if (s.profile() instanceof Feature.Constrained c) {
-                var info = new Label(translations
-                        .translate(
-                                "feature.sketchSummary",
-                                c.geometry().entities().size(),
-                                c.geometry().constraints().size())
-                        .orElseThrow());
+                var info = new Label(translations.translate(
+                        "feature.sketchSummary",
+                        c.geometry().entities().size(),
+                        c.geometry().constraints().size()));
                 info.setWrapText(true);
                 form.getChildren().add(info);
-                var hint = new Label(translations
-                        .translate("gui.edit_sketch_to_change_driving_dimensions_constraints_or_the_profile_boundary")
-                        .orElseThrow());
+                var hint = new Label(translations.translate(
+                        "gui.edit_sketch_to_change_driving_dimensions_constraints_or_the_profile_boundary"));
                 hint.setWrapText(true);
                 form.getChildren().add(hint);
             }
             form.getChildren()
                     .add(button(
-                            translations
-                                    .translate("gui.edit_sketch_constraints")
-                                    .orElseThrow(),
+                            translations.translate("gui.edit_sketch_constraints"),
                             "edit-sketch-constraints",
                             () -> editSketch(s)));
             dimension(feature, "offsetZ", s.plane().offsetZ());
             form.getChildren()
-                    .add(new Label(translations
-                            .translate("feature.plane", s.plane().id())
-                            .orElseThrow()));
+                    .add(new Label(
+                            translations.translate("feature.plane", s.plane().id())));
             form.getChildren()
                     .add(button(
-                            translations.translate("plane.change").orElseThrow(),
+                            translations.translate("plane.change"),
                             "change-sketch-plane",
                             () -> beginPlaneSelection(s)));
         } else if (feature instanceof Feature.Extrude e) {
@@ -1321,7 +1265,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                             values.get(parameter.key()),
                             FormulaField.unit(parameter.unit()));
                     var apply = button(
-                            translations.translate("gui.apply").orElseThrow(),
+                            translations.translate("gui.apply"),
                             "apply-" + parameter.key(),
                             () -> controller.edit(custom.id(), parameter.key(), input.declaredValue()));
                     input.setOnAction(e -> apply.fire());
@@ -1334,15 +1278,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 form.getChildren().add(message);
             }
             form.getChildren()
-                    .add(button(
-                            translations
-                                    .translate("gui.reload_plugin_and_rebuild")
-                                    .orElseThrow(),
-                            "custom-rebuild",
-                            () -> {
-                                inspect();
-                                controller.rebuild();
-                            }));
+                    .add(button(translations.translate("gui.reload_plugin_and_rebuild"), "custom-rebuild", () -> {
+                        inspect();
+                        controller.rebuild();
+                    }));
         }
         form.getChildren().add(featureDiagnostics);
         updateFeatureDiagnostics();
@@ -1357,19 +1296,16 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         material.setEditable(true);
         material.getEditor().setId("body-material-name");
         material.setValue(style.material());
-        material.setPromptText(translations.translate("body.unassigned").orElseThrow());
-        material.getEditor()
-                .setPromptText(translations.translate("body.unassigned").orElseThrow());
+        material.setPromptText(translations.translate("body.unassigned"));
+        material.getEditor().setPromptText(translations.translate("body.unassigned"));
         material.setMaxWidth(Double.MAX_VALUE);
         UiHelp.install(material, translations);
-        UiHelp.describe(
-                material.getEditor(),
-                translations.translate("help.body-material").orElseThrow());
+        UiHelp.describe(material.getEditor(), translations.translate("help.body-material"));
         var color = new ColorPicker(javafx.scene.paint.Color.web(style.color()));
         color.setId("body-color");
         color.setMaxWidth(Double.MAX_VALUE);
         UiHelp.install(color, translations);
-        var apply = button(translations.translate("gui.apply").orElseThrow(), "body-style-apply", () -> {
+        var apply = button(translations.translate("gui.apply"), "body-style-apply", () -> {
             var c = color.getValue();
             String rgb = String.format(
                     Locale.ROOT,
@@ -1380,23 +1316,21 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             controller.bodyStyle(bodyId, new BodyStyle(material.getEditor().getText(), rgb));
         });
         var reset = button(
-                translations.translate("body.reset").orElseThrow(),
-                "body-style-reset",
-                () -> controller.bodyStyle(bodyId, null));
+                translations.translate("body.reset"), "body-style-reset", () -> controller.bodyStyle(bodyId, null));
         reset.setDisable(!document.bodyStyles().containsKey(bodyId));
         material.getEditor().setOnAction(e -> apply.fire());
-        var materialLabel = new Label(translations.translate("body.material").orElseThrow());
+        var materialLabel = new Label(translations.translate("body.material"));
         materialLabel.setLabelFor(material);
-        var colorLabel = new Label(translations.translate("body.color").orElseThrow());
+        var colorLabel = new Label(translations.translate("body.color"));
         colorLabel.setLabelFor(color);
-        var hint = new Label(translations.translate("body.cadHint").orElseThrow());
+        var hint = new Label(translations.translate("body.cadHint"));
         hint.setWrapText(true);
         hint.getStyleClass().add("muted");
         var content = new VBox(6, materialLabel, material, colorLabel, color, new HBox(6, apply, reset), hint);
         // Properties remain readable while rebuilding; editing requires a current body.
         content.setDisable(
                 !controller.canExport() || controller.build().bodies().stream().noneMatch(b -> b.id().equals(bodyId)));
-        var section = new TitledPane(translations.translate("body.appearance").orElseThrow(), content);
+        var section = new TitledPane(translations.translate("body.appearance"), content);
         section.setCollapsible(false);
         form.getChildren().add(section);
     }
@@ -1415,14 +1349,16 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private void dimension(Feature feature, String name, double value) {
         var field = field(
-                "dimension-" + name, translations.translate("dimension." + name).orElse(name), value);
+                "dimension-" + name,
+                translations.tryTranslate("dimension." + name).orElse(name),
+                value);
         String expression = controller
                 .snapshot()
                 .document()
                 .parameters()
                 .binding(new dev.voxelbrew.api.model.parameters.ParameterSet.Target(feature.id(), name));
         if (!expression.isEmpty()) field.setText(expression);
-        var apply = button(translations.translate("gui.apply").orElseThrow(), "apply-" + name, () -> {
+        var apply = button(translations.translate("gui.apply"), "apply-" + name, () -> {
             String text = field.getText().strip();
             if (text.matches("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?")) {
                 controller.edit(feature.id(), name, number(field, name));
@@ -1471,8 +1407,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 .forEach(f -> sketches.getItems().add(f.id()));
         if (profile != null) {
             sketches.setValue(profile.sketchId());
-            form.getChildren()
-                    .addAll(new Label(translations.translate("gui.input_sketch").orElseThrow()), sketches);
+            form.getChildren().addAll(new Label(translations.translate("gui.input_sketch")), sketches);
         }
         var bodies = new ComboBox<String>();
         bodies.setId("repair-body");
@@ -1485,61 +1420,50 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             bodies.setValue(body.featureId());
             form.getChildren()
                     .addAll(
-                            new Label(translations
-                                    .translate("gui.input_body_feature")
-                                    .orElseThrow()),
+                            new Label(translations.translate("gui.input_body_feature")),
                             bodies,
-                            new Label(translations
-                                    .translate("gui.named_output_body_negative_or_positive")
-                                    .orElseThrow()),
+                            new Label(translations.translate("gui.named_output_body_negative_or_positive")),
                             output);
         }
-        form.getChildren()
-                .add(button(translations.translate("gui.repair_inputs").orElseThrow(), "repair", () -> {
-                    var repairedBody = body == null
-                            ? null
-                            : new Feature.BodyRef(
-                                    Objects.requireNonNull(
-                                            bodies.getValue(),
-                                            translations
-                                                    .translate("gui.choose_an_earlier_body")
-                                                    .orElseThrow()),
-                                    output.getText());
-                    if (feature instanceof Feature.EdgeFinish finish) {
-                        controller.replaceFeature(new Feature.EdgeFinish(
-                                finish.id(), repairedBody, finish.kind(), finish.size(), finish.edges()));
-                        return;
-                    }
-                    if (feature instanceof Feature.Shell shell) {
-                        controller.replaceFeature(
-                                new Feature.Shell(shell.id(), repairedBody, shell.thickness(), shell.removedFace()));
-                        return;
-                    }
-                    if (feature instanceof Feature.SplitBody split) {
-                        controller.replaceFeature(new Feature.SplitBody(split.id(), repairedBody, split.plane()));
-                        return;
-                    }
-                    var s = (Feature.Sketch) earlier.stream()
-                            .filter(f -> f instanceof Feature.Sketch && f.id().equals(sketches.getValue()))
-                            .findFirst()
-                            .orElseThrow(() -> new IllegalArgumentException(translations
-                                    .translate("gui.choose_an_earlier_sketch")
-                                    .orElseThrow()));
-                    var ref = new Feature.ProfileRef(s.id(), s.profileId());
-                    controller.replaceFeature(
-                            feature instanceof Feature.Extrude e
-                                    ? new Feature.Extrude(e.id(), ref, e.distance())
-                                    : new Feature.ThroughCut(
-                                            feature.id(),
-                                            ref,
-                                            new Feature.BodyRef(
-                                                    Objects.requireNonNull(
-                                                            bodies.getValue(),
-                                                            translations
-                                                                    .translate("gui.choose_an_earlier_body")
-                                                                    .orElseThrow()),
-                                                    output.getText())));
-                }));
+        form.getChildren().add(button(translations.translate("gui.repair_inputs"), "repair", () -> {
+            var repairedBody = body == null
+                    ? null
+                    : new Feature.BodyRef(
+                            Objects.requireNonNull(
+                                    bodies.getValue(), translations.translate("gui.choose_an_earlier_body")),
+                            output.getText());
+            if (feature instanceof Feature.EdgeFinish finish) {
+                controller.replaceFeature(new Feature.EdgeFinish(
+                        finish.id(), repairedBody, finish.kind(), finish.size(), finish.edges()));
+                return;
+            }
+            if (feature instanceof Feature.Shell shell) {
+                controller.replaceFeature(
+                        new Feature.Shell(shell.id(), repairedBody, shell.thickness(), shell.removedFace()));
+                return;
+            }
+            if (feature instanceof Feature.SplitBody split) {
+                controller.replaceFeature(new Feature.SplitBody(split.id(), repairedBody, split.plane()));
+                return;
+            }
+            var s = (Feature.Sketch) earlier.stream()
+                    .filter(f -> f instanceof Feature.Sketch && f.id().equals(sketches.getValue()))
+                    .findFirst()
+                    .orElseThrow(
+                            () -> new IllegalArgumentException(translations.translate("gui.choose_an_earlier_sketch")));
+            var ref = new Feature.ProfileRef(s.id(), s.profileId());
+            controller.replaceFeature(
+                    feature instanceof Feature.Extrude e
+                            ? new Feature.Extrude(e.id(), ref, e.distance())
+                            : new Feature.ThroughCut(
+                                    feature.id(),
+                                    ref,
+                                    new Feature.BodyRef(
+                                            Objects.requireNonNull(
+                                                    bodies.getValue(),
+                                                    translations.translate("gui.choose_an_earlier_body")),
+                                            output.getText())));
+        }));
     }
 
     private ParameterSet formulaParameters() {
@@ -1572,10 +1496,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         planeSnapshot = controller.snapshot();
         planeRepair = repair;
         tool = Tool.PLANE;
-        selectionLabel.setText(translations.translate("plane.choose").orElseThrow());
+        selectionLabel.setText(translations.translate("plane.choose"));
         form.getChildren().clear();
         fields.clear();
-        var hint = new Label(translations.translate("plane.hint").orElseThrow());
+        var hint = new Label(translations.translate("plane.hint"));
         hint.setWrapText(true);
         hint.setId("sketch-plane-hint");
         form.getChildren().add(hint);
@@ -1599,7 +1523,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         });
         toolActions
                 .getChildren()
-                .setAll(button(translations.translate("action.cancel").orElseThrow(), "cancel-tool", this::cancelTool));
+                .setAll(button(translations.translate("action.cancel"), "cancel-tool", this::cancelTool));
         viewport.pickSketchPlane(this::choosePlane, (id, face) -> {
             boolean flat = controller.build().bodies().stream()
                     .filter(b -> b.id().equals(id))
@@ -1629,7 +1553,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 .filter(b -> b.id().equals(id))
                 .findFirst();
         if (body.isEmpty() || body.get().planarFaces().stream().noneMatch(p -> p.faceIndex() == face)) {
-            error.setText(translations.translate("plane.flat_only").orElseThrow());
+            error.setText(translations.translate("plane.flat_only"));
             return;
         }
         if (planeRepair != null) {
@@ -1643,7 +1567,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     .findFirst()
                     .orElse(Integer.MAX_VALUE);
             if (bodyIndex >= sketchIndex) {
-                error.setText(translations.translate("plane.upstream_only").orElseThrow());
+                error.setText(translations.translate("plane.upstream_only"));
                 return;
             }
         }
@@ -1699,9 +1623,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         cancelTool();
         var before = controller.snapshot();
         if (controller.ioBusy() || controller.rebuilding()) {
-            throw new IllegalArgumentException(translations
-                    .translate("gui.wait_for_the_current_rebuild_or_file_operation")
-                    .orElseThrow());
+            throw new IllegalArgumentException(
+                    translations.translate("gui.wait_for_the_current_rebuild_or_file_operation"));
         }
         SketchEditor.show(
                 stage,
@@ -1715,9 +1638,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     var current = controller.snapshot();
                     if (!before.document().id().equals(current.document().id())
                             || before.revision() != current.revision()) {
-                        throw new IllegalStateException(translations
-                                .translate("gui.the_document_changed_while_editing_cancel_and_reopen_the_sketch")
-                                .orElseThrow());
+                        throw new IllegalStateException(translations.translate(
+                                "gui.the_document_changed_while_editing_cancel_and_reopen_the_sketch"));
                     }
                     controller.sketch(result, parameters, sketch == null);
                     selectedFeature = result.id();
@@ -1730,47 +1652,37 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     private void beginExtrusion() {
         var feature = selected();
         if (!(feature instanceof Feature.Sketch sketch)) {
-            throw new IllegalArgumentException(translations
-                    .translate("gui.select_a_closed_sketch_profile_first")
-                    .orElseThrow());
+            throw new IllegalArgumentException(translations.translate("gui.select_a_closed_sketch_profile_first"));
         }
         cancelTool();
         extrusionSketch = sketch;
         tool = Tool.EXTRUDE;
-        selectionLabel.setText(translations.translate("gui.extrude_profile").orElseThrow());
+        selectionLabel.setText(translations.translate("gui.extrude_profile"));
         form.getChildren().clear();
         fields.clear();
         var region = new ComboBox<String>();
         region.setId("extrude-region");
         var profileIds = new ArrayList<String>();
         profileIds.add(sketch.profileId());
-        region.getItems().add(translations.translate("gui.extrude_all_regions").orElseThrow());
+        region.getItems().add(translations.translate("gui.extrude_all_regions"));
         if (sketch.profile() instanceof Feature.Constrained constrained) {
             var regions = dev.voxelbrew.engine.sketch.SketchProfiles.selectableRegions(constrained.geometry());
             for (int i = 0; i < regions.size(); i++) {
                 profileIds.add(
                         dev.voxelbrew.engine.sketch.SketchProfiles.regionProfileId(sketch.profileId(), regions.get(i)));
-                region.getItems()
-                        .add(translations.translate("gui.extrude_region").orElseThrow() + " " + (i + 1));
+                region.getItems().add(translations.translate("gui.extrude_region") + " " + (i + 1));
             }
         }
         region.getSelectionModel().selectFirst();
-        form.getChildren()
-                .addAll(new Label(translations.translate("gui.extrude_region").orElseThrow()), region);
-        var distance = field(
-                "extrude-distance",
-                translations.translate("gui.signed_distance_mm").orElseThrow(),
-                5);
-        finish = button(translations.translate("gui.commit").orElseThrow(), "commit-extrusion", this::commitExtrusion);
+        form.getChildren().addAll(new Label(translations.translate("gui.extrude_region")), region);
+        var distance = field("extrude-distance", translations.translate("gui.signed_distance_mm"), 5);
+        finish = button(translations.translate("gui.commit"), "commit-extrusion", this::commitExtrusion);
         finish.getStyleClass().add("primary");
         toolActions
                 .getChildren()
-                .setAll(
-                        finish,
-                        button(translations.translate("action.cancel").orElseThrow(), "cancel-tool", this::cancelTool));
-        var hint = new Label(translations
-                .translate("gui.drag_the_gold_handle_or_type_a_distance_enter_commits_escape_cancels")
-                .orElseThrow());
+                .setAll(finish, button(translations.translate("action.cancel"), "cancel-tool", this::cancelTool));
+        var hint = new Label(
+                translations.translate("gui.drag_the_gold_handle_or_type_a_distance_enter_commits_escape_cancels"));
         hint.setWrapText(true);
         form.getChildren().add(hint);
         Runnable updatePreview = () -> {
@@ -1798,10 +1710,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             if (!finish.isDisabled()) finish.fire();
         });
         UiText.choices(
-                configuration,
-                name -> name.equals("Default")
-                        ? translations.translate("configuration.default").orElseThrow()
-                        : name);
+                configuration, name -> name.equals("Default") ? translations.translate("configuration.default") : name);
         viewport.standardView("Isometric");
         controller.previewExtrusion(sketch, 5);
         viewport.extrusionHandle(sketch, 5, v -> distance.setText(format(v)), () -> {
@@ -1828,20 +1737,17 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     private void beginCut() {
         if (!(selected() instanceof Feature.Sketch sketch)
                 || !(sketch.profile() instanceof Feature.Circle || sketch.profile() instanceof Feature.Constrained)) {
-            throw new IllegalArgumentException(
-                    translations.translate("gui.select_a_closed_sketch_profile").orElseThrow());
+            throw new IllegalArgumentException(translations.translate("gui.select_a_closed_sketch_profile"));
         }
         var choices = controller.build().bodies();
         if (choices.isEmpty()) {
-            throw new IllegalArgumentException(
-                    translations.translate("gui.a_target_body_is_required").orElseThrow());
+            throw new IllegalArgumentException(translations.translate("gui.a_target_body_is_required"));
         }
         var dialog = new ChoiceDialog<>(
                 choices.getFirst().id(),
                 choices.stream().map(DocumentController.Body::id).toList());
-        dialog.setTitle(translations.translate("gui.through_all_cut").orElseThrow());
-        dialog.setHeaderText(
-                translations.translate("gui.choose_the_target_body").orElseThrow());
+        dialog.setTitle(translations.translate("gui.through_all_cut"));
+        dialog.setHeaderText(translations.translate("gui.choose_the_target_body"));
         dialog.getDialogPane().lookupButton(ButtonType.OK).setId("cut-confirm");
         Dialogs.show(dialog, stage, translations).ifPresent(id -> {
             var target =
@@ -1881,23 +1787,18 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         form.getChildren().clear();
         fields.clear();
         error.setText("");
-        selectionLabel.setText(translations.translate(title).orElseThrow());
-        modificationSelection =
-                new Label(translations.translate("gui.choose_faces_in_viewport").orElseThrow());
+        selectionLabel.setText(translations.translate(title));
+        modificationSelection = new Label(translations.translate("gui.choose_faces_in_viewport"));
         modificationSelection.setWrapText(true);
         form.getChildren().add(modificationSelection);
         var size = field(
                 "modify-size",
-                translations
-                        .translate(title.equals("action.shell") ? "gui.thickness_mm" : "gui.size_mm")
-                        .orElseThrow(),
+                translations.translate(title.equals("action.shell") ? "gui.thickness_mm" : "gui.size_mm"),
                 1);
-        finish = button(translations.translate("gui.commit").orElseThrow(), "commit-modification", () -> {
+        finish = button(translations.translate("gui.commit"), "commit-modification", () -> {
             try {
                 if (modificationFaces.isEmpty() && modificationEdges.isEmpty()) {
-                    throw new IllegalArgumentException(translations
-                            .translate("gui.choose_faces_in_viewport")
-                            .orElseThrow());
+                    throw new IllegalArgumentException(translations.translate("gui.choose_faces_in_viewport"));
                 }
                 var body = controller.build().bodies().stream()
                         .filter(b -> b.id().equals(modificationBody))
@@ -1909,8 +1810,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 Feature feature;
                 if (modification.equals("action.shell")) {
                     if (modificationFaces.size() != 1) {
-                        throw new IllegalArgumentException(
-                                translations.translate("gui.choose_one_face").orElseThrow());
+                        throw new IllegalArgumentException(translations.translate("gui.choose_one_face"));
                     }
                     feature = new Feature.Shell(
                             id,
@@ -1922,9 +1822,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     edges.addAll(modificationEdges);
                     modificationFaces.forEach(face -> edges.addAll(body.edgesOnFace(face)));
                     if (edges.isEmpty()) {
-                        throw new IllegalArgumentException(translations
-                                .translate("gui.choose_faces_in_viewport")
-                                .orElseThrow());
+                        throw new IllegalArgumentException(translations.translate("gui.choose_faces_in_viewport"));
                     }
                     feature = new Feature.EdgeFinish(
                             id,
@@ -1951,9 +1849,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         finish.getStyleClass().add("primary");
         toolActions
                 .getChildren()
-                .setAll(
-                        finish,
-                        button(translations.translate("action.cancel").orElseThrow(), "cancel-tool", this::cancelTool));
+                .setAll(finish, button(translations.translate("action.cancel"), "cancel-tool", this::cancelTool));
         size.setOnAction(e -> finish.fire());
         viewport.select(modificationBody);
         refresh();
@@ -1992,15 +1888,14 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         var edges = new java.util.TreeSet<Integer>(modificationEdges);
         if (body != null) modificationFaces.forEach(face -> edges.addAll(body.edgesOnFace(face)));
         viewport.highlightSelectedEdges(modificationBody, edges);
-        modificationSelection.setText(translations
-                .translate("gui.selected_geometry", modificationEdges.size(), modificationFaces.size())
-                .orElseThrow());
+        modificationSelection.setText(
+                translations.translate("gui.selected_geometry", modificationEdges.size(), modificationFaces.size()));
     }
 
     private void beginSplit() {
         cancelTool();
         var dialog = new Dialog<Void>();
-        dialog.setTitle(translations.translate("action.split").orElseThrow());
+        dialog.setTitle(translations.translate("action.split"));
         var body = new ComboBox<DocumentController.Body>();
         body.setId("split-input");
         body.getItems().setAll(controller.build().bodies());
@@ -2031,14 +1926,14 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         dialog.getDialogPane()
                 .setContent(new VBox(
                         8,
-                        new Label(translations.translate("gui.input_body").orElseThrow()),
+                        new Label(translations.translate("gui.input_body")),
                         body,
-                        new Label(translations.translate("gui.plane_normal").orElseThrow()),
+                        new Label(translations.translate("gui.plane_normal")),
                         axis,
-                        new Label(translations.translate("gui.offset_mm").orElseThrow()),
+                        new Label(translations.translate("gui.offset_mm")),
                         offset,
                         error));
-        var commit = new ButtonType(translations.translate("gui.split").orElseThrow(), ButtonBar.ButtonData.OK_DONE);
+        var commit = new ButtonType(translations.translate("gui.split"), ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(commit, ButtonType.CANCEL);
         var button = dialog.getDialogPane().lookupButton(commit);
         button.setId("split-confirm");
@@ -2048,11 +1943,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                         + controller.snapshot().document().uuidGenerator().next();
                 var feature = new Feature.SplitBody(
                         id,
-                        Objects.requireNonNull(
-                                        body.getValue(),
-                                        translations
-                                                .translate("gui.choose_a_body")
-                                                .orElseThrow())
+                        Objects.requireNonNull(body.getValue(), translations.translate("gui.choose_a_body"))
                                 .output(),
                         new Feature.SplitPlane(
                                 axis.getValue().equals("X") ? 1 : 0,
@@ -2082,8 +1973,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         }
         var document = controller.snapshot().document();
         if (document.cursor() != document.features().size()) {
-            throw new IllegalStateException(
-                    translations.translate("construction.end").orElseThrow());
+            throw new IllegalStateException(translations.translate("construction.end"));
         }
         cancelTool();
         tool = Tool.CONSTRUCTION;
@@ -2145,17 +2035,15 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             requestChange(currentWindow);
             return;
         }
-        var current =
-                new ButtonType(translations.translate("projectWindow.current").orElseThrow());
-        var separate =
-                new ButtonType(translations.translate("projectWindow.new").orElseThrow());
+        var current = new ButtonType(translations.translate("projectWindow.current"));
+        var separate = new ButtonType(translations.translate("projectWindow.new"));
         var dialog = new Alert(
                 Alert.AlertType.CONFIRMATION,
-                translations.translate("projectWindow.question").orElseThrow(),
+                translations.translate("projectWindow.question"),
                 current,
                 separate,
                 ButtonType.CANCEL);
-        dialog.setHeaderText(translations.translate("projectWindow.title").orElseThrow());
+        dialog.setHeaderText(translations.translate("projectWindow.title"));
         dialog.getDialogPane().lookupButton(current).setId("project-window-current");
         dialog.getDialogPane().lookupButton(separate).setId("project-window-new");
         Dialogs.show(dialog, stage, translations).ifPresent(choice -> {
@@ -2173,8 +2061,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private CompletableFuture<Void> save(boolean saveAs) {
         if (controller.ioBusy()) {
-            return CompletableFuture.failedFuture(new IllegalStateException(
-                    translations.translate("gui.file_operation_in_progress").orElseThrow()));
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException(translations.translate("gui.file_operation_in_progress")));
         }
         if (!saveAs && controller.path() != null) {
             return controller.save(controller.path(), Files.exists(controller.path()));
@@ -2190,8 +2078,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 if (closed || stage.getScene() == null || !stage.isShowing()) return;
                 if (failure == null) {
                     showExportNotification(
-                            translations.translate("gui.export_success_title").orElseThrow(),
-                            translations.translate("gui.export_success", format).orElseThrow(),
+                            translations.translate("gui.export_success_title"),
+                            translations.translate("gui.export_success", format),
                             true);
                 } else {
                     var cause = failure instanceof java.util.concurrent.CompletionException completion
@@ -2200,8 +2088,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                             : failure;
                     String message = cause.getMessage() == null ? cause.toString() : cause.getMessage();
                     showExportNotification(
-                            translations.translate("gui.export_failed_title").orElseThrow(),
-                            translations.translate("gui.export_failed", message).orElseThrow(),
+                            translations.translate("gui.export_failed_title"),
+                            translations.translate("gui.export_failed", message),
                             false);
                 }
             });
@@ -2231,7 +2119,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         close.setId("export-notification-close");
         close.getStyleClass().add("export-toast-close");
         close.setFocusTraversable(false);
-        close.setTooltip(new Tooltip(translations.translate("dialog.close").orElseThrow()));
+        close.setTooltip(new Tooltip(translations.translate("dialog.close")));
         var card = new HBox(12, icon, copy, close);
         card.setAlignment(Pos.CENTER_LEFT);
         card.setPrefWidth(Math.min(380, Math.max(280, stage.getWidth() - 32)));
@@ -2286,12 +2174,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private void configureExportNotificationDuration() {
         var dialog = new Dialog<Integer>();
-        dialog.setTitle(
-                translations.translate("exportNotification.duration.title").orElseThrow());
+        dialog.setTitle(translations.translate("exportNotification.duration.title"));
         var input = new TextField(Integer.toString(exportNotificationDurationMillis));
         input.setId("export-notification-duration-ms");
-        var hint = new Label(
-                translations.translate("exportNotification.duration.hint").orElseThrow());
+        var hint = new Label(translations.translate("exportNotification.duration.hint"));
         hint.setWrapText(true);
         var error = new Label();
         error.setId("export-notification-duration-error");
@@ -2299,16 +2185,14 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         error.setVisible(false);
         error.managedProperty().bind(error.visibleProperty());
         dialog.getDialogPane().setContent(new VBox(10, hint, input, error));
-        var save = new ButtonType(translations.translate("action.save").orElseThrow(), ButtonBar.ButtonData.OK_DONE);
+        var save = new ButtonType(translations.translate("action.save"), ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().setAll(save, ButtonType.CANCEL);
         var selected = new int[1];
         dialog.getDialogPane().lookupButton(save).addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
             try {
                 selected[0] = parseNotificationDuration(input.getText());
             } catch (IllegalArgumentException failure) {
-                error.setText(translations
-                        .translate("exportNotification.duration.invalid")
-                        .orElseThrow());
+                error.setText(translations.translate("exportNotification.duration.invalid"));
                 error.setVisible(true);
                 event.consume();
             }
@@ -2349,24 +2233,22 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private void requestChange(Runnable action) {
         if (controller.ioBusy()) {
-            error.setText(translations
-                    .translate("gui.wait_for_the_current_file_operation")
-                    .orElseThrow());
+            error.setText(translations.translate("gui.wait_for_the_current_file_operation"));
             return;
         }
         if (!controller.dirty()) {
             action.run();
             return;
         }
-        var save = new ButtonType(translations.translate("action.save").orElseThrow(), ButtonBar.ButtonData.YES);
-        var discard = new ButtonType(translations.translate("gui.discard").orElseThrow(), ButtonBar.ButtonData.NO);
+        var save = new ButtonType(translations.translate("action.save"), ButtonBar.ButtonData.YES);
+        var discard = new ButtonType(translations.translate("gui.discard"), ButtonBar.ButtonData.NO);
         var alert = new Alert(
                 Alert.AlertType.CONFIRMATION,
-                translations.translate("gui.save_changes_to_this_design").orElseThrow(),
+                translations.translate("gui.save_changes_to_this_design"),
                 save,
                 discard,
                 ButtonType.CANCEL);
-        alert.setHeaderText(translations.translate("gui.unsaved_changes").orElseThrow());
+        alert.setHeaderText(translations.translate("gui.unsaved_changes"));
         alert.getDialogPane().lookupButton(save).setId("unsaved-save");
         alert.getDialogPane().lookupButton(discard).setId("unsaved-discard");
         alert.getDialogPane().lookupButton(ButtonType.CANCEL).setId("unsaved-cancel");
@@ -2451,7 +2333,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 recentMenu.getItems().add(item);
             }
             if (recentMenu.getItems().isEmpty()) {
-                var empty = new MenuItem(translations.translate("recent.empty").orElseThrow());
+                var empty = new MenuItem(translations.translate("recent.empty"));
                 empty.setDisable(true);
                 recentMenu.getItems().add(empty);
             }
@@ -2471,7 +2353,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 titleRecentMenu.getItems().add(item);
             }
             if (titleRecentMenu.getItems().isEmpty()) {
-                var empty = new MenuItem(translations.translate("recent.empty").orElseThrow());
+                var empty = new MenuItem(translations.translate("recent.empty"));
                 empty.setDisable(true);
                 titleRecentMenu.getItems().add(empty);
             }
@@ -2489,7 +2371,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private Menu viewMenu(Rendering rendering) {
         var viewMenu = menu("menu-view");
-        viewMenu.getItems().add(menuItem(translations.translate("action.fit").orElseThrow(), "menu-fit", false, () -> {
+        viewMenu.getItems().add(menuItem(translations.translate("action.fit"), "menu-fit", false, () -> {
             viewport.fit(meshes());
             Platform.runLater(viewport::requestFocus);
         }));
@@ -2501,19 +2383,18 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     () -> viewport.standardView(name));
             viewMenu.getItems().add(item);
         }
-        var appearanceMenu = new Menu(translations.translate("appearance.label").orElseThrow());
+        var appearanceMenu = new Menu(translations.translate("appearance.label"));
         appearanceMenu.setId("menu-appearance");
         UiHelp.menu(appearanceMenu, translations);
         var themeGroup = new ToggleGroup();
         for (var choice : Appearance.Choice.values()) {
             String name = choice.name().toLowerCase(Locale.ROOT);
-            var item = new RadioMenuItem(
-                    translations.translate("appearance." + name).orElseThrow());
+            var item = new RadioMenuItem(translations.translate("appearance." + name));
             item.setId("appearance-" + name);
             item.setToggleGroup(themeGroup);
             item.setSelected(choice == appearanceChoice);
             item.disableProperty().bind(disabledProperty());
-            UiHelp.menuItem(item, translations.translate("help.appearance").orElseThrow());
+            UiHelp.menuItem(item, translations.translate("help.appearance"));
             item.setOnAction(event -> {
                 appearanceChoice = choice;
                 appearance.save(choice);
@@ -2522,20 +2403,18 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             appearanceMenu.getItems().add(item);
         }
         viewMenu.getItems().addAll(new SeparatorMenuItem(), appearanceMenu);
-        var renderingMenu = new Menu(translations.translate("rendering.label").orElseThrow());
+        var renderingMenu = new Menu(translations.translate("rendering.label"));
         renderingMenu.setId("menu-rendering");
         UiHelp.menu(renderingMenu, translations);
         var renderingGroup = new ToggleGroup();
         for (var style : Rendering.Style.values()) {
             String name = style.name().toLowerCase(Locale.ROOT);
-            var item = new RadioMenuItem(
-                    translations.translate("rendering." + name).orElseThrow());
+            var item = new RadioMenuItem(translations.translate("rendering." + name));
             item.setId("rendering-" + name);
             item.setToggleGroup(renderingGroup);
             item.setSelected(style == viewport.rendering());
             item.disableProperty().bind(disabledProperty());
-            UiHelp.menuItem(
-                    item, translations.translate("help.rendering-" + name).orElseThrow());
+            UiHelp.menuItem(item, translations.translate("help.rendering-" + name));
             item.setOnAction(event -> {
                 viewport.setRendering(style);
                 rendering.save(style);
@@ -2556,8 +2435,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     }
 
     private MenuButton constructionMenu() {
-        var constructionMenu =
-                new MenuButton(translations.translate("construction.menu").orElseThrow());
+        var constructionMenu = new MenuButton(translations.translate("construction.menu"));
         constructionMenu.setId("construction-menu");
         constructionMenu.setGraphic(
                 ConstructionIcons.icon(dev.voxelbrew.api.model.construction.ConstructionTools.Tool.OFFSET_PLANE));
@@ -2568,13 +2446,12 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     || command == dev.voxelbrew.api.model.construction.ConstructionTools.Tool.POINT_VERTEX) {
                 constructionMenu.getItems().add(new SeparatorMenuItem());
             }
-            var item = new MenuItem(
-                    translations.translate("construction." + command.name()).orElseThrow());
+            var item = new MenuItem(translations.translate("construction." + command.name()));
             item.setGraphic(ConstructionIcons.icon(command));
             UiHelp.menuItem(
                     item,
-                    translations.translate("construction." + command.name()).orElseThrow() + ". "
-                            + translations.translate("construction.select").orElseThrow());
+                    translations.translate("construction." + command.name()) + ". "
+                            + translations.translate("construction.select"));
             item.setId("construct-" + command.name().toLowerCase(Locale.ROOT).replace('_', '-'));
             item.setOnAction(event -> attempt(() -> beginConstruction(command, null)));
             constructionMenu.getItems().add(item);
@@ -2605,10 +2482,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         });
         var left = new VBox(
                 10,
-                heading(translations.translate("gui.model").orElseThrow()),
+                heading(translations.translate("gui.model")),
                 tree,
                 new Separator(),
-                heading(translations.translate("workbench.configuration").orElseThrow()),
+                heading(translations.translate("workbench.configuration")),
                 configuration,
                 parameters,
                 customFeature);
@@ -2625,7 +2502,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             var key = KeyCombination.keyCombination("Shortcut+" + (index + 1)).getDisplayText();
             tab.setTooltip(UiHelp.tooltip(UiHelp.baseDescription(translations, tab.getId())
                     + "\n"
-                    + translations.translate("shortcuts.hint", key).orElseThrow()));
+                    + translations.translate("shortcuts.hint", key)));
         }
         workspaces.setId("workspaces");
         workspaces.getSelectionModel().selectedItemProperty().addListener((o, a, b) -> {
@@ -2772,10 +2649,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         } else if (printTab.isSelected()) {
             workspace = "slicer";
         }
-        help.setTitle(translations.translate("help." + workspace + ".title").orElseThrow());
+        help.setTitle(translations.translate("help." + workspace + ".title"));
         help.setHeaderText(null);
-        help.setContentText(
-                translations.translate("help." + workspace + ".content").orElseThrow());
+        help.setContentText(translations.translate("help." + workspace + ".content"));
         help.getDialogPane().setPrefWidth(600);
         help.getDialogPane().getButtonTypes().setAll(ButtonType.CLOSE);
         help.getDialogPane().lookupButton(ButtonType.CLOSE).setId("context-help-close");
@@ -2903,18 +2779,17 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         status.setText(buildStatus(diagnostics));
         documentTitle.setText((controller.dirty() ? "● " : "")
                 + (controller.path() == null
-                        ? translations.translate("gui.untitled").orElseThrow()
+                        ? translations.translate("gui.untitled")
                         : java.util.Objects.toString(
-                                controller.path().getFileName(),
-                                translations.translate("gui.untitled").orElseThrow())));
+                                controller.path().getFileName(), translations.translate("gui.untitled"))));
         UiHelp.describe(
                 documentTitle,
                 controller.path() == null
-                        ? translations.translate("help.unsaved-document").orElseThrow()
+                        ? translations.translate("help.unsaved-document")
                         : controller.path().toString());
         stage.setTitle((controller.dirty() ? "● " : "")
                 + (controller.path() == null
-                        ? translations.translate("gui.untitled").orElseThrow()
+                        ? translations.translate("gui.untitled")
                         : controller.path().getFileName())
                 + " — VoxelBrew CAD");
     }
@@ -2922,27 +2797,23 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     private String buildStatus(String diagnostics) {
         if (!controller.error().isBlank()) return controller.error();
         if (controller.ioBusy()) {
-            return translations.translate("gui.working_with_file").orElseThrow();
+            return translations.translate("gui.working_with_file");
         }
         if (controller.rebuilding()) {
-            return translations.translate("gui.rebuilding").orElseThrow();
+            return translations.translate("gui.rebuilding");
         }
         if (!diagnostics.isBlank()) return diagnostics;
         if (controller.hasPreview()) {
-            return translations
-                    .translate("gui.preview_release_or_enter_to_commit_escape_to_cancel")
-                    .orElseThrow();
+            return translations.translate("gui.preview_release_or_enter_to_commit_escape_to_cancel");
         }
-        return translations
-                .translate(
-                        "status.bodies",
-                        controller.build().bodies().size(),
-                        String.format(
-                                Locale.ROOT,
-                                "%.3f mm³",
-                                controller.build().bodies().stream()
-                                        .mapToDouble(DocumentController.Body::volume)
-                                        .sum()))
-                .orElseThrow();
+        return translations.translate(
+                "status.bodies",
+                controller.build().bodies().size(),
+                String.format(
+                        Locale.ROOT,
+                        "%.3f mm³",
+                        controller.build().bodies().stream()
+                                .mapToDouble(DocumentController.Body::volume)
+                                .sum()));
     }
 }

@@ -73,26 +73,18 @@ public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Set
     public Layout layout() {
         var children = new ArrayList<Component>();
         children.add(new FileDestination("destination", format.extensions().get(0)));
-        children.add(new CheckBox(
-                "overwrite", translations.translate("export.mesh.overwrite").orElseThrow(), false));
+        children.add(new CheckBox("overwrite", translations.translate("export.mesh.overwrite"), false));
         children.add(new ComboBox(
-                "space",
-                translations.translate("export.mesh.space").orElseThrow(),
-                List.of("DESIGN", "BUILD_PLATE"),
-                "DESIGN"));
+                "space", translations.translate("export.mesh.space"), List.of("DESIGN", "BUILD_PLATE"), "DESIGN"));
         children.add(new ComboBox(
                 "selection",
-                translations.translate("export.mesh.contents").orElseThrow(),
+                translations.translate("export.mesh.contents"),
                 List.of("MODEL", "SUPPORTS", "ALL"),
                 "MODEL"));
-        children.add(
-                new TextField("body", translations.translate("export.mesh.body").orElseThrow(), ""));
-        children.add(new TextField(
-                "instance", translations.translate("export.mesh.instance").orElseThrow(), ""));
-        children.add(new TextField(
-                "chord-tolerance", translations.translate("export.mesh.chord").orElseThrow(), "0.02"));
-        children.add(new TextField(
-                "angular-tolerance", translations.translate("export.mesh.angle").orElseThrow(), "5"));
+        children.add(new TextField("body", translations.translate("export.mesh.body"), ""));
+        children.add(new TextField("instance", translations.translate("export.mesh.instance"), ""));
+        children.add(new TextField("chord-tolerance", translations.translate("export.mesh.chord"), "0.02"));
+        children.add(new TextField("angular-tolerance", translations.translate("export.mesh.angle"), "5"));
         for (var option : format.options()) {
             String id = "option." + option.key();
             children.add(
@@ -100,14 +92,14 @@ public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Set
                             ? new ComboBox(
                                     id,
                                     translations
-                                            .translate("export.option." + option.key())
+                                            .tryTranslate("export.option." + option.key())
                                             .orElse(option.label()),
                                     option.choices(),
                                     option.defaultValue())
                             : new TextField(
                                     id,
                                     translations
-                                            .translate("export.option." + option.key())
+                                            .tryTranslate("export.option." + option.key())
                                             .orElse(option.label()),
                                     option.defaultValue()));
         }
@@ -119,37 +111,27 @@ public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Set
         var errors = new LinkedHashMap<String, String>();
         var destination = values.get("destination");
         if (destination == null || destination.isBlank()) {
-            errors.put(
-                    "destination",
-                    translations.translate("export.mesh.destination").orElseThrow());
+            errors.put("destination", translations.translate("export.mesh.destination"));
         } else {
             try {
                 Path.of(destination);
             } catch (java.nio.file.InvalidPathException failure) {
                 errors.put(
-                        "destination",
-                        translations
-                                .translate("export.mesh.invalidDestination", failure.getReason())
-                                .orElseThrow());
+                        "destination", translations.translate("export.mesh.invalidDestination", failure.getReason()));
             }
         }
         if (!"true".equals(values.getOrDefault("overwrite", "false"))
                 && !"false".equals(values.getOrDefault("overwrite", "false"))) {
-            errors.put(
-                    "overwrite",
-                    translations.translate("export.mesh.invalidOverwrite").orElseThrow());
+            errors.put("overwrite", translations.translate("export.mesh.invalidOverwrite"));
         }
         if (!"DESIGN".equals(values.getOrDefault("space", "DESIGN"))
                 && !"BUILD_PLATE".equals(values.getOrDefault("space", "DESIGN"))) {
-            errors.put(
-                    "space", translations.translate("export.mesh.invalidSpace").orElseThrow());
+            errors.put("space", translations.translate("export.mesh.invalidSpace"));
         }
         if (!"MODEL".equals(values.getOrDefault("selection", "MODEL"))
                 && !"SUPPORTS".equals(values.getOrDefault("selection", "MODEL"))
                 && !"ALL".equals(values.getOrDefault("selection", "MODEL"))) {
-            errors.put(
-                    "selection",
-                    translations.translate("export.mesh.invalidContents").orElseThrow());
+            errors.put("selection", translations.translate("export.mesh.invalidContents"));
         }
         validateTolerances(values, errors);
         validateFormatOptions(values, errors);
@@ -161,17 +143,13 @@ public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Set
             double chord = Double.parseDouble(values.getOrDefault("chord-tolerance", "0.02"));
             if (!Double.isFinite(chord) || chord < 1e-6) throw new NumberFormatException();
         } catch (NumberFormatException failure) {
-            errors.put(
-                    "chord-tolerance",
-                    translations.translate("export.mesh.invalidChord").orElseThrow());
+            errors.put("chord-tolerance", translations.translate("export.mesh.invalidChord"));
         }
         try {
             double angle = Double.parseDouble(values.getOrDefault("angular-tolerance", "5"));
             if (!Double.isFinite(angle) || angle <= 0 || angle > 180) throw new NumberFormatException();
         } catch (NumberFormatException failure) {
-            errors.put(
-                    "angular-tolerance",
-                    translations.translate("export.mesh.invalidAngle").orElseThrow());
+            errors.put("angular-tolerance", translations.translate("export.mesh.invalidAngle"));
         }
     }
 
@@ -180,24 +158,19 @@ public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Set
             var id = "option." + option.key();
             var value = values.getOrDefault(id, option.defaultValue());
             if (value == null) {
-                errors.put(id, translations.translate("export.mesh.missing").orElseThrow());
+                errors.put(id, translations.translate("export.mesh.missing"));
                 continue;
             }
             try {
                 option.validate(value);
             } catch (IllegalArgumentException failure) {
-                errors.put(
-                        id,
-                        translations
-                                .translate("export.mesh.invalidOption", option.label(), value)
-                                .orElseThrow());
+                errors.put(id, translations.translate("export.mesh.invalidOption", option.label(), value));
             }
         }
         for (var key : values.keySet()) {
             if (key.startsWith("option.")
                     && format.options().stream().noneMatch(option -> key.equals("option." + option.key()))) {
-                errors.put(
-                        key, translations.translate("export.mesh.unknown", key).orElseThrow());
+                errors.put(key, translations.translate("export.mesh.unknown", key));
             }
         }
     }
@@ -224,8 +197,7 @@ public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Set
         }
         for (var key : values.keySet()) {
             if (key.startsWith("option.") && !options.containsKey(key.substring("option.".length()))) {
-                throw new IllegalArgumentException(
-                        translations.translate("export.mesh.unknown", key).orElseThrow());
+                throw new IllegalArgumentException(translations.translate("export.mesh.unknown", key));
             }
         }
         return new Settings(
@@ -237,6 +209,6 @@ public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Set
 
     @Override
     public String title() {
-        return translations.translate("export.format." + format.id()).orElse(format.name());
+        return translations.tryTranslate("export.format." + format.id()).orElse(format.name());
     }
 }

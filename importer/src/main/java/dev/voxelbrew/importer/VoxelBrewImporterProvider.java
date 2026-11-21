@@ -22,9 +22,7 @@ public final class VoxelBrewImporterProvider implements ImporterProvider {
     @Override
     public ImporterDescriptor descriptor() {
         return new ImporterDescriptor(
-                "vxb",
-                translations.translate("import.vxb.title").orElseThrow(),
-                dev.voxelbrew.util.update.BuildVersion.current());
+                "vxb", translations.translate("import.vxb.title"), dev.voxelbrew.util.update.BuildVersion.current());
     }
 
     @Override

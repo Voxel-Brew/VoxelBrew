@@ -92,7 +92,7 @@ public final class UpdateProbe {
             System.setProperty("voxelbrew.home", home.toString());
             System.setProperty("voxelbrew.config", preferences.getFileName().toString());
             var messages = Services.load(TranslationService.class);
-            if (!"Otwórz…".equals(messages.translate("action.open").orElse(null)))
+            if (!"Otwórz…".equals(messages.tryTranslate("action.open").orElse(null)))
                 throw new IllegalStateException("Bundled translations are missing or incorrectly encoded");
         } finally {
             if (previous == null) System.clearProperty("voxelbrew.config");

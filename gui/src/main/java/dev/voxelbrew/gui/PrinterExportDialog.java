@@ -35,17 +35,12 @@ final class PrinterExportDialog {
             boolean visibility) {
         var dialog = new Dialog<Set<String>>();
         dialog.initOwner(owner);
-        dialog.setTitle(translations
-                .translate(visibility ? "print.visiblePrinters" : "print.exportPrinters")
-                .orElseThrow());
+        dialog.setTitle(translations.translate(visibility ? "print.visiblePrinters" : "print.exportPrinters"));
         dialog.setHeaderText(translations
                 .translate(visibility ? "print.visiblePrinters" : "print.exportPrinters")
-                .orElseThrow()
                 .replace("...", ""));
         var export = new ButtonType(
-                translations
-                        .translate(visibility ? "print.saveVisiblePrinters" : "print.exportSelectedPrinters")
-                        .orElseThrow(),
+                translations.translate(visibility ? "print.saveVisiblePrinters" : "print.exportSelectedPrinters"),
                 ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(export, ButtonType.CANCEL);
         dialog.getDialogPane().setId(visibility ? "printer-visibility-dialog" : "printer-export-dialog");
@@ -57,9 +52,7 @@ final class PrinterExportDialog {
         Set<String> selected = new LinkedHashSet<>(initial);
         long total =
                 entries.stream().filter(PrinterProfileCatalog.Entry::bundled).count();
-        var count = new Label(translations
-                .translate("print.printerSelectionCount", selected.size(), total)
-                .orElseThrow());
+        var count = new Label(translations.translate("print.printerSelectionCount", selected.size(), total));
         count.getStyleClass().add("printer-selection-count");
         var list = new VBox(2);
         list.getStyleClass().add("printer-checklist");
@@ -78,15 +71,13 @@ final class PrinterExportDialog {
                     selected.remove(id);
                 }
                 exportButton.setDisable(!visibility && selected.isEmpty());
-                count.setText(translations
-                        .translate("print.printerSelectionCount", selected.size(), total)
-                        .orElseThrow());
+                count.setText(translations.translate("print.printerSelectionCount", selected.size(), total));
             });
             list.getChildren().add(choice);
         }
         var search = new TextField();
         search.setId("printer-export-search");
-        search.setPromptText(translations.translate("print.searchPrinters").orElseThrow());
+        search.setPromptText(translations.translate("print.searchPrinters"));
         search.textProperty().addListener((o, a, query) -> {
             for (var node : list.getChildren()) {
                 boolean match =
@@ -101,25 +92,21 @@ final class PrinterExportDialog {
                 Math.max(140, Math.min(320, owner.getScene().getHeight() - 330)));
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scroll.getStyleClass().add("printer-checklist-scroll");
-        var description = new Label(translations
-                .translate(visibility ? "print.chooseVisiblePrinters" : "print.chooseExportPrinters")
-                .orElseThrow());
+        var description = new Label(
+                translations.translate(visibility ? "print.chooseVisiblePrinters" : "print.chooseExportPrinters"));
         description.setWrapText(true);
         description.getStyleClass().add("printer-dialog-description");
         var content = new VBox(12, description, search);
         content.setId(visibility ? "printer-visibility-dialog" : "printer-export-dialog");
         content.getStyleClass().add("printer-dialog-content");
         if (visibility) {
-            var selectAll =
-                    new Button(translations.translate("print.selectAllPrinters").orElseThrow());
+            var selectAll = new Button(translations.translate("print.selectAllPrinters"));
             selectAll.setId("printer-select-all");
             selectAll.setOnAction(event -> list.getChildren().forEach(node -> ((CheckBox) node).setSelected(true)));
-            var deselectAll = new Button(
-                    translations.translate("print.deselectAllPrinters").orElseThrow());
+            var deselectAll = new Button(translations.translate("print.deselectAllPrinters"));
             deselectAll.setId("printer-deselect-all");
             deselectAll.setOnAction(event -> list.getChildren().forEach(node -> ((CheckBox) node).setSelected(false)));
-            var invert =
-                    new Button(translations.translate("print.invertPrinters").orElseThrow());
+            var invert = new Button(translations.translate("print.invertPrinters"));
             invert.setId("printer-invert-selection");
             invert.setOnAction(event -> list.getChildren().forEach(node -> {
                 var choice = (CheckBox) node;

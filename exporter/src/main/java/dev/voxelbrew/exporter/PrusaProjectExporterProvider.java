@@ -14,7 +14,7 @@ public final class PrusaProjectExporterProvider extends GeometryExporterProvider
         super(
                 new ExporterDescriptor(
                         "prusa-project",
-                        translations.translate("export.prusaproject.name").orElseThrow(),
+                        translations.translate("export.prusaproject.name"),
                         dev.voxelbrew.util.update.BuildVersion.current()),
                 dev.voxelbrew.exporter.printing.PrusaProjectExporter::new);
     }

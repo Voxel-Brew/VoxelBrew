@@ -30,17 +30,9 @@ public final class MoonrakerDriverGui implements DriverGui {
     public Layout layout() {
         return new VerticalLayout(
                 new TextField(
-                        MOONRAKER_URL_ID,
-                        translations.translate("printer.moonraker.url").orElseThrow(),
-                        "http://localhost:7125"),
-                new TextField(
-                        MOONRAKER_SERIAL_ID,
-                        translations.translate("printer.moonraker.serial").orElseThrow(),
-                        ""),
-                new PasswordField(
-                        MOONRAKER_API_KEY_ID,
-                        translations.translate("printer.moonraker.key").orElseThrow(),
-                        ""));
+                        MOONRAKER_URL_ID, translations.translate("printer.moonraker.url"), "http://localhost:7125"),
+                new TextField(MOONRAKER_SERIAL_ID, translations.translate("printer.moonraker.serial"), ""),
+                new PasswordField(MOONRAKER_API_KEY_ID, translations.translate("printer.moonraker.key"), ""));
     }
 
     @Override
@@ -59,9 +51,7 @@ public final class MoonrakerDriverGui implements DriverGui {
                 throw new IllegalArgumentException();
             }
         } catch (IllegalArgumentException failure) {
-            errors.put(
-                    MOONRAKER_URL_ID,
-                    translations.translate("printer.moonraker.invalidAddress").orElseThrow());
+            errors.put(MOONRAKER_URL_ID, translations.translate("printer.moonraker.invalidAddress"));
         }
         return Map.copyOf(errors);
     }
@@ -70,8 +60,7 @@ public final class MoonrakerDriverGui implements DriverGui {
     public DriverConfiguration buildConfiguration(Map<String, String> values) {
         var errors = validate(values);
         if (!errors.isEmpty()) {
-            throw new IllegalArgumentException(
-                    translations.translate("printer.invalid", errors).orElseThrow());
+            throw new IllegalArgumentException(translations.translate("printer.invalid", errors));
         }
         return new DriverConfiguration(Map.of(
                 MOONRAKER_URL_ID, URI.create(values.get(MOONRAKER_URL_ID)),

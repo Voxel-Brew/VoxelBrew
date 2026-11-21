@@ -65,7 +65,7 @@ class UtilityServicesTest {
                 .isEqualTo(Locale.ENGLISH);
         assertThat(TranslationCatalogs.forLocale(
                                 Locale.forLanguageTag("pl"), polish.homeFolder().resolve("i18n"))
-                        .translate("action.save")
+                        .tryTranslate("action.save")
                         .orElseThrow())
                 .isEqualTo("Zapisz");
         assertThat(english.readUserConfig()).containsEntry("language", "en");
@@ -115,12 +115,12 @@ class UtilityServicesTest {
     @Test
     void translationProviderLoadsApiCatalogsAndAcceptsNewRegistrations() {
         var polish = TranslationCatalogs.forLocale(Locale.forLanguageTag("pl"), directory);
-        assertThat(polish.translate("api.export.destination.choose")).contains("Wybierz miejsce docelowe");
-        assertThat(polish.translate("api.import.source.choose")).contains("Wybierz plik źródłowy");
-        assertThat(polish.translate("test.translation")).isEmpty();
+        assertThat(polish.tryTranslate("api.export.destination.choose")).contains("Wybierz miejsce docelowe");
+        assertThat(polish.tryTranslate("api.import.source.choose")).contains("Wybierz plik źródłowy");
+        assertThat(polish.tryTranslate("test.translation")).isEmpty();
         assertThat(polish.registerTranslation(Locale.ENGLISH, "test.translation", "Fallback {0}"))
                 .isNull();
-        assertThat(polish.translate("test.translation", "message")).contains("Fallback message");
+        assertThat(polish.tryTranslate("test.translation", "message")).contains("Fallback message");
         assertThat(polish.registerTranslation(Locale.ENGLISH, "test.translation", "Replacement"))
                 .isEqualTo("Fallback {0}");
     }
@@ -130,11 +130,11 @@ class UtilityServicesTest {
         var service = Services.load(TranslationService.class);
         service.registerTranslation(service.currentLocale(), "test.local-catalog", "Registered by a provider");
 
-        assertThat(service.translate("test.local-catalog")).contains("Registered by a provider");
+        assertThat(service.tryTranslate("test.local-catalog")).contains("Registered by a provider");
         var other = Services.load(TranslationService.class);
-        assertThat(other.translate("action.save"))
+        assertThat(other.tryTranslate("action.save"))
                 .hasValueSatisfying(value -> assertThat(value).isNotBlank());
-        assertThat(other.translate("test.local-catalog")).isEmpty();
+        assertThat(other.tryTranslate("test.local-catalog")).isEmpty();
     }
 
     @Test

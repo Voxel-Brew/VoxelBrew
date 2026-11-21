@@ -58,8 +58,8 @@ final class FileDialog {
         var dialog = new Dialog<Path>();
         dialog.setTitle(
                 save
-                        ? translations.translate("gui.save_editable_design").orElseThrow()
-                        : translations.translate("gui.open_editable_design").orElseThrow());
+                        ? translations.translate("gui.save_editable_design")
+                        : translations.translate("gui.open_editable_design"));
         if (title != null && !extension.equals("vxb")) dialog.setTitle(title);
         Path initial = current;
         if (initial == null) {
@@ -76,7 +76,7 @@ final class FileDialog {
         var path = FormulaField.text(initial.toString(), () -> parameters, translations);
         path.setId("file-path");
         path.setPrefColumnCount(48);
-        var browse = new Button(translations.translate("gui.browse").orElseThrow());
+        var browse = new Button(translations.translate("gui.browse"));
         browse.setId("file-browse");
         UiHelp.install(browse, translations);
         browse.setOnAction(e -> {
@@ -86,21 +86,18 @@ final class FileDialog {
         error.getStyleClass().add("error");
         var box = new VBox(
                 10,
-                new Label(translations.translate("gui.editable_design_location").orElseThrow()),
+                new Label(translations.translate("gui.editable_design_location")),
                 Dialogs.pathRow(path, browse),
                 error);
         dialog.getDialogPane().setContent(box);
         var confirm = new ButtonType(
-                save
-                        ? translations.translate("action.save").orElseThrow()
-                        : translations.translate("gui.open").orElseThrow(),
+                save ? translations.translate("action.save") : translations.translate("gui.open"),
                 ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(confirm, ButtonType.CANCEL);
         var button = dialog.getDialogPane().lookupButton(confirm);
         button.setId("file-confirm");
         if (!save && !recentFiles.isEmpty()) {
-            var recent = new VBox(
-                    4, new Label(translations.translate("menu-open-recent").orElseThrow()));
+            var recent = new VBox(4, new Label(translations.translate("menu-open-recent")));
             recent.setId("file-recent-projects");
             for (int i = 0; i < Math.min(3, recentFiles.size()); i++) {
                 Path project = recentFiles.get(i);
@@ -164,8 +161,7 @@ final class FileDialog {
             dev.voxelbrew.api.i18n.TranslationService translations) {
         try {
             if (path.evaluatedText().isBlank()) {
-                throw new IllegalArgumentException(
-                        translations.translate("gui.choose_a_file_path").orElseThrow());
+                throw new IllegalArgumentException(translations.translate("gui.choose_a_file_path"));
             }
             Path selected = Path.of(path.evaluatedText()).toAbsolutePath();
             Path parent = selected.getParent();

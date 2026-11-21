@@ -11,7 +11,7 @@ public final class JsonImporter extends FileImporter {
     }
 
     public JsonImporter(@lombok.NonNull TranslationService translations) {
-        super(translations.translate("import.json.title").orElseThrow(), "json");
+        super(translations.translate("import.json.title"), "json");
     }
 
     @Override

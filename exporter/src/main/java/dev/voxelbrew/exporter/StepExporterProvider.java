@@ -22,9 +22,7 @@ public final class StepExporterProvider implements ExporterProvider<FileExportDi
     @Override
     public ExporterDescriptor descriptor() {
         return new ExporterDescriptor(
-                "step",
-                translations.translate("export.step.name").orElseThrow(),
-                dev.voxelbrew.util.update.BuildVersion.current());
+                "step", translations.translate("export.step.name"), dev.voxelbrew.util.update.BuildVersion.current());
     }
 
     @Override

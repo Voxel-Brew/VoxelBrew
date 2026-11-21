@@ -16,10 +16,10 @@ import lombok.extern.slf4j.Slf4j;
 final class SupportDialog {
     static void show(Window owner, TranslationService translations) {
         var dialog = new Dialog<ButtonType>();
-        dialog.setTitle(translations.translate("support.title").orElseThrow());
+        dialog.setTitle(translations.translate("support.title"));
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
         dialog.getDialogPane().lookupButton(ButtonType.CLOSE).setId("support-close");
-        var message = new Label(translations.translate("support.welcome").orElseThrow());
+        var message = new Label(translations.translate("support.welcome"));
         message.setWrapText(true);
         dialog.getDialogPane().setContent(new VBox(16, message, banners()));
         Dialogs.show(dialog, owner, translations);

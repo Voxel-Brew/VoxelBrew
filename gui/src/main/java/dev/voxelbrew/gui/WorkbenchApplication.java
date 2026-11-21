@@ -43,8 +43,7 @@ public final class WorkbenchApplication extends Application {
         var application = ApplicationModule.system(ApplicationImage.Component.GUI);
         var translations = application.translations();
         if (!Platform.isSupported(ConditionalFeature.SCENE3D)) {
-            throw new IllegalStateException(
-                    translations.translate("graphics.unavailable").orElseThrow());
+            throw new IllegalStateException(translations.translate("graphics.unavailable"));
         }
         var args = getParameters().getRaw();
         Path
@@ -91,12 +90,10 @@ public final class WorkbenchApplication extends Application {
                 if (!result.available() || !result.installable()) return;
                 Platform.runLater(() -> {
                     if (!stage.isShowing()) return;
-                    var download = new ButtonType(
-                            translations.translate("update.download").orElseThrow());
+                    var download = new ButtonType(translations.translate("update.download"));
                     var prompt = new Alert(Alert.AlertType.INFORMATION, result.message(), download, ButtonType.CANCEL);
-                    prompt.setTitle(translations.translate("update.title").orElseThrow());
-                    prompt.setHeaderText(
-                            translations.translate("update.heading").orElseThrow());
+                    prompt.setTitle(translations.translate("update.title"));
+                    prompt.setHeaderText(translations.translate("update.heading"));
                     if (prompt.showAndWait().filter(download::equals).isPresent() && stage.isShowing()) {
                         workbench.openUpdates();
                     }

@@ -125,11 +125,11 @@ final class ParameterSuggestions {
         if (popup == null) createPopup();
         var matches = matches(parameters.get(), reference.prefix(), field.expressionType());
         updateMatches(matches);
-        heading.setText(translations.translate("formula.parameters").orElseThrow());
-        hint.setText(translations.translate("formula.completionKeys").orElseThrow());
-        empty.setText(translations.translate("formula.noParameters").orElseThrow());
-        names.setAccessibleText(translations.translate("formula.parameters").orElseThrow());
-        names.setAccessibleHelp(translations.translate("formula.completionKeys").orElseThrow());
+        heading.setText(translations.translate("formula.parameters"));
+        hint.setText(translations.translate("formula.completionKeys"));
+        empty.setText(translations.translate("formula.noParameters"));
+        names.setAccessibleText(translations.translate("formula.parameters"));
+        names.setAccessibleHelp(translations.translate("formula.completionKeys"));
         var root = field.getScene().getRoot();
         boolean dark = root.getStyleClass().contains("dark") || root.lookup(".dark") != null;
         content.getStyleClass().removeAll("light", "dark");

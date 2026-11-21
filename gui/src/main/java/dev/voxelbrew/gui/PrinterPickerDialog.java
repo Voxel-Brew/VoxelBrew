@@ -17,13 +17,12 @@ final class PrinterPickerDialog {
             String currentId) {
         var search = new TextField();
         search.setId("print-printer-search");
-        search.setPromptText(translations.translate("print.searchPrinters").orElseThrow());
-        search.setAccessibleText(translations.translate("print.searchPrinters").orElseThrow());
+        search.setPromptText(translations.translate("print.searchPrinters"));
+        search.setAccessibleText(translations.translate("print.searchPrinters"));
         var results = new ListView<PrinterProfileCatalog.Entry>();
         results.setId("print-printer-results");
         results.setPrefHeight(300);
-        results.setPlaceholder(
-                new Label(translations.translate("print.noPrinters").orElseThrow()));
+        results.setPlaceholder(new Label(translations.translate("print.noPrinters")));
         results.setCellFactory(list -> new ListCell<>() {
             @Override
             protected void updateItem(PrinterProfileCatalog.Entry item, boolean empty) {
@@ -32,9 +31,7 @@ final class PrinterPickerDialog {
                     setText(null);
                     return;
                 }
-                String suffix = item.bundled()
-                        ? " (" + translations.translate("print.builtInPrinter").orElseThrow() + ")"
-                        : "";
+                String suffix = item.bundled() ? " (" + translations.translate("print.builtInPrinter") + ")" : "";
                 setText(item.name() + suffix);
             }
         });
@@ -56,7 +53,7 @@ final class PrinterPickerDialog {
             results.scrollTo(0);
         });
         var dialog = new Dialog<PrinterProfileCatalog.Entry>();
-        dialog.setTitle(translations.translate("print.printerSelector").orElseThrow());
+        dialog.setTitle(translations.translate("print.printerSelector"));
         var content = new VBox(8, search, results);
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);

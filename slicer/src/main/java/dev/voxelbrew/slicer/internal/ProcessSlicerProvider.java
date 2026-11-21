@@ -61,7 +61,7 @@ public abstract class ProcessSlicerProvider implements SlicerProvider {
                 if (value.isBlank()
                         && Set.of("definition", "machine", "process", "filament")
                                 .contains(key)) {
-                    errors.put(key, translations.translate("slicer.config.path").orElseThrow());
+                    errors.put(key, translations.translate("slicer.config.path"));
                 } else if (!value.isBlank()) {
                     try {
                         Path.of(value);
@@ -219,8 +219,7 @@ public abstract class ProcessSlicerProvider implements SlicerProvider {
                 .orElseThrow(java.util.concurrent.CancellationException::new);
         if (process.configurationOptions().containsKey("executable")
                 && settings.getOrDefault("executable", "").isBlank()) {
-            throw new SlicerException.Configuration(
-                    translations.translate("slicer.config.executable").orElseThrow());
+            throw new SlicerException.Configuration(translations.translate("slicer.config.executable"));
         }
         var configured = process.configure(settings);
         return configured.probe(command(configured), cancellation).actualVersion();

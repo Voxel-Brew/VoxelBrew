@@ -11,8 +11,8 @@ final class McpDialog {
     static void show(Window owner, McpServerHost server, UserConfigService store, TranslationService text) {
         var dialog = new Dialog<Void>();
         dialog.initOwner(owner);
-        dialog.setTitle(text.translate("mcp.title").orElseThrow());
-        var auto = new CheckBox(text.translate("mcp.autoStart").orElseThrow());
+        dialog.setTitle(text.translate("mcp.title"));
+        var auto = new CheckBox(text.translate("mcp.autoStart"));
         var port = new TextField("0");
         var connections = new TextField("4");
         var idle = new TextField("30");
@@ -36,7 +36,7 @@ final class McpDialog {
         } catch (Exception failure) {
             status.setText(failure.getMessage());
         }
-        var start = new Button(text.translate("mcp.apply").orElseThrow());
+        var start = new Button(text.translate("mcp.apply"));
         start.setOnAction(event -> {
             try {
                 var settings = new McpSettings(
@@ -53,19 +53,19 @@ final class McpDialog {
                 status.setText(failure.getMessage());
             }
         });
-        var stop = new Button(text.translate("mcp.stop").orElseThrow());
+        var stop = new Button(text.translate("mcp.stop"));
         stop.setOnAction(event -> {
             server.close();
             endpoint.clear();
         });
-        var copy = new Button(text.translate("mcp.copy").orElseThrow());
+        var copy = new Button(text.translate("mcp.copy"));
         copy.setOnAction(event -> {
             var clipboard = new ClipboardContent();
             clipboard.putString("{\"url\":\"" + server.endpoint() + "\",\"headers\":{\"Authorization\":\"Bearer "
                     + server.credential() + "\"}}");
             Clipboard.getSystemClipboard().setContent(clipboard);
         });
-        var rotate = new Button(text.translate("mcp.rotate").orElseThrow());
+        var rotate = new Button(text.translate("mcp.rotate"));
         rotate.setOnAction(event -> {
             server.regenerateToken();
             token.setText(server.credential());
@@ -75,13 +75,13 @@ final class McpDialog {
                 .setContent(new VBox(
                         8,
                         auto,
-                        new Label(text.translate("mcp.port").orElseThrow()),
+                        new Label(text.translate("mcp.port")),
                         port,
-                        new Label(text.translate("mcp.connections").orElseThrow()),
+                        new Label(text.translate("mcp.connections")),
                         connections,
-                        new Label(text.translate("mcp.idle").orElseThrow()),
+                        new Label(text.translate("mcp.idle")),
                         idle,
-                        new Label(text.translate("mcp.history").orElseThrow()),
+                        new Label(text.translate("mcp.history")),
                         history,
                         endpoint,
                         token,

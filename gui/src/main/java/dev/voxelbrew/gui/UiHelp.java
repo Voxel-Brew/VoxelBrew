@@ -19,13 +19,13 @@ final class UiHelp {
     static String baseDescription(TranslationService translations, String id) {
         String key = id;
         if (id.startsWith("print-remove-plate-")) {
-            return translations.translate("help.print-remove-plate").orElseThrow();
+            return translations.translate("help.print-remove-plate");
         }
         if (id.startsWith("choose-plane-")) {
-            return translations.translate("help.choose-plane").orElseThrow();
+            return translations.translate("help.choose-plane");
         }
         if (id.startsWith("view-") && !id.startsWith("view-cube-")) {
-            return translations.translate("help.standard-view").orElseThrow();
+            return translations.translate("help.standard-view");
         }
         if (Set.of("menu-undo", "menu-redo", "menu-parameters", "menu-fit").contains(id)) {
             key = id.substring(5);
@@ -36,33 +36,27 @@ final class UiHelp {
         } else if (id.startsWith("print-role-")) {
             key = "print-role";
         } else if (id.startsWith("constraint-menu-")) {
-            return translations
-                    .translate("constraint.hint." + id.substring(16).toUpperCase(Locale.ROOT))
-                    .orElseThrow();
+            return translations.translate("constraint.hint." + id.substring(16).toUpperCase(Locale.ROOT));
         } else if (id.startsWith("constraint-") && !id.equals("constraint-finish") && !id.equals("constraint-cancel")) {
-            return translations
-                    .translate("constraint.hint." + id.substring(11).toUpperCase(Locale.ROOT))
-                    .orElseThrow();
+            return translations.translate("constraint.hint." + id.substring(11).toUpperCase(Locale.ROOT));
         }
-        return translations.translate("help." + key).orElseThrow();
+        return translations.translate("help." + key);
     }
 
     static void dialogButton(ButtonBase button, ButtonType type, TranslationService translations) {
         String key = button.getId() == null ? null : "help." + button.getId();
-        String description = key == null ? null : translations.translate(key).orElse(null);
+        String description = key == null ? null : translations.tryTranslate(key).orElse(null);
         if (description == null) {
-            description = translations
-                    .translate(
-                            switch (type.getButtonData()) {
-                                case CANCEL_CLOSE -> "help.dialog-cancel";
-                                case NO -> "help.dialog-no";
-                                case YES, OK_DONE, APPLY -> "help.dialog-apply";
-                                default -> "help.dialog-close";
-                            })
-                    .orElseThrow();
+            description = translations.translate(
+                    switch (type.getButtonData()) {
+                        case CANCEL_CLOSE -> "help.dialog-cancel";
+                        case NO -> "help.dialog-no";
+                        case YES, OK_DONE, APPLY -> "help.dialog-apply";
+                        default -> "help.dialog-close";
+                    });
         }
         if (type == ButtonType.CLOSE) {
-            description = translations.translate("help.dialog-close").orElseThrow();
+            description = translations.translate("help.dialog-close");
         }
         describe(button, description);
     }

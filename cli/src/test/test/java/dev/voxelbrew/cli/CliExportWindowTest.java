@@ -29,7 +29,7 @@ class CliExportWindowTest {
 
     private static String message(String key, Object... arguments) {
         return Services.load(TranslationService.class)
-                .translate("api.export." + key, arguments)
+                .tryTranslate("api.export." + key, arguments)
                 .orElseThrow();
     }
 

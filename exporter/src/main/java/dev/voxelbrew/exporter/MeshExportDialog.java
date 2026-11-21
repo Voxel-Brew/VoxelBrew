@@ -83,7 +83,7 @@ public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Set
         children.add(new CheckBox("overwrite", translations.translate("export.mesh.overwrite"), false));
         children.add(new ComboBox(
                 "space",
-                translations.translate("export.mesh.space").orElseThrow(),
+                translations.tryTranslate("export.mesh.space").orElseThrow(),
                 plateOnly ? List.of("BUILD_PLATE") : List.of("DESIGN", "BUILD_PLATE"),
                 plateOnly ? "BUILD_PLATE" : "DESIGN"));
         children.add(new ComboBox(

@@ -15,8 +15,8 @@ final class McpDialog {
     static void show(Window owner, McpServerHost server, UserConfigService store, TranslationService text) {
         var dialog = new Dialog<Void>();
         dialog.getDialogPane().setPrefWidth(600);
-        dialog.setTitle(text.translate("mcp.title").orElseThrow());
-        var auto = new CheckBox(text.translate("mcp.autoStart").orElseThrow());
+        dialog.setTitle(text.tryTranslate("mcp.title").orElseThrow());
+        var auto = new CheckBox(text.tryTranslate("mcp.autoStart").orElseThrow());
         var port = new TextField("0");
         var connections = new TextField("4");
         var idle = new TextField("30");
@@ -42,7 +42,7 @@ final class McpDialog {
         } catch (Exception failure) {
             status.setText(failure.getMessage());
         }
-        var apply = new ButtonType(text.translate("mcp.apply").orElseThrow(), ButtonBar.ButtonData.APPLY);
+        var apply = new ButtonType(text.tryTranslate("mcp.apply").orElseThrow(), ButtonBar.ButtonData.APPLY);
         dialog.getDialogPane().getButtonTypes().setAll(apply, ButtonType.CLOSE);
         var start = (Button) dialog.getDialogPane().lookupButton(apply);
         start.addEventFilter(ActionEvent.ACTION, event -> {
@@ -63,20 +63,20 @@ final class McpDialog {
                 endpoint.setText(server.endpoint());
             }
         });
-        var stop = new Button(text.translate("mcp.stop").orElseThrow());
+        var stop = new Button(text.translate("mcp.stop"));
         stop.setOnAction(event -> {
             server.close();
             endpoint.clear();
             status.setText("");
         });
-        var copy = new Button(text.translate("mcp.copy").orElseThrow());
+        var copy = new Button(text.translate("mcp.copy"));
         copy.setOnAction(event -> {
             var clipboard = new ClipboardContent();
             clipboard.putString("{\"url\":\"" + server.endpoint() + "\",\"headers\":{\"Authorization\":\"Bearer "
                     + server.credential() + "\"}}");
             Clipboard.getSystemClipboard().setContent(clipboard);
         });
-        var rotate = new Button(text.translate("mcp.rotate").orElseThrow());
+        var rotate = new Button(text.translate("mcp.rotate"));
         rotate.setOnAction(event -> {
             server.regenerateToken();
             token.setText(server.credential());
@@ -88,12 +88,12 @@ final class McpDialog {
         var settings = new GridPane();
         settings.setHgap(12);
         settings.setVgap(8);
-        settings.addRow(0, new Label(text.translate("mcp.port").orElseThrow()), port);
-        settings.addRow(1, new Label(text.translate("mcp.connections").orElseThrow()), connections);
-        settings.addRow(2, new Label(text.translate("mcp.idle").orElseThrow()), idle);
-        settings.addRow(3, new Label(text.translate("mcp.history").orElseThrow()), history);
-        settings.addRow(4, new Label(text.translate("mcp.endpoint").orElseThrow()), endpoint);
-        settings.addRow(5, new Label(text.translate("mcp.token").orElseThrow()), token);
+        settings.addRow(0, new Label(text.tryTranslate("mcp.port").orElseThrow()), port);
+        settings.addRow(1, new Label(text.tryTranslate("mcp.connections").orElseThrow()), connections);
+        settings.addRow(2, new Label(text.tryTranslate("mcp.idle").orElseThrow()), idle);
+        settings.addRow(3, new Label(text.tryTranslate("mcp.history").orElseThrow()), history);
+        settings.addRow(4, new Label(text.tryTranslate("mcp.endpoint").orElseThrow()), endpoint);
+        settings.addRow(5, new Label(text.tryTranslate("mcp.token").orElseThrow()), token);
         GridPane.setHgrow(token, Priority.ALWAYS);
         status.visibleProperty().bind(status.textProperty().isNotEmpty());
         status.managedProperty().bind(status.visibleProperty());

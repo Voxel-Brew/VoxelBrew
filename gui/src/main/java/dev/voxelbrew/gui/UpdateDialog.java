@@ -82,16 +82,16 @@ final class UpdateDialog {
         this.translations = translations;
         this.beforeInstall = beforeInstall;
         this.worker = workers.get();
-        this.force = new CheckBox(translations.translate("update.reinstall").orElseThrow());
+        this.force = new CheckBox(translations.tryTranslate("update.reinstall").orElseThrow());
         this.status = new Label();
         var checkType =
-                new ButtonType(translations.translate("update.check").orElseThrow(), ButtonBar.ButtonData.OK_DONE);
+                new ButtonType(translations.tryTranslate("update.check").orElseThrow(), ButtonBar.ButtonData.OK_DONE);
         var downloadType =
-                new ButtonType(translations.translate("update.download").orElseThrow(), ButtonBar.ButtonData.APPLY);
+                new ButtonType(translations.tryTranslate("update.download").orElseThrow(), ButtonBar.ButtonData.APPLY);
         var installType =
-                new ButtonType(translations.translate("update.install").orElseThrow(), ButtonBar.ButtonData.APPLY);
-        dialog.setTitle(translations.translate("update.title").orElseThrow());
-        dialog.setHeaderText(translations.translate("update.heading").orElseThrow());
+                new ButtonType(translations.tryTranslate("update.install").orElseThrow(), ButtonBar.ButtonData.APPLY);
+        dialog.setTitle(translations.tryTranslate("update.title").orElseThrow());
+        dialog.setHeaderText(translations.tryTranslate("update.heading").orElseThrow());
         dialog.getDialogPane().setPrefWidth(480);
         dialog.getDialogPane().getButtonTypes().setAll(checkType, downloadType, installType, ButtonType.CANCEL);
         check = (Button) dialog.getDialogPane().lookupButton(checkType);
@@ -122,7 +122,7 @@ final class UpdateDialog {
         feedback.visibleProperty().bind(status.textProperty().isNotEmpty());
         feedback.managedProperty().bind(feedback.visibleProperty());
         var installed = new Label(translations
-                .translate("update.installed", BuildVersion.current())
+                .tryTranslate("update.installed", BuildVersion.current())
                 .orElseThrow());
         installed.getStyleClass().add("update-installed");
         dialog.getDialogPane().setContent(new VBox(14, installed, force, feedback));

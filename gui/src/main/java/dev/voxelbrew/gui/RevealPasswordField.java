@@ -68,7 +68,7 @@ final class RevealPasswordField extends StackPane {
 
     private void updateToggle(Button toggle, SVGPath eye, boolean revealed, TranslationService translations) {
         var title = translations
-                .translate(revealed ? "password.hide" : "password.show")
+                .tryTranslate(revealed ? "password.hide" : "password.show")
                 .orElseThrow();
         toggle.setAccessibleText(title);
         UiHelp.describe(toggle, title);

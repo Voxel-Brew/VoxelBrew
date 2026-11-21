@@ -5368,12 +5368,12 @@ class WorkbenchUiTest {
             click("update-cancel");
             updates.slow = false;
             click("updates");
-            text("update-version", "1.1.0");
+            assertThat(fx(() -> workbench.lookup("#update-version"))).isNull();
             click("update-force");
             click("update-check");
             waitForUpdate("Update available");
             assertThat(updates.requests.get() > request).isTrue();
-            assertThat(updates.requested).isEqualTo(dev.voxelbrew.util.update.ReleaseVersion.release("1.1.0"));
+            assertThat(updates.requested).isNull();
             fx(() -> {
                 Screenshot.save(
                         stage.getScene(),

@@ -110,12 +110,8 @@ final class FormulaField extends TextField {
     }
 
     private void localizeHelp() {
-        setPromptText(translations
-                .translate(unit == null ? "formula.textPrompt" : "formula.numberPrompt")
-                .orElseThrow());
-        syntax.setText(translations
-                .translate(unit == null ? "formula.textSyntax" : "formula.numberSyntax")
-                .orElseThrow());
+        setPromptText(translations.translate(unit == null ? "formula.textPrompt" : "formula.numberPrompt"));
+        syntax.setText(translations.translate(unit == null ? "formula.textSyntax" : "formula.numberSyntax"));
         setAccessibleHelp(syntax.getText());
     }
 
@@ -125,12 +121,8 @@ final class FormulaField extends TextField {
         double result = parameters.get().value(getText(), selected);
         double displayed = selected.displayValue(Measurements.quantity(result, selected.canonicalUnit()));
         if (!bounds.get().accepts(displayed)) {
-            throw new IllegalArgumentException(translations
-                    .translate(
-                            "formula.bounds",
-                            bounds.get().minimumHint(),
-                            bounds.get().maximumHint())
-                    .orElseThrow());
+            throw new IllegalArgumentException(translations.translate(
+                    "formula.bounds", bounds.get().minimumHint(), bounds.get().maximumHint()));
         }
         validation.accept(result);
         return result;
@@ -191,9 +183,8 @@ final class FormulaField extends TextField {
     int integer() {
         double result = value();
         if (result != Math.rint(result) || result < Integer.MIN_VALUE || result > Integer.MAX_VALUE) {
-            throw new IllegalArgumentException(translations
-                    .translate("gui.expected_a_whole_number_in_the_supported_range")
-                    .orElseThrow());
+            throw new IllegalArgumentException(
+                    translations.translate("gui.expected_a_whole_number_in_the_supported_range"));
         }
         return (int) result;
     }
@@ -231,12 +222,8 @@ final class FormulaField extends TextField {
             preview.setText(expressionType.mark
                     + "  "
                     + (formula
-                            ? translations
-                                    .translate("formula.result", result, suffix)
-                                    .orElseThrow()
-                            : translations
-                                    .translate("gui.supports_formulas_and_parameters")
-                                    .orElseThrow()));
+                            ? translations.translate("formula.result", result, suffix)
+                            : translations.translate("gui.supports_formulas_and_parameters")));
             pseudoClassStateChanged(INVALID, false);
         } catch (RuntimeException failure) {
             preview.setText(expressionType.mark + "  " + failure.getMessage());

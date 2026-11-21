@@ -14,7 +14,7 @@ public final class ThreeMfExporterProvider extends GeometryExporterProvider {
         super(
                 new ExporterDescriptor(
                         "3mf",
-                        translations.translate("export.format.3mf").orElseThrow(),
+                        translations.translate("export.format.3mf"),
                         dev.voxelbrew.util.update.BuildVersion.current()),
                 ThreeMfExporter::new);
     }

@@ -12,7 +12,7 @@ public final class JsonExporter extends FileExporter {
     public JsonExporter(@lombok.NonNull TranslationService translations) {
         super(
                 "json",
-                translations.translate("export.json.title").orElseThrow(),
+                translations.translate("export.json.title"),
                 (document, path, overwrite, window) -> JsonDocumentWriter.save(document, path, overwrite));
     }
 }

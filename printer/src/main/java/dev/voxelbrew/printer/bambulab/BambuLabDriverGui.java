@@ -31,16 +31,10 @@ public final class BambuLabDriverGui implements DriverGui {
         return new VerticalLayout(
                 new TextField(
                         BAMBU_ADDRESS_ID,
-                        translations.translate("printer.bambulab.address").orElseThrow(),
+                        translations.translate("printer.bambulab.address"),
                         "mqtts://printer.local:8883"),
-                new TextField(
-                        BAMBU_SERIAL_ID,
-                        translations.translate("printer.bambulab.serial").orElseThrow(),
-                        ""),
-                new PasswordField(
-                        BAMBU_SECRET_ID,
-                        translations.translate("printer.bambulab.access").orElseThrow(),
-                        ""));
+                new TextField(BAMBU_SERIAL_ID, translations.translate("printer.bambulab.serial"), ""),
+                new PasswordField(BAMBU_SECRET_ID, translations.translate("printer.bambulab.access"), ""));
     }
 
     @Override
@@ -61,19 +55,13 @@ public final class BambuLabDriverGui implements DriverGui {
                 throw new IllegalArgumentException();
             }
         } catch (IllegalArgumentException failure) {
-            errors.put(
-                    BAMBU_ADDRESS_ID,
-                    translations.translate("printer.bambulab.invalidAddress").orElseThrow());
+            errors.put(BAMBU_ADDRESS_ID, translations.translate("printer.bambulab.invalidAddress"));
         }
         if (values.getOrDefault(BAMBU_SERIAL_ID, "").isBlank()) {
-            errors.put(
-                    BAMBU_SERIAL_ID,
-                    translations.translate("printer.bambulab.missingSerial").orElseThrow());
+            errors.put(BAMBU_SERIAL_ID, translations.translate("printer.bambulab.missingSerial"));
         }
         if (values.getOrDefault(BAMBU_SECRET_ID, "").isBlank()) {
-            errors.put(
-                    BAMBU_SECRET_ID,
-                    translations.translate("printer.bambulab.missingCode").orElseThrow());
+            errors.put(BAMBU_SECRET_ID, translations.translate("printer.bambulab.missingCode"));
         }
         return Map.copyOf(errors);
     }
@@ -82,8 +70,7 @@ public final class BambuLabDriverGui implements DriverGui {
     public DriverConfiguration buildConfiguration(Map<String, String> values) {
         var errors = validate(values);
         if (!errors.isEmpty()) {
-            throw new IllegalArgumentException(
-                    translations.translate("printer.invalid", errors).orElseThrow());
+            throw new IllegalArgumentException(translations.translate("printer.invalid", errors));
         }
         return new DriverConfiguration(Map.of(
                 BAMBU_ADDRESS_ID,

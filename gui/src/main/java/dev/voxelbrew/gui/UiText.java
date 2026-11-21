@@ -24,12 +24,12 @@ final class UiText {
     }
 
     static <E extends Enum<E>> void enums(ComboBox<E> control, TranslationService translations, String prefix) {
-        choices(control, value -> translations.translate(prefix + value.name()).orElseThrow());
+        choices(control, value -> translations.translate(prefix + value.name()));
     }
 
     static String view(TranslationService translations, String name) {
         return java.util.Arrays.stream(name.split(" "))
-                .map(part -> translations.translate("view." + part).orElse(part))
+                .map(part -> translations.tryTranslate("view." + part).orElse(part))
                 .collect(java.util.stream.Collectors.joining(" "));
     }
 

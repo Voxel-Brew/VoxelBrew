@@ -153,8 +153,7 @@ public final class DesktopImportWindow implements ImportWindow {
         } else {
             dialog.getDialogPane().setContent(content);
         }
-        var confirm =
-                new ButtonType(translations.translate("action.import").orElseThrow(), ButtonBar.ButtonData.OK_DONE);
+        var confirm = new ButtonType(translations.translate("action.import"), ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(confirm, ButtonType.CANCEL);
         var button = dialog.getDialogPane().lookupButton(confirm);
         button.setId("import-confirm");
@@ -248,7 +247,7 @@ public final class DesktopImportWindow implements ImportWindow {
             var input = new javafx.scene.control.CheckBox(box.label());
             input.setId("import-" + box.id());
             UiHelp.describe(
-                    input, translations.translate("help.import-" + box.id()).orElse(box.label()));
+                    input, translations.tryTranslate("help.import-" + box.id()).orElse(box.label()));
             input.setSelected(box.selected());
             input.getStyleClass().add("import-dialog-choice");
             return bind(
@@ -325,12 +324,12 @@ public final class DesktopImportWindow implements ImportWindow {
             suggestion = suggestedSource;
         }
         if (suggestion != null) path.setText(suggestion.toString());
-        var browse = new Button(translations.translate("gui.browse").orElseThrow());
+        var browse = new Button(translations.translate("gui.browse"));
         browse.setId("file-browse");
         UiHelp.install(browse, translations);
         browse.setOnAction(event -> {
             var chooser = new FileChooser();
-            chooser.setTitle(translations.translate("import.source").orElseThrow());
+            chooser.setTitle(translations.translate("import.source"));
             chooser.getExtensionFilters()
                     .add(new FileChooser.ExtensionFilter("*." + source.extension(), "*." + source.extension()));
             if (!path.getText().isBlank()) {
@@ -348,7 +347,7 @@ public final class DesktopImportWindow implements ImportWindow {
                 source.id(),
                 path::getText,
                 path,
-                field(translations.translate("import.source").orElseThrow(), Dialogs.pathRow(path, browse)),
+                field(translations.translate("import.source"), Dialogs.pathRow(path, browse)),
                 path.textProperty(),
                 onChange);
     }

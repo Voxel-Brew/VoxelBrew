@@ -13,7 +13,7 @@ public final class StepExporter extends FileExporter {
     public StepExporter(@lombok.NonNull TranslationService translations) {
         super(
                 "step",
-                translations.translate("export.step.title").orElseThrow(),
+                translations.translate("export.step.title"),
                 (document, destination, overwrite, window) -> StepDocumentWriter.save(
                         document,
                         destination,

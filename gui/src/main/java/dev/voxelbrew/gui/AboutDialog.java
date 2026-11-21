@@ -49,20 +49,19 @@ final class AboutDialog {
     AboutDialog(UpdateServiceFactory factory, TranslationService translations, Supplier<ExecutorService> workers) {
         this.factory = factory;
         this.translations = translations;
-        dialog.setTitle(translations.translate("about.title").orElseThrow());
+        dialog.setTitle(translations.translate("about.title"));
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
         close = (Button) dialog.getDialogPane().lookupButton(ButtonType.CLOSE);
         close.setId("about-close");
         var product = new Label("VoxelBrew CAD");
         product.getStyleClass().add("selection-title");
-        var version =
-                label(translations.translate("about.version", Version.version()).orElseThrow(), "about-version");
+        var version = label(translations.translate("about.version", Version.version()), "about-version");
         status.setId("about-status");
         status.setWrapText(true);
         progress.setMaxSize(20, 20);
         progress.setMinSize(20, 20);
         progress.managedProperty().bind(progress.visibleProperty());
-        check = new Button(translations.translate("about.check").orElseThrow());
+        check = new Button(translations.translate("about.check"));
         check.setId("about-check");
         check.setMinWidth(Region.USE_PREF_SIZE);
         UiHelp.install(check, translations);
@@ -81,7 +80,7 @@ final class AboutDialog {
                 12,
                 product,
                 version,
-                label(translations.translate("about.description").orElseThrow(), "about-description"),
+                label(translations.translate("about.description"), "about-description"),
                 new Separator(),
                 releaseStatus,
                 check,
@@ -116,23 +115,19 @@ final class AboutDialog {
     private void check() {
         check.setDisable(true);
         progress.setVisible(true);
-        status.setText(translations.translate("about.checking").orElseThrow());
+        status.setText(translations.translate("about.checking"));
         worker.execute(() -> {
             try {
                 var result = factory.create().check(new UpdateService.Request(null, false), cancellation);
                 Platform.runLater(() -> {
                     if (closed) return;
                     String message = result.available()
-                            ? translations
-                                    .translate(
-                                            "about.available", result.release().version())
-                                    .orElseThrow()
-                            : translations
-                                    .translate("about.current", result.release().version())
-                                    .orElseThrow();
+                            ? translations.translate(
+                                    "about.available", result.release().version())
+                            : translations.translate(
+                                    "about.current", result.release().version());
                     if (!result.installable()) {
-                        message += "\n"
-                                + translations.translate("about.development").orElseThrow();
+                        message += "\n" + translations.translate("about.development");
                     }
                     status.setText(message);
                     finished();
@@ -146,7 +141,7 @@ final class AboutDialog {
                 }
                 Platform.runLater(() -> {
                     if (closed) return;
-                    status.setText(translations.translate("about.failed").orElseThrow());
+                    status.setText(translations.translate("about.failed"));
                     finished();
                 });
             }
@@ -175,12 +170,12 @@ final class AboutDialog {
             Dialogs.show(legal, owner, translations);
         } catch (IOException failure) {
             log.error("Cannot read bundled legal information {}", resource, failure);
-            status.setText(translations.translate("about.legalFailed").orElseThrow());
+            status.setText(translations.translate("about.legalFailed"));
         }
     }
 
     private Hyperlink link(String key, String id) {
-        var link = new Hyperlink(translations.translate(key).orElseThrow());
+        var link = new Hyperlink(translations.translate(key));
         link.setId(id);
         link.setWrapText(true);
         UiHelp.install(link, translations);

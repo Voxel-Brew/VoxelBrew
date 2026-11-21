@@ -14,15 +14,13 @@ final class PrintValidationMessages {
                     String name = objectName.apply(diagnostic.objectId()) + " [" + diagnostic.objectId() + "]";
                     var mesh = result.meshes().get(diagnostic.objectId());
                     if (diagnostic.code().equals("MESH") && mesh != null) {
-                        return translations
-                                .translate(
-                                        "print.validation.mesh",
-                                        name,
-                                        mesh.degenerateTriangles(),
-                                        mesh.boundaryEdges(),
-                                        mesh.nonManifoldEdges(),
-                                        mesh.inconsistentEdges())
-                                .orElseThrow();
+                        return translations.translate(
+                                "print.validation.mesh",
+                                name,
+                                mesh.degenerateTriangles(),
+                                mesh.boundaryEdges(),
+                                mesh.nonManifoldEdges(),
+                                mesh.inconsistentEdges());
                     }
                     return name + ": " + diagnostic.message();
                 })

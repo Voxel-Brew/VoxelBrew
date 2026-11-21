@@ -18,6 +18,6 @@ public final class VoxelBrewExporter extends FileExporter {
     }
 
     VoxelBrewExporter(TranslationService translations, Writer writer) {
-        super("vxb", translations.translate("export.vxb.title").orElseThrow(), writer);
+        super("vxb", translations.translate("export.vxb.title"), writer);
     }
 }

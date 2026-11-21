@@ -21,7 +21,7 @@ class UiTextTest {
 
     private static void choices(TranslationService t, String prefix, Enum<?>[] values) {
         for (var value : values) {
-            assertThat(t.translate(prefix + value.name()).orElseThrow().isBlank())
+            assertThat(t.tryTranslate(prefix + value.name()).orElseThrow().isBlank())
                     .isFalse();
         }
     }
@@ -30,12 +30,12 @@ class UiTextTest {
     void aboutMessagesFormatVersionsAndPolishLegalHelpWithoutAWindow() {
         var en = TranslationCatalogs.forLocale(Locale.ENGLISH, directory);
         var pl = TranslationCatalogs.forLocale(Locale.forLanguageTag("pl"), directory);
-        assertThat(en.translate("about.version", "1.2.3").orElseThrow()).isEqualTo("Version 1.2.3");
-        assertThat(pl.translate("about.version", "1.2.3").orElseThrow()).isEqualTo("Wersja 1.2.3");
-        assertThat(en.translate("about.available", "1.1.0").orElseThrow()).isEqualTo("New version available: 1.1.0");
-        assertThat(pl.translate("about.available", "1.1.0").orElseThrow()).isEqualTo("Dostępna nowa wersja: 1.1.0");
-        assertThat(pl.translate("about.updates").orElseThrow()).isEqualTo("Otwórz aktualizator…");
-        assertThat(pl.translate("help.about-license").orElseThrow().contains("licencję"))
+        assertThat(en.tryTranslate("about.version", "1.2.3").orElseThrow()).isEqualTo("Version 1.2.3");
+        assertThat(pl.tryTranslate("about.version", "1.2.3").orElseThrow()).isEqualTo("Wersja 1.2.3");
+        assertThat(en.tryTranslate("about.available", "1.1.0").orElseThrow()).isEqualTo("New version available: 1.1.0");
+        assertThat(pl.tryTranslate("about.available", "1.1.0").orElseThrow()).isEqualTo("Dostępna nowa wersja: 1.1.0");
+        assertThat(pl.tryTranslate("about.updates").orElseThrow()).isEqualTo("Otwórz aktualizator…");
+        assertThat(pl.tryTranslate("help.about-license").orElseThrow().contains("licencję"))
                 .isTrue();
     }
 
@@ -64,7 +64,9 @@ class UiTextTest {
                     var matcher = Pattern.compile("translations\\s*\\.translate\\(\\s*\"([^\"]+)\"\\s*[,)]")
                             .matcher(Files.readString(file));
                     while (matcher.find()) {
-                        assertThat(t.translate(matcher.group(1)).orElseThrow().isBlank())
+                        assertThat(t.tryTranslate(matcher.group(1))
+                                        .orElseThrow()
+                                        .isBlank())
                                 .as(file + ": " + matcher.group(1))
                                 .isFalse();
                     }
@@ -81,9 +83,11 @@ class UiTextTest {
             choices(t, "export.contents.", ExportSelection.Contents.values());
             for (var style : Rendering.Style.values()) {
                 String name = style.name().toLowerCase(Locale.ROOT);
-                assertThat(t.translate("rendering." + name).orElseThrow().isBlank())
+                assertThat(t.tryTranslate("rendering." + name).orElseThrow().isBlank())
                         .isFalse();
-                assertThat(t.translate("help.rendering-" + name).orElseThrow().isBlank())
+                assertThat(t.tryTranslate("help.rendering-" + name)
+                                .orElseThrow()
+                                .isBlank())
                         .isFalse();
             }
         }

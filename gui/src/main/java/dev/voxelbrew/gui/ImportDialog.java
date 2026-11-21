@@ -15,17 +15,14 @@ final class ImportDialog {
     static Optional<ImporterDescriptor> choose(
             Window owner, ImporterProviderRegistry registry, TranslationService translations) {
         var dialog = new Dialog<ImporterDescriptor>();
-        dialog.setTitle(translations.translate("import.title").orElseThrow());
+        dialog.setTitle(translations.translate("import.title"));
         var format = new ComboBox<ImporterDescriptor>();
         format.setId("import-format");
         format.getItems().setAll(registry.descriptors().stream().toList());
         UiText.choices(format, ImporterDescriptor::name);
         format.getSelectionModel().selectFirst();
-        dialog.getDialogPane()
-                .setContent(new VBox(
-                        8, new Label(translations.translate("gui.format").orElseThrow()), format));
-        var confirm =
-                new ButtonType(translations.translate("action.import").orElseThrow(), ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().setContent(new VBox(8, new Label(translations.translate("gui.format")), format));
+        var confirm = new ButtonType(translations.translate("action.import"), ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(confirm, ButtonType.CANCEL);
         var button = dialog.getDialogPane().lookupButton(confirm);
         button.setId("import-confirm");

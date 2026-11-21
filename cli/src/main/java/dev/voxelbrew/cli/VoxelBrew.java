@@ -762,10 +762,7 @@ public final class VoxelBrew implements Runnable {
                     command.getErr().println("ERROR: " + failure.getMessage());
                     return 1;
                 });
-        cliCommand
-                .getCommandSpec()
-                .usageMessage()
-                .description(translations.translate("app.description").orElseThrow());
+        cliCommand.getCommandSpec().usageMessage().description(translations.translate("app.description"));
         PrintingCommands.register(cliCommand);
         ImportCommands.register(cliCommand);
         FeatureCommands.register(cliCommand);

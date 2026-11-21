@@ -417,7 +417,7 @@ public final class Viewport extends StackPane {
             label.setStyle("-fx-border-color: " + colors[i] + ";");
             label.setManaged(false);
             label.setCursor(Cursor.HAND);
-            UiHelp.describe(label, translations.translate("help.choose-plane").orElseThrow());
+            UiHelp.describe(label, translations.translate("help.choose-plane"));
             label.setOnMouseClicked(e -> {
                 if (e.getButton() == MouseButton.PRIMARY && e.isStillSincePress()) {
                     choose.accept(plane);

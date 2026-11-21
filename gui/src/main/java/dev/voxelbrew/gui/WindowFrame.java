@@ -188,7 +188,7 @@ final class WindowFrame extends BorderPane {
         var button = new Button("", icon);
         button.setId(id);
         button.getStyleClass().add("window-control");
-        button.setAccessibleText(translations.translate("help." + id).orElseThrow());
+        button.setAccessibleText(translations.translate("help." + id));
         UiHelp.install(button, translations);
         button.setOnAction(e -> action.run());
         return button;
@@ -230,9 +230,7 @@ final class WindowFrame extends BorderPane {
     private void updateMaximize() {
         boolean restored = !maximized();
         ((SVGPath) maximize.getGraphic()).setContent(restored ? "M2 2 H12 V12 H2 Z" : "M4 1 H13 V10 M1 4 H10 V13 H1 Z");
-        String help = translations
-                .translate(restored ? "help.window-maximize" : "help.window-restore")
-                .orElseThrow();
+        String help = translations.translate(restored ? "help.window-maximize" : "help.window-restore");
         maximize.setAccessibleText(help);
         UiHelp.describe(maximize, help);
         maximize.setDisable(!stage.isResizable() || stage.isFullScreen());

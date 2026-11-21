@@ -45,8 +45,8 @@ class TranslationServiceImplTest {
         var finnish = new TranslationServiceImpl(Locale.forLanguageTag("fi-FI"), catalogs);
         assertThat(finnish.supportedLocales())
                 .contains(Locale.ENGLISH, Locale.forLanguageTag("pl"), Locale.forLanguageTag("fi-FI"));
-        assertThat(finnish.translate("action.save").orElseThrow()).isEqualTo("Tallenna");
-        assertThat(finnish.translate("language.title").orElseThrow()).isEqualTo("Application language");
+        assertThat(finnish.tryTranslate("action.save").orElseThrow()).isEqualTo("Tallenna");
+        assertThat(finnish.tryTranslate("language.title").orElseThrow()).isEqualTo("Application language");
         assertThat(finnish.languages().get("fi-FI")).isEqualTo("Suomi");
         assertThat(finnish.languages().get("en-EN")).isEqualTo("English");
         assertThat(finnish.languages().get("pl-PL")).isEqualTo("Polski");
@@ -78,7 +78,7 @@ class TranslationServiceImplTest {
                 "ja-JP", "フィレット");
         examples.forEach((tag, expected) -> {
             var service = new TranslationServiceImpl(Locale.forLanguageTag(tag), directory);
-            assertThat(service.translate("action.fillet")).as(tag).contains(expected);
+            assertThat(service.tryTranslate("action.fillet")).as(tag).contains(expected);
             assertThat(service.languages()).containsKey(service.currentLocale().toLanguageTag());
         });
     }
@@ -148,23 +148,23 @@ class TranslationServiceImplTest {
         var config = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties");
         Locale.setDefault(Locale.ENGLISH);
         Locale.setDefault(Locale.Category.DISPLAY, Locale.forLanguageTag("pl-PL"));
-        assertThat(new TranslationServiceImpl().translate("action.save").orElseThrow())
+        assertThat(new TranslationServiceImpl().tryTranslate("action.save").orElseThrow())
                 .isEqualTo("Zapisz");
         assertThat(config.homeFolder().resolve("config.properties")).doesNotExist();
         assertThat(Locale.getDefault(Locale.Category.FORMAT)).isEqualTo(Locale.ENGLISH);
 
         config.saveUserConfig("external.setting", "preserve me");
         var before = config.readUserConfig();
-        assertThat(new TranslationServiceImpl().translate("action.save").orElseThrow())
+        assertThat(new TranslationServiceImpl().tryTranslate("action.save").orElseThrow())
                 .isEqualTo("Zapisz");
         assertThat(config.readUserConfig()).isEqualTo(before);
         config.saveUserConfig("language", "  ");
-        assertThat(new TranslationServiceImpl().translate("action.save").orElseThrow())
+        assertThat(new TranslationServiceImpl().tryTranslate("action.save").orElseThrow())
                 .isEqualTo("Zapisz");
 
         Locale.setDefault(Locale.Category.DISPLAY, Locale.UK);
         Locale.setDefault(Locale.Category.FORMAT, Locale.forLanguageTag("pl-PL"));
-        assertThat(new TranslationServiceImpl().translate("action.save").orElseThrow())
+        assertThat(new TranslationServiceImpl().tryTranslate("action.save").orElseThrow())
                 .isEqualTo("Save");
     }
 
@@ -177,7 +177,7 @@ class TranslationServiceImplTest {
             assertThat(new TranslationServiceImpl().currentLocale()).isEqualTo(Locale.ENGLISH);
         }
         config.saveUserConfig("language", "pl-PL");
-        assertThat(new TranslationServiceImpl().translate("action.save").orElseThrow())
+        assertThat(new TranslationServiceImpl().tryTranslate("action.save").orElseThrow())
                 .isEqualTo("Zapisz");
         Locale.setDefault(Locale.Category.DISPLAY, Locale.forLanguageTag("pl-PL"));
         for (var saved : List.of("en", "en-GB", "fi-FI", "not_a_tag")) {
@@ -185,7 +185,7 @@ class TranslationServiceImplTest {
             assertThat(new TranslationServiceImpl().currentLocale()).isEqualTo(Locale.ENGLISH);
         }
         config.saveUserConfig("language", " SYSTEM ");
-        assertThat(new TranslationServiceImpl().translate("action.save").orElseThrow())
+        assertThat(new TranslationServiceImpl().tryTranslate("action.save").orElseThrow())
                 .isEqualTo("Zapisz");
         var file = config.homeFolder().resolve("config.properties");
         Files.writeString(file, "language=\\uXXXX");
@@ -255,37 +255,45 @@ class TranslationServiceImplTest {
             Locale.setDefault(Locale.forLanguageTag("pl-PL"));
             var polish = new TranslationServiceImpl(Locale.forLanguageTag("pl-PL"), directory);
             assertThat(polish.currentLocale()).isEqualTo(Locale.forLanguageTag("pl"));
-            assertThat(polish.translate("action.open").orElseThrow()).isEqualTo("Otwórz…");
-            assertThat(polish.translate("update.installed", "1.2.3").orElseThrow())
+            assertThat(polish.tryTranslate("action.open").orElseThrow()).isEqualTo("Otwórz…");
+            assertThat(polish.tryTranslate("update.installed", "1.2.3").orElseThrow())
                     .isEqualTo("Zainstalowano: 1.2.3");
             assertThat(new TranslationServiceImpl(Locale.KOREAN, directory)
-                            .translate("action.open")
+                            .tryTranslate("action.open")
                             .orElseThrow())
                     .isEqualTo("Open…");
             assertThat(new TranslationServiceImpl(Locale.KOREAN, directory).currentLocale())
                     .isEqualTo(Locale.ENGLISH);
-            assertThat(polish.translate("view.accessible", "Góra").orElseThrow())
+            assertThat(polish.tryTranslate("view.accessible", "Góra").orElseThrow())
                     .isEqualTo("Widok: Góra");
-            assertThat(polish.translate("external.caption").orElse("Provider-owned caption"))
+            assertThat(polish.tryTranslate("external.caption").orElse("Provider-owned caption"))
                     .isEqualTo("Provider-owned caption");
-            assertThat(polish.translate("action.open").orElse("ignored")).isEqualTo("Otwórz…");
-            assertThat(polish.translate("missing.key")).isEmpty();
+            assertThat(polish.tryTranslate("action.open").orElse("ignored")).isEqualTo("Otwórz…");
+            assertThat(polish.tryTranslate("missing.key")).isEmpty();
         } finally {
             Locale.setDefault(previous);
         }
     }
 
     @Test
+    void translateReturnsLocalizedTextOrFormatsMissingKeys() {
+        var polish = new TranslationServiceImpl(Locale.forLanguageTag("pl"), directory);
+        assertThat(polish.translate("update.installed", "1.2.3")).isEqualTo("Zainstalowano: 1.2.3");
+        assertThat(polish.translate("missing.key")).isEqualTo("pl:missing.key[]");
+        assertThat(polish.translate("missing.key", "first", 2)).isEqualTo("pl:missing.key[first, 2]");
+    }
+
+    @Test
     void configurationSelectsLanguageAndEveryCatalogHasTheSameKeysAndValidFormats() throws Exception {
         var config = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties");
         config.saveUserConfig("language", "en");
-        assertThat(new TranslationServiceImpl().translate("action.save").orElseThrow())
+        assertThat(new TranslationServiceImpl().tryTranslate("action.save").orElseThrow())
                 .isEqualTo("Save");
         config.saveUserConfig("language", "pl");
-        assertThat(new TranslationServiceImpl().translate("action.save").orElseThrow())
+        assertThat(new TranslationServiceImpl().tryTranslate("action.save").orElseThrow())
                 .isEqualTo("Zapisz");
         config.saveUserConfig("language", "not_a_tag");
-        assertThat(new TranslationServiceImpl().translate("action.save").orElseThrow())
+        assertThat(new TranslationServiceImpl().tryTranslate("action.save").orElseThrow())
                 .isEqualTo("Save");
         var english = new TranslationServiceImpl(Locale.ENGLISH, directory);
         var keys = readCatalog("en");
@@ -295,7 +303,9 @@ class TranslationServiceImplTest {
             assertThat(service.currentLocale()).isEqualTo(locale);
             assertThat(translated.keySet()).as(locale.toString()).isEqualTo(keys.keySet());
             for (String key : keys.stringPropertyNames()) {
-                assertThat(service.translate(key, "test").orElseThrow()).as(key).isNotBlank();
+                assertThat(service.tryTranslate(key, "test").orElseThrow())
+                        .as(key)
+                        .isNotBlank();
                 assertThat(placeholders(translated.getProperty(key)))
                         .as("%s %s", locale, key)
                         .isEqualTo(placeholders(keys.getProperty(key)));
@@ -310,20 +320,20 @@ class TranslationServiceImplTest {
         var english = new TranslationServiceImpl();
         config.saveUserConfig("language", "pl-PL");
         var polish = new TranslationServiceImpl();
-        assertThat(english.translate("language.label").orElseThrow()).isEqualTo("Language…");
-        assertThat(polish.translate("language.label").orElseThrow()).isEqualTo("Język…");
-        assertThat(english.translate("formula.result", "1.5", " mm").orElseThrow())
+        assertThat(english.tryTranslate("language.label").orElseThrow()).isEqualTo("Language…");
+        assertThat(polish.tryTranslate("language.label").orElseThrow()).isEqualTo("Język…");
+        assertThat(english.tryTranslate("formula.result", "1.5", " mm").orElseThrow())
                 .isEqualTo("Result: 1.5 mm");
-        assertThat(polish.translate("formula.result", "1.5", " mm").orElseThrow())
+        assertThat(polish.tryTranslate("formula.result", "1.5", " mm").orElseThrow())
                 .isEqualTo("Wynik: 1.5 mm");
         Locale previous = Locale.getDefault();
         try {
             config.saveUserConfig("language", "system");
             Locale.setDefault(Locale.forLanguageTag("pl-PL"));
-            assertThat(new TranslationServiceImpl().translate("action.save").orElseThrow())
+            assertThat(new TranslationServiceImpl().tryTranslate("action.save").orElseThrow())
                     .isEqualTo("Zapisz");
             Locale.setDefault(Locale.forLanguageTag("fi"));
-            assertThat(new TranslationServiceImpl().translate("action.save").orElseThrow())
+            assertThat(new TranslationServiceImpl().tryTranslate("action.save").orElseThrow())
                     .isEqualTo("Save");
         } finally {
             Locale.setDefault(previous);

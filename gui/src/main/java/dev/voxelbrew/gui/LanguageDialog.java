@@ -15,7 +15,7 @@ final class LanguageDialog {
     static void show(
             Window owner, TranslationService translations, UserConfigService configuration, ExecutorService worker) {
         var dialog = new Dialog<Void>();
-        dialog.setTitle(translations.translate("language.title").orElseThrow());
+        dialog.setTitle(translations.translate("language.title"));
         var choice = new ComboBox<String>();
         choice.setId("language-choice");
         var languages = translations.languages();
@@ -23,10 +23,8 @@ final class LanguageDialog {
         choice.getItems().addAll(languages.keySet());
         UiText.choices(
                 choice,
-                value -> value.equals("system")
-                        ? translations.translate("language.system").orElseThrow()
-                        : languages.get(value));
-        var message = new Label(translations.translate("language.restart").orElseThrow());
+                value -> value.equals("system") ? translations.translate("language.system") : languages.get(value));
+        var message = new Label(translations.translate("language.restart"));
         message.setWrapText(true);
         message.setId("language-status");
         try {
@@ -44,11 +42,10 @@ final class LanguageDialog {
             choice.setValue(saved.isEmpty() || saved.equalsIgnoreCase("system") ? "system" : selected);
         } catch (UserConfigException failure) {
             choice.setValue("system");
-            message.setText(translations
-                    .translate("language.readFailed", failure.getCause().getMessage())
-                    .orElseThrow());
+            message.setText(translations.translate(
+                    "language.readFailed", failure.getCause().getMessage()));
         }
-        var save = new Button(translations.translate("action.save").orElseThrow());
+        var save = new Button(translations.translate("action.save"));
         save.setId("language-save");
         UiHelp.install(save, translations);
         save.setOnAction(event -> {
@@ -59,11 +56,10 @@ final class LanguageDialog {
                 String result;
                 try {
                     configuration.saveUserConfig("language", language);
-                    result = translations.translate("language.saved").orElseThrow();
+                    result = translations.translate("language.saved");
                 } catch (UserConfigException failure) {
-                    result = translations
-                            .translate("language.saveFailed", failure.getCause().getMessage())
-                            .orElseThrow();
+                    result = translations.translate(
+                            "language.saveFailed", failure.getCause().getMessage());
                 }
                 String status = result;
                 Platform.runLater(() -> {

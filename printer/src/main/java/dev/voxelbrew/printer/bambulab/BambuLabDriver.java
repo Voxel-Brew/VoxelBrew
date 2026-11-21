@@ -77,7 +77,7 @@ public final class BambuLabDriver implements Driver {
 
     @Override
     public String name() {
-        return translations.translate("printer.bambulab.name").orElseThrow();
+        return translations.translate("printer.bambulab.name");
     }
 
     @Override
@@ -90,8 +90,7 @@ public final class BambuLabDriver implements Driver {
         var values = config.toInput();
         var errors = form.validate(values);
         if (!errors.isEmpty()) {
-            throw new IllegalArgumentException(
-                    translations.translate("printer.invalid", errors).orElseThrow());
+            throw new IllegalArgumentException(translations.translate("printer.invalid", errors));
         }
     }
 
@@ -115,7 +114,7 @@ public final class BambuLabDriver implements Driver {
                     OptionalDouble.empty(),
                     OptionalDouble.empty(),
                     OptionalDouble.empty(),
-                    message(translations.translate("printer.bambulab.status").orElseThrow(), failure));
+                    message(translations.translate("printer.bambulab.status"), failure));
         }
     }
 
@@ -127,20 +126,17 @@ public final class BambuLabDriver implements Driver {
         try {
             validate(config);
             if (!artifact.format().equals("gcode.3mf")) {
-                return new PrintResult.Failure(
-                        Set.of(translations.translate("printer.bambulab.format").orElseThrow()));
+                return new PrintResult.Failure(Set.of(translations.translate("printer.bambulab.format")));
             }
             if (!"orca".equals(artifact.metadata().get("backend"))
                     || !"0".equals(artifact.metadata().get("tool"))) {
-                return new PrintResult.Failure(
-                        Set.of(translations.translate("printer.bambulab.tool").orElseThrow()));
+                return new PrintResult.Failure(Set.of(translations.translate("printer.bambulab.tool")));
             }
             temporary = Files.createTempFile("voxelbrew-job-", ".gcode.3mf");
             Files.write(temporary, artifact.bytes());
             try (var session = transports.open(config)) {
                 if (!session.status().canStart()) {
-                    return new PrintResult.Failure(Set.of(
-                            translations.translate("printer.bambulab.busy").orElseThrow()));
+                    return new PrintResult.Failure(Set.of(translations.translate("printer.bambulab.busy")));
                 }
                 var uploaded = session.upload(temporary, progress -> {});
                 submissionAttempted = true;
@@ -149,7 +145,7 @@ public final class BambuLabDriver implements Driver {
                 return PrintResult.Success.SUCCESS;
             }
         } catch (JobRejectedException rejection) {
-            return failed(translations.translate("printer.bambulab.rejected").orElseThrow(), rejection, false);
+            return failed(translations.translate("printer.bambulab.rejected"), rejection, false);
         } catch (IOException | RuntimeException failure) {
             if (submitted) {
                 log.warn("BambuLab accepted the submission but transport cleanup failed", failure);
@@ -157,10 +153,8 @@ public final class BambuLabDriver implements Driver {
             }
             return failed(
                     submissionAttempted
-                            ? translations
-                                    .translate("printer.bambulab.uncertain")
-                                    .orElseThrow()
-                            : translations.translate("printer.bambulab.failed").orElseThrow(),
+                            ? translations.translate("printer.bambulab.uncertain")
+                            : translations.translate("printer.bambulab.failed"),
                     failure,
                     submissionAttempted);
         } finally {

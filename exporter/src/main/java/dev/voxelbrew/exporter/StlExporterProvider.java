@@ -14,7 +14,7 @@ public final class StlExporterProvider extends GeometryExporterProvider {
         super(
                 new ExporterDescriptor(
                         "stl",
-                        translations.translate("export.stl.name").orElseThrow(),
+                        translations.translate("export.stl.name"),
                         dev.voxelbrew.util.update.BuildVersion.current()),
                 BinaryStlExporter::new);
     }

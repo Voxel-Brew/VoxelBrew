@@ -11,7 +11,7 @@ public final class VoxelBrewImporter extends FileImporter {
     }
 
     public VoxelBrewImporter(@lombok.NonNull TranslationService translations) {
-        super(translations.translate("import.vxb.title").orElseThrow(), "vxb");
+        super(translations.translate("import.vxb.title"), "vxb");
     }
 
     @Override

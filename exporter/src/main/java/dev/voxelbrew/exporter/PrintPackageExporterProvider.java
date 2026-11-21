@@ -23,21 +23,18 @@ public final class PrintPackageExporterProvider implements ExporterProvider<File
     public ExporterDescriptor descriptor() {
         return new ExporterDescriptor(
                 "gcode-package",
-                translations.translate("export.printpackage.name").orElseThrow(),
+                translations.translate("export.printpackage.name"),
                 dev.voxelbrew.util.update.BuildVersion.current());
     }
 
     @Override
     public Exporter<FileExportDialog.Destination> create() {
         return new FileExporter(
-                "gcode.3mf",
-                translations.translate("export.package.title").orElseThrow(),
-                (document, path, overwrite, window) -> {
+                "gcode.3mf", translations.translate("export.package.title"), (document, path, overwrite, window) -> {
                     var artifact =
                             document.printArtifacts().get(document.printSetup().activePlateId());
                     if (artifact == null || !artifact.format().equals("gcode.3mf")) {
-                        throw new java.io.IOException(
-                                translations.translate("export.package.missing").orElseThrow());
+                        throw new java.io.IOException(translations.translate("export.package.missing"));
                     }
                     AtomicExport.write(
                             new FileExportDialog.Destination(path, overwrite),

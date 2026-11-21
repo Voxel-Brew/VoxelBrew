@@ -282,7 +282,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
     }
 
     private String t(String key) {
-        return text.translate("device." + key).orElseThrow();
+        return text.translate("device." + key);
     }
 
     private Button button(String key, Runnable action) {
@@ -505,10 +505,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
         boolean overwrite = Files.exists(path);
         if (overwrite) {
             var confirmation = new Alert(
-                    Alert.AlertType.CONFIRMATION,
-                    text.translate("file.replace", path).orElseThrow(),
-                    ButtonType.YES,
-                    ButtonType.NO);
+                    Alert.AlertType.CONFIRMATION, text.translate("file.replace", path), ButtonType.YES, ButtonType.NO);
             if (Dialogs.show(confirmation, getScene().getWindow(), text).orElse(ButtonType.NO) != ButtonType.YES) {
                 return;
             }

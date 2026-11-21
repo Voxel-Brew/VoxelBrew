@@ -250,7 +250,7 @@ public final class DesktopExportWindow implements ExportWindow {
         content.getChildren().add(error);
         setDialogContent(dialog, content);
         var confirm = new ButtonType(
-                confirmLabel == null ? translations.translate("gui.export").orElseThrow() : confirmLabel,
+                confirmLabel == null ? translations.translate("gui.export") : confirmLabel,
                 ButtonBar.ButtonData.OK_DONE);
         var accepted = new AtomicReference<R>();
         BiConsumer<ActionEvent, Boolean> attempt = (event, checkOnly) -> {
@@ -385,10 +385,9 @@ public final class DesktopExportWindow implements ExportWindow {
         var path = new javafx.scene.control.TextField(
                 source.defaultPath() == null ? "" : source.defaultPath().toString());
         path.setId(inputPrefix + source.id());
-        var caption = sourceCaption == null
-                ? translations.translate("import.source").orElseThrow()
-                : sourceCaption.apply(source.id());
-        var browse = new Button(translations.translate("gui.browse").orElseThrow());
+        var caption =
+                sourceCaption == null ? translations.translate("import.source") : sourceCaption.apply(source.id());
+        var browse = new Button(translations.translate("gui.browse"));
         browse.setId(inputPrefix + source.id() + "-browse");
         browse.setOnAction(event -> {
             var chooser = new FileChooser();
@@ -398,8 +397,7 @@ public final class DesktopExportWindow implements ExportWindow {
                 chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(pattern, pattern));
             }
             chooser.getExtensionFilters()
-                    .add(new FileChooser.ExtensionFilter(
-                            translations.translate("gui.allFiles").orElseThrow(), "*"));
+                    .add(new FileChooser.ExtensionFilter(translations.translate("gui.allFiles"), "*"));
             try {
                 Path initial = Path.of(path.getText());
                 Path parent = initial.getParent();
@@ -433,12 +431,12 @@ public final class DesktopExportWindow implements ExportWindow {
             path.setText(dev.voxelbrew.gui.ExportDialog.destinationForFormat(suggestion, destination.extension())
                     .toString());
         }
-        var browse = new Button(translations.translate("gui.browse").orElseThrow());
+        var browse = new Button(translations.translate("gui.browse"));
         browse.setId("file-browse");
         UiHelp.install(browse, translations);
         browse.setOnAction(event -> {
             var chooser = new FileChooser();
-            chooser.setTitle(translations.translate("gui.destination").orElseThrow());
+            chooser.setTitle(translations.translate("gui.destination"));
             chooser.getExtensionFilters()
                     .add(new FileChooser.ExtensionFilter(
                             "*." + destination.extension(), "*." + destination.extension()));
@@ -457,7 +455,7 @@ public final class DesktopExportWindow implements ExportWindow {
                 destination.id(),
                 path::getText,
                 path,
-                field(translations.translate("gui.destination").orElseThrow(), Dialogs.pathRow(path, browse)),
+                field(translations.translate("gui.destination"), Dialogs.pathRow(path, browse)),
                 path.textProperty(),
                 onChange);
     }
@@ -470,7 +468,7 @@ public final class DesktopExportWindow implements ExportWindow {
         if (!Files.exists(path)) return true;
         var confirmation = new Alert(
                 Alert.AlertType.CONFIRMATION,
-                translations.translate("file.replace", path).orElseThrow(),
+                translations.translate("file.replace", path),
                 ButtonType.YES,
                 ButtonType.NO);
         if (Dialogs.show(confirmation, owner, translations).orElse(ButtonType.NO) != ButtonType.YES) return false;
@@ -497,7 +495,7 @@ public final class DesktopExportWindow implements ExportWindow {
             var input = new javafx.scene.control.CheckBox(box.label());
             input.setId(inputPrefix + box.id());
             UiHelp.describe(
-                    input, translations.translate("help.export-" + box.id()).orElse(box.label()));
+                    input, translations.tryTranslate("help.export-" + box.id()).orElse(box.label()));
             input.setSelected(box.selected());
             input.getStyleClass().add("export-dialog-choice");
             return bind(

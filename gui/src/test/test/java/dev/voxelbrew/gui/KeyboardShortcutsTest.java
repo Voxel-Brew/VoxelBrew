@@ -125,7 +125,7 @@ class KeyboardShortcutsTest {
                     assertThat(UiHelp.description(translations, binding.id()).isBlank())
                             .isFalse();
                     assertThat(translations
-                                    .translate("shortcuts.section." + scope.name())
+                                    .tryTranslate("shortcuts.section." + scope.name())
                                     .orElseThrow()
                                     .isBlank())
                             .isFalse();

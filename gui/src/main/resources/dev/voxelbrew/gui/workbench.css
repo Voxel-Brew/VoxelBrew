@@ -92,8 +92,9 @@
 .dark.export-toast.failure .export-toast-symbol {
   -fx-stroke: #ff9ca5;
 }
-.export-toast-close {
+.export-toast .button.export-toast-close {
   -fx-background-color: transparent;
+  -fx-background-insets: 0;
   -fx-background-radius: 6;
   -fx-border-color: transparent;
   -fx-padding: 0;
@@ -101,18 +102,24 @@
   -fx-pref-width: 26;
   -fx-min-height: 26;
   -fx-pref-height: 26;
-  -fx-font-size: 18px;
   -fx-cursor: hand;
 }
-.light.export-toast .export-toast-close {
-  -fx-text-fill: #697488;
+.export-toast-close-icon {
+  -fx-fill: transparent;
+  -fx-stroke-width: 1.6;
+  -fx-stroke-line-cap: round;
 }
-.dark.export-toast .export-toast-close {
-  -fx-text-fill: #aeb7c7;
+.light.export-toast .export-toast-close-icon {
+  -fx-stroke: #626d7e;
 }
-.export-toast-close:hover {
-  -fx-background-color: -fx-selection-bar;
-  -fx-text-fill: -fx-text-background-color;
+.dark.export-toast .export-toast-close-icon {
+  -fx-stroke: #b9c1cf;
+}
+.light.export-toast .button.export-toast-close:hover {
+  -fx-background-color: #eef1f6;
+}
+.dark.export-toast .button.export-toast-close:hover {
+  -fx-background-color: #41454f;
 }
 .quick-menu-heading {
   -fx-font-size: 10px;

@@ -4348,6 +4348,34 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void exportNotificationShowsDismissIconInBothThemes() throws Exception {
+        openPrepared("plate-5mm.vxb");
+        for (int palette : List.of(1, 2)) {
+            choice("appearance", palette);
+            click("export");
+            chooseExporter("gcode");
+            Thread.sleep(220);
+            fx(() -> {
+                var close = (Button) node("#export-notification-close");
+                var icon = (javafx.scene.shape.SVGPath) close.getGraphic();
+                assertThat(icon.getStroke()).isNotNull();
+                assertThat(icon.getBoundsInParent().getWidth()).isGreaterThan(0);
+                assertThat(close.getBackground().getFills())
+                        .allMatch(fill -> javafx.scene.paint.Color.TRANSPARENT.equals(fill.getFill()));
+                var scene = close.getScene();
+                Screenshot.save(
+                        scene,
+                        Path.of(
+                                System.getProperty("voxelbrew.ui.artifacts"),
+                                "export-notification-" + (palette == 1 ? "light" : "dark") + ".png"));
+                close.fire();
+                assertThat(scene.getWindow().isShowing()).isFalse();
+                return null;
+            });
+        }
+    }
+
+    @Test
     void polishWorkbenchDialogsSketchPrintingAndLanguagePreferenceUseRealControls() throws Exception {
         ready();
         // One translated dialog wiring check; message/resource matrices live in UiTextTest.

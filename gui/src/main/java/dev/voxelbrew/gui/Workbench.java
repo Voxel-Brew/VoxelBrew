@@ -519,10 +519,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     }
 
     static Path exportSuggestion(Path saveFolder, Path projectPath) {
-        return saveFolder.resolve(
-                projectPath == null
-                        ? "Untitled.vxb"
-                        : java.util.Objects.toString(projectPath.getFileName(), "Untitled.vxb"));
+        return projectPath == null ? saveFolder.resolve("Untitled.vxb") : projectPath;
     }
 
     Workbench(
@@ -2689,7 +2686,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             viewport.stopPlaneSelection();
             inspect();
         }
-        printer.documentChanged(document);
+        printer.documentChanged(document, controller.path());
         printerTab.setDisable(!printer.hasJobs());
         if (printerTab.isDisable() && printerTab.isSelected()) {
             workspaces.getSelectionModel().select(printTab.isDisable() ? designTab : printTab);

@@ -794,7 +794,7 @@ class WorkbenchUiTest {
                 new Scene(created, 820, 650);
                 created.applyCss();
                 created.layout();
-                created.documentChanged(job);
+                created.documentChanged(job, null);
                 return created;
             });
             try {
@@ -4438,6 +4438,8 @@ class WorkbenchUiTest {
                 .contains("G-code");
         click("export");
         chooseExporter("stl");
+        assertThat(fx(() -> ((TextField) node("#export-path")).getText()))
+                .isEqualTo(file.resolveSibling("polish-model.stl").toString());
         assertPathRowLabels("export-path");
         assertThat(fx(() -> ((ComboBox<?>) node("#export-space")).getValue())).isEqualTo("DESIGN");
         key(KeyCode.ESCAPE);

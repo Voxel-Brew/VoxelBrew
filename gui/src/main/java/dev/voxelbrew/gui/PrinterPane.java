@@ -70,6 +70,8 @@ final class PrinterPane extends VBox implements AutoCloseable {
 
     private CadDocument document;
 
+    private Path projectPath;
+
     private Driver session;
 
     // Accessed only by the serialized device worker, including final cleanup.
@@ -315,7 +317,8 @@ final class PrinterPane extends VBox implements AutoCloseable {
         return box;
     }
 
-    void documentChanged(CadDocument value) {
+    void documentChanged(CadDocument value, Path path) {
+        projectPath = path;
         if (document == null
                 || !document.gcode().equals(value.gcode())
                 || !document.printArtifacts().equals(value.printArtifacts())) {
@@ -494,6 +497,10 @@ final class PrinterPane extends VBox implements AutoCloseable {
         String format = artifact == null ? "gcode" : artifact.format();
         var chooser = new FileChooser();
         chooser.setTitle(t("exportGcode"));
+        if (projectPath != null) {
+            var folder = projectPath.toAbsolutePath().getParent();
+            if (folder != null && Files.isDirectory(folder)) chooser.setInitialDirectory(folder.toFile());
+        }
         chooser.setInitialFileName(plates.getValue().name() + "." + format);
         chooser.getExtensionFilters()
                 .add(new FileChooser.ExtensionFilter("Print artifact (*." + format + ")", "*." + format));

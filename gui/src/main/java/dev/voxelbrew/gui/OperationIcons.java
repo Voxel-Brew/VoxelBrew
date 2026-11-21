@@ -6,6 +6,10 @@ import javafx.scene.shape.SVGPath;
 
 final class OperationIcons {
     static Group icon(String command) {
+        return icon(command, Color.web("#658dcc"));
+    }
+
+    static Group icon(String command, Color stroke) {
         var shape = new SVGPath();
         shape.setContent(
                 switch (command) {
@@ -20,7 +24,7 @@ final class OperationIcons {
                     default -> throw new IllegalArgumentException("Unknown operation: " + command);
                 });
         shape.setFill(Color.TRANSPARENT);
-        shape.setStroke(command.equals("constrained-sketch") ? Color.WHITE : Color.web("#658dcc"));
+        shape.setStroke(stroke);
         shape.setStrokeWidth(1.5);
         var group = new Group(shape);
         group.setMouseTransparent(true);

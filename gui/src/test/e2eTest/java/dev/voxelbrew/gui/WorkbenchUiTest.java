@@ -254,6 +254,8 @@ class WorkbenchUiTest {
         assertThat(fx(() -> workbench.viewport().orientationProperty().get())).isEqualTo(orientation);
         assertThat(fx(() -> workbench.viewport().modelToScreen(new Point3D(30, 20, 5))))
                 .isEqualTo(projection);
+        assertThat(fx(() -> ((Button) node("#quick-constrained-sketch")).getGraphic()))
+                .isNotNull();
         assertThat(fx(() -> node("#quick-extrude"))).isNotNull();
         assertThat(fx(() -> node("#quick-undo").isDisabled())).isTrue();
         fx(() -> {

@@ -154,6 +154,8 @@ tasks.named("clean") { dependsOn(libraryProjects.map { "${it.path}:clean" }) }
 
 configure(libraryProjects) {
     configurations.configureEach {
+        // Build the application against its own modules when the BOM manages a newer release.
+        resolutionStrategy.preferProjectModules()
         // API and BOM snapshots can be republished under the same version.
         resolutionStrategy.cacheChangingModulesFor(0, "seconds")
     }

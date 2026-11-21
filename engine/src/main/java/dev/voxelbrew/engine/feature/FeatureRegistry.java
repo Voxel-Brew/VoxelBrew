@@ -70,9 +70,7 @@ public final class FeatureRegistry implements AutoCloseable {
                 if (!providers.hasNext()) break;
                 var provider = providers.next();
                 var descriptor = Objects.requireNonNull(provider.descriptor());
-                if (descriptor.apiVersion() != FeatureProvider.API_VERSION) {
-                    diagnostics.add("Incompatible feature " + descriptor.key() + ": API " + descriptor.apiVersion());
-                } else if (entries.putIfAbsent(descriptor.key(), new Entry(descriptor, provider)) != null) {
+                if (entries.putIfAbsent(descriptor.key(), new Entry(descriptor, provider)) != null) {
                     diagnostics.add("Duplicate feature ID: " + descriptor.key());
                 }
                 failures = 0;

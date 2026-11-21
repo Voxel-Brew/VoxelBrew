@@ -67,12 +67,7 @@ public final class BrokenFeatureProviders {
     private static FeatureDescriptor descriptor(String provider) {
         var original = new SpacerProvider().descriptor();
         return new FeatureDescriptor(
-                provider,
-                original.type(),
-                "Broken spacer",
-                original.apiVersion(),
-                original.payloadVersion(),
-                original.parameters());
+                provider, original.type(), "Broken spacer", original.payloadVersion(), original.parameters());
     }
 
     private BrokenFeatureProviders() {}

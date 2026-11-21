@@ -27,8 +27,6 @@ final class UpdateDialog {
 
     private final Dialog<ButtonType> dialog = new Dialog<>();
 
-    private final TextField version = new TextField();
-
     private final CheckBox force;
 
     private final Label status;
@@ -83,13 +81,14 @@ final class UpdateDialog {
         this.translations = translations;
         this.beforeInstall = beforeInstall;
         this.worker = workers.get();
-        this.force = new CheckBox(translations.translate("update.reinstall"));
-        this.status = new Label(translations.translate("update.intro"));
-        this.check = new Button(translations.translate("update.check"));
-        this.download = new Button(translations.translate("update.download"));
-        this.installType = new ButtonType(translations.translate("update.install"), ButtonBar.ButtonData.OK_DONE);
-        dialog.setTitle(translations.translate("update.title"));
-        dialog.setHeaderText(translations.translate("update.heading"));
+        this.force = new CheckBox(translations.translate("update.reinstall").orElseThrow());
+        this.status = new Label();
+        this.check = new Button(translations.translate("update.check").orElseThrow());
+        this.download = new Button(translations.translate("update.download").orElseThrow());
+        this.installType =
+                new ButtonType(translations.translate("update.install").orElseThrow(), ButtonBar.ButtonData.OK_DONE);
+        dialog.setTitle(translations.translate("update.title").orElseThrow());
+        dialog.setHeaderText(translations.translate("update.heading").orElseThrow());
         dialog.getDialogPane().getButtonTypes().setAll(installType, ButtonType.CANCEL);
         install = (Button) dialog.getDialogPane().lookupButton(installType);
         cancel = (Button) dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
@@ -98,20 +97,20 @@ final class UpdateDialog {
         cancel.setText(translations.translate("action.cancel"));
         check.setId("update-check");
         download.setId("update-download");
-        version.setId("update-version");
         force.setId("update-force");
         for (var control : java.util.List.of(force, check, download)) UiHelp.install(control, translations);
         status.setId("update-status");
-        version.setPromptText(translations.translate("update.versionPrompt"));
         status.setWrapText(true);
+        status.visibleProperty().bind(status.textProperty().isNotEmpty());
+        status.managedProperty().bind(status.visibleProperty());
         progress.setMaxSize(26, 26);
         progress.setVisible(false);
         progress.managedProperty().bind(progress.visibleProperty());
         var content = new VBox(
                 12,
-                new Label(translations.translate("update.installed", BuildVersion.current())),
-                new Label(translations.translate("update.version")),
-                version,
+                new Label(translations
+                        .translate("update.installed", BuildVersion.current())
+                        .orElseThrow()),
                 force,
                 check,
                 status,
@@ -120,7 +119,6 @@ final class UpdateDialog {
         dialog.getDialogPane().setContent(content);
         download.setDisable(true);
         install.setDisable(true);
-        version.textProperty().addListener((observable, old, value) -> invalidateSelection());
         force.selectedProperty().addListener((observable, old, value) -> invalidateSelection());
         check.setOnAction(e -> check());
         download.setOnAction(e -> download());
@@ -144,7 +142,6 @@ final class UpdateDialog {
         busy = value;
         progress.setVisible(value);
         check.setDisable(value || prepared != null);
-        version.setDisable(value || prepared != null);
         force.setDisable(value || prepared != null);
         download.setDisable(
                 value || selected == null || !selected.available() || !selected.installable() || prepared != null);
@@ -152,18 +149,7 @@ final class UpdateDialog {
     }
 
     private void check() {
-        UpdateService.Request request;
-        try {
-            request = new UpdateService.Request(
-                    version.getText().isBlank()
-                            ? null
-                            : ReleaseVersion.release(version.getText().strip()),
-                    force.isSelected());
-        } catch (IllegalArgumentException invalid) {
-            status.setText(invalid.getMessage());
-            invalidateSelection();
-            return;
-        }
+        var request = new UpdateService.Request(null, force.isSelected());
         selected = null;
         busy(true);
         status.setText(translations.translate("update.checking"));

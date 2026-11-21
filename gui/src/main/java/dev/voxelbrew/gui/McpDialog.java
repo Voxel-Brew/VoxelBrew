@@ -2,17 +2,21 @@ package dev.voxelbrew.gui;
 
 import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.userconfig.UserConfigService;
+import javafx.event.ActionEvent;
 import javafx.scene.control.*;
 import javafx.scene.input.*;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
 final class McpDialog {
     static void show(Window owner, McpServerHost server, UserConfigService store, TranslationService text) {
         var dialog = new Dialog<Void>();
-        dialog.initOwner(owner);
-        dialog.setTitle(text.translate("mcp.title"));
-        var auto = new CheckBox(text.translate("mcp.autoStart"));
+        dialog.getDialogPane().setPrefWidth(600);
+        dialog.setTitle(text.translate("mcp.title").orElseThrow());
+        var auto = new CheckBox(text.translate("mcp.autoStart").orElseThrow());
         var port = new TextField("0");
         var connections = new TextField("4");
         var idle = new TextField("30");
@@ -20,10 +24,30 @@ final class McpDialog {
         var endpoint = new TextField(server.endpoint());
         endpoint.setEditable(false);
         var token = new PasswordField();
+        token.setId("mcp-token");
         token.setText(server.credential());
         token.setEditable(false);
+        var visibleToken = new TextField();
+        visibleToken.setId("mcp-visible-token");
+        visibleToken.setEditable(false);
+        visibleToken.textProperty().bind(token.textProperty());
+        var reveal = new Button(text.translate("mcp.showToken").orElseThrow());
+        reveal.setId("mcp-toggle-token");
+        var credential = Dialogs.pathRow(token, reveal);
+        visibleToken.setMinWidth(0);
+        HBox.setHgrow(visibleToken, Priority.ALWAYS);
+        reveal.setOnAction(event -> {
+            boolean visible = credential.getChildren().getFirst() == token;
+            credential.getChildren().set(0, visible ? visibleToken : token);
+            reveal.setText(
+                    text.translate(visible ? "mcp.hideToken" : "mcp.showToken").orElseThrow());
+        });
         var status = new Label();
-        var activity = new TextArea(server.activity().toString());
+        status.setWrapText(true);
+        var activity = new TextArea(
+                server.activity().stream().map(Object::toString).collect(java.util.stream.Collectors.joining("\n")));
+        activity.visibleProperty().bind(activity.textProperty().isNotEmpty());
+        activity.managedProperty().bind(activity.visibleProperty());
         activity.setEditable(false);
         activity.setPrefRowCount(3);
         try {
@@ -36,8 +60,11 @@ final class McpDialog {
         } catch (Exception failure) {
             status.setText(failure.getMessage());
         }
-        var start = new Button(text.translate("mcp.apply"));
-        start.setOnAction(event -> {
+        var apply = new ButtonType(text.translate("mcp.apply").orElseThrow(), ButtonBar.ButtonData.APPLY);
+        dialog.getDialogPane().getButtonTypes().setAll(apply, ButtonType.CLOSE);
+        var start = (Button) dialog.getDialogPane().lookupButton(apply);
+        start.addEventFilter(ActionEvent.ACTION, event -> {
+            event.consume();
             try {
                 var settings = new McpSettings(
                         auto.isSelected(),
@@ -47,52 +74,50 @@ final class McpDialog {
                         Integer.parseInt(history.getText()));
                 settings.save(store);
                 server.start(settings);
-                endpoint.setText(server.endpoint());
-                status.setText(server.endpoint());
+                status.setText("");
             } catch (Exception failure) {
                 status.setText(failure.getMessage());
+            } finally {
+                endpoint.setText(server.endpoint());
             }
         });
-        var stop = new Button(text.translate("mcp.stop"));
+        var stop = new Button(text.translate("mcp.stop").orElseThrow());
         stop.setOnAction(event -> {
             server.close();
             endpoint.clear();
+            status.setText("");
         });
-        var copy = new Button(text.translate("mcp.copy"));
+        var copy = new Button(text.translate("mcp.copy").orElseThrow());
         copy.setOnAction(event -> {
             var clipboard = new ClipboardContent();
             clipboard.putString("{\"url\":\"" + server.endpoint() + "\",\"headers\":{\"Authorization\":\"Bearer "
                     + server.credential() + "\"}}");
             Clipboard.getSystemClipboard().setContent(clipboard);
         });
-        var rotate = new Button(text.translate("mcp.rotate"));
+        var rotate = new Button(text.translate("mcp.rotate").orElseThrow());
         rotate.setOnAction(event -> {
             server.regenerateToken();
             token.setText(server.credential());
             endpoint.clear();
+            status.setText("");
         });
+        copy.disableProperty().bind(endpoint.textProperty().isEmpty());
+        stop.disableProperty().bind(endpoint.textProperty().isEmpty());
+        var settings = new GridPane();
+        settings.setHgap(12);
+        settings.setVgap(8);
+        settings.addRow(0, new Label(text.translate("mcp.port").orElseThrow()), port);
+        settings.addRow(1, new Label(text.translate("mcp.connections").orElseThrow()), connections);
+        settings.addRow(2, new Label(text.translate("mcp.idle").orElseThrow()), idle);
+        settings.addRow(3, new Label(text.translate("mcp.history").orElseThrow()), history);
+        settings.addRow(4, new Label(text.translate("mcp.endpoint").orElseThrow()), endpoint);
+        settings.addRow(5, new Label(text.translate("mcp.token").orElseThrow()), credential);
+        GridPane.setHgrow(credential, Priority.ALWAYS);
+        status.visibleProperty().bind(status.textProperty().isNotEmpty());
+        status.managedProperty().bind(status.visibleProperty());
         dialog.getDialogPane()
-                .setContent(new VBox(
-                        8,
-                        auto,
-                        new Label(text.translate("mcp.port")),
-                        port,
-                        new Label(text.translate("mcp.connections")),
-                        connections,
-                        new Label(text.translate("mcp.idle")),
-                        idle,
-                        new Label(text.translate("mcp.history")),
-                        history,
-                        endpoint,
-                        token,
-                        start,
-                        stop,
-                        copy,
-                        rotate,
-                        status,
-                        activity));
-        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
-        dialog.showAndWait();
+                .setContent(new VBox(12, auto, settings, new HBox(8, copy, rotate, stop), status, activity));
+        Dialogs.show(dialog, owner, text);
     }
 
     private McpDialog() {}

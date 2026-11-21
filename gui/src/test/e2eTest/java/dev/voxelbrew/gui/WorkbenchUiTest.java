@@ -4277,6 +4277,25 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void mcpCredentialsStartMaskedAndCanBeRevealed() throws Exception {
+        click("menu-settings");
+        click("mcp-server");
+        assertThat(fx(() -> node("#mcp-token"))).isInstanceOf(PasswordField.class);
+        assertThat(fx(() -> stage.getScene().lookup("#mcp-visible-token"))).isNull();
+        click("mcp-toggle-token");
+        assertThat(fx(() -> ((TextField) node("#mcp-visible-token")).getText().isBlank()))
+                .isFalse();
+        click("mcp-toggle-token");
+        assertThat(fx(() -> stage.getScene().lookup("#mcp-visible-token"))).isNull();
+        fx(() -> {
+            Screenshot.save(
+                    stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "mcp-settings.png"));
+            return null;
+        });
+        key(KeyCode.ESCAPE);
+    }
+
+    @Test
     void firstLaunchUsesSystemDisplayLanguageAndShowsSystemPreference() throws Exception {
         ready();
         assertThat(fx(() -> command(workbench, "save").getText())).isEqualTo("Zapisz");

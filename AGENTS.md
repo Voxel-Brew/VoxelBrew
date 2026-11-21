@@ -24,7 +24,8 @@ Java production code uses `src/main/java`. Tests intentionally use
   runs its own Checkstyle tasks through `:engine:checkExporterFixture`.
 - To reproduce the SpotBugs gate in CI, run
   `./gradlew basicChecks :engine:checkExporterFixture -PbundleSlicers=false`.
-  The unit, integration, and platform jobs wait for it to pass.
+  CI runs SpotBugs, unit tests, and formatting in parallel. Integration waits for all three,
+  then the platform checks run. `Full check` reports the overall result.
 - `./gradlew spotlessCheck test` runs formatting checks and unit tests.
 - `./gradlew integrationTest` runs native-backed integration tests. Bootstrap platform
   dependencies first with `scripts/bootstrap-native.sh` and `scripts/bootstrap-slicer.sh`.

@@ -44,9 +44,8 @@ jobs:
             **/build/reports/spotbugs/
             **/build/reports/checkstyle/
   unit:
-    needs: spotbugs
     if: ${{ !contains(github.event.head_commit.message, '[migration]') }}
-    name: Unit tests and formatting (Ubuntu)
+    name: Unit tests (Ubuntu)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -73,8 +72,8 @@ jobs:
         with:
           path: .tools/bundled-slicers
           key: bundled-slicers-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/bundle-slicers.py') }}
-      - name: Unit tests and formatting
-        run: ./gradlew --build-cache spotlessCheck test
+      - name: Run unit tests
+        run: ./gradlew --build-cache test
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -83,8 +82,33 @@ jobs:
           path: |
             **/build/reports/
             **/build/test-results/test/
+  format:
+    if: ${{ !contains(github.event.head_commit.message, '[migration]') }}
+    name: Formatting (Ubuntu)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Voxel-Brew/BOM
+          path: .tools/bom
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check formatting
+        run: ./gradlew --build-cache spotlessCheck
   integration:
-    needs: spotbugs
+    needs: [spotbugs, unit, format]
     if: ${{ !contains(github.event.head_commit.message, '[migration]') }}
     name: Integration tests
     secrets: inherit
@@ -94,7 +118,7 @@ jobs:
       suite: integrationTest
       artifact-name: integration-ubuntu-24.04
   platform:
-    needs: spotbugs
+    needs: integration
     if: ${{ !contains(github.event.head_commit.message, '[migration]') }}
     name: Platform checks
     strategy:
@@ -121,18 +145,20 @@ jobs:
   full-check:
     name: Full check
     if: ${{ always() && !contains(github.event.head_commit.message, '[migration]') }}
-    needs: [spotbugs, unit, integration, platform]
+    needs: [spotbugs, unit, format, integration, platform]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Require SpotBugs, tests, and platform checks to pass
+      - name: Require every check to pass
         env:
           SPOTBUGS_RESULT: ${{ needs.spotbugs.result }}
           UNIT_RESULT: ${{ needs.unit.result }}
+          FORMAT_RESULT: ${{ needs.format.result }}
           INTEGRATION_RESULT: ${{ needs.integration.result }}
           PLATFORM_RESULT: ${{ needs.platform.result }}
         run: |
           test "$SPOTBUGS_RESULT" = success
           test "$UNIT_RESULT" = success
+          test "$FORMAT_RESULT" = success
           test "$INTEGRATION_RESULT" = success
           test "$PLATFORM_RESULT" = success

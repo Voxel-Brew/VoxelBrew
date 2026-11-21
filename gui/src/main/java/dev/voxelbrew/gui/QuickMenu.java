@@ -214,7 +214,8 @@ final class QuickMenu implements AutoCloseable {
     private Button actionButton(Action action) {
         var button = new Button();
         button.setId("quick-" + action.id());
-        if (Set.of("extrude", "cut", "fillet", "chamfer", "shell", "split-body").contains(action.id())) {
+        if (Set.of("constrained-sketch", "extrude", "cut", "fillet", "chamfer", "shell", "split-body")
+                .contains(action.id())) {
             button.setGraphic(OperationIcons.icon(action.id()));
         }
         button.setAccessibleText(action.label());

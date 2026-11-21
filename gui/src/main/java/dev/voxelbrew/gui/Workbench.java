@@ -746,7 +746,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         var title = new HBox(12, brand, documentTitle, menuBar);
         title.getStyleClass().add("title-strip");
         window = new WindowFrame(stage, title, this, translations);
-        var sketchIcon = OperationIcons.icon("constrained-sketch");
+        var sketchIcon = OperationIcons.icon("constrained-sketch", javafx.scene.paint.Color.WHITE);
         if (constrainedSketch.getGraphic() == null) {
             constrainedSketch.setGraphic(sketchIcon);
         } else {

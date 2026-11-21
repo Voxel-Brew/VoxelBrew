@@ -183,8 +183,6 @@ final class PrinterPane extends VBox implements AutoCloseable {
                 setText(empty || item == null ? null : item.name());
             }
         });
-        var configure = button("configure", this::configure);
-        configure.getStyleClass().add("printer-configure");
         exportGcode = button("exportGcode", this::exportGcode);
         print = button("print", this::submit);
         print.getStyleClass().add("printer-primary");
@@ -203,9 +201,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
         var introduction = new VBox(5, heading, subtitle);
         var plateStep = step("01", t("plate"), t("plateHint"), plates);
         var deviceStep = step("02", t("device"), t("deviceHint"), deviceName);
-        var configureRow = new HBox(configure);
-        configureRow.setAlignment(Pos.CENTER_RIGHT);
-        var setup = new VBox(22, plateStep, deviceStep, configureRow);
+        var setup = new VBox(22, plateStep, deviceStep);
         setup.getStyleClass().add("printer-card");
         var sendTitle = new Label(t("sendTitle"));
         sendTitle.getStyleClass().add("printer-section-title");
@@ -258,12 +254,14 @@ final class PrinterPane extends VBox implements AutoCloseable {
 
     QuickMenu quickMenu(
             javafx.scene.Parent theme, java.util.function.Supplier<java.util.List<QuickMenu.Action>> workspaces) {
+        var configure = button("configure", this::configure);
         return new QuickMenu(
                 this,
                 theme,
                 text,
                 () -> {
-                    var commands = QuickMenu.controls(this, "printer-configure", "printer-exportGcode");
+                    var commands = QuickMenu.controls(this, "printer-exportGcode");
+                    commands.addFirst(QuickMenu.Action.button(configure, "⚙"));
                     if (print.isVisible()) commands.addAll(QuickMenu.controls(this, "printer-print"));
                     return new QuickMenu.Content(commands, List.of());
                 },

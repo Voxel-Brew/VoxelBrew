@@ -31,7 +31,15 @@ tasks.processResources {
     filesMatching("voxelbrew-util-version.properties") { expand("version" to buildVersion) }
 }
 
-tasks.jar { manifest.attributes("Implementation-Version" to buildVersion) }
+tasks.jar {
+    manifest.attributes("Implementation-Version" to buildVersion)
+    // The public model reads this host metadata when evaluating $vb.version.
+    from(tasks.processResources) {
+        include("voxelbrew-util-version.properties")
+        into("META-INF/voxelbrew")
+        rename { "application.properties" }
+    }
+}
 
 tasks.named<Test>("integrationTest") {
     val artifact = tasks.jar.flatMap { it.archiveFile }

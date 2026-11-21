@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.*;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
+import java.util.Properties;
 import org.junit.jupiter.api.Test;
 
 class VersionTest {
@@ -21,8 +22,14 @@ class VersionTest {
         try (var loader =
                 new URLClassLoader(new URL[] {artifact.toUri().toURL()}, ClassLoader.getPlatformClassLoader())) {
             var version = loader.loadClass("dev.voxelbrew.util.Version");
-            assertThat(version.getMethod("version").invoke(null))
-                    .isEqualTo(System.getProperty("voxelbrew.test.buildVersion"));
+            var expected = System.getProperty("voxelbrew.test.buildVersion");
+            assertThat(version.getMethod("version").invoke(null)).isEqualTo(expected);
+            try (var input = loader.getResourceAsStream("META-INF/voxelbrew/application.properties")) {
+                assertThat(input).isNotNull();
+                var properties = new Properties();
+                properties.load(input);
+                assertThat(properties.getProperty("version")).isEqualTo(expected);
+            }
         }
     }
 }

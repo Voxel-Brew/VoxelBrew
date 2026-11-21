@@ -640,6 +640,14 @@ public final class DocumentController implements AutoCloseable {
 
         capturePrintWorkspace();
         var captured = session.document();
+        if (exporterId.equals("3mf") && captured.printSetup().instances().isEmpty()) {
+            return CompletableFuture.failedFuture(
+                    new java.io.IOException("No objects on the active plate; place a model in the Slicer first"));
+        }
+        if (exporterId.equals("gcode") && captured.activeGcode().isEmpty()) {
+            return CompletableFuture.failedFuture(
+                    new java.io.IOException("No G-code for the active plate; slice it first"));
+        }
         long generation = documentGeneration.get();
         ioBusy = true;
         onChanged.run();

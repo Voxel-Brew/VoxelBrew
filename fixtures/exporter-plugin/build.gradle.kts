@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     `java-library`
     id("dev.voxelbrew.spotbugs")
@@ -19,7 +21,14 @@ configurations.configureEach {
 
 java { toolchain.languageVersion.set(JavaLanguageVersion.of(21)) }
 
-val bomVersion = providers.gradleProperty("bomVersion").orElse("0.1.0-SNAPSHOT").get()
+val hostProperties =
+    Properties().apply { file("../../gradle.properties").inputStream().use { load(it) } }
+val bomVersion =
+    providers.gradleProperty("bomVersion").getOrElse(hostProperties.getProperty("bomVersion"))
+val hostVersion =
+    providers
+        .gradleProperty("projectVersion")
+        .getOrElse(hostProperties.getProperty("projectVersion"))
 
 dependencies {
     compileOnly(platform("dev.voxelbrew:bom:$bomVersion"))
@@ -42,6 +51,11 @@ val features =
 dependencies {
     add(features.compileOnlyConfigurationName, platform("dev.voxelbrew:bom:$bomVersion"))
     add(features.compileOnlyConfigurationName, "dev.voxelbrew:engine")
+}
+
+// Feature providers compile against the engine and util built by the host checkout.
+configurations.named(features.compileClasspathConfigurationName) {
+    resolutionStrategy.force("dev.voxelbrew:engine:$hostVersion", "dev.voxelbrew:util:$hostVersion")
 }
 
 tasks.named<Jar>("jar") { from(features.output) }

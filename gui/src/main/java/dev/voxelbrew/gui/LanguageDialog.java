@@ -6,6 +6,7 @@ import dev.voxelbrew.api.userconfig.UserConfigService;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import javafx.application.Platform;
+import javafx.event.ActionEvent;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
@@ -45,10 +46,14 @@ final class LanguageDialog {
             message.setText(translations.translate(
                     "language.readFailed", failure.getCause().getMessage()));
         }
-        var save = new Button(translations.translate("action.save"));
+        var saveType =
+                new ButtonType(translations.translate("action.save").orElseThrow(), ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().setAll(saveType, ButtonType.CLOSE);
+        var save = (Button) dialog.getDialogPane().lookupButton(saveType);
         save.setId("language-save");
         UiHelp.install(save, translations);
-        save.setOnAction(event -> {
+        save.addEventFilter(ActionEvent.ACTION, event -> {
+            event.consume();
             String language = choice.getValue();
             save.setDisable(true);
             choice.setDisable(true);
@@ -69,8 +74,9 @@ final class LanguageDialog {
                 });
             });
         });
-        dialog.getDialogPane().setContent(new VBox(10, choice, message, save));
-        dialog.getDialogPane().getButtonTypes().setAll(ButtonType.CLOSE);
+        choice.setMaxWidth(Double.MAX_VALUE);
+        dialog.getDialogPane().setPrefWidth(420);
+        dialog.getDialogPane().setContent(new VBox(12, choice, message));
         dialog.getDialogPane().lookupButton(ButtonType.CLOSE).setId("language-close");
         Dialogs.show(dialog, owner, translations);
     }

@@ -700,6 +700,14 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     private void configurePrinterSidebar() {
         printerChoice.setId("print-printer");
         printTarget.setId("print-target");
+        var lockProfile = printTarget
+                .disableProperty()
+                .or(printTarget
+                        .valueProperty()
+                        .isNotNull()
+                        .and(printTarget.valueProperty().isNotEqualTo("")));
+        printerChoice.disableProperty().bind(lockProfile);
+        plateSize.disableProperty().bind(lockProfile);
         printTarget.setMaxWidth(Double.MAX_VALUE);
         printerProfileLabel.setId("print-printer-profile-label");
         printTarget.setPromptText(translations.translate("print.profileOnly"));
@@ -2624,10 +2632,9 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         var saved = setup().printerSnapshot();
         var p = PrintProfile.resolve(setup()).printer();
         boolean deviceSelected = hasPrintDevice();
-        printerProfileLabel.setText(
-                translations.translate(deviceSelected ? "print.deviceProfile" : "print.printerSelector"));
-        printerChoice.setDisable(deviceSelected);
-        plateSize.setDisable(deviceSelected);
+        printerProfileLabel.setText(translations
+                .translate(deviceSelected ? "print.deviceProfile" : "print.printerSelector")
+                .orElseThrow());
         if (!nozzle.isFocused()) nozzle.setText(Double.toString(p.nozzleMm()));
         var entry = printerCatalog.entries().stream()
                 .filter(e -> e.definition().printer().id().equals(p.id()))
@@ -2656,7 +2663,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     }
 
     private void editPlate() {
-        if (hasPrintDevice()) return;
+        if (plateSize.isDisabled()) return;
         var dialog = new Dialog<ButtonType>();
         dialog.initOwner(getScene().getWindow());
         dialog.setTitle(translations.translate("print.editPlate"));

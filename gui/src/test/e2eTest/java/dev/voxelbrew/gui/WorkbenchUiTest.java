@@ -1106,7 +1106,9 @@ class WorkbenchUiTest {
         assertThat(fx(() ->
                         ((TabPane) node("#print-controls")).getSelectionModel().getSelectedIndex()))
                 .isEqualTo(3);
-        assertThat(fx(() -> node("#print-target").isDisabled())).isTrue();
+        for (String control : List.of("print-target", "print-configure-devices", "print-printer", "print-plate-size")) {
+            assertThat(fx(() -> node("#" + control).isDisabled())).as(control).isTrue();
+        }
         Path saved = directory.resolve("sliced.vxb");
         fx(() -> workbench.controller().save(saved, false)).get(20, TimeUnit.SECONDS);
         assertThat(DocumentReader.load(saved).activeGcode()).isEqualTo(lines);
@@ -1140,11 +1142,15 @@ class WorkbenchUiTest {
         assertThat(fx(() -> ((TabPane) node("#print-controls"))
                         .getTabs().subList(0, 3).stream().allMatch(Tab::isDisable)))
                 .isTrue();
-        assertThat(fx(() -> node("#print-target").isDisabled())).isTrue();
+        for (String control : List.of("print-target", "print-configure-devices", "print-printer", "print-plate-size")) {
+            assertThat(fx(() -> node("#" + control).isDisabled())).as(control).isTrue();
+        }
         var setupBeforeClean = document().printSetup();
         click("print-clean-slicing");
         assertThat(document().printSetup()).isEqualTo(setupBeforeClean);
-        assertThat(fx(() -> node("#print-target").isDisabled())).isFalse();
+        for (String control : List.of("print-target", "print-configure-devices", "print-printer", "print-plate-size")) {
+            assertThat(fx(() -> node("#" + control).isDisabled())).as(control).isFalse();
+        }
         assertThat(document().gcode().isEmpty()).isTrue();
         assertThat(fx(() -> node("#print-clean-slicing").isDisabled())).isTrue();
         assertThat(fx(() ->

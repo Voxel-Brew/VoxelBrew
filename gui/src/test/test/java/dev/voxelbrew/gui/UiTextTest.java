@@ -107,7 +107,7 @@ class UiTextTest {
         try (var sources = Files.list(Path.of("src/main/java/dev/voxelbrew/gui"))) {
             for (var file : sources.filter(p -> p.toString().endsWith(".java")).toList()) {
                 var matcher = Pattern.compile(
-                                "button\\(\\s*(?:translations\\s*\\.translate\\(\\s*\"[^\"]+\"\\s*\\)\\s*\\.orElseThrow\\(\\)|\"[^\"]*\"),\\s*\"([^\"]+)\"\\s*,")
+                                "button\\(\\s*(?:translations\\s*\\.translate\\(\\s*\"[^\"]+\"\\s*\\)|\"[^\"]*\"),\\s*\"([^\"]+)\"\\s*,")
                         .matcher(Files.readString(file));
                 while (matcher.find()) ids.add(matcher.group(1));
             }

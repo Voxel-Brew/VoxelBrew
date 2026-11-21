@@ -13,7 +13,6 @@ import dev.voxelbrew.api.model.vui.Layout;
 import dev.voxelbrew.api.model.vui.TextField;
 import dev.voxelbrew.api.model.vui.VerticalLayout;
 import dev.voxelbrew.util.services.Services;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -30,6 +29,8 @@ public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Set
     private final MeshFormat format;
 
     private final TranslationService translations;
+
+    private final boolean plateOnly;
 
     public record Settings(
             ExportSelection selection,
@@ -58,15 +59,21 @@ public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Set
     }
 
     public MeshExportDialog(@NonNull MeshFormat format) {
-        this(format, Services.load(TranslationService.class));
+        this(format, false);
     }
 
-    @SuppressFBWarnings(
-            value = "EI_EXPOSE_REP2",
-            justification = "The injected translation service is intentionally shared.")
-    public MeshExportDialog(@NonNull MeshFormat format, @NonNull TranslationService translations) {
+    MeshExportDialog(MeshFormat format, boolean plateOnly) {
+        this(format, Services.load(TranslationService.class), plateOnly);
+    }
+
+    public MeshExportDialog(MeshFormat format, TranslationService translations) {
+        this(format, translations, false);
+    }
+
+    private MeshExportDialog(@NonNull MeshFormat format, @NonNull TranslationService translations, boolean plateOnly) {
         this.translations = translations;
         this.format = format;
+        this.plateOnly = plateOnly;
     }
 
     @Override
@@ -75,7 +82,10 @@ public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Set
         children.add(new FileDestination("destination", format.extensions().get(0)));
         children.add(new CheckBox("overwrite", translations.translate("export.mesh.overwrite"), false));
         children.add(new ComboBox(
-                "space", translations.translate("export.mesh.space"), List.of("DESIGN", "BUILD_PLATE"), "DESIGN"));
+                "space",
+                translations.translate("export.mesh.space").orElseThrow(),
+                plateOnly ? List.of("BUILD_PLATE") : List.of("DESIGN", "BUILD_PLATE"),
+                plateOnly ? "BUILD_PLATE" : "DESIGN"));
         children.add(new ComboBox(
                 "selection",
                 translations.translate("export.mesh.contents"),
@@ -182,7 +192,9 @@ public final class MeshExportDialog implements ExportDialog<MeshExportDialog.Set
         var destination = values.get("destination");
         var overwrite = values.getOrDefault("overwrite", "false");
         var selection = new ExportSelection(
-                ExportSelection.Space.valueOf(values.getOrDefault("space", "DESIGN")),
+                plateOnly
+                        ? ExportSelection.Space.BUILD_PLATE
+                        : ExportSelection.Space.valueOf(values.getOrDefault("space", "DESIGN")),
                 ExportSelection.Contents.valueOf(values.getOrDefault("selection", "MODEL")),
                 emptyToNull(values.get("body")),
                 emptyToNull(values.get("instance")));

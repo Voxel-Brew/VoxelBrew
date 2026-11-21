@@ -32,27 +32,26 @@ public abstract class MeshExporter implements Exporter<MeshExportDialog.Settings
     @Override
     public final Optional<MeshExportDialog.Settings> export(CadDocument document, ExportWindow window)
             throws IOException {
-        var requested = window.show(new MeshExportDialog(format()));
+        boolean plateExport = format().extensions().contains("3mf")
+                && document.printSetup().plates().stream()
+                        .anyMatch(plate -> !plate.instances().isEmpty());
+        var requested = window.show(new MeshExportDialog(format(), plateExport));
         if (requested.isEmpty()) return Optional.empty();
         publish(
                 document,
                 requested.get(),
-                window instanceof PluginDirectorySource source ? source.pluginDirectory() : plugins);
+                window instanceof PluginDirectorySource source ? source.pluginDirectory() : plugins,
+                plateExport);
         return requested;
     }
 
-    private void publish(CadDocument document, MeshExportDialog.Settings requested, Path pluginDirectory)
+    private void publish(
+            CadDocument document, MeshExportDialog.Settings requested, Path pluginDirectory, boolean plateExport)
             throws IOException {
-        // 3MF is a plate handoff whenever the user has prepared a slicer plate.
         var selection = requested.selection();
-        boolean preparedPlate = document.printSetup().plates().stream()
-                .anyMatch(p -> !p.instances().isEmpty());
-        if (format().extensions().contains("3mf") && preparedPlate) {
+        if (plateExport) {
             selection = new ExportSelection(
-                    ExportSelection.Space.BUILD_PLATE,
-                    selection.contents(),
-                    selection.space() == ExportSelection.Space.DESIGN ? null : selection.body(),
-                    selection.instance());
+                    ExportSelection.Space.BUILD_PLATE, selection.contents(), selection.body(), selection.instance());
         }
         var settings = new MeshExportDialog.Settings(
                 selection, requested.mesh(), requested.options(), requested.destination(), requested.snapshot());

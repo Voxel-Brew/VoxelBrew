@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.exporter.*;
 import dev.voxelbrew.api.model.CadDocument;
+import dev.voxelbrew.api.model.Feature;
 import dev.voxelbrew.api.model.mesh.MeshOptions;
 import dev.voxelbrew.engine.printing.ManufacturingModels;
 import java.nio.file.*;
@@ -114,6 +115,37 @@ class UnifiedExportTest {
                 .summaryStatistics();
         assertThat(xs.getMin()).isCloseTo(0, org.assertj.core.data.Offset.offset(0.001));
         assertThat(xs.getMax()).isCloseTo(60, org.assertj.core.data.Offset.offset(0.001));
+    }
+
+    @Test
+    void threeMfRejectsBodiesMissingFromTheActivePlate() {
+        var base = ExportTest.reference();
+        var setup = dev.voxelbrew.api.model.printing.PrintSetup.empty()
+                .withInstances(List.of(new dev.voxelbrew.api.model.BodyInstance(
+                        "placed", "thickness.body", dev.voxelbrew.api.model.Transform.IDENTITY)));
+        var features = new ArrayList<>(base.features());
+        features.add(new Feature.Sketch(
+                "other-sketch",
+                "other.profile",
+                new Feature.Plane("origin-xy", 0),
+                new Feature.Rectangle(70, 0, 10, 10)));
+        features.add(new Feature.Extrude("unplaced", new Feature.ProfileRef("other-sketch", "other.profile"), 8));
+        var document = new CadDocument(base.id(), features, features.size(), setup);
+        Path target = directory.resolve("unplaced.3mf");
+        ExportWindow parent = new ExportWindow() {
+            @Override
+            public <R> Optional<R> show(ExportDialog<R> dialog) {
+                return Optional.of(dialog.buildSettings(Map.of(
+                        "destination", target.toString(),
+                        "space", "DESIGN",
+                        "body", "unplaced.body")));
+            }
+        };
+        var exporter = new ThreeMfExporter(directory);
+        assertThatThrownBy(() -> exporter.export(document, parent))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unknown body unplaced.body");
+        assertThat(target).doesNotExist();
     }
 
     @Test

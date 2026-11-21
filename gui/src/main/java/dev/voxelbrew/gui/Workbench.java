@@ -2495,6 +2495,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 attempt(() -> controller.configuration(configuration.getValue()));
             }
         });
+        var configurationActions = new HBox(6, parameters, customFeature);
         var left = new VBox(
                 10,
                 heading(translations.translate("gui.model")),
@@ -2502,11 +2503,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 new Separator(),
                 heading(translations.translate("workbench.configuration")),
                 configuration,
-                parameters,
-                customFeature);
+                configurationActions);
         left.getStyleClass().add("side-panel");
-        left.setPrefWidth(220);
-        left.setMinWidth(185);
+        tree.setPrefWidth(200);
+        left.setMinWidth(Region.USE_PREF_SIZE);
         VBox.setVgrow(tree, Priority.ALWAYS);
         return left;
     }

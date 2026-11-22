@@ -1,10 +1,6 @@
 // Credentials belong in user Gradle properties or environment variables, never source control.
 repositories {
-    if (
-        providers.gradleProperty("useMavenLocal").orNull == "true" ||
-            (gradle.parent != null && System.getProperty("voxelbrew.workspace") != null)
-    )
-        mavenLocal()
+    if (providers.gradleProperty("useMavenLocal").orNull == "true") mavenLocal()
     mavenCentral()
     maven {
         name = "githubBom"

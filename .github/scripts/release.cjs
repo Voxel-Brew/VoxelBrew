@@ -555,9 +555,9 @@ function main() {
       "Invalid merge-back candidate.",
     );
     if (release.remote(`refs/tags/${m.tag}`) === m.tagObject)
-      release.api("dispatches", {
-        event_type: "release-merge-back",
-        client_payload: { branch: m.branch, source: m.next },
+      release.api("actions/workflows/release-merge-back.yml/dispatches", {
+        ref: m.branch,
+        inputs: { source: m.next },
       });
   } else
     throw new Error(

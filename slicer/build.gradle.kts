@@ -21,7 +21,11 @@ val bundleSlicers =
     providers
         .gradleProperty("bundleSlicers")
         .map(String::toBoolean)
-        .getOrElse(supportsSlicerBundles)
+        .getOrElse(supportsSlicerBundles && slicerPlatform == "macos")
+
+if (slicerPlatform == "macos") {
+    tasks.processResources { exclude("dev/voxelbrew/slicer/orca-bbl.zip") }
+}
 
 if (bundleSlicers) {
     check(supportsSlicerBundles) {
@@ -76,6 +80,10 @@ tasks.named<Test>("test") {
 }
 
 tasks.named<Test>("integrationTest") {
+    systemProperty(
+        "voxelbrew.test.slicerCache",
+        rootProject.file(".tools/bundled-slicers").absolutePath,
+    )
     dependsOn(":engine:buildNative", ":engine:buildExporterFixture")
     systemProperty(
         "voxelbrew.native.path",

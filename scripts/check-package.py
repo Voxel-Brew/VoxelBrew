@@ -37,6 +37,15 @@ else:
     app = image / "lib/app"
     runtime = image / "lib/runtime"
 assert launcher.is_file(), launcher
+if sys.platform in ("win32", "linux"):
+    if sys.platform == "linux":
+        libraries = [lib.name.split(".so")[0] for lib in (app / "native").glob("libTK*.so*")]
+        assert libraries and len(libraries) == len(set(libraries)), "Expected one copy per OCCT toolkit"
+    slicer_jar, = app.glob("slicer-impl-*.jar")
+    with zipfile.ZipFile(slicer_jar) as jar:
+        embedded = [name for name in jar.namelist() if "/slicer/bundled/" in name and name.endswith((".zip", ".tar.gz"))]
+        assert not embedded, f"Unexpected embedded slicer engines: {embedded}"
+
 
 
 def digest(path):
@@ -102,8 +111,11 @@ for notice in ("LICENSE", "ASSEMBLY_EXCEPTION", "ADDITIONAL_LICENSE_INFO"):
 native_source = root / "engine/build/native/runtime"
 native_libraries = {}
 built_app = root / kind / "build/app-image" / image.name / app.relative_to(image)
+occt_abi = properties(root / "scripts/native-versions.properties")["occt.version"].rsplit(".", 1)[0]
 for source in sorted(path for path in native_source.rglob("*") if path.is_file()):
     relative = source.relative_to(native_source)
+    if sys.platform == "linux" and source.name.startswith("libTK") and ".so" in source.name:
+        relative = relative.with_name(source.name.split(".so")[0] + ".so." + occt_abi)
     bundled = app / "native" / relative
     assert bundled.is_file(), "Missing native dependency: " + str(relative)
     checksum = digest(source)

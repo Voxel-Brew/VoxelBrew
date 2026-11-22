@@ -22,8 +22,10 @@ public class BundledSlicers {
 
     public static final class Window implements SlicerWindow {
         private final Bundle bundle;
+        private final Path installedExecutable;
 
-        private Window(Bundle bundle) {
+        private Window(Bundle bundle, Path installedExecutable) {
+            this.installedExecutable = installedExecutable;
             this.bundle = bundle;
         }
 
@@ -37,6 +39,18 @@ public class BundledSlicers {
                 throws IOException, SlicerException {
             if (!bundle.provider().equals(process.descriptor().id())) {
                 throw new SlicerException.Configuration("Selected bundle belongs to another slicer provider");
+            }
+            if (installedExecutable != null) {
+                var options = new LinkedHashMap<String, String>();
+                options.put("executable", installedExecutable.toString());
+                if (bundle.provider().equals("orca")) {
+                    try (var presets = BundledSlicers.class.getResourceAsStream("/dev/voxelbrew/slicer/orca-bbl.zip")) {
+                        if (presets == null) throw new IOException("Orca preset catalog is missing");
+                        unzip(presets, scratch, cancellation);
+                    }
+                    options.putAll(BundledOrcaPresets.prepare(scratch, model.profile(), cancellation));
+                }
+                return process.configure(options);
             }
             var properties = new Properties();
             try (var descriptor = BundledSlicers.class.getResourceAsStream(bundle.descriptor())) {
@@ -93,13 +107,22 @@ public class BundledSlicers {
         return BUNDLES.stream().anyMatch(bundle -> bundle.id().equals(id));
     }
 
-    public static List<SlicerInstallation> installations() {
+    public static List<SlicerInstallation> installations(Path directory) {
         if (PLATFORM.isEmpty()) return List.of();
-        return BUNDLES.stream()
-                .filter(bundle -> BundledSlicers.class.getResource(bundle.descriptor()) != null)
-                .map(bundle -> new SlicerInstallation(
-                        bundle.id(), bundle.provider(), bundle.name(), bundle.version(), "", Map.of()))
-                .toList();
+        var result = new ArrayList<SlicerInstallation>();
+        for (var bundle : BUNDLES) {
+            Map<String, String> settings = Map.of();
+            if (BundledSlicers.class.getResource(bundle.descriptor()) == null) {
+                var download = SlicerDownload.find(bundle.provider());
+                if (download.isEmpty()) continue;
+                var executable = download.get().installedExecutable(directory);
+                if (!Files.isExecutable(executable)) continue;
+                settings = Map.of("executable", executable.toString());
+            }
+            result.add(new SlicerInstallation(
+                    bundle.id(), bundle.provider(), bundle.name(), bundle.version(), "", settings));
+        }
+        return List.copyOf(result);
     }
 
     static String platform(String os, String architecture) {
@@ -110,14 +133,16 @@ public class BundledSlicers {
         return "";
     }
 
-    public static SlicerWindow window(UUID id) {
-        return new Window(BUNDLES.stream()
-                .filter(bundle -> bundle.id().equals(id))
-                .findFirst()
-                .orElseThrow());
+    public static SlicerWindow window(UUID id, String executable) {
+        return new Window(
+                BUNDLES.stream()
+                        .filter(bundle -> bundle.id().equals(id))
+                        .findFirst()
+                        .orElseThrow(),
+                executable == null ? null : Path.of(executable));
     }
 
-    private static void unzip(InputStream payload, Path destination, Cancellation cancellation)
+    static void unzip(InputStream payload, Path destination, Cancellation cancellation)
             throws IOException, SlicerException.Configuration {
         try (var zip = new ZipInputStream(new BufferedInputStream(payload))) {
             for (var entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {

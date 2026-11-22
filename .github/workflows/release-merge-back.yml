@@ -2,13 +2,11 @@ name: Release - merge back to master
 on:
   push:
     branches: ["release/**"]
-  repository_dispatch:
-    types: [release-merge-back]
   workflow_dispatch:
     inputs:
-      branch:
-        description: "Release branch to merge (release/A.B.x)"
-        required: true
+      source:
+        description: "Release branch commit to merge (blank uses the current tip)"
+        required: false
         type: string
 permissions:
   contents: write
@@ -18,19 +16,21 @@ concurrency:
   cancel-in-progress: false
 jobs:
   merge:
-    if: ${{ github.event_name != 'push' || !github.event.deleted }}
+    if: ${{ startsWith(github.ref, 'refs/heads/release/') && (github.event_name != 'push' || !github.event.deleted) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      RELEASE_BRANCH: ${{ inputs.branch || github.event.client_payload.branch || github.ref_name }}
-      RELEASE_SOURCE: ${{ github.event.client_payload.source || (github.event_name == 'push' && github.sha) || '' }}
+      RELEASE_BRANCH: ${{ github.ref_name }}
+      RELEASE_SOURCE: ${{ inputs.source || (github.event_name == 'push' && github.sha) || '' }}
     steps:
       # Use trusted default-branch automation, not scripts from the incoming release branch.
       - uses: actions/checkout@v4
         with:
           ref: master
           fetch-depth: 0
+          # Git uses checkout's persisted credential to push the merge-back branch.
+          token: ${{ secrets.RELEASE_PR_TOKEN || github.token }}
       - uses: actions/setup-node@v4
         with:
           node-version: "24"

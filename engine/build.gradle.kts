@@ -289,19 +289,11 @@ publishing {
     }
 }
 
-// A separate Gradle invocation lets the fixture resolve the BOM convention as an included build.
+// Build the fixture as an external Maven consumer of the host publications.
 val fixtureTasks =
     mapOf("buildExporterFixture" to "jar", "checkExporterFixture" to "check").mapValues {
         (taskName, fixtureTask) ->
         tasks.register<Exec>(taskName) {
-            val composite = gradle.parent ?: gradle
-            val dependencies = listOf("bom", "model", "import", "export", "slicer", "printer")
-            val workspaceBuild = composite.includedBuilds.map { it.name }.containsAll(dependencies)
-            if (workspaceBuild) {
-                dependsOn(
-                    dependencies.map { composite.includedBuild(it).task(":publishToMavenLocal") }
-                )
-            }
             dependsOn(
                 "publishEnginePublicationToFixtureRepository",
                 ":util:publishUtilPublicationToFixtureRepository",
@@ -318,7 +310,7 @@ val fixtureTasks =
                 "ORG_GRADLE_PROJECT_bomVersion",
                 providers.gradleProperty("bomVersion").get(),
             )
-            if (workspaceBuild || providers.gradleProperty("useMavenLocal").orNull == "true") {
+            if (providers.gradleProperty("useMavenLocal").orNull == "true") {
                 environment("ORG_GRADLE_PROJECT_useMavenLocal", "true")
             }
             listOf("githubPackagesUser", "githubPackagesToken").forEach { key ->

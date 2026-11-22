@@ -53,11 +53,6 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: Voxel-Brew/BOM
-          path: .tools/bom
-          persist-credentials: false
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -85,11 +80,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/checkout@v4
-        with:
-          repository: Voxel-Brew/BOM
-          path: .tools/bom
-          persist-credentials: false
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -122,11 +112,6 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: Voxel-Brew/BOM
-          path: .tools/bom
-          persist-credentials: false
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

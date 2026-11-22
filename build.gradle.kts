@@ -1,12 +1,17 @@
 import com.diffplug.spotless.LineEnding
-import com.github.spotbugs.snom.SpotBugsTask
+import java.util.Properties
 
 plugins {
     `java-base`
     id("com.diffplug.spotless") version "8.11.0"
-    id("dev.voxelbrew.spotbugs") apply false
-    id("dev.voxelbrew.checkstyle") apply false
 }
+
+val qualityPolicy = "https://raw.githubusercontent.com/Voxel-Brew/BOM/master/quality"
+
+val formatterPolicy =
+    Properties().apply {
+        resources.text.fromUri("$qualityPolicy/spotless.properties").asReader().use { load(it) }
+    }
 
 // Root-owned targets include the independent consumer build without making it a subproject.
 val sourceProjects =
@@ -27,8 +32,8 @@ val formatterBin = formatterEnvironment.dir(if (formatterWindows) "Scripts" else
 val formatterPython = formatterBin.file(if (formatterWindows) "python.exe" else "python")
 val clangFormatExecutable =
     formatterBin.file(if (formatterWindows) "clang-format.exe" else "clang-format")
-val clangFormatVersion = "18.1.8"
-val clangStyle = "{BasedOnStyle: Google, IndentWidth: 4, ColumnLimit: 100, SortIncludes: Never}"
+val clangFormatVersion = formatterPolicy.getProperty("clangFormat")
+val clangStyle = formatterPolicy.getProperty("cppStyle")
 val createFormatterEnvironment by
     tasks.registering(Exec::class) {
         outputs.file(formatterPython)
@@ -61,9 +66,9 @@ spotless {
     java {
         target(
             sourceProjects.map { "$it/src/**/java/**/*.java" } +
-                listOf("fixtures/updater/*.java", "scripts/*.java", "gradle/JavaMemberOrder.java")
+                listOf("fixtures/updater/*.java", "scripts/*.java")
         )
-        palantirJavaFormat("2.103.0")
+        palantirJavaFormat(formatterPolicy.getProperty("palantirJavaFormat"))
         trimTrailingWhitespace()
         endWithNewline()
     }
@@ -72,7 +77,7 @@ spotless {
             listOf("*.gradle.kts", "gradle/*.gradle.kts") +
                 sourceProjects.map { "$it/*.gradle.kts" }
         )
-        ktfmt("0.59").kotlinlangStyle()
+        ktfmt(formatterPolicy.getProperty("ktfmt")).kotlinlangStyle()
         trimTrailingWhitespace()
         endWithNewline()
     }
@@ -92,7 +97,7 @@ spotless {
         target("engine/src/main/proto/*.proto")
         clangFormat(clangFormatVersion)
             .pathToExe(clangFormatExecutable.asFile.absolutePath)
-            .style("Google")
+            .style(formatterPolicy.getProperty("protobufStyle"))
         trimTrailingWhitespace()
         endWithNewline()
     }
@@ -109,7 +114,13 @@ spotless {
             ".github/scripts/*.cjs",
             "gui/src/**/*.css",
         )
-        prettier("3.6.2").config(mapOf("printWidth" to 100, "proseWrap" to "preserve"))
+        prettier(formatterPolicy.getProperty("prettier"))
+            .config(
+                mapOf(
+                    "printWidth" to formatterPolicy.getProperty("printWidth").toInt(),
+                    "proseWrap" to formatterPolicy.getProperty("proseWrap"),
+                )
+            )
         endWithNewline()
     }
     format("text") {
@@ -165,8 +176,7 @@ configure(libraryProjects) {
     }
     apply(plugin = "java-library")
     extensions.configure<BasePluginExtension> { archivesName.set(projectDir.name) }
-    apply(plugin = "dev.voxelbrew.spotbugs")
-    apply(plugin = "dev.voxelbrew.checkstyle")
+    apply(from = "$qualityPolicy/analysis.gradle")
     extensions.configure<JavaPluginExtension> {
         toolchain.languageVersion.set(JavaLanguageVersion.of(21))
     }
@@ -210,12 +220,14 @@ configure(libraryProjects) {
         }
     }
     if (name == "engine") {
-        tasks.named<SpotBugsTask>("spotbugsMain") {
+        tasks.named("spotbugsMain") {
             // Keep generated Protobuf classes available to callers without analyzing them.
-            classes =
+            setProperty(
+                "classes",
                 sources.getByName("main").output.classesDirs.asFileTree.matching {
                     exclude("**/persistence/proto/**")
-                }
+                },
+            )
         }
     }
     sources.named("test") {
@@ -315,7 +327,9 @@ val checkJavaMemberOrder by
         group = "verification"
         description = "Check Java member declaration order."
         javaLauncher.set(javaMemberOrderLauncher)
-        mainClass.set(layout.projectDirectory.file("gradle/JavaMemberOrder.java").asFile.path)
+        val checker = resources.text.fromUri("$qualityPolicy/JavaMemberOrder.java")
+        jvmArgs("--source", "21")
+        mainClass.set(providers.provider { checker.asFile().absolutePath })
         args(sourceProjects.map { "$it/src" } + listOf("fixtures/updater", "scripts", "gradle"))
     }
 
@@ -353,10 +367,6 @@ val testCleanupTest by
     tasks.registering(Exec::class) {
         group = "verification"
         description = "Run tests for the Python build and verification scripts."
-        environment(
-            "VOXELBREW_MEMBER_ORDER_JAVA",
-            javaMemberOrderLauncher.get().executablePath.asFile.path,
-        )
         commandLine(
             if (formatterWindows) "python" else "python3",
             "-m",

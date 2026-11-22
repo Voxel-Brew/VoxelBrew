@@ -1,39 +1,4 @@
-pluginManagement {
-    val bomDirectory =
-        providers.environmentVariable("VOXELBREW_BOM_DIR").orNull?.let { file(it) }
-            ?: listOf("../BOM", ".tools/bom")
-                .map { file(it) }
-                .firstOrNull { it.resolve("spotbugs-conventions").isDirectory }
-    require(bomDirectory?.resolve("spotbugs-conventions")?.isDirectory == true) {
-        "Set VOXELBREW_BOM_DIR to a VoxelBrew BOM checkout with SpotBugs conventions."
-    }
-    includeBuild(checkNotNull(bomDirectory).resolve("spotbugs-conventions"))
-}
-
 rootProject.name = "voxelbrew"
-
-// A direct app invocation in the workspace uses the same projects as the parent composite.
-if (gradle.parent == null) {
-    val apiNames = listOf("model", "import", "export", "printer", "slicer")
-    val checkouts =
-        listOf(file("../BOM") to file("../api"), file(".tools/bom") to file(".tools/api"))
-            .firstOrNull { (bom, apis) ->
-                bom.resolve("settings.gradle.kts").isFile &&
-                    apiNames.all { apis.resolve("$it/settings.gradle.kts").isFile }
-            }
-    if (checkouts != null) {
-        val (bom, apis) = checkouts
-        includeBuild(bom) { name = "bom" }
-        apiNames.forEach { api ->
-            includeBuild(apis.resolve(api)) {
-                name = api
-                dependencySubstitution {
-                    substitute(module("dev.voxelbrew.api:$api")).using(project(":"))
-                }
-            }
-        }
-    }
-}
 
 include("util", "engine", "gui", "cli")
 

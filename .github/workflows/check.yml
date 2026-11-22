@@ -14,8 +14,40 @@ env:
   GITHUB_PACKAGES_USER: ${{ vars.PACKAGES_USER || github.actor }}
   GITHUB_PACKAGES_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN || github.token }}
 jobs:
-  spotbugs:
+  changes:
     if: ${{ !contains(github.event.head_commit.message, '[migration]') }}
+    name: Determine check scope
+    runs-on: ubuntu-24.04
+    outputs:
+      full: ${{ steps.scope.outputs.full }}
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          fetch-depth: 0
+      - id: scope
+        env:
+          PUSH_BASE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          full=true
+          case "$GITHUB_EVENT_NAME" in
+            pull_request) range="$PR_BASE...$PR_HEAD" ;;
+            push) range="$PUSH_BASE..$GITHUB_SHA" ;;
+            *) range="" ;;
+          esac
+          # Unknown paths or an unavailable comparison require the full suite.
+          if [[ -n "$range" ]] && git diff --quiet --no-renames "$range" -- . \
+              ':(exclude,glob)*.md' ':(exclude,glob)**/README.md' \
+              ':(exclude,glob)**/AGENTS.md' ':(exclude,glob)docs/**/*.md' \
+              ':(exclude,glob)docs/screenshots/*.png' ':(exclude)LICENSE'; then
+            full=false
+          fi
+          echo "full=$full" >> "$GITHUB_OUTPUT"
+  spotbugs:
+    needs: changes
+    if: needs.changes.outputs.full == 'true'
     name: SpotBugs (Ubuntu)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -44,7 +76,8 @@ jobs:
             **/build/reports/spotbugs/
             **/build/reports/checkstyle/
   unit:
-    if: ${{ !contains(github.event.head_commit.message, '[migration]') }}
+    needs: changes
+    if: needs.changes.outputs.full == 'true'
     name: Unit tests (Ubuntu)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -145,20 +178,28 @@ jobs:
   full-check:
     name: Full check
     if: ${{ always() && !contains(github.event.head_commit.message, '[migration]') }}
-    needs: [spotbugs, unit, format, integration, platform]
+    needs: [changes, spotbugs, unit, format, integration, platform]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require every check to pass
         env:
+          SCOPE_RESULT: ${{ needs.changes.result }}
+          FULL: ${{ needs.changes.outputs.full }}
           SPOTBUGS_RESULT: ${{ needs.spotbugs.result }}
           UNIT_RESULT: ${{ needs.unit.result }}
           FORMAT_RESULT: ${{ needs.format.result }}
           INTEGRATION_RESULT: ${{ needs.integration.result }}
           PLATFORM_RESULT: ${{ needs.platform.result }}
         run: |
-          test "$SPOTBUGS_RESULT" = success
-          test "$UNIT_RESULT" = success
+          test "$SCOPE_RESULT" = success
           test "$FORMAT_RESULT" = success
-          test "$INTEGRATION_RESULT" = success
-          test "$PLATFORM_RESULT" = success
+          case "$FULL" in
+            true) expected=success ;;
+            false) expected=skipped ;;
+            *) exit 1 ;;
+          esac
+          test "$SPOTBUGS_RESULT" = "$expected"
+          test "$UNIT_RESULT" = "$expected"
+          test "$INTEGRATION_RESULT" = "$expected"
+          test "$PLATFORM_RESULT" = "$expected"

@@ -82,14 +82,14 @@ Use `.\gradlew.bat` in place of `./gradlew` on Windows.
 
 ## Commit & Pull Request Guidelines
 
-Prefer **Rebase and merge** for pull requests. Use **Squash and merge** only as an exception.
-The **Create a merge commit** option is blocked.
-
 Start every commit subject with `feat:`, `fix:`, or `chore:` and follow it with a concise,
 imperative description, for example `fix: preserve tessellation face mapping`. Keep commits scoped
 to one coherent change. Pull requests should explain the motivation and behavior, link relevant
 issues, list exact verification commands, and include screenshots for visible GUI changes. Do not
 commit `.tools/`, build outputs, downloaded toolchains, or local IDE state.
+
+Prefer **Rebase and merge** for pull requests. Use **Squash and merge** only as an exception.
+The **Create a merge commit** option is blocked.
 
 ## Lombok in Java code
 

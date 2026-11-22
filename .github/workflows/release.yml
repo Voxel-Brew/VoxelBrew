@@ -1,5 +1,7 @@
 name: Release native applications
 on:
+  push:
+    branches: ["release/**"]
   workflow_dispatch:
     inputs:
       dry-run:
@@ -14,11 +16,12 @@ concurrency:
   cancel-in-progress: false
 jobs:
   candidate:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.created }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      RELEASE_DRY_RUN: ${{ inputs.dry-run }}
+      RELEASE_DRY_RUN: ${{ github.event_name == 'push' || inputs.dry-run }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,7 +49,7 @@ jobs:
             suite: check
           - os: ubuntu-24.04
             suite: check
-          - os: voxelbrew-macos-intel-gui
+          - os: macos-15-intel
             suite: headlessPlatformCheck
     secrets: inherit
     uses: ./.github/workflows/native-check.yml
@@ -84,7 +87,7 @@ jobs:
           retention-days: 3
           if-no-files-found: error
   publish:
-    if: ${{ !inputs.dry-run }}
+    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.dry-run }}
     needs: [candidate, native, verify]
     runs-on: ubuntu-24.04
     timeout-minutes: 15

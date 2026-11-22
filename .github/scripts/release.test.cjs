@@ -177,10 +177,23 @@ test("published candidate uses tested commit, patch bump and version-preserving 
   assert.equal(publisher.remote("refs/heads/master"), preparation.next);
   assert.equal(publisher.git("rev-parse", "v0.1.0^{commit}"), m.release);
   assert.throws(() => publisher.publish(m, f.assets), /advanced/);
-  assert.equal(publisher.mergeBack("release/0.1.x", m.next), true);
+  const head = publisher.mergeBack("release/0.1.x", m.next);
+  assert.equal(head, `merge-back/0.1.x/${m.next}`);
+  assert.equal(publisher.mergeBack("release/0.1.x", m.next), head);
+  assert.equal(publisher.remote("refs/heads/master"), preparation.next);
+  const commit = publisher.fetch(head);
+  publisher.git("checkout", "--detach", commit);
   assert.equal(version(publisher.read()).value, "0.2.0-SNAPSHOT");
   assert.equal(fs.readFileSync(path.join(publisher.cwd, "bugfix.txt"), "utf8"), "fixed\n");
+  publisher.git("push", "origin", `${commit}:refs/heads/master`);
   assert.equal(publisher.mergeBack("release/0.1.x", m.next), false);
+  publisher.git("checkout", "--detach", m.next);
+  fs.writeFileSync(path.join(publisher.cwd, "bugfix.txt"), "updated fix\n");
+  publisher.git("commit", "-am", "Update patch");
+  const patch = publisher.git("rev-parse", "HEAD");
+  publisher.git("push", "origin", `${patch}:refs/heads/release/0.1.x`);
+  const update = publisher.fetch(publisher.mergeBack("release/0.1.x", patch));
+  assert.equal(publisher.git("show", `${update}:bugfix.txt`), "updated fix");
 });
 test("failed asset upload leaves tag and release branch unchanged", (t) => {
   const f = fixture(t);

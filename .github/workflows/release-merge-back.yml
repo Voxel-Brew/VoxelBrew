@@ -31,6 +31,8 @@ jobs:
         with:
           ref: master
           fetch-depth: 0
+          # Git uses checkout's persisted credential to push the merge-back branch.
+          token: ${{ secrets.RELEASE_PR_TOKEN || github.token }}
       - uses: actions/setup-node@v4
         with:
           node-version: "24"

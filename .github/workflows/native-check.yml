@@ -34,7 +34,7 @@ jobs:
     name: ${{ inputs.suite }} (${{ inputs.os }})
     runs-on: ${{ inputs.os }}
     # macOS package checks also build and upload both app archives.
-    timeout-minutes: ${{ inputs.suite == 'headlessPackageCheck' && 30 || 20 }}
+    timeout-minutes: ${{ inputs.release-candidate && 90 || inputs.suite == 'headlessPackageCheck' && 30 || 20 }}
     env:
       ORG_GRADLE_PROJECT_uiTestShard: ${{ inputs.ui-shard }}
       ORG_GRADLE_PROJECT_uiTestShardCount: ${{ inputs.ui-shard-count }}

@@ -71,7 +71,7 @@ function assetNames(v) {
     .concat(
       `VoxelBrewCLI-${v}-macos-x64.zip`,
       `VoxelBrew-${v}-windows-x64-Setup.exe`,
-      `VoxelBrew-${v}-macos-x64.dmg`,
+      ...(v === "1.0.0" ? [] : [`VoxelBrew-${v}-macos-x64.dmg`]),
     )
     .sort();
 }
@@ -487,7 +487,12 @@ function main() {
     if (process.env.GITHUB_OUTPUT)
       fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${m.version}\nrelease=${m.release}\n`);
   } else if (mode === "checkout") {
-    release.load(path.resolve(directory), selected, branch);
+    const m = release.load(path.resolve(directory), selected, branch);
+    if (process.env.GITHUB_OUTPUT)
+      fs.appendFileSync(
+        process.env.GITHUB_OUTPUT,
+        `mac_gui_installer=${assetNames(m.version).some((name) => name.endsWith(".dmg"))}\n`,
+      );
   } else if (mode === "collect") {
     collect(release, path.resolve(directory), path.resolve(process.argv[4]));
   } else if (mode === "manifest") {

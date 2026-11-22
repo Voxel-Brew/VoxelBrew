@@ -414,9 +414,32 @@ class Release {
     } catch {
       /* New release commits. */
     }
-    this.git("checkout", "--detach", target);
+    // Rebase-merging a PR preserves its message but drops the original release ancestry.
+    const marker = "VoxelBrew-release-source: ";
+    const history = this.git("log", "--format=%B", "--fixed-strings", "--grep", marker, target);
+    let mergeTarget = target;
+    for (const match of history.matchAll(/^VoxelBrew-release-source: ([a-f0-9]{40})$/gm)) {
+      try {
+        this.git("merge-base", "--is-ancestor", match[1], source);
+      } catch {
+        continue;
+      }
+      mergeTarget = this.git(
+        "commit-tree",
+        `${target}^{tree}`,
+        "-p",
+        target,
+        "-p",
+        match[1],
+        "-m",
+        "Restore release merge base",
+      );
+      break;
+    }
+    if (this.git("merge-base", mergeTarget, source) === source) return false;
+    this.git("checkout", "--detach", mergeTarget);
     const current = version(this.read()).value;
-    const base = this.git("merge-base", target, source);
+    const base = this.git("merge-base", mergeTarget, source);
     // Normalize only projectVersion before a real three-way merge of the property file.
     const directory = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "voxelbrew-merge-"));
     let properties;
@@ -450,18 +473,31 @@ class Release {
       this.git("add", "gradle.properties");
       check(
         !this.git("diff", "--name-only", "--diff-filter=U"),
-        "Merge conflicts; follow docs/releases.md manual merge-back steps.",
+        "Merge conflicts require manual resolution before opening a merge-back PR.",
       );
-      this.git("commit", "-m", `Merge ${branch} into master preserving ${current}`);
-      this.push([
-        { ref: "refs/heads/master", expected: target, commit: this.git("rev-parse", "HEAD") },
-      ]);
-      return true;
+      const tree = this.git("write-tree");
+      this.git("merge", "--abort");
+      if (tree === this.git("rev-parse", `${target}^{tree}`)) return false;
+      const head = `merge-back/${branch.slice("release/".length)}/${source}`;
+      const ref = `refs/heads/${head}`;
+      const existing = this.remote(ref);
+      if (!existing) {
+        const commit = this.git(
+          "commit-tree",
+          tree,
+          "-p",
+          target,
+          "-m",
+          `fix: merge ${branch} back into master\n\n${marker}${source}`,
+        );
+        this.push([{ ref, expected: "", commit }]);
+      }
+      return head;
     } catch (error) {
       try {
         this.git("merge", "--abort");
       } catch {
-        /* A committed merge is left local on push rejection. */
+        /* No merge is active if preparing the PR branch failed after cleanup. */
       }
       throw error;
     }
@@ -505,8 +541,10 @@ function main() {
     release.publish(m, path.resolve(process.argv[4]));
   } else if (mode === "merge-back") {
     const source = process.env.RELEASE_SOURCE || release.fetch(branch);
-    if (release.mergeBack(branch, source))
-      release.api("actions/workflows/check.yml/dispatches", { ref: "master" });
+    const head = release.mergeBack(branch, source);
+    if (head && process.env.GITHUB_OUTPUT)
+      fs.appendFileSync(process.env.GITHUB_OUTPUT, `head=${head}\n`);
+    if (!head) console.log(`Master already contains the changes from ${branch} at ${source}.`);
   } else if (mode === "dispatch-merge") {
     const m = JSON.parse(fs.readFileSync(path.join(directory, "release.json")));
     check(

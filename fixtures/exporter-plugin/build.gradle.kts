@@ -1,10 +1,10 @@
 import java.util.Properties
 
-plugins {
-    `java-library`
-    id("dev.voxelbrew.spotbugs")
-    id("dev.voxelbrew.checkstyle")
-}
+plugins { `java-library` }
+
+val qualityPolicy = "https://raw.githubusercontent.com/Voxel-Brew/BOM/master/quality"
+
+apply(from = "$qualityPolicy/analysis.gradle")
 
 group = "external.consumer"
 

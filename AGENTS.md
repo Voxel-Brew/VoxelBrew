@@ -66,8 +66,8 @@ There is no numeric coverage quota, but every behavior change should include reg
 
 ## Pre-commit SpotBugs
 
-For a standalone checkout, set `VOXELBREW_BOM_DIR` to a VoxelBrew BOM checkout that
-contains `spotbugs-conventions`. The composite workspace and CI supply it automatically.
+The build resolves VoxelBrew artifacts through Maven and fetches shared quality policy
+from the public BOM master branch.
 
 HTML and XML reports are under each module?s `build/reports/spotbugs/`. Analysis uses
 the JavaFX dependencies from the normal classpaths. SpotBugs has limited coverage of

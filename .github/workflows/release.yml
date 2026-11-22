@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       dry-run:
-        description: "Build and verify only; master is allowed for a rehearsal. Disable only on release/A.B.x to publish."
+        description: "Build and verify only. Disable on release/A.B.x to publish."
         type: boolean
         default: true
 permissions:
@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   candidate:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.created }}
+    if: ${{ startsWith(github.ref, 'refs/heads/release/') && (github.event_name == 'workflow_dispatch' || github.event.created) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
@@ -93,6 +93,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
+      actions: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:

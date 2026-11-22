@@ -12,7 +12,7 @@ on:
         type: string
 permissions:
   contents: write
-  actions: write
+  pull-requests: write
 concurrency:
   group: release-merge-back
   cancel-in-progress: false
@@ -34,4 +34,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-      - run: node .github/scripts/release.cjs merge-back
+      - id: changes
+        run: node .github/scripts/release.cjs merge-back
+      - name: Open or reuse merge-back pull request
+        if: steps.changes.outputs.head
+        env:
+          # The organization restricts PR creation by GITHUB_TOKEN.
+          GH_TOKEN: ${{ secrets.RELEASE_PR_TOKEN || github.token }}
+          PR_BRANCH: ${{ steps.changes.outputs.head }}
+        run: |
+          url=$(gh pr list --repo "$GITHUB_REPOSITORY" --base master --head "$PR_BRANCH" --state open --json url --jq '.[0].url')
+          if [[ -z "$url" ]]; then
+            echo "Prepared branch: https://github.com/$GITHUB_REPOSITORY/compare/master...$PR_BRANCH?expand=1" >> "$GITHUB_STEP_SUMMARY"
+            url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base master --head "$PR_BRANCH" \
+              --title "Merge $RELEASE_BRANCH changes back into master" \
+              --body "Apply release changes from ${PR_BRANCH##*/} while preserving the master development version.")
+          fi
+          echo "Merge-back pull request: $url" >> "$GITHUB_STEP_SUMMARY"

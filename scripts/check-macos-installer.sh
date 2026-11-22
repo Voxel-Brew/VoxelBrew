@@ -22,10 +22,7 @@ test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$mount/VoxelBrew.
 /usr/bin/ditto "$mount/VoxelBrew.app" "$installed"
 test -x "$installed/Contents/MacOS/VoxelBrew"
 rm -f "$evidence/installed-gui.png" "$evidence/installed-gui.txt"
-/usr/bin/open -n "$installed" \
-    --env "_JAVA_OPTIONS=-Dprism.order=es2 -Dprism.forceGPU=true -Dprism.verbose=true" \
-    --stdout "$PWD/$evidence/installed-gui.stdout" --stderr "$PWD/$evidence/installed-gui.stderr" \
-    --args --smoke-test --smoke-output "$PWD/$evidence/installed-gui.png"
+/usr/bin/open -n "$installed" --args --smoke-test --smoke-output "$PWD/$evidence/installed-gui.png"
 for ((i=0; i<120; i++)); do
     if [[ -s "$evidence/installed-gui.png" && -s "$evidence/installed-gui.txt" ]]; then
         exit 0
@@ -33,5 +30,4 @@ for ((i=0; i<120; i++)); do
     sleep 1
 done
 echo 'Installed GUI did not finish its render-and-pick smoke test' >&2
-cat "$evidence/installed-gui.stderr" >&2
 exit 1

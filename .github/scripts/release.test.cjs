@@ -252,6 +252,12 @@ test("candidate metadata tampering is rejected", (t) => {
   fs.writeFileSync(path.join(f.plan, "release.json"), JSON.stringify({ ...m, release: m.next }));
   assert.throws(() => clone(f, "worker").load(f.plan, f.base, "master"), /refs differ/);
 });
+test("1.0.0 ships the Intel Mac CLI and omits the unqualified DMG", () => {
+  assert.ok(assetNames("1.0.0").includes("VoxelBrewCLI-1.0.0-macos-x64.zip"));
+  assert.ok(!assetNames("1.0.0").some((name) => name.endsWith(".dmg")));
+  assert.ok(assetNames("1.0.1").includes("VoxelBrew-1.0.1-macos-x64.dmg"));
+});
+
 test("manifest requires every qualified download with matching revision and hashes", (t) => {
   const f = fixture(t),
     m = { version: "1.2.3", release: "a".repeat(40) };

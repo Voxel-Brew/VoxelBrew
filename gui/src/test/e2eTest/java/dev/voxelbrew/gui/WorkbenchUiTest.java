@@ -2415,6 +2415,18 @@ class WorkbenchUiTest {
             assertThat(fx(() -> ((Label) node("#slicer-installation-status")).getText()))
                     .contains("Bundled and read-only");
         }
+        if (dev.voxelbrew.slicer.internal.SlicerDownload.find("prusa-slicer").isPresent() && bundled.isEmpty()) {
+            chooseSlicerProvider("prusa-slicer");
+            fx(() -> {
+                var install = (Button) node("#slicer-installation-download");
+                assertThat(install.isVisible()).isTrue();
+                assertThat(install.getText()).contains("MiB");
+                assertThat(install.getWidth()).isGreaterThanOrEqualTo(Math.floor(install.prefWidth(-1)));
+                Screenshot.save(
+                        stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "slicer-download.png"));
+                return null;
+            });
+        }
         openPrusaInstallation("Prusa first");
         assertSlicerInstallationRejected("export-check", "Choose a slicer executable");
         assertThat(store.load()).allMatch(dev.voxelbrew.slicer.SlicerInstallation::bundled);

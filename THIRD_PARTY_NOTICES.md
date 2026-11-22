@@ -68,13 +68,12 @@
   and https://www.nuget.org/packages/Microsoft.Windows.SDK.CPP.x64/10.0.22621.1.
   SDK tools are not part of the application runtime.
 
-- **PrusaSlicer 2.7.2**, AGPL-3.0, bundled upstream executables and resources.
+- **PrusaSlicer 2.7.2**, AGPL-3.0, upstream executables and resources (on demand on Windows and Linux).
   Corresponding release source, license, and build instructions are available at
   https://github.com/prusa3d/PrusaSlicer/tree/version_2.7.2.
   The app uses the portable payload and preserves the notices distributed with it.
 
-- **OrcaSlicer 2.5.0**, AGPL-3.0, bundled upstream executables, resources and
-  Bambu preset JSON. Corresponding release source, license, and build
+- **OrcaSlicer 2.5.0**, AGPL-3.0, upstream executables and resources (on demand on Windows and Linux), and bundled Bambu preset JSON. Corresponding release source, license, and build
   instructions are available at https://github.com/OrcaSlicer/OrcaSlicer/tree/v2.5.0.
   The app uses the portable payload and preserves the notices distributed with it.
 

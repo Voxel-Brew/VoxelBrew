@@ -1,3 +1,4 @@
+import java.util.Properties
 import org.gradle.jvm.toolchain.JavaToolchainService
 
 // Applied to the two frontends; packages the host architecture only.
@@ -91,7 +92,21 @@ val preparePackage by
         from(installationMetadata)
         from(tasks.named("jar"))
         from(configurations.named("runtimeClasspath"))
-        from(project(":engine").layout.buildDirectory.dir("native/runtime")) { into("native") }
+        from(project(":engine").layout.buildDirectory.dir("native/runtime")) {
+            into("native")
+            if (packagePlatform == "linux") {
+                val nativeVersions =
+                    Properties().apply {
+                        rootProject.file("scripts/native-versions.properties").inputStream().use {
+                            load(it)
+                        }
+                    }
+                val sonameSuffix =
+                    ".so." + nativeVersions.getProperty("occt.version").substringBeforeLast('.')
+                // Copy the ELF SONAME once. Gradle otherwise dereferences all three OCCT aliases.
+                exclude { it.name.startsWith("libTK") && !it.name.endsWith(sonameSuffix) }
+            }
+        }
         from(rootProject.file("LICENSE"))
         from(rootProject.file("THIRD_PARTY_NOTICES.md"))
         from(rootProject.file("third_party")) { into("third_party") }
@@ -142,7 +157,8 @@ val appImage by
                 "--add-modules",
                 "java.se,jdk.unsupported,jdk.crypto.ec,jdk.localedata",
                 "--jlink-options",
-                "--strip-debug --no-man-pages --no-header-files",
+                if (packageMac) "--strip-debug --no-man-pages --no-header-files"
+                else "--strip-debug --no-man-pages --no-header-files --compress=zip-6",
             ) +
                 (applicationIcon?.let { listOf("--icon", it.absolutePath) } ?: emptyList()) +
                 (if (packageWindows && project.name == "cli") listOf("--win-console")

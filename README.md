@@ -55,10 +55,12 @@ Choose a sketch plane, then draw your profile with precise dimensions.
 
 **Slicer** — prepare a plate and preview its generated toolpaths.
 
-Choose the bundled PrusaSlicer or OrcaSlicer in the **Process** tab. Both are
-read-only in **Slicers → Configure slicers**, where you can also test and save
-your own installations. Bundled OrcaSlicer uses compatible Bambu printer
-and nozzle presets.
+On Windows and Linux, open **Slicers > Configure slicers**, choose PrusaSlicer
+or OrcaSlicer, and click **Install**. The CLI offers the same downloads with
+`slicer install prusa-slicer` and `slicer install orca`. Both frontends share
+installed engines, which work offline. You can also configure an existing
+executable. Select your installation in the **Process** tab. macOS includes
+both engines. Managed OrcaSlicer installations include Bambu printer and nozzle presets.
 
 ![Slicer workspace in the light theme](docs/screenshots/slicer-light.png)
 

@@ -136,6 +136,9 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./scripts/bootstrap-slicer.ps1
+      - name: Prepare pinned slicer downloads for integration tests
+        if: inputs.suite == 'integrationTest' && runner.os == 'Linux'
+        run: python3 scripts/bundle-slicers.py test-downloads linux .tools/bundled-slicers
       - name: Integration tests (headless Ubuntu)
         if: inputs.suite == 'integrationTest'
         run: ./gradlew --build-cache integrationTest
@@ -160,15 +163,15 @@ jobs:
         shell: bash
         run: ./gradlew ${{ inputs.release-candidate && runner.os == 'macOS' && ':cli:packageZip' || ':cli:packageZip :gui:packageZip' }} ${{ runner.os == 'Windows' && '''-PvsGenerator=Visual Studio 17 2022''' || '' }}
       - name: Install Inno Setup 6
-        if: inputs.release-candidate && runner.os == 'Windows'
+        if: inputs.archive && runner.os == 'Windows'
         shell: pwsh
         run: choco install innosetup --no-progress -y
       - name: Build GUI installer
-        if: inputs.release-candidate && (runner.os == 'Windows' || (runner.os == 'macOS' && steps.candidate.outputs.mac_gui_installer == 'true'))
+        if: (inputs.archive && runner.os == 'Windows') || (inputs.release-candidate && runner.os == 'macOS' && steps.candidate.outputs.mac_gui_installer == 'true')
         shell: bash
         run: ./gradlew :gui:packageInstaller ${{ runner.os == 'Windows' && '''-PvsGenerator=Visual Studio 17 2022''' || '' }}
       - name: Verify installed Windows GUI and uninstall
-        if: inputs.release-candidate && runner.os == 'Windows'
+        if: inputs.archive && runner.os == 'Windows'
         shell: pwsh
         run: ./scripts/check-windows-installer.ps1 (Get-Item gui/build/distributions/VoxelBrew-*-windows-x64-Setup.exe).FullName
       - name: Verify installed macOS GUI

@@ -82,6 +82,10 @@ Use `.\gradlew.bat` in place of `./gradlew` on Windows.
 
 ## Commit & Pull Request Guidelines
 
+For automatic release merge-backs, configure the Actions secret `RELEASE_PR_TOKEN`
+with access to this repository. A fine-grained token needs Contents, Workflows,
+and Pull requests write permissions to push workflow changes and open the PR.
+
 Start every commit subject with `feat:`, `fix:`, or `chore:` and follow it with a concise,
 imperative description, for example `fix: preserve tessellation face mapping`. Keep commits scoped
 to one coherent change. Pull requests should explain the motivation and behavior, link relevant

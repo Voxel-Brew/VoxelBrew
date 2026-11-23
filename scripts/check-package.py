@@ -170,6 +170,8 @@ plugins = workspace / "trusted plugins with spaces"
 plugins.mkdir()
 shutil.copy2(root / "fixtures/exporter-plugin/build/libs/fixture-exporter-1.0.jar", plugins / "external.jar")
 if kind == "gui":
+    cli = launcher.with_name("VoxelBrewCLI" + launcher.suffix)
+    assert "throughHole=true" in execute([str(cli), "designer", "native-demo"])[0]
     screenshot = workspace / "packaged-gui.png"
     run("--plugin-dir", plugins, "--smoke-test", "--smoke-output", screenshot)
     assert screenshot.is_file() and screenshot.stat().st_size > 10000

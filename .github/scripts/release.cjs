@@ -71,7 +71,7 @@ function assetNames(v) {
     .concat(
       `VoxelBrewCLI-${v}-macos-x64.zip`,
       `VoxelBrew-${v}-windows-x64-Setup.exe`,
-      ...(v === "1.0.0" ? [] : [`VoxelBrew-${v}-macos-x64.dmg`]),
+      ...(v === "1.0.0" ? [] : [`VoxelBrew-${v}-linux-x64.deb`, `VoxelBrew-${v}-macos-x64.dmg`]),
     )
     .sort();
 }
@@ -82,7 +82,7 @@ function manifest(directory, m) {
   const expected = assetNames(m.version);
   const actual = fs
     .readdirSync(directory)
-    .filter((name) => /\.(zip|exe|dmg)$/.test(name))
+    .filter((name) => /\.(zip|exe|dmg|deb)$/.test(name))
     .sort();
   check(
     JSON.stringify(actual) === JSON.stringify(expected),
@@ -527,7 +527,8 @@ function main() {
     if (process.env.GITHUB_OUTPUT)
       fs.appendFileSync(
         process.env.GITHUB_OUTPUT,
-        `mac_gui_installer=${assetNames(m.version).some((name) => name.endsWith(".dmg"))}\n`,
+        `linux_gui_installer=${assetNames(m.version).some((name) => name.endsWith(".deb"))}\n` +
+          `mac_gui_installer=${assetNames(m.version).some((name) => name.endsWith(".dmg"))}\n`,
       );
   } else if (mode === "collect") {
     collect(release, path.resolve(directory), path.resolve(process.argv[4]));

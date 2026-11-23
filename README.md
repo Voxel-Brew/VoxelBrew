@@ -24,9 +24,18 @@ VoxelBrew supports **Windows, macOS, and Linux**.
 
 [Download the latest release](https://github.com/Voxel-Brew/VoxelBrew/releases/latest).
 
-The Windows setup and macOS disk image install the desktop application only.
-To use the command line, download and extract the separate `VoxelBrewCLI` ZIP
-for your operating system and CPU architecture.
+### Install the desktop application and CLI
+
+Each desktop installer includes the `VoxelBrewCLI` launcher and a bundled Java runtime.
+
+| Platform         | Install                                                                          | Try the CLI                                                                                                             |
+| ---------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Windows          | Run the `-Setup.exe` installer.                                                  | In PowerShell, run `& "$env:LOCALAPPDATA\Programs\VoxelBrew\VoxelBrewCLI.exe" --help` for the default install location. |
+| Debian or Ubuntu | From the download directory, run `sudo apt install ./VoxelBrew-*-linux-x64.deb`. | Run `VoxelBrewCLI --help`.                                                                                              |
+| macOS            | Open the DMG and drag VoxelBrew to Applications.                                 | Run `/Applications/VoxelBrew.app/Contents/MacOS/VoxelBrewCLI --help`.                                                   |
+
+On other Linux distributions, extract the desktop ZIP and run `./VoxelBrew/bin/VoxelBrewCLI --help`.
+For a CLI-only installation, extract the separate `VoxelBrewCLI` ZIP for your platform.
 
 ### Features
 

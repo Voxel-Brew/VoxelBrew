@@ -727,8 +727,7 @@ public final class VoxelBrew implements Runnable {
         dev.voxelbrew.util.logging.Logging.initialize("cli");
         configureInstalledRuntime();
         int result;
-        try (var lease = dev.voxelbrew.util.update.ApplicationImage.running(
-                dev.voxelbrew.util.update.ApplicationImage.Component.CLI)) {
+        try (var lease = dev.voxelbrew.util.update.ApplicationImage.running(installationComponent())) {
             result = commandLine().execute(args);
         } catch (java.io.IOException | RuntimeException | LinkageError failure) {
             log.error("CLI startup or execution failed", failure);
@@ -740,11 +739,16 @@ public final class VoxelBrew implements Runnable {
         System.exit(result);
     }
 
+    static dev.voxelbrew.util.update.ApplicationImage.Component installationComponent() {
+        return Boolean.getBoolean("voxelbrew.cli.desktopInstallation")
+                ? dev.voxelbrew.util.update.ApplicationImage.Component.GUI
+                : dev.voxelbrew.util.update.ApplicationImage.Component.CLI;
+    }
+
     public static CommandLine commandLine() {
         return CliComponent.factory()
                 .create(
-                        dev.voxelbrew.util.di.ApplicationModule.system(
-                                dev.voxelbrew.util.update.ApplicationImage.Component.CLI),
+                        dev.voxelbrew.util.di.ApplicationModule.system(installationComponent()),
                         new dev.voxelbrew.cli.FileIoModule())
                 .commandLine();
     }

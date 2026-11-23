@@ -71,6 +71,8 @@ public final class ModelSession {
     private static Feature withDimension(Feature feature, String field, double value) {
         if (feature instanceof ConstructionFeature c && field.equals("value")) {
             return new ConstructionFeature(c.id(), c.tool(), c.inputs(), value, c.alternate());
+        } else if (BodyExtrusion.modifiesBody(feature) && field.equals("distance")) {
+            return BodyExtrusion.from(feature).withDistance(value);
         } else if (feature instanceof Feature.Extrude e && field.equals("distance")) {
             return new Feature.Extrude(e.id(), e.profile(), value);
         } else if (feature instanceof Feature.EdgeFinish f && field.equals("size")) {
@@ -189,7 +191,9 @@ public final class ModelSession {
                 parameters.active(),
                 parameters.bindings().stream()
                         .filter(b -> !removed.contains(b.target().featureId()))
-                        .toList());
+                        .toList(),
+                uuidGenerator,
+                parameters.builtins());
         commit(next, printSetup, expressions);
         cursor = nextCursor;
     }
@@ -229,7 +233,7 @@ public final class ModelSession {
     public synchronized void editDimension(
             String featureId, String field, double value, java.nio.file.Path pluginDirectory) {
         Feature feature = features.get(index(featureId));
-        if (feature instanceof Feature.Custom custom) {
+        if (feature instanceof Feature.Custom custom && !BodyExtrusion.modifiesBody(feature)) {
             try (var registry = new dev.voxelbrew.engine.feature.FeatureRegistry(pluginDirectory)) {
                 replace(registry.edit(custom, java.util.Map.of(field, value)));
             } catch (java.io.IOException failure) {
@@ -425,8 +429,8 @@ public final class ModelSession {
             dev.voxelbrew.api.model.parameters.ParameterSet expressions,
             java.util.Map<String, BodyStyle> styles,
             java.util.Map<String, String> names) {
-        List<Feature> validated =
-                new CadDocument(id, next, Math.min(cursor, next.size()), setup, expressions, styles, names).features();
+        var document = new CadDocument(id, next, Math.min(cursor, next.size()), setup, expressions, styles, names);
+        List<Feature> validated = document.features();
         if (validated.equals(features)
                 && setup.equals(printSetup)
                 && expressions.equals(parameters)
@@ -439,7 +443,7 @@ public final class ModelSession {
         features = validated;
         invalidateGcode();
         printSetup = setup;
-        parameters = expressions.withUuidGenerator(uuidGenerator);
+        parameters = document.parameters().withUuidGenerator(uuidGenerator);
         bodyStyles = java.util.Map.copyOf(styles);
         bodyNames = java.util.Map.copyOf(names);
         revision++;

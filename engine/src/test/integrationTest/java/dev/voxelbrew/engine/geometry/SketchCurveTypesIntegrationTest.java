@@ -98,6 +98,87 @@ class SketchCurveTypesIntegrationTest {
     }
 
     @Test
+    void mirrorTextAcrossEachAxisAndExtrudeAfterReopening() throws Exception {
+        var source = SketchText.create("label", "LF", "SansSerif", 0, 0, 0, 10, 0, .1, "", false);
+        for (var mirror :
+                List.of(new TextMirror(true, false), new TextMirror(false, true), new TextMirror(true, true))) {
+            var text = mirror.apply(source);
+            var expectedGlyph = source.text().glyphs().get(mirror.horizontal() ? 1 : 0);
+            var original = expectedGlyph.contours().getFirst().getFirst();
+            var reflected =
+                    text.text().glyphs().getFirst().contours().getFirst().getFirst();
+            assertThat(reflected.value(0))
+                    .isEqualTo(mirror.horizontal() ? expectedGlyph.advance() - original.value(0) : original.value(0));
+            assertThat(reflected.value(1)).isEqualTo(mirror.vertical() ? -original.value(1) : original.value(1));
+            var session = new ModelSession(CadDocument.empty());
+            session.add(new Feature.Sketch(
+                    "sketch", "profile", new Feature.Plane("origin-xy", 0), new Feature.Constrained(geometry(text))));
+            session.add(new Feature.Extrude("extrude", new Feature.ProfileRef("sketch", "profile"), 2));
+            var file = directory.resolve("mirror-" + mirror.horizontal() + "-" + mirror.vertical() + ".vxb");
+            DocumentWriter.save(session.document(), file, false);
+            var loaded = DocumentReader.load(file);
+            assertThat(loaded).isEqualTo(session.document());
+            var profile =
+                    (Feature.Constrained) ((Feature.Sketch) loaded.features().getFirst()).profile();
+            assertThat(TextMirror.of(profile.geometry().entity("label"))).isEqualTo(mirror);
+            try (var result = new ModelSession(loaded).evaluate()) {
+                result.requireCompleteDocument();
+                assertThat(result.bodies()).hasSize(2);
+            }
+        }
+    }
+
+    @Test
+    void rectangleWithTextExtrudesSelectedLetterStrokesAndCountersAfterReopening() throws Exception {
+        var text = SketchText.create("label", "OB", "SansSerif", 0, 0, 0, 10, 0, .1, "", false);
+        var rectangle = Sketches.rectangle("frame", -10, -10, 60, 40, false);
+        var entities = new ArrayList<>(rectangle.entities());
+        entities.add(text);
+        var combined = geometry(entities.toArray(Entity[]::new));
+        var faces = SketchProfiles.selectableRegions(combined);
+        assertThat(faces).hasSize(6);
+        String frame = SketchProfiles.selectableRegions(rectangle).getFirst().id();
+        var letters = SketchProfiles.selectableRegions(geometry(text));
+        var strokes =
+                letters.stream().filter(r -> r.profile().loops().size() > 1).toList();
+        var counters =
+                letters.stream().filter(r -> r.profile().loops().size() == 1).toList();
+        assertThat(strokes).hasSize(2);
+        assertThat(counters).hasSize(3);
+        double textVolume = 0;
+        for (var stroke : strokes) {
+            try (var solid = Solid.profilePrism(stroke.profile(), 0, 2)) {
+                textVolume += solid.volume();
+            }
+        }
+        var cutout = new ArrayList<>(List.of(frame));
+        counters.forEach(r -> cutout.add(r.id()));
+        var sketch = new Feature.Sketch("s", "p", new Feature.Plane("origin-xy", 0), new Feature.Constrained(combined));
+        var selections = List.of(
+                strokes.stream().map(SketchProfiles.Region::id).toList(),
+                cutout,
+                faces.stream().map(SketchProfiles.Region::id).toList());
+        var volumes = List.of(textVolume, 4800 - textVolume, 4800.0);
+        var bodies = List.of(2, 4, 1);
+        for (int i = 0; i < selections.size(); i++) {
+            var session = new ModelSession(CadDocument.empty());
+            session.add(sketch);
+            String profile = SketchProfiles.selectedProfileId("p", selections.get(i));
+            session.add(new Feature.Extrude("extrude", new Feature.ProfileRef("s", profile), 2));
+            var file = directory.resolve("text-selection-" + i + ".vxb");
+            DocumentWriter.save(session.document(), file, false);
+            try (var result = new ModelSession(DocumentReader.load(file)).evaluate()) {
+                result.requireCompleteDocument();
+                assertThat(result.bodies()).hasSize(bodies.get(i));
+                assertThat(result.bodies().stream()
+                                .mapToDouble(b -> b.solid().volume())
+                                .sum())
+                        .isCloseTo(volumes.get(i), within(1e-5));
+            }
+        }
+    }
+
+    @Test
     void textOutlinesRoundTripAndExtrudeIntoIndependentBodiesWithHoles() throws Exception {
         int handles = NativeKernel.liveHandles();
         var text = SketchText.create("label", "OB", "SansSerif", 0, 0, 0, 10, 0, .1, "", false);

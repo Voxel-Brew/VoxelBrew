@@ -5,7 +5,7 @@ plugins {
 }
 
 dependencies {
-    api("dev.voxelbrew.api:model")
+    api("dev.voxelbrew.api:model:${providers.gradleProperty("modelApiVersion").get()}")
     implementation("org.apache.commons:commons-compress")
     implementation("com.google.code.gson:gson")
     testFixturesImplementation(

@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 
 class PrintPlacementTest {
     @Test
-    void automaticOrientationUsesBroadBedFaceAndPreservesCenter() {
+    void automaticOrientationPreservesElevationAndPreservesCenter() {
         var mesh = dev.voxelbrew.api.model.printing.MeshGeometry.box(new dev.voxelbrew.api.model.printing.SupportVolume(
                 "support",
                 "part",
@@ -25,8 +25,8 @@ class PrintPlacementTest {
         var oriented = PrintPlacement.autoOrient(mesh, current);
         var after = dev.voxelbrew.api.model.printing.MeshGeometry.bounds(
                 dev.voxelbrew.api.model.printing.MeshGeometry.transform(mesh, oriented));
-        assertThat(after.minZ()).isCloseTo(0, org.assertj.core.data.Offset.offset(1e-6));
-        assertThat(after.maxZ()).isCloseTo(5, org.assertj.core.data.Offset.offset(1e-6));
+        assertThat(after.minZ()).isCloseTo(before.minZ(), org.assertj.core.data.Offset.offset(1e-6));
+        assertThat(after.maxZ()).isCloseTo(before.maxZ(), org.assertj.core.data.Offset.offset(1e-6));
         assertThat(after.minX() + after.maxX())
                 .isCloseTo(before.minX() + before.maxX(), org.assertj.core.data.Offset.offset(1e-6));
         assertThat(after.minY() + after.maxY())

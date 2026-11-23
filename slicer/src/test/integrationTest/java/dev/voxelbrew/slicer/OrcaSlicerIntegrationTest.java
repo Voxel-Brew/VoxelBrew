@@ -2,7 +2,6 @@ package dev.voxelbrew.slicer;
 
 import static org.assertj.core.api.Assertions.*;
 
-import dev.voxelbrew.api.model.mesh.MeshOptions;
 import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import dev.voxelbrew.engine.printing.*;
@@ -38,14 +37,25 @@ class OrcaSlicerIntegrationTest {
         var setup =
                 session.document().printSetup().withPrinter(ProfileHardware.resolve(catalog.require("bambu-lab-a1")));
         session.setPrintSetup(setup.withProfile("orca", setup.printerId(), setup.materialId(), setup.process()));
-        var model = ManufacturingModels.evaluate(session.document(), MeshOptions.DEFAULT);
+        var model = PrintingTest.twoFilamentModel(session, true);
+        session.setBodyStyle("other.body", new dev.voxelbrew.api.model.BodyStyle("PLA", "#55BB22"));
+        var palette = PlateFilaments.from(session.document(), model);
         var result = SliceService.slice(
                         new OrcaSlicerProvider(),
                         model,
+                        palette,
                         SlicerTestSupport.window(options),
                         new Cancellation(),
                         System.out::println)
                 .orElseThrow();
+        assertThat(PlateFilaments.read(result.artifact().metadata())).isEqualTo(palette);
+        assertThat(result.job().lines())
+                .anyMatch(line ->
+                        line.startsWith("; filament_colour") && line.contains("#55BB22") && line.contains("#AA0033"));
+        var usage = dev.voxelbrew.importer.FilamentUsage.fromLines(result.job().lines());
+        assertThat(usage.filaments())
+                .extracting(dev.voxelbrew.importer.FilamentUsage.Filament::slot)
+                .containsExactly(1, 2);
         assertThat(result.artifact()).isNotNull();
         assertThat(result.job().modelLayers().isEmpty()).isFalse();
         assertThat(result.artifact().metadata().get("model")).isEqualTo("Bambu Lab A1");

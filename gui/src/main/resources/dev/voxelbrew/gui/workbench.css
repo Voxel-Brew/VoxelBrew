@@ -435,6 +435,24 @@
 .error {
   -fx-text-fill: #d65c46;
 }
+#sketch-size-entry {
+  -fx-padding: 4 7;
+  -fx-background-color: -fx-control-inner-background;
+  -fx-border-color: #8795a3;
+  -fx-border-radius: 5;
+  -fx-background-radius: 5;
+}
+#sketch-pointer-hint {
+  -fx-background-color: #263746;
+  -fx-background-radius: 5;
+  -fx-padding: 4 8;
+  -fx-font-size: 12px;
+  -fx-text-fill: white;
+}
+.dark #sketch-pointer-hint {
+  -fx-background-color: #e0e9f2;
+  -fx-text-fill: #18232d;
+}
 .sketch-editor {
   -fx-background-color: -fx-base;
   -fx-padding: 14;
@@ -452,6 +470,11 @@
 .text-field.invalid {
   -fx-border-color: #d65c46;
   -fx-border-radius: 4;
+}
+.parameter-name-field:invalid {
+  -fx-border-color: #d65c46;
+  -fx-border-radius: 4;
+  -fx-text-fill: #d65c46;
 }
 .text-field.formula-field {
   -fx-padding: 4 28 4 27;
@@ -956,6 +979,21 @@
 .slicer-status-bar {
   -fx-padding: 12 16;
 }
+#print-diagnostics {
+  -fx-background-color: -fx-control-inner-background;
+  -fx-border-color: -fx-box-border;
+  -fx-padding: 4;
+}
+#print-diagnostics .text {
+  -fx-fill: -fx-text-background-color;
+}
+#print-diagnostics .job-failure {
+  -fx-fill: #aa342b;
+  -fx-font-weight: bold;
+}
+.dark #print-diagnostics .job-failure {
+  -fx-fill: #ff897a;
+}
 .slicer-hint {
   -fx-padding: 10 12;
 }
@@ -974,6 +1012,22 @@
   -fx-font-weight: bold;
   -fx-font-size: 13px;
 }
+.button.parameter-row-action {
+  -fx-background-color: transparent;
+  -fx-border-color: transparent;
+  -fx-padding: 0;
+  -fx-min-width: 24;
+  -fx-pref-width: 24;
+  -fx-pref-height: 24;
+  -fx-font-size: 15px;
+}
+.button.parameter-row-action:hover {
+  -fx-background-color: -fx-base;
+}
+.button.parameter-row-action:focused {
+  -fx-border-color: -fx-focus-color;
+}
+.parameter-primary-action,
 .slicer-primary-action {
   -fx-background-color: #6555ce;
   -fx-background-insets: 0;
@@ -982,8 +1036,11 @@
   -fx-border-radius: 9;
   -fx-text-fill: white;
   -fx-font-weight: bold;
+}
+.slicer-primary-action {
   -fx-padding: 10 22;
 }
+.parameter-primary-action:hover,
 .slicer-primary-action:hover {
   -fx-background-color: #7866de;
 }
@@ -1423,6 +1480,21 @@
 .printer-metric-value {
   -fx-font-size: 16px;
   -fx-font-weight: bold;
+}
+.printer-filament-summary {
+  -fx-padding: 14 16;
+  -fx-background-radius: 8;
+  -fx-border-color: transparent transparent transparent #7967d8;
+  -fx-border-width: 0 0 0 4;
+}
+.light .printer-filament-summary {
+  -fx-background-color: #efedfc;
+}
+.dark .printer-filament-summary {
+  -fx-background-color: #393351;
+}
+.printer-filament-summary .printer-metric-value {
+  -fx-font-size: 22px;
 }
 .printer-message {
   -fx-text-fill: #5c4bc5;

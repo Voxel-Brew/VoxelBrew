@@ -1,10 +1,12 @@
 package dev.voxelbrew.gui;
 
 import dev.voxelbrew.api.i18n.TranslationService;
+import dev.voxelbrew.api.model.BodyStyle;
 import dev.voxelbrew.api.model.CadDocument;
 import dev.voxelbrew.api.model.printing.PrintArtifact;
 import dev.voxelbrew.api.printer.*;
 import dev.voxelbrew.api.printer.driver.*;
+import dev.voxelbrew.importer.FilamentUsage;
 import dev.voxelbrew.slicer.SliceService;
 import java.nio.file.*;
 import java.util.*;
@@ -44,7 +46,9 @@ final class PrinterPane extends VBox implements AutoCloseable {
     private final Label status = new Label(), details = new Label(), message = new Label();
 
     private final Label connectionDetail = new Label();
-
+    private final VBox filamentEstimate = new VBox(10);
+    private final GridPane filamentTable = new GridPane();
+    private final Label filamentMass = new Label(), filamentLength = new Label();
     private final Label progressValue = new Label(),
             nozzleValue = new Label(),
             bedValue = new Label(),
@@ -69,8 +73,14 @@ final class PrinterPane extends VBox implements AutoCloseable {
     private Printer selectedDevice;
 
     private CadDocument document;
+    private List<String> filamentLines;
+    private FilamentUsage filamentUsage;
+    private List<BodyStyle> filamentStyles = List.of();
 
     private Path projectPath;
+
+    @lombok.Setter
+    private java.util.function.BiConsumer<String, Path> onExported = (format, path) -> {};
 
     private Driver session;
 
@@ -201,7 +211,24 @@ final class PrinterPane extends VBox implements AutoCloseable {
         var subtitle = new Label(t("workspaceSubtitle"));
         subtitle.getStyleClass().add("printer-subtitle");
         var introduction = new VBox(5, heading, subtitle);
-        var plateStep = step("01", t("plate"), t("plateHint"), plates);
+        filamentEstimate.setId("printer-filament");
+        filamentEstimate.managedProperty().bind(filamentEstimate.visibleProperty());
+        filamentEstimate.getStyleClass().add("printer-filament-summary");
+        var filamentTitle = new Label(t("filamentEstimate"));
+        filamentTitle.getStyleClass().add("printer-section-title");
+        filamentMass.setId("printer-filament-mass");
+        filamentLength.setId("printer-filament-length");
+        filamentTable.setHgap(12);
+        filamentTable.setVgap(7);
+        for (int width : List.of(40, 30, 30)) {
+            var column = new ColumnConstraints();
+            column.setPercentWidth(width);
+            filamentTable.getColumnConstraints().add(column);
+        }
+        filamentMass.getStyleClass().add("printer-metric-value");
+        filamentLength.getStyleClass().add("printer-metric-value");
+        filamentEstimate.getChildren().addAll(filamentTitle, filamentTable);
+        var plateStep = step("01", t("plate"), t("plateHint"), new VBox(12, plates, filamentEstimate));
         var deviceStep = step("02", t("device"), t("deviceHint"), deviceName);
         var setup = new VBox(22, plateStep, deviceStep);
         setup.getStyleClass().add("printer-card");
@@ -355,6 +382,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
     }
 
     private void syncDevice(boolean reconnect) {
+        updateFilamentEstimate();
         PrintArtifact artifact = document == null || plates.getValue() == null
                 ? null
                 : document.printArtifacts().get(plates.getValue().id());
@@ -372,6 +400,83 @@ final class PrinterPane extends VBox implements AutoCloseable {
         } else {
             update();
         }
+    }
+
+    private void updateFilamentEstimate() {
+        var plate = plates.getValue();
+        var lines = document == null || plate == null ? null : document.gcode().get(plate.id());
+        filamentEstimate.setVisible(lines != null);
+        if (lines == null) return;
+        var artifact = document.printArtifacts().get(plate.id());
+        var styles = artifact == null
+                ? List.<BodyStyle>of()
+                : dev.voxelbrew.engine.printing.PlateFilaments.read(artifact.metadata())
+                        .slots();
+        if (styles.isEmpty()) {
+            var legacy = document.printSetup().plates().stream()
+                    .filter(candidate -> candidate.id().equals(plate.id()))
+                    .flatMap(candidate -> candidate.instances().stream())
+                    .map(instance -> document.bodyStyle(instance.bodyId()))
+                    .distinct()
+                    .toList();
+            if (legacy.size() == 1) styles = legacy;
+        }
+        if (lines == filamentLines && styles.equals(filamentStyles)) return;
+        if (lines != filamentLines) filamentUsage = FilamentUsage.fromLines(lines);
+        filamentLines = lines;
+        filamentStyles = styles;
+        renderFilamentTable(filamentUsage, styles);
+    }
+
+    private void renderFilamentTable(FilamentUsage usage, List<BodyStyle> styles) {
+        var format = java.text.NumberFormat.getNumberInstance(text.currentLocale());
+        format.setMaximumFractionDigits(2);
+        filamentTable.getChildren().clear();
+        filamentTable.addRow(0, new Label(t("filament")), new Label(t("filamentMass")), new Label(t("filamentLength")));
+        int row = 1;
+        var filaments = usage.filaments();
+        if (filaments.isEmpty()
+                && styles.size() == 1
+                && (usage.grams().isPresent() || usage.millimeters().isPresent())) {
+            filaments = List.of(new FilamentUsage.Filament(1, "", usage.millimeters(), usage.grams()));
+        }
+        for (var filament : filaments) {
+            var style = filament.slot() <= styles.size() ? styles.get(filament.slot() - 1) : null;
+            String color = style == null ? filament.color() : style.color();
+            String name = Integer.toString(filament.slot());
+            if (style != null && !style.material().isBlank()) name += " · " + style.material();
+            var swatch = new javafx.scene.shape.Rectangle(14, 14);
+            swatch.setStroke(javafx.scene.paint.Color.GRAY);
+            swatch.setFill(
+                    color.isEmpty() ? javafx.scene.paint.Color.TRANSPARENT : javafx.scene.paint.Color.web(color));
+            if (color.isEmpty()) swatch.getStrokeDashArray().setAll(3.0, 2.0);
+            String colorDescription = color.isEmpty() ? t("unknown") : color;
+            var slot = new Label(name, swatch);
+            slot.setTooltip(new Tooltip(colorDescription));
+            slot.setAccessibleText(t("filament") + " " + name + ", " + colorDescription);
+            slot.setId("printer-filament-slot-" + filament.slot());
+            filamentTable.addRow(
+                    row++,
+                    slot,
+                    new Label(mass(filament.grams(), format)),
+                    new Label(length(filament.millimeters(), format)));
+        }
+        filamentTable.add(new Separator(), 0, row++, 3, 1);
+        var total = new Label(t("filamentTotal"));
+        total.getStyleClass().add("printer-section-title");
+        filamentMass.setText(mass(usage.grams(), format));
+        filamentLength.setText(length(usage.millimeters(), format));
+        filamentTable.addRow(row, total, filamentMass, filamentLength);
+    }
+
+    private String mass(OptionalDouble grams, java.text.NumberFormat format) {
+        return grams.isPresent() ? format.format(grams.getAsDouble()) + " g" : t("unknown");
+    }
+
+    private String length(OptionalDouble millimeters, java.text.NumberFormat format) {
+        if (millimeters.isEmpty()) return t("unknown");
+        double mm = millimeters.getAsDouble();
+        return mm >= 1000 ? format.format(mm / 1000) + " m" : format.format(mm) + " mm";
     }
 
     private void update() {
@@ -530,6 +635,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
                         if (revision != jobGeneration.get()) throw new SliceService.OutdatedException();
                     },
                     () -> {});
+            onExported.accept(format, path);
         } catch (java.io.IOException | IllegalArgumentException | SliceService.OutdatedException failure) {
             error(failure);
         }

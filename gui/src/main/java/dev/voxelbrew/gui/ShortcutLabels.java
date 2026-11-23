@@ -13,13 +13,12 @@ import javafx.scene.text.Text;
  */
 final class ShortcutLabels {
     static void install(ButtonBase button) {
-        var key = KeyboardShortcuts.letter(button.getId());
-        // Menu buttons combine their icon with an underlined caption.
-        if (key.isEmpty()
-                || (button.getGraphic() != null && !(button instanceof MenuButton))
-                || button.getProperties().putIfAbsent(ShortcutLabels.class, true) != null) {
-            return;
-        }
+        if (button.getGraphic() != null && !(button instanceof MenuButton)) return;
+        KeyboardShortcuts.letter(button.getId()).ifPresent(key -> install(button, key));
+    }
+
+    static void install(ButtonBase button, String key) {
+        if (button.getProperties().putIfAbsent(ShortcutLabels.class, true) != null) return;
         var caption = new HBox();
         caption.getStyleClass().add("shortcut-caption");
         caption.setAlignment(Pos.BASELINE_LEFT);
@@ -39,8 +38,8 @@ final class ShortcutLabels {
             button.setGraphic(content);
         }
         button.setMinWidth(Region.USE_PREF_SIZE);
-        update(button, caption, key.get());
-        button.textProperty().addListener((observable, before, after) -> update(button, caption, key.get()));
+        update(button, caption, key);
+        button.textProperty().addListener((observable, before, after) -> update(button, caption, key));
     }
 
     private static void update(ButtonBase button, HBox caption, String key) {

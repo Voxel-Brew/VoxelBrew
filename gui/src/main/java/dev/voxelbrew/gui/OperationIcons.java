@@ -18,6 +18,10 @@ final class OperationIcons {
                         "M2 11L10 7L18 11V16L10 20L2 16Z M2 11L10 15L18 11 M10 15V20 M10 10V1 M6 5L10 1L14 5";
                     case "cut" -> "M2 8L10 4L18 8V16L10 20L2 16Z M2 8L10 12L18 8 M10 12V20 M10 1V10 M6 6L10 10L14 6";
                     case "fillet" -> "M2 19V9Q2 2 9 2H19 M6 19V10Q6 6 10 6H19 M2 19H6 M19 2V6";
+                    case "rectangular" -> "M2 2H8V8H2Z M12 2H18V8H12Z M2 12H8V18H2Z M12 12H18V18H12Z";
+                    case "mirror" -> "M2 16L7 5V16Z M18 16L13 5V16Z M10 1V5 M10 8V12 M10 15V19";
+                    case "circular" ->
+                        "M10 1L13 4L10 7L7 4Z M19 10L16 13L13 10L16 7Z M10 19L7 16L10 13L13 16Z M1 10L4 7L7 10L4 13Z";
                     case "chamfer" -> "M2 19V9L9 2H19 M6 19V11L11 6H19 M2 19H6 M19 2V6";
                     case "shell" -> "M2 6L10 2L18 6V15L10 19L2 15Z M2 6L10 10L18 6 M10 10V19 M6 6L10 4L14 6L10 8Z";
                     case "split-body" -> "M1 6L7 3L7 17L1 14Z M13 3L19 6V14L13 17Z M10 1V5 M10 8V12 M10 15V19";

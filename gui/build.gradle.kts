@@ -9,6 +9,7 @@ val javafxPlatform =
     else "linux"
 
 dependencies {
+    implementation("org.fxmisc.richtext:richtextfx:0.11.7")
     implementation("io.modelcontextprotocol.sdk:mcp")
     implementation("org.eclipse.jetty.ee10:jetty-ee10-servlet")
     implementation("com.google.code.gson:gson")
@@ -36,7 +37,15 @@ dependencies {
 
 application { mainClass.set("dev.voxelbrew.gui.Launcher") }
 
+val applicationVersion = project.version.toString()
+
 tasks.processResources {
+    inputs.property("applicationVersion", applicationVersion)
+    from(project(":util").file("src/main/resources/voxelbrew-util-version.properties")) {
+        into("META-INF/voxelbrew")
+        rename { "application.properties" }
+        expand("version" to applicationVersion)
+    }
     from(listOf(rootProject.file("LICENSE"), rootProject.file("THIRD_PARTY_NOTICES.md"))) {
         into("dev/voxelbrew/gui/legal")
     }

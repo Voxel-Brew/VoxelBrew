@@ -33,7 +33,7 @@ public final class WorkbenchApplication extends Application {
         stage.setMinHeight(Math.min(700, screen.getHeight() - 80));
         stage.show();
         log.info("Workbench window opened with plugin directory {}", plugins);
-        if (open != null) workbench.controller().open(open).exceptionally(failure -> null);
+        if (open != null) workbench.openWithRecovery(open);
         stage.setOnHidden(event -> workbench.close());
         return workbench;
     }
@@ -67,6 +67,7 @@ public final class WorkbenchApplication extends Application {
             throw new IllegalArgumentException("--smoke-test creates an unsaved fixture; omit --open");
         }
         workbench = openWindow(stage, plugins, open, application);
+        if (open == null && !args.contains("--smoke-test")) workbench.openWithRecovery(null);
         workbench.startMcpIfConfigured();
         checkForUpdates(stage, translations);
         if (args.contains("--smoke-test")) {

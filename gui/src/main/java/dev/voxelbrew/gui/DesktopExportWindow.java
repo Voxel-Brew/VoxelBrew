@@ -41,6 +41,12 @@ public final class DesktopExportWindow implements ExportWindow {
 
     private Path suggestedDestination;
 
+    private String destinationInputId;
+
+    @lombok.Getter
+    @lombok.experimental.Accessors(fluent = true)
+    private Path acceptedDestination;
+
     private String exporterVersion;
 
     private String confirmLabel;
@@ -244,6 +250,8 @@ public final class DesktopExportWindow implements ExportWindow {
             var validator = activeValidation.get();
             if (validator != null) displayErrors(inputs, validator.apply(readValues(inputs)), error);
         };
+        destinationInputId = null;
+        acceptedDestination = null;
         var content = new VBox(14, render(layout, inputs, revalidate));
         applyInitial(inputs, initial);
         content.getStyleClass().add("export-dialog-content");
@@ -278,6 +286,7 @@ public final class DesktopExportWindow implements ExportWindow {
                     return;
                 }
                 accepted.set(Objects.requireNonNull(buildSettings.apply(selected), "export settings"));
+                acceptedDestination = selectedDestination(selected);
             } catch (RuntimeException failure) {
                 error.setText(Objects.toString(failure.getMessage(), failure.toString()));
                 error.setVisible(true);
@@ -297,6 +306,11 @@ public final class DesktopExportWindow implements ExportWindow {
         button.addEventFilter(ActionEvent.ACTION, event -> attempt.accept(event, false));
         dialog.setResultConverter(choice -> choice == confirm ? accepted.get() : null);
         return Dialogs.show(dialog, owner, translations);
+    }
+
+    private Path selectedDestination(Map<String, String> values) {
+        if (destinationInputId == null) return null;
+        return Path.of(values.get(destinationInputId)).toAbsolutePath().normalize();
     }
 
     private Node render(Component component, Map<String, InputBinding> inputs, Runnable onChange) {
@@ -419,6 +433,7 @@ public final class DesktopExportWindow implements ExportWindow {
             FileDestination destination, Map<String, InputBinding> inputs, Runnable onChange) {
         var path = new javafx.scene.control.TextField();
         path.setId("export-path");
+        destinationInputId = destination.id();
         Path suggestion;
         if (destination.defaultPath() != null) {
             suggestion = destination.defaultPath();

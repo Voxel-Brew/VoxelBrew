@@ -81,6 +81,8 @@ final class NativeKernel {
 
     static native long cutThroughCircle(long body, double x, double y, double diameter);
 
+    static native long combine(long body, long[] tools, boolean subtract);
+
     static native long[] split(long body, double nx, double ny, double nz, double offset);
 
     static native long edgeFinish(long body, boolean fillet, double size, int[] edges);

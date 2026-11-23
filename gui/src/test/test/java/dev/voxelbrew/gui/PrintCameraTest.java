@@ -6,6 +6,23 @@ import org.junit.jupiter.api.Test;
 
 class PrintCameraTest {
     @Test
+    void retainedMeshesAlignWithThePlacementRasterAcrossCameraGestures() {
+        var transform = new javafx.scene.transform.Affine();
+        for (var camera : java.util.List.of(new PrintCamera(false), new PrintCamera(true))) {
+            camera.orbit(31, -17);
+            camera.scroll(120);
+            camera.pan(-53, 27);
+            double ox = 400 + camera.panX(), oy = 250 + camera.panY(), scale = 3 * camera.zoom();
+            camera.projectInto(transform, ox, oy, scale, 0.75);
+            var point = transform.transform(-12, 37, 8);
+            var tolerance = org.assertj.core.data.Offset.offset(1e-9);
+            assertThat(point.getX()).isCloseTo(ox + scale * camera.x(-12, 37), tolerance);
+            assertThat(point.getY()).isCloseTo(oy - scale * camera.y(-12, 37, 8), tolerance);
+            assertThat(point.getZ()).isCloseTo(0.75 * camera.depth(-12, 37, 8), tolerance);
+        }
+    }
+
+    @Test
     void standardViewNavigationUpdatesProjectionAndKeepsTopViewPlanar() {
         var camera = new PrintCamera(true);
         camera.orient(ViewOrientation.named("Front"));

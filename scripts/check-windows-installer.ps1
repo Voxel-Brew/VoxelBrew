@@ -13,6 +13,10 @@ try {
     $link = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)
     if ($link.TargetPath -ne (Join-Path $installed 'VoxelBrew.exe')) { throw 'Start menu target differs from installed launcher' }
     if ($link.WorkingDirectory -ne $installed) { throw 'Start menu working directory differs from installation' }
+    $command = (Get-Item -LiteralPath 'HKCU:\Software\Classes\VoxelBrew.Design\shell\open\command').GetValue('')
+    if ($command -ne ('"{0}\VoxelBrew.exe" --open "%1"' -f $installed)) { throw 'Invalid VXB open command' }
+    $handlers = Get-Item -LiteralPath 'HKCU:\Software\Classes\.vxb\OpenWithProgids'
+    if ($handlers.GetValueNames() -notcontains 'VoxelBrew.Design') { throw 'Missing VXB file association' }
     Push-Location $env:TEMP
     try {
         $launched = Start-Process -FilePath $shortcut -PassThru

@@ -15,7 +15,7 @@ public final class PrusaConfiguration {
         return Double.toString(value(quantity, unit));
     }
 
-    public static SortedMap<String, String> settings(ManufacturingModel model) throws IOException {
+    private static SortedMap<String, String> readBaseSettings() throws IOException {
         var result = new TreeMap<String, String>();
         try (var input = Objects.requireNonNull(PrusaConfiguration.class.getResourceAsStream("prusa-2.7.2.ini"));
                 var reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
@@ -25,6 +25,11 @@ public final class PrusaConfiguration {
                 result.put(line.substring(0, at).strip(), line.substring(at + 1).strip());
             }
         }
+        return result;
+    }
+
+    public static SortedMap<String, String> settings(ManufacturingModel model) throws IOException {
+        var result = readBaseSettings();
         var profile = model.profile();
         var p = profile.process();
         var material = profile.material();
@@ -77,6 +82,48 @@ public final class PrusaConfiguration {
         result.put("printer_settings_id", profile.printer().id());
         result.put("filament_settings_id", material.id());
         result.put("print_settings_id", "VoxelBrew-explicit-process");
+        var slots = PlateFilaments.read(model.setup().workspaceSettings()).slots();
+        if (!slots.isEmpty()) {
+            var materials = slots.stream()
+                    .map(slot -> PrintProfile.resolve(model.setup()
+                                    .withProfile(
+                                            model.setup().backendId(),
+                                            model.setup().printerId(),
+                                            slot.material(),
+                                            p))
+                            .material())
+                    .toList();
+            String types = slots.stream()
+                    .map(dev.voxelbrew.api.model.BodyStyle::material)
+                    .collect(Collectors.joining(";"));
+            result.put("filament_type", types);
+            result.put("filament_settings_id", types);
+            result.put(
+                    "filament_colour",
+                    slots.stream().map(dev.voxelbrew.api.model.BodyStyle::color).collect(Collectors.joining(";")));
+            result.put(
+                    "nozzle_diameter",
+                    String.join(",", Collections.nCopies(slots.size(), result.get("nozzle_diameter"))));
+            result.put(
+                    "filament_density",
+                    slots.stream()
+                            .map(slot -> slot.material().equals("PETG") ? "1.27" : "1.24")
+                            .collect(Collectors.joining(",")));
+            for (String key : List.of("temperature", "first_layer_temperature")) {
+                result.put(
+                        key,
+                        materials.stream()
+                                .map(m -> Integer.toString((int) m.nozzleTemperature()))
+                                .collect(Collectors.joining(",")));
+            }
+            for (String key : List.of("bed_temperature", "first_layer_bed_temperature")) {
+                result.put(
+                        key,
+                        materials.stream()
+                                .map(m -> Integer.toString((int) m.bedTemperature()))
+                                .collect(Collectors.joining(",")));
+            }
+        }
         return Collections.unmodifiableSortedMap(result);
     }
 

@@ -187,7 +187,11 @@ final class UpdateDialog {
                     if (closed) return;
                     service = created;
                     selected = result;
-                    status.setText(result.message());
+                    String message = translations.translate(
+                            result.available() ? "update.available" : "about.current",
+                            result.release().version());
+                    if (!result.installable()) message += "\n" + translations.translate("about.development");
+                    status.setText(message);
                     busy(false);
                 });
             } catch (Exception failure) {

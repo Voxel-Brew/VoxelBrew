@@ -3,6 +3,7 @@ package dev.voxelbrew.gui;
 import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.Feature;
 import dev.voxelbrew.api.model.mesh.MeshData;
+import dev.voxelbrew.engine.model.BodyExtrusion;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,6 +23,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.PhongMaterial;
 import javafx.scene.shape.*;
+import javafx.scene.text.Text;
 import javafx.scene.transform.Affine;
 import javafx.scene.transform.Rotate;
 import javafx.scene.transform.Translate;
@@ -34,20 +36,22 @@ public final class Viewport extends StackPane {
             sketches = new Group(),
             aids = new Group(),
             world = new Group();
-    private final Rotate tilt = new Rotate(28, Rotate.X_AXIS), orbit = new Rotate(-35, Rotate.Y_AXIS);
+    private final Rotate tilt = new Rotate(ViewOrientation.HOME.tilt(), Rotate.X_AXIS);
+    private final Rotate orbit = new Rotate(ViewOrientation.HOME.orbit(), Rotate.Y_AXIS);
     private final Translate center = new Translate(), pan = new Translate();
 
     private final PerspectiveCamera camera = new PerspectiveCamera(true);
+    private final MeshView groundGrid = new MeshView();
+    private final List<GridAxis> axes = List.of(
+            new GridAxis("x", toView(1, 0, 0), "#bb6666"),
+            new GridAxis("y", toView(0, 1, 0), "#55a184"),
+            new GridAxis("z", toView(0, 0, 1), "#5b86d6"));
 
     private final Map<String, MeshView> bodyViews = new LinkedHashMap<>();
 
     private final Map<String, MeshView> edgeViews = new LinkedHashMap<>();
 
     private final Map<String, TechnicalEdges> edgeData = new LinkedHashMap<>();
-
-    private final AmbientLight light = new AmbientLight(Color.gray(0.45));
-
-    private final PointLight key = new PointLight(Color.gray(0.7));
 
     private final SubScene scene;
 
@@ -59,6 +63,7 @@ public final class Viewport extends StackPane {
     private final TranslationService translations;
 
     private final javafx.scene.layout.Pane planeLabels = new javafx.scene.layout.Pane();
+    private final Map<GridAxis, Text> axisLabels = new LinkedHashMap<>();
 
     private final Map<javafx.scene.control.Label, Feature.Plane> originLabels = new LinkedHashMap<>();
 
@@ -171,6 +176,47 @@ public final class Viewport extends StackPane {
         return result;
     }
 
+    private static void addProfileHighlight(
+            Group group, dev.voxelbrew.api.model.sketch.SketchGeometry geometry, double offset) {
+        var fill = new Path();
+        try {
+            for (var ring : dev.voxelbrew.engine.sketch.SketchProfiles.profileContours(geometry)) {
+                var first = ring.getFirst();
+                fill.getElements().add(new MoveTo(first.x(), first.y()));
+                for (var point : ring.subList(1, ring.size())) {
+                    fill.getElements().add(new LineTo(point.x(), point.y()));
+                }
+                fill.getElements().add(new ClosePath());
+            }
+        } catch (IllegalArgumentException incompleteProfile) {
+            return;
+        }
+        fill.setFillRule(FillRule.EVEN_ODD);
+        fill.setStroke(null);
+        fill.setFill(Color.web("#eead48", 0.52));
+        fill.setMouseTransparent(true);
+        fill.getStyleClass().add("sketch-profile-highlight");
+        fill.getTransforms().add(new Rotate(90, Rotate.X_AXIS));
+        fill.setTranslateY(-offset - 0.035);
+        group.getChildren().add(fill);
+    }
+
+    private static List<SketchStrokes.Segment> sketchSegments(
+            List<dev.voxelbrew.api.model.sketch.SketchGeometry.Entity> curves, boolean construction) {
+        var segments = new java.util.ArrayList<SketchStrokes.Segment>();
+        for (var curve : curves) {
+            var points = curve.sample();
+            for (int i = 1; i < points.size(); i++) {
+                if (construction && i % 4 >= 2) continue;
+                var a = points.get(i - 1);
+                var b = points.get(i);
+                if (a.distance(b) < 1e-9) continue;
+                segments.add(new SketchStrokes.Segment(a, b));
+            }
+        }
+        return segments;
+    }
+
     @SuppressFBWarnings(
             value = "EI_EXPOSE_REP2",
             justification = "The viewport shares the window's translation service.")
@@ -197,10 +243,8 @@ public final class Viewport extends StackPane {
         selectedEdges.setMouseTransparent(true);
         selectedEdges.setDepthTest(DepthTest.DISABLE);
         world.getTransforms().addAll(pan, tilt, orbit, center);
-        key.setTranslateX(-100);
-        key.setTranslateY(-150);
-        key.setTranslateZ(-150);
-        scene = new SubScene(new Group(world, light, key), 800, 600, true, SceneAntialiasing.BALANCED);
+        scene = new SubScene(
+                new Group(world, new AmbientLight(Color.WHITE)), 800, 600, true, SceneAntialiasing.BALANCED);
         scene.setId("viewport-scene");
         scene.setCamera(camera);
         camera.setNearClip(0.01);
@@ -210,13 +254,27 @@ public final class Viewport extends StackPane {
         scene.widthProperty().bind(widthProperty());
         scene.heightProperty().bind(heightProperty());
         planeLabels.setPickOnBounds(false);
-        getChildren().addAll(scene, planeLabels);
+        var axisOverlay = new javafx.scene.layout.Pane();
+        axisOverlay.setMouseTransparent(true);
+        axisOverlay.visibleProperty().bind(aids.visibleProperty());
+        for (var axis : axes) {
+            var label = new Text(axis.getAccessibleText());
+            label.setId(axis.getId() + "-label");
+            label.setManaged(false);
+            label.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
+            label.setFill(((PhongMaterial) axis.getMaterial()).getDiffuseColor());
+            axisLabels.put(axis, label);
+            axisOverlay.getChildren().add(label);
+        }
+        getChildren().addAll(scene, axisOverlay, planeLabels);
         world.localToSceneTransformProperty().addListener((o, a, b) -> {
             positionPlaneLabels();
+            requestLayout();
             scheduleEdges();
         });
         camera.translateZProperty().addListener((o, a, b) -> {
             positionPlaneLabels();
+            requestLayout();
             scheduleEdges();
         });
         scene.heightProperty().addListener((o, a, b) -> scheduleEdges());
@@ -444,6 +502,7 @@ public final class Viewport extends StackPane {
     protected void layoutChildren() {
         super.layoutChildren();
         positionPlaneLabels();
+        updateGrid();
     }
 
     private void positionPlaneLabels() {
@@ -534,7 +593,10 @@ public final class Viewport extends StackPane {
         var consumed = new java.util.HashSet<String>();
         if (rendering == Rendering.Style.TECHNICAL) {
             for (var feature : features) {
-                if (feature instanceof Feature.Extrude extrude) {
+                if (BodyExtrusion.modifiesBody(feature)) {
+                    consumed.add(
+                            BodyExtrusion.from(feature).extrusion().profile().sketchId());
+                } else if (feature instanceof Feature.Extrude extrude) {
                     consumed.add(extrude.profile().sketchId());
                 } else if (feature instanceof Feature.ThroughCut cut) {
                     consumed.add(cut.profile().sketchId());
@@ -558,6 +620,7 @@ public final class Viewport extends StackPane {
             Feature.Sketch sketch, dev.voxelbrew.api.model.sketch.SketchGeometry geometry, boolean chosen) {
         var group = new Group();
         group.getTransforms().add(viewTransform(sketch.plane().frame()));
+        if (chosen) addProfileHighlight(group, geometry, sketch.plane().offsetZ());
         for (var entity : geometry.entities()) {
             java.util.List<dev.voxelbrew.api.model.sketch.SketchGeometry.Entity> curves;
             try {
@@ -565,17 +628,7 @@ public final class Viewport extends StackPane {
             } catch (IllegalArgumentException invalid) {
                 continue;
             }
-            var segments = new java.util.ArrayList<SketchStrokes.Segment>();
-            for (var curve : curves) {
-                var points = curve.sample();
-                for (int i = 1; i < points.size(); i++) {
-                    if (entity.construction() && i % 4 >= 2) continue;
-                    var a = points.get(i - 1);
-                    var b = points.get(i);
-                    if (a.distance(b) < 1e-9) continue;
-                    segments.add(new SketchStrokes.Segment(a, b));
-                }
-            }
+            var segments = sketchSegments(curves, entity.construction());
             if (!segments.isEmpty()) {
                 for (var segment : segments) {
                     sketchPicks.add(new SketchPick(
@@ -698,11 +751,8 @@ public final class Viewport extends StackPane {
     void setRendering(@NonNull Rendering.Style style) {
         rendering = style;
         boolean technical = style == Rendering.Style.TECHNICAL;
-        light.setColor(technical ? Color.WHITE : Color.gray(.45));
-        key.setLightOn(!technical);
-        if (!technical) camera.setNearClip(.01);
         aids.setVisible(!technical);
-        outlines.setVisible(technical);
+        requestLayout();
         setDark(dark);
         select(selected);
         var previousSketches = shownSketches;
@@ -774,12 +824,12 @@ public final class Viewport extends StackPane {
     }
 
     private void scheduleEdges() {
-        if (rendering != Rendering.Style.TECHNICAL || edgesPending) return;
+        if (edgesPending || edgeData.isEmpty()) return;
         edgesPending = true;
         // Coalesce the tilt/orbit/pan/fit transform changes into one update per UI pulse.
         javafx.application.Platform.runLater(() -> {
             edgesPending = false;
-            if (rendering == Rendering.Style.TECHNICAL) updateEdges();
+            updateEdges();
         });
     }
 
@@ -912,21 +962,52 @@ public final class Viewport extends StackPane {
     }
 
     private void grid() {
-        for (int n = -100; n <= 100; n += 10) {
-            double width = n == 0 ? 0.15 : 0.055;
-            var x = new Box(200, width, width);
-            x.setTranslateZ(n);
-            var y = new Box(width, width, 200);
-            y.setTranslateX(n);
-            x.setMaterial(new PhongMaterial(Color.web(n == 0 ? "#bb6666" : "#8795a3")));
-            y.setMaterial(new PhongMaterial(Color.web(n == 0 ? "#55a184" : "#8795a3")));
-            aids.getChildren().addAll(x, y);
-        }
-        var z = new Box(0.15, 50, 0.15);
-        z.setTranslateY(-25);
-        z.setMaterial(new PhongMaterial(Color.web("#5b86d6")));
-        aids.getChildren().add(z);
+        groundGrid.setMaterial(new PhongMaterial(Color.web("#8795a3")));
+        groundGrid.setCullFace(CullFace.NONE);
+        groundGrid.setManaged(false);
+        aids.getChildren().add(groundGrid);
+        aids.getChildren().addAll(axes);
         aids.setMouseTransparent(true);
+    }
+
+    private void updateGrid() {
+        if (!aids.isVisible() || scene.getHeight() <= 0 || scene.getWidth() <= 0) return;
+        double slope = Math.tan(Math.toRadians(camera.getFieldOfView() / 2));
+        double slopeX = slope * scene.getWidth() / scene.getHeight();
+        var occupied = new java.util.ArrayList<javafx.geometry.Bounds>();
+        occupied.add(viewCube.getBoundsInParent());
+        for (var axis : axes) {
+            var ends = axis.update(
+                    world.getLocalToParentTransform(),
+                    distance,
+                    slopeX,
+                    slope,
+                    scene.getHeight(),
+                    camera.getNearClip(),
+                    camera.getFarClip());
+            var label = axisLabels.get(axis);
+            label.setVisible(false);
+            var size = label.getLayoutBounds();
+            if (scene.getWidth() < size.getWidth() + 12 || scene.getHeight() < size.getHeight() + 12) continue;
+            for (var end : ends) {
+                double x = Math.clamp(end.getX() + 4, 6, scene.getWidth() - size.getWidth() - 6);
+                double y = Math.clamp(end.getY() - size.getHeight() - 4, 6, scene.getHeight() - size.getHeight() - 6);
+                label.relocate(x, y);
+                var bounds = label.getBoundsInParent();
+                if (occupied.stream().anyMatch(bounds::intersects)) continue;
+                occupied.add(bounds);
+                label.setVisible(true);
+                break;
+            }
+        }
+        groundGrid.setMesh(GroundGrid.mesh(
+                world::parentToLocal,
+                distance,
+                slopeX,
+                slope,
+                scene.getHeight(),
+                camera.getNearClip(),
+                camera.getFarClip()));
     }
 
     private void installPanHandlers() {

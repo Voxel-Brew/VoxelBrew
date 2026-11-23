@@ -4,7 +4,7 @@ import javafx.geometry.Point3D;
 
 /** Camera rotation in the viewport's Z-up CAD basis, independent of document state. */
 record ViewOrientation(double tilt, double orbit) {
-    static final ViewOrientation HOME = new ViewOrientation(28, -35);
+    static final ViewOrientation HOME = lookingFrom(1, 1, 1);
 
     static ViewOrientation lookingFrom(int x, int y, int z) {
         var direction = new Point3D(x, y, z);

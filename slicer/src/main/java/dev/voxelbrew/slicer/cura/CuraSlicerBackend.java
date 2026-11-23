@@ -111,7 +111,9 @@ public final class CuraSlicerBackend implements ProcessSlicer {
             properties.forEach((key, value) -> result.put(key.toString(), value.toString()));
         }
         result.put("machine_gcode_flavor", "RepRap (Marlin/Sprinter)");
-        result.put("machine_extruder_count", "1");
+        int tools =
+                PlateFilaments.read(model.setup().workspaceSettings()).slots().size();
+        result.put("machine_extruder_count", Integer.toString(Math.max(1, tools)));
         result.put("machine_nozzle_size", Double.toString(profile.printer().nozzleMm()));
         for (var key : List.of(
                 "line_width",
@@ -166,8 +168,39 @@ public final class CuraSlicerBackend implements ProcessSlicer {
                 "-j",
                 Path.of(definition).toAbsolutePath().toString()));
         settings.forEach((key, value) -> arguments.addAll(List.of("-s", key + "=" + value)));
-        arguments.addAll(
-                List.of("-o", request.output().toString(), "-l", request.input().toString()));
+        arguments.addAll(List.of("-o", request.output().toString()));
+        var palette = PlateFilaments.read(request.model().setup().workspaceSettings());
+        var slots = palette.slots();
+        if (!slots.isEmpty()) {
+            for (int i = 0; i < slots.size(); i++) {
+                var slot = slots.get(i);
+                var setup = request.model().setup();
+                var material = PrintProfile.resolve(setup.withProfile(
+                                setup.backendId(), setup.printerId(), slot.material(), setup.process()))
+                        .material();
+                arguments.addAll(List.of(
+                        "-e" + i,
+                        "-s",
+                        "material_type=" + slot.material(),
+                        "-s",
+                        "material_color=" + slot.color(),
+                        "-s",
+                        "material_print_temperature=" + material.nozzleTemperature(),
+                        "-s",
+                        "material_print_temperature_layer_0=" + material.nozzleTemperature(),
+                        "-s",
+                        "material_bed_temperature=" + material.bedTemperature(),
+                        "-s",
+                        "material_bed_temperature_layer_0=" + material.bedTemperature()));
+            }
+        }
+        int index = 0;
+        for (var instance : request.model().instances()) {
+            int tool = palette.bodies().getOrDefault(instance.bodyId(), 1) - 1;
+            Path input =
+                    request.model().instances().size() == 1 ? request.input() : request.instanceFile(instance, index++);
+            arguments.addAll(List.of("-e" + tool, "-l", input.toString(), "-s", "extruder_nr=" + tool));
+        }
         ProcessRunner.run(arguments, request.workingDirectory(), request.cancellation(), request.diagnostics());
         return new RunResult(settings);
     }

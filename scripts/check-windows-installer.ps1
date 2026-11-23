@@ -3,8 +3,16 @@ $ErrorActionPreference = 'Stop'
 $installerPath = (Resolve-Path -LiteralPath $Installer).Path
 $installed = Join-Path $env:LOCALAPPDATA 'Programs\VoxelBrew'
 $shortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\VoxelBrew\VoxelBrew.lnk'
+$classes = 'HKCU:\Software\Classes'
+$handlers = Join-Path $classes '.vxb\OpenWithProgids'
+$design = Join-Path $classes 'VoxelBrew.Design'
 $evidence = Join-Path (Get-Location) 'gui\build\package-artifacts\installer'
 if (Test-Path -LiteralPath $installed) { throw "Refusing to replace existing $installed" }
+$existingType = Get-Item -LiteralPath 'Registry::HKEY_CLASSES_ROOT\.vxb' -ErrorAction SilentlyContinue
+$userChoice = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.vxb\UserChoice'
+if (($existingType -and $existingType.GetValue('')) -or (Test-Path -LiteralPath $userChoice)) {
+    throw 'The shell-open test requires a Windows profile without an existing .vxb default'
+}
 New-Item -ItemType Directory -Force -Path $evidence | Out-Null
 try {
     $process = Start-Process -FilePath $installerPath -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
@@ -13,10 +21,24 @@ try {
     $link = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)
     if ($link.TargetPath -ne (Join-Path $installed 'VoxelBrew.exe')) { throw 'Start menu target differs from installed launcher' }
     if ($link.WorkingDirectory -ne $installed) { throw 'Start menu working directory differs from installation' }
-    $command = (Get-Item -LiteralPath 'HKCU:\Software\Classes\VoxelBrew.Design\shell\open\command').GetValue('')
-    if ($command -ne ('"{0}\VoxelBrew.exe" --open "%1"' -f $installed)) { throw 'Invalid VXB open command' }
-    $handlers = Get-Item -LiteralPath 'HKCU:\Software\Classes\.vxb\OpenWithProgids'
-    if ($handlers.GetValueNames() -notcontains 'VoxelBrew.Design') { throw 'Missing VXB file association' }
+    if ((Get-Item -LiteralPath $handlers).GetValueNames() -notcontains 'VoxelBrew.Design') { throw 'Missing .vxb handler' }
+    $command = (Get-Item -LiteralPath (Join-Path $design 'shell\open\command')).GetValue('')
+    if ($command -ne ('"{0}\VoxelBrew.exe" --open "%1"' -f $installed)) { throw "Incorrect .vxb open command: $command" }
+    $document = Join-Path $evidence 'associated design.vxb'
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../fixtures/reference-8mm.vxb') -Destination $document
+    $opened = Start-Process -FilePath $document -Verb Open -PassThru
+    if (!$opened) { throw 'Windows did not launch a process for the .vxb document' }
+    try {
+        $deadline = [DateTime]::UtcNow.AddSeconds(60)
+        while ([DateTime]::UtcNow -lt $deadline -and !$opened.HasExited) {
+            $opened.Refresh()
+            if ($opened.MainWindowTitle.Contains('associated design.vxb')) { break }
+            Start-Sleep -Milliseconds 250
+        }
+        if ($opened.HasExited -or !$opened.MainWindowTitle.Contains('associated design.vxb')) { throw 'Explorer did not open the design in VoxelBrew' }
+    } finally {
+        if (!$opened.HasExited) { Stop-Process -Id $opened.Id -Force }
+    }
     Push-Location $env:TEMP
     try {
         & (Join-Path $installed 'VoxelBrewCLI.exe') designer native-demo
@@ -38,3 +60,10 @@ try {
     }
 }
 if (Test-Path -LiteralPath $installed) { throw "Uninstall left $installed" }
+if (Test-Path -LiteralPath $design) { throw 'Uninstall left the VoxelBrew file type' }
+if ((Test-Path -LiteralPath $handlers) -and ((Get-Item -LiteralPath $handlers).GetValueNames() -contains 'VoxelBrew.Design')) {
+    throw 'Uninstall left VoxelBrew in the .vxb handler list'
+}
+if ((Test-Path -LiteralPath "$classes\.vxb") -and ((Get-Item -LiteralPath "$classes\.vxb").GetValue('') -eq 'VoxelBrew.Design')) {
+    throw 'Uninstall left a stale .vxb default'
+}

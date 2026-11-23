@@ -21,6 +21,7 @@ test -L "$mount/Applications"
 test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$mount/VoxelBrew.app/Contents/Info.plist")" = dev.voxelbrew.gui
 /usr/bin/ditto "$mount/VoxelBrew.app" "$installed"
 test -x "$installed/Contents/MacOS/VoxelBrew"
+"$installed/Contents/MacOS/VoxelBrewCLI" designer native-demo
 rm -f "$evidence/installed-gui.png" "$evidence/installed-gui.txt"
 /usr/bin/open -n "$installed" --args --smoke-test --smoke-output "$PWD/$evidence/installed-gui.png"
 for ((i=0; i<120; i++)); do

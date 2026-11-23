@@ -167,14 +167,23 @@ jobs:
         shell: pwsh
         run: choco install innosetup --no-progress -y
       - name: Build GUI installer
-        if: (inputs.archive && runner.os == 'Windows') || (inputs.release-candidate && runner.os == 'macOS' && steps.candidate.outputs.mac_gui_installer == 'true')
+        if: (inputs.archive && runner.os == 'Windows') || (inputs.release-candidate && ((runner.os == 'Linux' && steps.candidate.outputs.linux_gui_installer == 'true') || (runner.os == 'macOS' && steps.candidate.outputs.mac_gui_installer == 'true')))
         shell: bash
         run: ./gradlew :gui:packageInstaller ${{ runner.os == 'Windows' && '''-PvsGenerator=Visual Studio 17 2022''' || '' }}
-      - name: Verify installed Windows GUI and uninstall
+      - name: Verify installed Linux desktop and CLI
+        if: inputs.release-candidate && runner.os == 'Linux' && steps.candidate.outputs.linux_gui_installer == 'true'
+        run: |
+          sudo apt-get install -y ./gui/build/distributions/VoxelBrew-*-linux-x64.deb
+          VoxelBrewCLI designer native-demo
+          bash scripts/with-virtual-desktop.sh VoxelBrew --smoke-test --smoke-output "$RUNNER_TEMP/installed-gui.png"
+          test -s "$RUNNER_TEMP/installed-gui.png"
+          sudo apt-get remove -y voxelbrew
+          test ! -e /usr/bin/VoxelBrewCLI
+      - name: Verify installed Windows desktop and CLI and uninstall
         if: inputs.archive && runner.os == 'Windows'
         shell: pwsh
         run: ./scripts/check-windows-installer.ps1 (Get-Item gui/build/distributions/VoxelBrew-*-windows-x64-Setup.exe).FullName
-      - name: Verify installed macOS GUI
+      - name: Verify installed macOS desktop and CLI
         if: inputs.release-candidate && runner.os == 'macOS' && steps.candidate.outputs.mac_gui_installer == 'true'
         run: bash scripts/check-macos-installer.sh gui/build/distributions/VoxelBrew-*-macos-x64.dmg
       - name: Collect qualified release archives and provenance

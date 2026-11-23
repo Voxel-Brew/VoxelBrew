@@ -19,6 +19,8 @@ try {
     if ($handlers.GetValueNames() -notcontains 'VoxelBrew.Design') { throw 'Missing VXB file association' }
     Push-Location $env:TEMP
     try {
+        & (Join-Path $installed 'VoxelBrewCLI.exe') designer native-demo
+        if ($LASTEXITCODE -ne 0) { throw 'Installed CLI designer native-demo failed' }
         $launched = Start-Process -FilePath $shortcut -PassThru
         Start-Sleep -Seconds 5
         if ($launched.HasExited) { throw 'Start menu launch exited before opening the GUI' }

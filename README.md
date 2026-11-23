@@ -24,6 +24,10 @@ VoxelBrew supports **Windows, macOS, and Linux**.
 
 [Download the latest release](https://github.com/Voxel-Brew/VoxelBrew/releases/latest).
 
+The Windows setup and macOS disk image install the desktop application only.
+To use the command line, download and extract the separate `VoxelBrewCLI` ZIP
+for your operating system and CPU architecture.
+
 ### Features
 
 - **Parametric modeling:** create dimensioned sketches, extrude solids, and cut

@@ -175,10 +175,13 @@ jobs:
         run: |
           sudo apt-get install -y ./gui/build/distributions/VoxelBrew-*-linux-x64.deb
           VoxelBrewCLI designer native-demo
+          bash scripts/with-virtual-desktop.sh bash scripts/check-associated-design.sh
           bash scripts/with-virtual-desktop.sh VoxelBrew --smoke-test --smoke-output "$RUNNER_TEMP/installed-gui.png"
           test -s "$RUNNER_TEMP/installed-gui.png"
           sudo apt-get remove -y voxelbrew
           test ! -e /usr/bin/VoxelBrewCLI
+          test ! -e /usr/share/mime/packages/dev.voxelbrew.gui.xml
+          test ! -e /usr/share/applications/dev.voxelbrew.gui.desktop
       - name: Verify installed Windows desktop and CLI and uninstall
         if: inputs.archive && runner.os == 'Windows'
         shell: pwsh

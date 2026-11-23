@@ -115,12 +115,15 @@ val preparePackage by
 
 val cliLauncher = rootProject.file("gui/src/main/packaging/cli-launcher.properties")
 
+val macAssociation = rootProject.file("gui/src/main/packaging/macos-vxb.properties")
+
 val appImage by
     tasks.registering(Exec::class) {
         group = "distribution"
         description = "Build a native launcher with a bundled Java 21 runtime and matching OCCT."
         dependsOn(preparePackage)
         if (project.name == "gui") inputs.file(cliLauncher)
+        if (packageMac && project.name == "gui") inputs.file(macAssociation)
         inputs.dir(packageInput)
         inputs.file(packageJdk.resolve("release"))
         inputs.file(rootProject.file("gradle/packaging.gradle.kts"))
@@ -147,7 +150,12 @@ val appImage by
                 "--vendor",
                 "voxelbrew.dev",
                 *(if (packageMac && project.name == "gui")
-                    arrayOf("--mac-package-identifier", "dev.voxelbrew.gui")
+                    arrayOf(
+                        "--mac-package-identifier",
+                        "dev.voxelbrew.gui",
+                        "--file-associations",
+                        macAssociation.absolutePath,
+                    )
                 else emptyArray()),
                 *(if (project.name == "gui")
                     arrayOf("--add-launcher", "VoxelBrewCLI=${cliLauncher.absolutePath}")
@@ -283,8 +291,6 @@ if (project.name == "gui") {
                 val source = installerStage.get().dir("VoxelBrew").asFile.absolutePath
                 val output = installerOutput.get().asFile.absolutePath
                 val icon = applicationIcon!!.absolutePath
-                val quotedExe = "\"\"{app}\\VoxelBrew.exe\"\""
-                val quotedFile = "\"\"%1\"\""
                 val script =
                     """
                     [Setup]
@@ -302,14 +308,6 @@ if (project.name == "gui") {
                     SetupIconFile=$icon
                     Compression=lzma
                     SolidCompression=yes
-
-                    ChangesAssociations=yes
-
-                    [Registry]
-                    Root: HKCU; Subkey: "Software\Classes\.vxb\OpenWithProgids"; ValueType: none; ValueName: "VoxelBrew.Design"; Flags: uninsdeletevalue
-                    Root: HKCU; Subkey: "Software\Classes\VoxelBrew.Design"; ValueType: string; ValueData: "VoxelBrew design"; Flags: uninsdeletekey
-                    Root: HKCU; Subkey: "Software\Classes\VoxelBrew.Design\DefaultIcon"; ValueType: string; ValueData: "{app}\VoxelBrew.exe,0"
-                    Root: HKCU; Subkey: "Software\Classes\VoxelBrew.Design\shell\open\command"; ValueType: string; ValueData: "${quotedExe} --open ${quotedFile}"
 
                     [Files]
                     Source: "$source\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs

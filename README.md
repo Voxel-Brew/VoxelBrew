@@ -34,7 +34,7 @@ Each desktop installer includes the `VoxelBrewCLI` launcher and a bundled Java r
 | Debian or Ubuntu | From the download directory, run `sudo apt install ./VoxelBrew-*-linux-x64.deb`. | Run `VoxelBrewCLI --help`.                                                                                              |
 | macOS            | Open the DMG and drag VoxelBrew to Applications.                                 | Run `/Applications/VoxelBrew.app/Contents/MacOS/VoxelBrewCLI --help`.                                                   |
 
-Windows setup registers VoxelBrew to open `.vxb` designs from File Explorer. If you already use another app for these files, select VoxelBrew from the **Open with** menu.
+The Windows installer, Debian/Ubuntu package, and macOS app register VoxelBrew as an editor for `.vxb` designs. Double-click a design in your file manager or choose VoxelBrew from **Open with** if another app is your default.
 
 On other Linux distributions, extract the desktop ZIP and run `./VoxelBrew/bin/VoxelBrewCLI --help`.
 For a CLI-only installation, extract the separate `VoxelBrewCLI` ZIP for your platform.

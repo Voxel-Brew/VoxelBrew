@@ -7,6 +7,32 @@ import java.net.http.*;
 import org.junit.jupiter.api.Test;
 
 class McpServerHostTest {
+    private static Thread newSweeper(java.util.Set<Thread> existing) {
+        return Thread.getAllStackTraces().keySet().stream()
+                .filter(thread -> !existing.contains(thread)
+                        && thread.getName().startsWith("streamable-http-server-transport-session-sweeper-"))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    @Test
+    void stoppingOrRestartingListenerTerminatesItsSessionSweeper() throws Exception {
+        try (var document = new DocumentController(
+                Runnable::run, doc -> new DocumentController.Build(java.util.List.of(), java.util.List.of(), true))) {
+            var settings = new McpSettings(false, 0, 4, 30, 100);
+            var existing = Thread.getAllStackTraces().keySet();
+            Thread second;
+            try (var server = new McpServerHost(new McpAutomation(document, () -> false, Runnable::run))) {
+                server.start(settings);
+                var first = newSweeper(existing);
+                server.start(settings);
+                assertThat(first.join(java.time.Duration.ofSeconds(3))).isTrue();
+                second = newSweeper(existing);
+            }
+            assertThat(second.join(java.time.Duration.ofSeconds(3))).isTrue();
+        }
+    }
+
     @Test
     void listenerRequiresTokenAndRejectsForeignOrigin() throws Exception {
         try (var document = new DocumentController(

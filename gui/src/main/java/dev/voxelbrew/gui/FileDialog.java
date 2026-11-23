@@ -65,7 +65,7 @@ final class FileDialog {
         if (initial == null) {
             try {
                 initial = save
-                        ? configuration.homeFolder().resolve("Untitled." + extension)
+                        ? projectsFolder().resolve("Untitled." + extension)
                         : Path.of(System.getProperty("user.home"), "Untitled.vxb");
             } catch (IllegalArgumentException failure) {
                 Dialogs.show(
@@ -171,6 +171,10 @@ final class FileDialog {
             error.setText(failure.getMessage());
             e.consume();
         }
+    }
+
+    static Path projectsFolder() {
+        return Path.of(System.getProperty("user.home"), "VoxelBrew");
     }
 
     private FileDialog() {}

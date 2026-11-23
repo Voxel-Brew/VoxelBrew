@@ -62,6 +62,9 @@
   Source: https://github.com/openjdk/jfx21u (tag `21.0.13+1`).
   Upstream license and licensing clarification are retained in
   `third_party/javafx/` and copied into the development GUI distribution.
+- **RichTextFX 0.11.7**, **Flowless 0.7.4**, **UndoFX 2.1.1**, **WellBehavedFX 0.3.3**,
+  and **ReactFX 2.0-M5** provide the desktop application's styled Job log.
+  Upstream license texts ship in the corresponding directories under `third_party/`.
 - **Microsoft Windows SDK C++ 10.0.22621.1** NuGet packages, Microsoft's SDK
   license as included in the archives. Build prerequisite only, downloaded
   unchanged from https://www.nuget.org/packages/Microsoft.Windows.SDK.CPP/10.0.22621.1

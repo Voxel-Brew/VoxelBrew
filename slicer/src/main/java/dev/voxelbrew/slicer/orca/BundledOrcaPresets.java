@@ -33,6 +33,23 @@ public class BundledOrcaPresets {
                         + printer.id() + " with a " + printer.nozzleMm() + " mm nozzle"));
         var machine = resolve(catalog, machineName, new HashSet<>());
         var process = resolve(catalog, field(machine, "default_print_profile"), new HashSet<>());
+        var filament = filament(catalog, machine, machineName, material, cancellation);
+        return Map.of(
+                "machine",
+                write(root, "machine", machine),
+                "process",
+                write(root, "process", process),
+                "filament",
+                write(root, "filament", filament));
+    }
+
+    static JsonObject filament(
+            Map<String, JsonObject> catalog,
+            JsonObject machine,
+            String machineName,
+            String material,
+            Cancellation cancellation)
+            throws SlicerException {
         JsonObject filament = null;
         for (String name : values(machine, "default_filament_profile")) {
             var candidate = resolve(catalog, name, new HashSet<>());
@@ -61,13 +78,10 @@ public class BundledOrcaPresets {
             throw new SlicerException.UnsupportedInput(
                     "Bundled OrcaSlicer has no " + material + " preset for " + machineName);
         }
-        return Map.of(
-                "machine", write(root, "machine", machine),
-                "process", write(root, "process", process),
-                "filament", write(root, "filament", filament));
+        return filament;
     }
 
-    private static Map<String, JsonObject> readCatalog(Path directory, Cancellation cancellation)
+    static Map<String, JsonObject> readCatalog(Path directory, Cancellation cancellation)
             throws IOException, SlicerException.Configuration {
         var catalog = new TreeMap<String, JsonObject>();
         try (var paths = Files.walk(directory)) {

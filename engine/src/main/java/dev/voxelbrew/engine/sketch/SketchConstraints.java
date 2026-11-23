@@ -9,6 +9,28 @@ import java.util.List;
 
 /** Geometric equations shared by the solver, persistence validation, CLI, and desktop editor. */
 public final class SketchConstraints {
+    /** A point and its perpendicular projection onto the selected line's supporting axis. */
+    public record PointLineDistance(Vec point, Vec foot) {
+        public double value() {
+            return point.distance(foot);
+        }
+    }
+
+    public static java.util.Optional<PointLineDistance> pointLineDistance(SketchGeometry geometry, List<Ref> refs) {
+        if (refs.size() != 2) return java.util.Optional.empty();
+        var first = refs.getFirst();
+        var last = refs.getLast();
+        if ((first.part() == Part.OBJECT) == (last.part() == Part.OBJECT)) return java.util.Optional.empty();
+        var lineRef = first.part() == Part.OBJECT ? first : last;
+        var edge = geometry.entity(lineRef.entityId());
+        if (edge.kind() != Kind.LINE) return java.util.Optional.empty();
+        var point = geometry.point(lineRef == first ? last : first);
+        var start = edge.at(0);
+        var axis = direction(edge).unit();
+        return java.util.Optional.of(new PointLineDistance(
+                point, start.plus(axis.times(point.minus(start).dot(axis)))));
+    }
+
     public static Constraint create(SketchGeometry g, String id, Type type, List<Ref> refs, double value) {
         List<Double> values = List.of();
         if (type.dimension()) values = List.of(value);
@@ -65,7 +87,7 @@ public final class SketchConstraints {
             case CURVATURE -> "Select two curve endpoints; at least one must be a spline.";
             case POLYGON -> "Select at least three connected lines in boundary order.";
             case LENGTH -> "Select one line.";
-            case DISTANCE -> "Select two points or two parallel lines.";
+            case DISTANCE -> "Select two points, two parallel lines, or a point or circle and a line.";
             case DISTANCE_X, DISTANCE_Y -> "Select two points (the origin is selectable).";
             case RADIUS, DIAMETER -> "Select a circle or arc.";
             case ANGLE -> "Select one line (from X), or two lines. Enter degrees.";
@@ -76,6 +98,7 @@ public final class SketchConstraints {
     }
 
     public static double[] residuals(SketchGeometry g, Constraint c) {
+        if (SketchCopies.linked(c)) return new double[0]; // Derived poses are evaluated by substitution.
         try {
             return equations(g, c);
         } catch (IllegalArgumentException failure) {
@@ -295,19 +318,35 @@ public final class SketchConstraints {
             case DISTANCE, DISTANCE_X, DISTANCE_Y -> {
                 count(c, 2);
                 if (c.type() == Type.DISTANCE && refs.stream().allMatch(r -> r.part() == Part.OBJECT)) {
+                    if (values.getFirst() < 0) throw new IllegalArgumentException("Distance cannot be negative");
+                    var first = object(g, refs.getFirst());
+                    var second = object(g, refs.getLast());
+                    if (first.kind() == Kind.CIRCLE || second.kind() == Kind.CIRCLE) {
+                        var circle = first.kind() == Kind.CIRCLE ? first : second;
+                        var edge = line(g, circle == first ? refs.getLast() : refs.getFirst());
+                        double distance = Math.abs(direction(edge)
+                                .unit()
+                                .cross(circle.point(Part.CENTER).minus(edge.at(0))));
+                        return new double[] {distance - circle.value(2) - values.getFirst()};
+                    }
                     var a = line(g, refs.get(0));
                     var b = line(g, refs.get(1));
-                    if (values.getFirst() < 0) throw new IllegalArgumentException("Distance cannot be negative");
                     var u = direction(a).unit();
                     return new double[] {
                         10 * u.cross(direction(b).unit()),
                         Math.abs(u.cross(b.at(0).minus(a.at(0)))) - values.getFirst()
                     };
                 }
-                var d = g.point(refs.get(1)).minus(g.point(refs.get(0)));
                 if (c.type() == Type.DISTANCE && values.getFirst() < 0) {
                     throw new IllegalArgumentException("Distance cannot be negative");
                 }
+                if (c.type() == Type.DISTANCE) {
+                    var measurement = pointLineDistance(g, refs);
+                    if (measurement.isPresent()) {
+                        return new double[] {measurement.get().value() - values.getFirst()};
+                    }
+                }
+                var d = g.point(refs.get(1)).minus(g.point(refs.get(0)));
                 return new double[] {
                     (switch (c.type()) {
                                 case DISTANCE -> d.length();

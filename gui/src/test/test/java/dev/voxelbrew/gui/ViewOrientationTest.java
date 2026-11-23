@@ -60,6 +60,16 @@ class ViewOrientationTest {
     }
 
     @Test
+    void sketchLocalAxesAreScreenAlignedAndInvertible() {
+        var basis = SketchViewBasis.DEFAULT;
+        var point = new dev.voxelbrew.api.model.sketch.SketchGeometry.Vec(13, -23);
+        var projected = basis.project(point);
+        assertThat(projected.x()).isEqualTo(-23);
+        assertThat(projected.y()).isEqualTo(-13);
+        assertThat(basis.unproject(projected.x(), projected.y())).isEqualTo(point);
+    }
+
+    @Test
     void standardViewsKeepZUpAndCorrectLeftRightHandedness() {
         assertThat(ViewOrientation.named("Top")).isEqualTo(new ViewOrientation(90, 0));
         assertThat(ViewOrientation.named("Bottom")).isEqualTo(new ViewOrientation(-90, 0));
@@ -72,6 +82,15 @@ class ViewOrientationTest {
             assertThat(ViewOrientation.named(name).name()).isEqualTo(name);
         }
         assertThat(new ViewOrientation(12, 34).name()).isEqualTo("Custom");
+    }
+
+    @Test
+    void homeLooksFromThePositiveDiagonalWithZUp() {
+        var home = ViewOrientation.HOME;
+        var diagonal = new Point3D(1, 1, 1).normalize();
+        assertThat(home.project(diagonal).distance(new Point3D(0, 0, -1))).isCloseTo(0, within(1e-12));
+        assertThat(home.project(new Point3D(0, 0, 1)).getY()).isNegative();
+        assertThat(ViewOrientation.named("Isometric")).isEqualTo(home);
     }
 
     @Test

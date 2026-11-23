@@ -7,7 +7,11 @@ import dev.voxelbrew.api.model.FaceSupport;
 import dev.voxelbrew.api.model.Feature;
 import dev.voxelbrew.api.model.Transform;
 import dev.voxelbrew.api.model.mesh.MeshOptions;
+import dev.voxelbrew.api.model.sketch.SketchGeometry;
 import dev.voxelbrew.engine.geometry.Solid;
+import dev.voxelbrew.engine.sketch.FaceProjection;
+import dev.voxelbrew.engine.sketch.SketchConstraints;
+import dev.voxelbrew.engine.sketch.Sketches;
 import dev.voxelbrew.exporter.DocumentWriter;
 import dev.voxelbrew.importer.DocumentReader;
 import java.nio.file.Path;
@@ -138,6 +142,48 @@ class SketchPlaneTest {
     }
 
     @Test
+    void dimensionToProjectedEdgeFollowsUpstreamWidthAfterReopen() throws Exception {
+        var session = plate(Feature.Plane.origin("XY"), 5);
+        Feature.Plane plane;
+        SketchGeometry.Entity right;
+        try (var result = session.evaluate()) {
+            var body = result.bodies().getFirst();
+            var faces = body.solid().planarFaces();
+            var top = faces.stream().filter(f -> f.nz() > .99).findFirst().orElseThrow();
+            plane = FaceSupport.attach(body.output(), faces, top.faceIndex());
+            var edges = FaceProjection.edges(
+                    plane, faces, body.solid().faceEdges(), body.solid().edgeSamples());
+            assertThat(edges).hasSize(4);
+            right = edges.stream()
+                    .filter(e -> Math.abs(e.at(.5).x() - 60) < .001)
+                    .findFirst()
+                    .orElseThrow();
+        }
+        var circle = Sketches.entity("circle", SketchGeometry.Kind.CIRCLE, false, 50, 15, 3);
+        var geometry = new SketchGeometry(List.of(circle, right), List.of(), List.of(circle.id()));
+        geometry = geometry.add(SketchConstraints.create(
+                geometry,
+                "margin",
+                SketchGeometry.Type.DISTANCE,
+                List.of(circle.ref(SketchGeometry.Part.CENTER), right.ref()),
+                10));
+        session.add(new Feature.Sketch("attached", "bossProfile", plane, new Feature.Constrained(geometry)));
+        session.add(new Feature.Extrude("boss", new Feature.ProfileRef("attached", "bossProfile"), 3));
+        var file = directory.resolve("projected-edge.vxb");
+        DocumentWriter.save(session.document(), file, false);
+        session = new ModelSession(DocumentReader.load(file));
+        session.editDimension("plate", "width", 70);
+        try (var result = session.evaluate()) {
+            assertThat(result.valid()).as(result.diagnostics().toString()).isTrue();
+            var sketch = (Feature.Sketch) result.resolvedFeatures().get(2);
+            var resolved = ((Feature.Constrained) sketch.profile()).geometry();
+            assertThat(resolved.entity(right.id()).at(.5).x()).isCloseTo(70, within(.001));
+            assertThat(resolved.entity("circle").value(0)).isCloseTo(60, within(.001));
+            assertThat(result.bodies().getLast().solid().volume()).isCloseTo(Math.PI * 27, within(.001));
+        }
+    }
+
+    @Test
     void exactPlanarFacesMatchMeshFacesAndTransformsKeepSourceImmutable() {
         var frame = Transform.translation(3, -7, 11).compose(Transform.rotation(21, 33, 47));
         try (var source = Solid.circlePrism(0, 0, 0, 20, 7);
@@ -151,6 +197,12 @@ class SketchPlaneTest {
                     .isEqualTo(2);
             var mesh = moved.tessellate(MeshOptions.DEFAULT);
             for (var face : faces) {
+                var support = FaceSupport.attach(new Feature.BodyRef("base", "body"), faces, face.faceIndex());
+                var outline = FaceProjection.edges(support, faces, moved.faceEdges(), moved.edgeSamples());
+                assertThat(outline).singleElement().satisfies(edge -> {
+                    assertThat(edge.kind()).isEqualTo(SketchGeometry.Kind.CIRCLE);
+                    assertThat(edge.value(2)).isCloseTo(10, within(1e-6));
+                });
                 int triangles = 0;
                 for (int t = 0; t < mesh.triangleCount(); t++) {
                     if (mesh.faceIndex(t) == face.faceIndex()) {

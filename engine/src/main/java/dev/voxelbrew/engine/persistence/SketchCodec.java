@@ -14,7 +14,10 @@ class SketchCodec {
                 message.getConstraintsList().stream()
                         .map(c -> new SketchGeometry.Constraint(
                                 c.getId(),
-                                SketchGeometry.Type.valueOf(c.getType().name()),
+                                c.getType() == DocumentProto.SketchConstraint.Type.PATTERN_LINK
+                                        ? SketchGeometry.Type.FIX
+                                        : SketchGeometry.Type.valueOf(
+                                                c.getType().name()),
                                 c.getRefsList().stream()
                                         .map(r -> new SketchGeometry.Ref(
                                                 r.getEntityId(),
@@ -43,7 +46,9 @@ class SketchCodec {
                                                         .map(SketchCodec::entity)
                                                         .toList())
                                                 .toList()))
-                                .toList())
+                                .toList(),
+                        SketchText.Horizontal.valueOf(t.getHorizontal().name()),
+                        SketchText.Vertical.valueOf(t.getVertical().name()))
                 : null;
         return new SketchGeometry.Entity(
                 e.getId(),
@@ -69,7 +74,11 @@ class SketchCodec {
                     .setContent(t.content())
                     .setFont(t.font())
                     .setStyle(t.style())
-                    .setPathId(t.pathId());
+                    .setPathId(t.pathId())
+                    .setHorizontal(DocumentProto.SketchText.Horizontal.valueOf(
+                            t.horizontal().name()))
+                    .setVertical(DocumentProto.SketchText.Vertical.valueOf(
+                            t.vertical().name()));
             for (var g : t.glyphs()) {
                 var glyph = DocumentProto.SketchGlyph.newBuilder().setAdvance(g.advance());
                 for (var c : g.contours()) {
@@ -90,7 +99,10 @@ class SketchCodec {
             var constraint = DocumentProto.SketchConstraint.newBuilder()
                     .setId(c.id())
                     .setType(
-                            DocumentProto.SketchConstraint.Type.valueOf(c.type().name()))
+                            dev.voxelbrew.engine.sketch.SketchCopies.linked(c)
+                                    ? DocumentProto.SketchConstraint.Type.PATTERN_LINK
+                                    : DocumentProto.SketchConstraint.Type.valueOf(
+                                            c.type().name()))
                     .addAllValues(c.values());
             for (var r : c.refs()) {
                 constraint.addRefs(DocumentProto.SketchReference.newBuilder()

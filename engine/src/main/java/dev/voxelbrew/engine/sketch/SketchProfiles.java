@@ -69,16 +69,56 @@ public final class SketchProfiles {
         return profileId + "/region/" + region.id();
     }
 
+    public static String selectedProfileId(String profileId, List<String> ids) {
+        if (ids.isEmpty()) throw new IllegalArgumentException("Select at least one sketch region");
+        if (ids.size() == 1) return profileId + "/region/" + ids.getFirst();
+        return profileId + "/regions/" + String.join(".", new TreeSet<>(ids));
+    }
+
     public static List<Region> referencedRegions(dev.voxelbrew.api.model.Feature.Sketch sketch, String profileId) {
         var geometry = ((dev.voxelbrew.api.model.Feature.Constrained) sketch.profile()).geometry();
         if (sketch.profileId().equals(profileId)) return regions(geometry);
+        String prefix = sketch.profileId() + "/regions/";
+        if (profileId.startsWith(prefix)) {
+            var selected = new HashSet<>(
+                    Arrays.asList(profileId.substring(prefix.length()).split("\\.", -1)));
+            var loops = profileLoops(geometry, true);
+            var polygons = loops.stream().map(SketchProfiles::samples).toList();
+            var parent = enclosingLoops(
+                    loops,
+                    polygons,
+                    polygons.stream().mapToDouble(SketchProfiles::area).toArray());
+            var boundary = new LinkedHashSet<Entity>();
+            for (int i = 0; i < loops.size(); i++) {
+                if (!selected.remove(regionId(loops.get(i)))) continue;
+                // Curves shared by two selected faces are interior to their union.
+                for (int j = 0; j < loops.size(); j++) {
+                    if (j == i || parent[j] == i) {
+                        for (var edge : loops.get(j)) {
+                            if (!boundary.add(edge.entity())) boundary.remove(edge.entity());
+                        }
+                    }
+                }
+            }
+            if (!selected.isEmpty()) throw new IllegalArgumentException("Selected sketch region no longer exists");
+            return buildRegions(boundaryLoops(List.copyOf(boundary), true), false, true).stream()
+                    .sorted(Comparator.comparing(Region::id))
+                    .toList();
+        }
         return List.of(selectableRegions(geometry).stream()
                 .filter(region -> regionProfileId(sketch.profileId(), region).equals(profileId))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Selected sketch region no longer exists")));
     }
 
-    private static List<Region> regions(SketchGeometry g, boolean individual) {
+    /** Sampled rings of the whole extrusion profile, for even-odd filling on the sketch plane. */
+    public static List<List<Vec>> profileContours(SketchGeometry geometry) {
+        return profileLoops(geometry, false).stream()
+                .map(SketchProfiles::samples)
+                .toList();
+    }
+
+    private static List<List<Edge>> profileLoops(SketchGeometry g, boolean individual) {
         SketchConstraints.requireSatisfied(g);
         if (g.boundary().isEmpty()) {
             throw new IllegalArgumentException("Select closed profile geometry in Edit sketch before extruding");
@@ -88,7 +128,14 @@ public final class SketchProfiles {
                 .flatMap(e -> g.curves(e).stream())
                 .toList());
         if (remaining.isEmpty()) throw new IllegalArgumentException("Profile has no curves");
-        var loops = boundaryLoops(remaining, individual);
+        return boundaryLoops(remaining, individual);
+    }
+
+    private static List<Region> regions(SketchGeometry g, boolean individual) {
+        return buildRegions(profileLoops(g, individual), individual, individual);
+    }
+
+    private static List<Region> buildRegions(List<List<Edge>> loops, boolean includeNested, boolean stableIds) {
         var polygons = loops.stream().map(SketchProfiles::samples).toList();
         var areas = polygons.stream().mapToDouble(SketchProfiles::area).toArray();
         int[] parent = enclosingLoops(loops, polygons, areas);
@@ -96,7 +143,7 @@ public final class SketchProfiles {
         for (int i = 0; i < loops.size(); i++) {
             int depth = 0;
             for (int p = parent[i]; p >= 0; p = parent[p]) depth++;
-            if (depth % 2 != 0) continue;
+            if (!includeNested && depth % 2 != 0) continue;
             var wires = new ArrayList<List<PlanarProfile.Segment>>();
             wires.add(segments(loops.get(i), areas[i] < 0));
             for (int j = 0; j < loops.size(); j++) {
@@ -104,7 +151,7 @@ public final class SketchProfiles {
                     wires.add(segments(loops.get(j), areas[j] > 0));
                 }
             }
-            String id = individual
+            String id = stableIds
                     ? regionId(loops.get(i))
                     : loops.get(i).getFirst().entity().id();
             result.add(new Region(id, new PlanarProfile(wires)));
@@ -123,6 +170,7 @@ public final class SketchProfiles {
                 directed.add(new Edge(entity, true));
             }
         }
+        omitIsolatedSegments(directed, loops);
         var next = new HashMap<Edge, Edge>();
         for (var edge : directed) {
             var outgoing = directed.stream()
@@ -164,6 +212,21 @@ public final class SketchProfiles {
         loops.sort(
                 Comparator.comparingInt(loop -> entities.indexOf(loop.getFirst().entity())));
         return loops;
+    }
+
+    private static void omitIsolatedSegments(List<Edge> directed, List<List<Edge>> loops) {
+        // A standalone segment (for example a line joining two hole centers) bounds no face.
+        // Keep edges attached to other curves so an incomplete contour is still diagnosed.
+        var isolated = directed.stream()
+                .filter(edge -> directed.stream()
+                        .noneMatch(other -> !other.entity().equals(edge.entity())
+                                && (other.start().distance(edge.start()) <= TOLERANCE
+                                        || other.start().distance(edge.end()) <= TOLERANCE)))
+                .toList();
+        directed.removeAll(isolated);
+        if (directed.isEmpty() && loops.isEmpty()) {
+            throw new IllegalArgumentException("Open profile; select closed geometry before extruding");
+        }
     }
 
     private static String regionId(List<Edge> loop) {

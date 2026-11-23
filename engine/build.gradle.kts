@@ -7,7 +7,7 @@ plugins {
 }
 
 dependencies {
-    api("dev.voxelbrew.api:model")
+    api("dev.voxelbrew.api:model:${providers.gradleProperty("modelApiVersion").get()}")
     add("integrationTestImplementation", project(":importer-impl"))
     add("integrationTestImplementation", project(":exporter-impl"))
     implementation(project(":util"))

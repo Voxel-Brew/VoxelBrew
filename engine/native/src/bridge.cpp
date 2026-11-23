@@ -5,6 +5,7 @@
 #include <sstream>
 #include <limits>
 #include <BRepAlgoAPI_Cut.hxx>
+#include <BRepAlgoAPI_Fuse.hxx>
 #include <BRepAlgoAPI_Splitter.hxx>
 #include <BRepFilletAPI_MakeFillet.hxx>
 #include <BRepFilletAPI_MakeChamfer.hxx>
@@ -372,6 +373,40 @@ JNIEXPORT jlong JNICALL Java_dev_voxelbrew_engine_geometry_NativeKernel_rectangl
         prism.Build();
         if (!prism.IsDone()) throw std::runtime_error("prism construction failed");
         return own(prism.Shape());
+    });
+}
+
+JNIEXPORT jlong JNICALL Java_dev_voxelbrew_engine_geometry_NativeKernel_combine(JNIEnv* env, jclass,
+                                                                                jlong id,
+                                                                                jlongArray ids,
+                                                                                jboolean subtract) {
+    return guarded<jlong>(env, "body extrusion", 0, [&] {
+        const auto source = lookup(id);
+        auto count = env->GetArrayLength(ids);
+        if (count == 0) throw std::invalid_argument("Select at least one profile");
+        std::vector<jlong> handles(count);
+        env->GetLongArrayRegion(ids, 0, count, handles.data());
+        TopTools_ListOfShape arguments, tools;
+        arguments.Append(*source);
+        for (auto handle : handles) tools.Append(*lookup(handle));
+        BRepAlgoAPI_Fuse fuse;
+        BRepAlgoAPI_Cut cut;
+        BRepAlgoAPI_BooleanOperation& op = subtract
+                                               ? static_cast<BRepAlgoAPI_BooleanOperation&>(cut)
+                                               : static_cast<BRepAlgoAPI_BooleanOperation&>(fuse);
+        op.SetArguments(arguments);
+        op.SetTools(tools);
+        op.SetNonDestructive(true);
+        op.Build();
+        if (!op.IsDone() || op.HasErrors()) throw std::runtime_error("boolean extrusion failed");
+        op.SimplifyResult();
+        GProp_GProps before, after;
+        BRepGProp::VolumeProperties(*source, before);
+        BRepGProp::VolumeProperties(op.Shape(), after);
+        if (std::abs(after.Mass() - before.Mass()) <=
+            Precision::Confusion() * Precision::Confusion() * Precision::Confusion())
+            throw std::runtime_error("extrusion does not change the target body");
+        return own(op.Shape());
     });
 }
 

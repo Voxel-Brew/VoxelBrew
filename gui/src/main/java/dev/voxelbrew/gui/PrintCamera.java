@@ -74,6 +74,22 @@ final class PrintCamera {
         return zx * x + zy * y + zz * z;
     }
 
+    void projectInto(javafx.scene.transform.Affine target, double ox, double oy, double scale, double depthScale) {
+        target.setToTransform(
+                scale * xx,
+                scale * xy,
+                0,
+                ox,
+                -scale * yx,
+                -scale * yy,
+                -scale * yz,
+                oy,
+                depthScale * zx,
+                depthScale * zy,
+                depthScale * zz,
+                0);
+    }
+
     private void updateProjection() {
         var x = orientation.project(new Point3D(1, 0, 0));
         var y = orientation.project(new Point3D(0, 1, 0));

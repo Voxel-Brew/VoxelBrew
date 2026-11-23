@@ -92,13 +92,21 @@ public final class Sketches {
 
     public static SketchGeometry removeEntity(SketchGeometry g, String id) {
         g.entity(id);
+        var removed = new java.util.HashSet<>(List.of(id));
+        for (var link : g.constraints()) {
+            if (!SketchCopies.linked(link)) continue;
+            var refs = link.refs();
+            if (removed.contains(refs.getFirst().entityId())
+                    || (refs.size() == 3 && removed.contains(refs.get(2).entityId()))) {
+                removed.add(refs.get(1).entityId());
+            }
+        }
         return new SketchGeometry(
-                g.entities().stream().filter(e -> !e.id().equals(id)).toList(),
+                g.entities().stream().filter(e -> !removed.contains(e.id())).toList(),
                 g.constraints().stream()
-                        .filter(c ->
-                                c.refs().stream().noneMatch(r -> r.entityId().equals(id)))
+                        .filter(c -> c.refs().stream().noneMatch(r -> removed.contains(r.entityId())))
                         .toList(),
-                g.boundary().stream().filter(e -> !e.equals(id)).toList());
+                g.boundary().stream().filter(e -> !removed.contains(e)).toList());
     }
 
     public static SketchGeometry editDimension(SketchGeometry g, String id, double value) {

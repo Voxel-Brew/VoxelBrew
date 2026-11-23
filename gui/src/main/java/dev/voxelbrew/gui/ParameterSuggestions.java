@@ -3,6 +3,7 @@ package dev.voxelbrew.gui;
 import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.parameters.BuiltinParameters;
 import dev.voxelbrew.api.model.parameters.ParameterSet;
+import java.io.IOException;
 import java.util.List;
 import java.util.function.Supplier;
 import javafx.application.Platform;
@@ -36,12 +37,22 @@ final class ParameterSuggestions {
     }
 
     static List<String> matches(ParameterSet parameters, String prefix, FormulaField.ExpressionType type) {
-        return parameters.allParameters().stream()
+        return availableParameters(parameters).stream()
                 .map(ParameterSet.Parameter::name)
                 .filter(name -> type == FormulaField.ExpressionType.STRING || !BuiltinParameters.isString(name))
                 .filter(name -> name.startsWith(prefix))
                 .sorted()
                 .toList();
+    }
+
+    static List<ParameterSet.Parameter> availableParameters(ParameterSet parameters) {
+        try {
+            return parameters.allParameters();
+        } catch (IllegalStateException failure) {
+            // Older model APIs enumerate the host version and the other built-ins in one operation.
+            if (!(failure.getCause() instanceof IOException)) throw failure;
+            return parameters.parameters();
+        }
     }
 
     static Reference reference(String text, int caret) {

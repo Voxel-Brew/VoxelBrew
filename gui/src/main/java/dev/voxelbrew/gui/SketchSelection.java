@@ -5,17 +5,22 @@ import static dev.voxelbrew.api.model.sketch.SketchGeometry.*;
 import dev.voxelbrew.api.model.sketch.SketchGeometry;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 
 /** Directional selection against the same sampled curves used by the sketch canvas. */
 final class SketchSelection {
     static Set<Ref> inBox(SketchGeometry geometry, Vec start, Vec end, boolean crossing) {
+        return inBox(geometry, start, end, crossing, UnaryOperator.identity());
+    }
+
+    static Set<Ref> inBox(SketchGeometry geometry, Vec start, Vec end, boolean crossing, UnaryOperator<Vec> project) {
         double minX = Math.min(start.x(), end.x()), maxX = Math.max(start.x(), end.x());
         double minY = Math.min(start.y(), end.y()), maxY = Math.max(start.y(), end.y());
         var result = new LinkedHashSet<Ref>();
         for (var entity : geometry.entities()) {
             boolean any = false, all = true, hasCurve = false;
             for (var curve : entity.kind() == Kind.POINT ? java.util.List.<Entity>of() : geometry.curves(entity)) {
-                var points = curve.sample();
+                var points = curve.sample().stream().map(project).toList();
                 hasCurve = true;
                 for (var p : points) all &= inside(p, minX, minY, maxX, maxY);
                 for (int i = 1; i < points.size(); i++) {
@@ -25,7 +30,7 @@ final class SketchSelection {
             if (hasCurve && (crossing ? any : all)) result.add(entity.ref());
             else if (entity.kind() == Kind.POINT) {
                 for (var ref : entity.pointRefs()) {
-                    if (inside(entity.point(ref), minX, minY, maxX, maxY)) result.add(ref);
+                    if (inside(project.apply(entity.point(ref)), minX, minY, maxX, maxY)) result.add(ref);
                 }
             }
         }

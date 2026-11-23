@@ -257,6 +257,8 @@ if (project.name == "gui") {
                 val source = installerStage.get().dir("VoxelBrew").asFile.absolutePath
                 val output = installerOutput.get().asFile.absolutePath
                 val icon = applicationIcon!!.absolutePath
+                val quotedExe = "\"\"{app}\\VoxelBrew.exe\"\""
+                val quotedFile = "\"\"%1\"\""
                 val script =
                     """
                     [Setup]
@@ -273,6 +275,14 @@ if (project.name == "gui") {
                     SetupIconFile=$icon
                     Compression=lzma
                     SolidCompression=yes
+
+                    ChangesAssociations=yes
+
+                    [Registry]
+                    Root: HKCU; Subkey: "Software\Classes\.vxb\OpenWithProgids"; ValueType: none; ValueName: "VoxelBrew.Design"; Flags: uninsdeletevalue
+                    Root: HKCU; Subkey: "Software\Classes\VoxelBrew.Design"; ValueType: string; ValueData: "VoxelBrew design"; Flags: uninsdeletekey
+                    Root: HKCU; Subkey: "Software\Classes\VoxelBrew.Design\DefaultIcon"; ValueType: string; ValueData: "{app}\VoxelBrew.exe,0"
+                    Root: HKCU; Subkey: "Software\Classes\VoxelBrew.Design\shell\open\command"; ValueType: string; ValueData: "${quotedExe} --open ${quotedFile}"
 
                     [Files]
                     Source: "$source\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs

@@ -84,8 +84,10 @@ final class SketchCommands implements Runnable {
         @Option(names = "--height", defaultValue = "10")
         double height;
 
-        @Option(names = "--angle", defaultValue = "0", description = "Text rotation in degrees")
-        double angle;
+        @Option(
+                names = "--angle",
+                description = "Text rotation from -180 to 180 degrees (default 90 for free text, 0 along a path)")
+        Double angle;
 
         @Option(names = "--spacing", defaultValue = "0", description = "Extra text character spacing in em")
         double spacing;
@@ -119,7 +121,8 @@ final class SketchCommands implements Runnable {
                                     font,
                                     style,
                                     height,
-                                    dev.voxelbrew.api.model.units.Measurements.radians(angle),
+                                    dev.voxelbrew.api.model.units.Measurements.radians(
+                                            angle == null ? tool.defaultTextAngleDegrees() : angle),
                                     spacing)));
         }
     }

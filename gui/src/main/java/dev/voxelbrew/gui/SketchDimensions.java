@@ -19,23 +19,37 @@ final class SketchDimensions {
 
     static Measurement measure(SketchGeometry g, List<Ref> refs, Vec position) {
         refs = references(g, refs);
+        var pointLine = dev.voxelbrew.engine.sketch.SketchConstraints.pointLineDistance(g, refs);
+        if (pointLine.isPresent()) {
+            return new Measurement(Type.DISTANCE, pointLine.get().value());
+        }
         if (refs.size() == 1 && refs.getFirst().part() == Part.OBJECT) {
             var e = g.entity(refs.getFirst().entityId());
             if (e.kind() == Kind.LINE) {
                 return new Measurement(Type.LENGTH, e.at(0).distance(e.at(1)));
             }
-            if (e.kind() == Kind.CIRCLE) return new Measurement(Type.DIAMETER, e.value(2) * 2);
-            if (e.kind() == Kind.ARC) return new Measurement(Type.RADIUS, e.value(2));
+            if (e.kind() == Kind.CIRCLE || e.kind() == Kind.ARC) return new Measurement(Type.RADIUS, e.value(2));
+        }
+        if (refs.size() == 2 && refs.stream().allMatch(r -> r.part() == Part.OBJECT)) {
+            return measureCurves(
+                    g.entity(refs.getFirst().entityId()),
+                    g.entity(refs.getLast().entityId()));
         }
         if (refs.size() == 2 && refs.stream().allMatch(r -> r.part() != Part.OBJECT)) {
             return measurePoints(g.point(refs.get(0)), g.point(refs.get(1)), position);
         }
-        if (refs.size() == 2
-                && refs.stream()
-                        .allMatch(r -> r.part() == Part.OBJECT
-                                && g.entity(r.entityId()).kind() == Kind.LINE)) {
-            var a = g.entity(refs.get(0).entityId());
-            var b = g.entity(refs.get(1).entityId());
+        throw new IllegalArgumentException("Unsupported dimension selection");
+    }
+
+    private static Measurement measureCurves(Entity a, Entity b) {
+        var circle = a.kind() == Kind.CIRCLE ? a : b;
+        var line = circle == a ? b : a;
+        if (circle.kind() == Kind.CIRCLE && line.kind() == Kind.LINE) {
+            var direction = line.at(1).minus(line.at(0)).unit();
+            double gap = Math.abs(direction.cross(circle.point(Part.CENTER).minus(line.at(0)))) - circle.value(2);
+            if (gap >= 0) return new Measurement(Type.DISTANCE, gap);
+        }
+        if (a.kind() == Kind.LINE && b.kind() == Kind.LINE) {
             var u = a.at(1).minus(a.at(0));
             var v = b.at(1).minus(b.at(0));
             if (Math.abs(u.unit().cross(v.unit())) < 1e-6) {

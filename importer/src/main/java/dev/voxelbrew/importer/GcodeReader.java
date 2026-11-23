@@ -18,7 +18,6 @@ public final class GcodeReader {
         final List<Segment> segments = new ArrayList<Segment>();
         final SortedSet<Double> layers = new TreeSet<Double>();
         final Map<String, String> report = new LinkedHashMap<String, String>();
-        OptionalDouble filament = OptionalDouble.empty();
         Optional<String> time = Optional.empty();
         double x = 0, y = 0, z = 0, e = 0, width = 0.45, height = 0.2;
         boolean absolute = true, absoluteE = true;
@@ -42,8 +41,6 @@ public final class GcodeReader {
                 width = number(line.substring(7));
             } else if (line.startsWith(";HEIGHT:")) {
                 height = number(line.substring(8));
-            } else if (line.startsWith("; filament used [mm] = ")) {
-                filament = OptionalDouble.of(number(line.substring(line.indexOf('=') + 1)));
             } else if (line.startsWith("; estimated printing time (normal mode) = ")) {
                 time = Optional.of(line.substring(line.indexOf('=') + 1).strip());
             } else if (line.startsWith("; VOXELBREW ")) {
@@ -172,7 +169,13 @@ public final class GcodeReader {
             if (segments.stream().noneMatch(Segment::deposits)) {
                 throw new IOException("Slicer output contains no deposition moves");
             }
-            return new GcodeJob(segments, new ArrayList<>(layers), filament, time, report, lines);
+            return new GcodeJob(
+                    segments,
+                    new ArrayList<>(layers),
+                    FilamentUsage.fromLines(lines).millimeters(),
+                    time,
+                    report,
+                    lines);
         }
     }
 

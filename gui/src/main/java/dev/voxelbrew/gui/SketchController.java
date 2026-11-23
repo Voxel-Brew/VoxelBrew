@@ -140,6 +140,7 @@ final class SketchController implements AutoCloseable {
     }
 
     void edit(SketchGeometry next, ParameterSet nextParameters) {
+        next = dev.voxelbrew.engine.sketch.FaceProjection.usedReferences(next);
         if (next.equals(definition) && nextParameters.equals(parameters)) return;
         interactionError = "";
         remember();

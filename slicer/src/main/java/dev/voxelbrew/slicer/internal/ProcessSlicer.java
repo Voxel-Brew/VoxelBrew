@@ -39,7 +39,18 @@ public interface ProcessSlicer {
             Path workingDirectory,
             Path output,
             Cancellation cancellation,
-            Consumer<String> diagnostics) {}
+            Consumer<String> diagnostics) {
+        public Path instanceFile(dev.voxelbrew.api.model.BodyInstance instance, int index) throws IOException {
+            var view = dev.voxelbrew.exporter.ModelViews.selectInstance(
+                    dev.voxelbrew.exporter.ModelViews.from(model), instance.id());
+            var file = workingDirectory.resolve("object-" + index + ".stl");
+            var exporter = new dev.voxelbrew.exporter.BinaryStlExporter();
+            try (var out = java.nio.file.Files.newOutputStream(file)) {
+                exporter.write(view, dev.voxelbrew.api.model.mesh.MeshOptions.DEFAULT, Map.of(), out);
+            }
+            return file;
+        }
+    }
 
     record RunResult(Map<String, String> resolvedSettings, dev.voxelbrew.api.model.printing.PrintArtifact artifact) {
         public RunResult(Map<String, String> resolvedSettings) {

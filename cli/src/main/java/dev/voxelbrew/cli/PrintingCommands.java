@@ -684,6 +684,7 @@ final class PrintingCommands {
                     var result = SliceService.slice(
                             provider,
                             model,
+                            dev.voxelbrew.engine.printing.PlateFilaments.from(selected, model),
                             window,
                             cancellation,
                             spec.commandLine().getErr()::println);

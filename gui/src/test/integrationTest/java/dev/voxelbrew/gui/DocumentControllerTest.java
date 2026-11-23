@@ -44,6 +44,49 @@ class DocumentControllerTest {
     }
 
     @Test
+    void changingNozzleRebuildsAnExtrusionBoundToThePrintProfile() throws Exception {
+        try (var controller = new DocumentController(callbacks::add)) {
+            var profile = sketch("base", 0);
+            controller.add(profile);
+            await(() -> !controller.rebuilding());
+            controller.previewExtrusion(profile, "$vb.slicer.nozzle_diameter");
+            await(() -> !controller.rebuilding());
+            controller.commitPreview();
+            await(() -> !controller.rebuilding());
+            assertThat(controller.canExport()).isTrue();
+            assertThat(controller.build().bodies().getFirst().volume()).isCloseTo(960, within(.001));
+
+            var setup = controller.snapshot().document().printSetup();
+            controller.printSetup(setup.withNozzle(.6));
+            assertThat(controller.canExport()).isFalse();
+            await(() -> !controller.rebuilding());
+            assertThat(controller.canExport()).isTrue();
+            assertThat(controller.build().bodies().getFirst().volume()).isCloseTo(1440, within(.001));
+        }
+    }
+
+    @Test
+    void changingPlacementReusesTheEvaluatedCadBody() throws Exception {
+        try (var controller = new DocumentController(callbacks::add)) {
+            var profile = sketch("base", 0);
+            controller.add(profile);
+            await(() -> !controller.rebuilding());
+            controller.previewExtrusion(profile, "5");
+            await(() -> !controller.rebuilding());
+            controller.commitPreview();
+            await(() -> !controller.rebuilding());
+            var build = controller.build();
+            var setup = controller.snapshot().document().printSetup();
+            var instance = new BodyInstance("placed", build.bodies().getFirst().id(), Transform.translation(12, 7, 0));
+            controller.printSetup(setup.withInstances(List.of(instance)));
+            assertThat(controller.rebuilding()).isFalse();
+            assertThat(controller.build()).isSameAs(build);
+            assertThat(controller.snapshot().document().printSetup().instances())
+                    .containsExactly(instance);
+        }
+    }
+
+    @Test
     void selectedRegionPreviewCommitsAndReopensWithoutChangingSketch() throws Exception {
         var g = dev.voxelbrew.engine.sketch.Sketches.rectangle("r", 0, 0, 20, 10, false);
         var entities = new java.util.ArrayList<>(g.entities());

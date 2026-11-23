@@ -88,6 +88,27 @@ final class QuickMenu implements AutoCloseable {
 
     record Content(List<Action> radial, List<Action> additional) {}
 
+    private static Map<String, String> shortcutLetters(Content commands) {
+        var actions = new ArrayList<>(commands.radial());
+        actions.addAll(commands.additional());
+        var letters = new LinkedHashMap<String, String>();
+        for (var action : actions) {
+            KeyboardShortcuts.letter(action.id()).ifPresent(key -> letters.put(action.id(), key));
+        }
+        for (var action : actions) {
+            if (letters.containsKey(action.id())) continue;
+            String candidates = action.label().toUpperCase(Locale.ROOT) + "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            candidates
+                    .chars()
+                    .filter(c -> c >= 'A' && c <= 'Z')
+                    .mapToObj(c -> Character.toString((char) c))
+                    .filter(key -> !letters.containsValue(key))
+                    .findFirst()
+                    .ifPresent(key -> letters.put(action.id(), key));
+        }
+        return letters;
+    }
+
     static List<Action> controls(Parent root, String... ids) {
         return controls(id -> (ButtonBase) root.lookup("#" + id), ids);
     }
@@ -211,7 +232,7 @@ final class QuickMenu implements AutoCloseable {
         }
     }
 
-    private Button actionButton(Action action) {
+    private Button actionButton(Action action, Map<String, String> letters) {
         var button = new Button();
         button.setId("quick-" + action.id());
         if (Set.of("constrained-sketch", "extrude", "cut", "fillet", "chamfer", "shell", "split-body")
@@ -227,6 +248,8 @@ final class QuickMenu implements AutoCloseable {
                                         .then("✓ " + action.label())
                                         .otherwise(action.label()));
         button.disableProperty().bind(action.disabled());
+        String letter = letters.get(action.id());
+        if (letter != null) ShortcutLabels.install(button, letter);
         button.setMaxWidth(Double.MAX_VALUE);
         button.setOnAction(e -> {
             if (action.disabled().get()) return;
@@ -251,7 +274,8 @@ final class QuickMenu implements AutoCloseable {
         var heading = new Label(text.translate("quick.actions"));
         heading.getStyleClass().add("quick-menu-heading");
         root.getChildren().add(heading);
-        var ring = radialButtons(commands);
+        var letters = shortcutLetters(commands);
+        var ring = radialButtons(commands, letters);
         var workspaceButton = new MenuButton(text.translate("quick.workspace"));
         workspaceButton.setId("quick-workspaces");
         workspaceButton.getStyleClass().add("quick-menu-workspace");
@@ -291,7 +315,7 @@ final class QuickMenu implements AutoCloseable {
         extras.setHgap(6);
         extras.setVgap(3);
         for (int index = 0; index < commands.additional().size(); index++) {
-            var button = actionButton(commands.additional().get(index));
+            var button = actionButton(commands.additional().get(index), letters);
             button.getStyleClass().add("quick-menu-extra");
             button.setPrefWidth(220);
             extras.add(button, index % 2, index / 2);
@@ -319,6 +343,14 @@ final class QuickMenu implements AutoCloseable {
         double centerOffset = 14 + heading.prefHeight(-1) + 10 + ring.prefHeight(-1) / 2;
         double top = Math.max(bounds.getMinY(), Math.min(y - centerOffset, bounds.getMaxY() - height));
         popup.show(surface.getScene().getWindow(), left, top);
+        installPopupKeys(root, workspaceButton, letters);
+        workspaceButton.requestFocus();
+    }
+
+    private void installPopupKeys(Parent root, MenuButton workspaceButton, Map<String, String> letters) {
+        var shortcuts = new HashMap<KeyCombination, Button>();
+        letters.forEach((id, letter) ->
+                shortcuts.put(KeyCombination.keyCombination(letter), (Button) root.lookup("#quick-" + id)));
         root.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (event.getCode() == KeyCode.ESCAPE) {
                 hide();
@@ -330,9 +362,15 @@ final class QuickMenu implements AutoCloseable {
                     button.fire();
                 }
                 event.consume();
+            } else if (!workspaceButton.isShowing()) {
+                shortcuts.forEach((key, button) -> {
+                    if (key.match(event)) {
+                        event.consume();
+                        button.fire();
+                    }
+                });
             }
         });
-        workspaceButton.requestFocus();
     }
 
     void hide() {
@@ -351,14 +389,14 @@ final class QuickMenu implements AutoCloseable {
         observeWindow(null);
     }
 
-    private GridPane radialButtons(Content commands) {
+    private GridPane radialButtons(Content commands, Map<String, String> letters) {
         var ring = new GridPane();
         ring.getStyleClass().add("quick-menu-ring");
         ring.setHgap(6);
         ring.setVgap(6);
         int[][] slots = {{1, 0}, {2, 0}, {2, 1}, {2, 2}, {1, 2}, {0, 2}, {0, 1}, {0, 0}};
         for (int index = 0; index < Math.min(8, commands.radial().size()); index++) {
-            var button = actionButton(commands.radial().get(index));
+            var button = actionButton(commands.radial().get(index), letters);
             button.getStyleClass().add("quick-menu-command");
             button.setPrefWidth(slots[index][0] == 1 ? 152 : 136);
             button.setMinHeight(36);

@@ -7,7 +7,10 @@ import dev.voxelbrew.engine.parameters.*;
 import java.util.*;
 import java.util.function.Function;
 import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.*;
 import javafx.stage.Window;
 
@@ -15,6 +18,8 @@ import javafx.stage.Window;
  * One cancellable parameter/configuration transaction, usable from the workbench or sketch draft.
  */
 final class ParameterDialog {
+    private static final javafx.css.PseudoClass INVALID = javafx.css.PseudoClass.getPseudoClass("invalid");
+
     private final TranslationService translations;
 
     private final List<Feature> features;
@@ -28,7 +33,7 @@ final class ParameterDialog {
     private final TableView<FeatureDimensions.Dimension> dimensions = new TableView<>();
 
     private final TextField name = textField("parameter-name"), configName = textField("configuration-name");
-    private final FormulaField expression, stringExpression, comment, override, binding;
+    private final FormulaField expression, comment, override, binding;
 
     private final ComboBox<ParameterUnit> unit = new ComboBox<>();
 
@@ -40,19 +45,66 @@ final class ParameterDialog {
 
     private boolean refreshing;
 
-    private String selectedParameter;
+    private RowEditor rowEditor;
+
+    private final class RowEditor {
+        final ParameterSet.Parameter parameter;
+        final TextField rowName = textField("parameter-row-name");
+        final ComboBox<ParameterUnit> rowUnit = new ComboBox<>();
+        final FormulaField rowExpression;
+        final FormulaField rowComment;
+
+        RowEditor(ParameterSet.Parameter parameter) {
+            this.parameter = parameter;
+            rowName.setText(parameter.name());
+            rowUnit.setId("parameter-row-unit");
+            rowUnit.getItems().setAll(ParameterUnit.values());
+            rowUnit.setValue(parameter.unit());
+            rowUnit.setMaxWidth(Double.MAX_VALUE);
+            rowExpression = FormulaField.number(
+                    draft.expression(parameter, draft.active()), () -> draft, rowUnit::getValue, translations);
+            rowExpression.setId("parameter-row-expression");
+            rowUnit.valueProperty().addListener(o -> rowExpression.refreshFormula());
+            rowComment = FormulaField.text(Expressions.literalText(parameter.comment()), () -> draft, translations);
+            rowComment.setId("parameter-row-comment");
+            watchName(rowName, parameter);
+            rowExpression.focusedProperty().addListener((o, before, focused) -> {
+                if (!focused && rowEditor == this) {
+                    attempt(() -> draft.value(rowExpression.getText(), rowUnit.getValue()));
+                }
+            });
+            for (var editor : List.of(rowName, rowExpression, rowComment)) {
+                editor.setOnAction(event -> {
+                    event.consume();
+                    attempt(ParameterDialog.this::saveRow);
+                });
+            }
+            for (var editor : List.of(rowName, rowUnit, rowExpression, rowComment)) {
+                editor.addEventHandler(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
+                    if (event.getCode() == KeyCode.ESCAPE) {
+                        event.consume();
+                        cancelRow();
+                    }
+                });
+            }
+        }
+    }
 
     static Optional<ParameterSet> show(
             Window owner, List<Feature> features, ParameterSet initial, TranslationService translations) {
         var editor = new ParameterDialog(features, initial, translations);
         var dialog = new Dialog<ParameterSet>();
         dialog.setTitle(translations.translate("gui.parameters_and_configurations"));
+        dialog.getDialogPane().setPrefWidth(840);
         dialog.getDialogPane().setContent(editor.content());
         dialog.getDialogPane().getButtonTypes().setAll(ButtonType.APPLY, ButtonType.CANCEL);
-        dialog.getDialogPane().lookupButton(ButtonType.APPLY).setId("parameters-apply");
+        var apply = dialog.getDialogPane().lookupButton(ButtonType.APPLY);
+        apply.setId("parameters-apply");
+        apply.getStyleClass().add("parameter-primary-action");
         dialog.getDialogPane().lookupButton(ButtonType.CANCEL).setId("parameters-cancel");
-        dialog.getDialogPane().lookupButton(ButtonType.APPLY).addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
+        apply.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
             try {
+                editor.saveRow();
                 editor.draft.validate();
             } catch (RuntimeException failure) {
                 editor.error.setText(failure.getMessage());
@@ -61,6 +113,13 @@ final class ParameterDialog {
         });
         dialog.setResultConverter(b -> b == ButtonType.APPLY ? editor.draft : null);
         return Dialogs.show(dialog, owner, translations);
+    }
+
+    private static Button rowAction() {
+        var button = new Button();
+        button.getStyleClass().add("parameter-row-action");
+        button.setTooltip(new Tooltip());
+        return button;
     }
 
     private static TextField textField(String id) {
@@ -77,7 +136,7 @@ final class ParameterDialog {
     }
 
     static List<ParameterSet.Parameter> groupedParameters(ParameterSet set) {
-        return set.allParameters().stream()
+        return ParameterSuggestions.availableParameters(set).stream()
                 .sorted(Comparator.comparing((ParameterSet.Parameter p) -> {
                             int dot = p.name().indexOf('.');
                             return dot < 0 ? "" : p.name().substring(0, dot);
@@ -86,12 +145,52 @@ final class ParameterDialog {
                 .toList();
     }
 
+    static ParameterSet removeParameter(ParameterSet set, String name, TranslationService translations) {
+        for (var parameter : set.parameters()) {
+            if (parameter.name().equals(name)) continue;
+            checkReference(name, parameter.name(), parameter.expression(), translations);
+            for (var configuration : set.configurations()) {
+                var override = configuration.overrides().get(parameter.id());
+                if (override != null) {
+                    checkReference(name, configuration.name() + " / " + parameter.name(), override, translations);
+                }
+            }
+        }
+        for (var binding : set.bindings()) {
+            checkReference(name, binding.target().toString(), binding.expression(), translations);
+        }
+        return set.remove(name);
+    }
+
+    static ParameterSet freezeSketchText(ParameterSet set, String name) {
+        var next = set;
+        for (var binding : set.bindings()) {
+            String field = binding.target().field();
+            if (FeatureText.isField(field) && field.endsWith(":content") && references(binding.expression(), name)) {
+                String value = set.text(binding.expression());
+                next = next.bind(binding.target(), "=\"" + value.replace("\"", "\"\"") + "\"");
+            }
+        }
+        return next;
+    }
+
+    private static boolean references(String expression, String name) {
+        // Use the formula engine's token rules so quoted text and longer names are left alone.
+        return !expression.equals(Expressions.rename(expression, name, ""));
+    }
+
+    private static void checkReference(String name, String owner, String expression, TranslationService translations) {
+        if (references(expression, name)) {
+            throw new IllegalArgumentException(
+                    translations.translate("parameters.removeReferenced", name, owner, expression));
+        }
+    }
+
     private ParameterDialog(List<Feature> features, ParameterSet initial, TranslationService translations) {
         this.translations = translations;
         this.features = List.copyOf(features);
         draft = initial;
         expression = field("parameter-expression");
-        stringExpression = field("parameter-string-expression");
         comment = field("parameter-comment");
         override = field("configuration-expression");
         binding = field("parameter-binding-expression");
@@ -129,17 +228,6 @@ final class ParameterDialog {
     private Button button(String label, String id, Runnable action) {
         var b = new Button(label);
         b.setId(id);
-        if (id.equals("parameter-save") || id.equals("parameter-remove")) {
-            b.disableProperty()
-                    .bind(javafx.beans.binding.Bindings.createBooleanBinding(
-                            () -> parameters.getSelectionModel().getSelectedItem() != null
-                                    && parameters
-                                            .getSelectionModel()
-                                            .getSelectedItem()
-                                            .name()
-                                            .startsWith("vb."),
-                            parameters.getSelectionModel().selectedItemProperty()));
-        }
         UiHelp.install(b, translations);
         b.setOnAction(e -> attempt(action));
         return b;
@@ -154,6 +242,23 @@ final class ParameterDialog {
         }
     }
 
+    private void requestRemoval(String parameterName) {
+        var frozen = freezeSketchText(draft, parameterName);
+        var next = removeParameter(frozen, parameterName, translations);
+        if (frozen != draft) {
+            var confirm = new Alert(
+                    Alert.AlertType.CONFIRMATION,
+                    translations.translate("parameters.freezeSketchText", parameterName, configLabel(draft.active())),
+                    ButtonType.YES,
+                    ButtonType.CANCEL);
+            confirm.setHeaderText(translations.translate("gui.remove"));
+            if (Dialogs.show(confirm, parameters.getScene().getWindow(), translations)
+                            .orElse(ButtonType.CANCEL)
+                    != ButtonType.YES) return;
+        }
+        update(next);
+    }
+
     private void update(ParameterSet next) {
         FeatureDimensions.validateBindings(features, next);
         draft = next;
@@ -162,18 +267,24 @@ final class ParameterDialog {
 
     private Pane content() {
         configureParameterTable();
-        parameters.getSelectionModel().selectedItemProperty().addListener((o, a, p) -> selectParameter(p));
+        unit.setMaxWidth(Double.MAX_VALUE);
+        watchName(name, null);
+        expression.focusedProperty().addListener((o, before, focused) -> {
+            if (!focused && !expression.isDisabled() && !expression.getText().isBlank()) {
+                attempt(() -> draft.value(expression.getText(), unit.getValue()));
+            }
+        });
         unit.setId("parameter-unit");
         unit.valueProperty().addListener(o -> expression.refreshFormula());
         unit.getItems().setAll(ParameterUnit.values());
         unit.setValue(ParameterUnit.MM);
-        stringExpression.setEditable(false);
-        stringExpression.setVisible(false);
-        stringExpression.setManaged(false);
-        var expressionFields = new StackPane(expression, stringExpression);
         var fields = new GridPane();
         fields.setHgap(8);
         fields.setVgap(5);
+        var inputColumn = new ColumnConstraints(0, 0, Double.MAX_VALUE);
+        inputColumn.setHgrow(Priority.ALWAYS);
+        fields.getColumnConstraints()
+                .setAll(new ColumnConstraints(), inputColumn, new ColumnConstraints(), inputColumn);
         fields.addRow(
                 0,
                 new Label(translations.translate("gui.name")),
@@ -183,38 +294,13 @@ final class ParameterDialog {
         fields.addRow(
                 1,
                 new Label(translations.translate("gui.expression")),
-                expressionFields,
+                expression,
                 new Label(translations.translate("gui.comment")),
                 comment);
+        var save = button(translations.translate("gui.add"), "parameter-save", this::addParameter);
+        save.getStyleClass().add("parameter-primary-action");
         var parameterButtons = new FlowPane(
-                6,
-                6,
-                button(translations.translate("gui.add_update"), "parameter-save", () -> {
-                    ParameterSet next = draft;
-                    if (selectedParameter != null
-                            && !next.parameter(selectedParameter)
-                                    .name()
-                                    .equals(name.getText().strip())) {
-                        next = next.rename(selectedParameter, name.getText().strip());
-                    }
-                    update(next.put(
-                            name.getText().strip(),
-                            unit.getValue(),
-                            expression.getText().strip(),
-                            comment.evaluatedText()));
-                }),
-                button(translations.translate("action.new"), "parameter-new", () -> {
-                    selectedParameter = null;
-                    parameters.getSelectionModel().clearSelection();
-                    name.clear();
-                    expression.clear();
-                    comment.clear();
-                    name.requestFocus();
-                }),
-                button(translations.translate("gui.remove"), "parameter-remove", () -> {
-                    update(draft.remove(name.getText().strip()));
-                    selectedParameter = null;
-                }));
+                6, 6, save, button("↺ " + translations.translate("gui.clear"), "parameter-new", this::clearFields));
         var parameterPane = new VBox(
                 7,
                 new Label(translations.translate(
@@ -334,6 +420,13 @@ final class ParameterDialog {
                 new Tab(translations.translate("gui.parameters"), parameterPane),
                 new Tab(translations.translate("gui.configurations"), configurationPane),
                 new Tab(translations.translate("gui.dimensions"), dimensionsPane));
+        tabs.getSelectionModel().selectedIndexProperty().addListener((o, before, after) -> {
+            if (before.intValue() != 0 || rowEditor == null) return;
+            attempt(this::saveRow);
+            if (rowEditor != null) tabs.getSelectionModel().select(0);
+        });
+        save.defaultButtonProperty()
+                .bind(tabs.getSelectionModel().selectedIndexProperty().isEqualTo(0));
         tabs.setId("parameters-tabs");
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         tabs.setPrefHeight(370);
@@ -383,19 +476,16 @@ final class ParameterDialog {
         try {
             var config = configurations.getSelectionModel().getSelectedItem();
             var chosen = overrideParameter.getValue();
+            var rows = groupedParameters(draft);
+            boolean missingBuiltins = rows.size() == draft.parameters().size();
+            showBuiltins.setDisable(missingBuiltins);
+            showBuiltins.setText(translations.translate(
+                    missingBuiltins ? "parameters.builtinsUnavailable" : "parameters.showBuiltins"));
             parameters
                     .getItems()
-                    .setAll(groupedParameters(draft).stream()
+                    .setAll(rows.stream()
                             .filter(p -> showBuiltins.isSelected() || !p.name().startsWith("vb."))
                             .toList());
-            if (selectedParameter != null) {
-                parameters
-                        .getSelectionModel()
-                        .select(draft.parameters().stream()
-                                .filter(p -> p.id().equals(selectedParameter))
-                                .findFirst()
-                                .orElse(null));
-            }
             overrideParameter.getItems().setAll(draft.parameters());
             overrideParameter.setValue(
                     chosen == null
@@ -468,37 +558,17 @@ final class ParameterDialog {
 
     private void configureParameterTable() {
         showBuiltins.setId("parameters-show-builtins");
-        showBuiltins.setText(translations.translate("parameters.showBuiltins"));
         UiHelp.install(showBuiltins, translations);
         showBuiltins.setSelected(true);
-        showBuiltins.selectedProperty().addListener((o, before, show) -> {
-            var selected = parameters.getSelectionModel().getSelectedItem();
-            if (!show && selected != null && selected.name().startsWith("vb.")) {
-                selectedParameter = null;
-                parameters.getSelectionModel().clearSelection();
-                name.clear();
-                expression.clear();
-                stringExpression.clear();
-                comment.clear();
-            }
-            refresh();
-        });
+        showBuiltins.selectedProperty().addListener(o -> refresh());
         parameters.setId("parameter-table");
         parameters.setPlaceholder(new Label(translations.translate("parameters.empty")));
         parameters.setPrefHeight(175);
-        parameters.getColumns().add(column(translations.translate("gui.name"), 110, ParameterSet.Parameter::name));
+        parameters.getColumns().add(rowColumn("gui.name", 110, ParameterSet.Parameter::name, r -> r.rowName));
         parameters
                 .getColumns()
-                .add(column(
-                        translations.translate("gui.unit"),
-                        65,
-                        p -> BuiltinParameters.isString(p.name())
-                                ? "string"
-                                : p.unit().toString()));
-        parameters
-                .getColumns()
-                .add(column(translations.translate("gui.expression"), 180, p -> draft.expression(p, draft.active())));
-        parameters.getColumns().add(column(translations.translate("gui.value"), 90, p -> {
+                .add(rowColumn("gui.expression", 180, p -> draft.expression(p, draft.active()), r -> r.rowExpression));
+        var valueColumn = ParameterDialog.<ParameterSet.Parameter>column(translations.translate("gui.value"), 90, p -> {
             try {
                 if (p.name().startsWith("vb.")) {
                     return Expressions.format(draft.builtins().value(p.name()));
@@ -510,10 +580,68 @@ final class ParameterDialog {
             } catch (RuntimeException failure) {
                 return translations.translate("gui.error");
             }
-        }));
+        });
+        valueColumn.setCellFactory(c -> new TableCell<>() {
+            {
+                setOnMouseClicked(event -> {
+                    if (!isEmpty() && event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2) {
+                        attempt(() -> startRow(getTableRow().getItem(), r -> r.rowExpression));
+                    }
+                });
+            }
+
+            @Override
+            protected void updateItem(String text, boolean empty) {
+                super.updateItem(text, empty);
+                setText(empty ? null : text);
+            }
+        });
+        parameters.getColumns().add(valueColumn);
         parameters
                 .getColumns()
-                .add(column(translations.tryTranslate("gui.comment").orElseThrow(), 130, this::parameterComment));
+                .add(rowColumn(
+                        "gui.unit",
+                        85,
+                        p -> BuiltinParameters.isString(p.name())
+                                ? "string"
+                                : p.unit().toString(),
+                        r -> r.rowUnit));
+        parameters.getColumns().add(rowColumn("gui.comment", 130, this::parameterComment, r -> r.rowComment));
+        var actions = new TableColumn<ParameterSet.Parameter, Void>();
+        actions.setMinWidth(60);
+        actions.setPrefWidth(60);
+        actions.setMaxWidth(60);
+        actions.setSortable(false);
+        actions.setCellFactory(column -> new TableCell<>() {
+            private final Button edit = rowAction();
+            private final Button remove = rowAction();
+            private final HBox buttons = new HBox(2, edit, remove);
+
+            {
+                edit.setOnAction(event -> attempt(() -> {
+                    if (editing(getTableRow().getItem())) saveRow();
+                    else startRow(getTableRow().getItem(), r -> r.rowName);
+                }));
+                remove.setOnAction(event -> attempt(() -> {
+                    var parameter = getTableRow().getItem();
+                    if (editing(parameter)) cancelRow();
+                    else requestRemoval(parameter.name());
+                }));
+            }
+
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                var parameter = empty ? null : getTableView().getItems().get(getIndex());
+                boolean editing = editing(parameter);
+                labelRowAction(edit, editing ? "✓" : "✎", editing ? "action.save" : "parameter.edit");
+                labelRowAction(remove, editing ? "↺" : "×", editing ? "action.cancel" : "gui.remove");
+                String prefix = editing ? "parameter-row-save-" : "parameter-row-edit-";
+                edit.setId(parameter == null ? null : prefix + parameter.name());
+                setGraphic(parameter == null || parameter.name().startsWith("vb.") ? null : buttons);
+            }
+        });
+        parameters.getColumns().add(actions);
         parameters.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
     }
 
@@ -525,31 +653,116 @@ final class ParameterDialog {
                 .orElse(parameter.comment());
     }
 
-    private void selectParameter(ParameterSet.Parameter p) {
-        boolean builtin = p != null && p.name().startsWith("vb.");
-        boolean string = p != null && BuiltinParameters.isString(p.name());
-        stringExpression.setVisible(string);
-        stringExpression.setManaged(string);
-        expression.setVisible(!string);
-        expression.setManaged(!string);
-        unit.setPromptText(string ? "string" : "");
-        if (!string && unit.getValue() == null) unit.setValue(ParameterUnit.MM);
-        for (var control : List.of(name, unit, expression, comment)) control.setDisable(builtin);
-        if (builtin) {
-            name.setText(p.name());
-            unit.setValue(string ? null : p.unit());
-            if (string) stringExpression.setText(p.expression());
-            else {
-                expression.setText(p.expression());
+    private void labelRowAction(Button button, String glyph, String key) {
+        String label = translations.translate(key);
+        button.setText(glyph);
+        button.setAccessibleText(label);
+        button.getTooltip().setText(label);
+    }
+
+    private void addParameter() {
+        String newName = validateName(name, null);
+        update(draft.put(newName, unit.getValue(), expression.getText().strip(), comment.evaluatedText()));
+        clearFields();
+    }
+
+    private void clearFields() {
+        name.pseudoClassStateChanged(INVALID, false);
+        name.clear();
+        expression.clear();
+        comment.clear();
+        unit.setValue(ParameterUnit.MM);
+        name.requestFocus();
+    }
+
+    private void watchName(TextField field, ParameterSet.Parameter original) {
+        field.getStyleClass().add("parameter-name-field");
+        field.focusedProperty().addListener((o, before, focused) -> {
+            if (!focused && (original == null ? !field.getText().isBlank() : editing(original))) {
+                attempt(() -> validateName(field, original));
             }
-            comment.setText(parameterComment(p));
+        });
+        field.textProperty().addListener(o -> {
+            if (field.getPseudoClassStates().contains(INVALID)) attempt(() -> validateName(field, original));
+        });
+    }
+
+    private String validateName(TextField field, ParameterSet.Parameter original) {
+        String candidate = field.getText().strip();
+        try {
+            ParameterSet.requireName(candidate);
+        } catch (IllegalArgumentException invalid) {
+            field.pseudoClassStateChanged(INVALID, true);
+            throw new IllegalArgumentException(translations.translate("parameter.invalidName"), invalid);
         }
-        if (refreshing || p == null) return;
-        if (p.name().startsWith("vb.")) return;
-        selectedParameter = p.id();
-        name.setText(p.name());
-        unit.setValue(p.unit());
-        expression.setText(draft.expression(p, draft.active()));
-        comment.setText(Expressions.literalText(p.comment()));
+        boolean duplicate = draft.parameters().stream()
+                .anyMatch(p -> p.name().equals(candidate) && (original == null || !p.id().equals(original.id())));
+        field.pseudoClassStateChanged(INVALID, duplicate);
+        if (duplicate) throw new IllegalArgumentException(translations.translate("parameter.duplicateName", candidate));
+        return candidate;
+    }
+
+    private boolean editing(ParameterSet.Parameter p) {
+        return rowEditor != null && p != null && rowEditor.parameter.id().equals(p.id());
+    }
+
+    private void startRow(ParameterSet.Parameter p, Function<RowEditor, Node> field) {
+        if (p == null || p.name().startsWith("vb.")) return;
+        if (!editing(p)) {
+            saveRow();
+            rowEditor = new RowEditor(p);
+            parameters.refresh();
+        }
+        var editor = field.apply(rowEditor);
+        javafx.application.Platform.runLater(() -> {
+            editor.requestFocus();
+            if (editor instanceof TextField input) input.selectAll();
+        });
+    }
+
+    private void saveRow() {
+        if (rowEditor == null) return;
+        var row = rowEditor;
+        String newName = validateName(row.rowName, row.parameter);
+        var next = newName.equals(row.parameter.name()) ? draft : draft.rename(row.parameter.id(), newName);
+        update(next.put(
+                newName, row.rowUnit.getValue(), row.rowExpression.getText().strip(), row.rowComment.evaluatedText()));
+        cancelRow();
+    }
+
+    private void cancelRow() {
+        rowEditor = null;
+        error.setText("");
+        parameters.refresh();
+    }
+
+    private TableColumn<ParameterSet.Parameter, String> rowColumn(
+            String title,
+            double width,
+            Function<ParameterSet.Parameter, String> value,
+            Function<RowEditor, Node> editor) {
+        var column = column(translations.translate(title), width, value);
+        column.setCellFactory(c -> new TableCell<>() {
+            {
+                setOnMouseClicked(event -> {
+                    if (!isEmpty()
+                            && event.getButton() == MouseButton.PRIMARY
+                            && event.getClickCount() == 2
+                            && getGraphic() == null) {
+                        attempt(() -> startRow(getTableRow().getItem(), editor));
+                    }
+                });
+            }
+
+            @Override
+            protected void updateItem(String text, boolean empty) {
+                super.updateItem(text, empty);
+                var p = empty ? null : getTableView().getItems().get(getIndex());
+                boolean activeRow = editing(p);
+                setText(empty || activeRow ? null : text);
+                setGraphic(activeRow ? editor.apply(rowEditor) : null);
+            }
+        });
+        return column;
     }
 }

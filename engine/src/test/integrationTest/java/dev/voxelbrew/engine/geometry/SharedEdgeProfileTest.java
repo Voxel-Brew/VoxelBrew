@@ -67,7 +67,7 @@ class SharedEdgeProfileTest {
         entities.add(Sketches.entity("hole", Kind.CIRCLE, false, 10, 5, 2));
         var g = geometry(entities);
         var regions = SketchProfiles.selectableRegions(g);
-        assertThat(regions.size()).isEqualTo(2);
+        assertThat(regions).hasSize(3);
         try (var solid = Solid.profilePrism(regions.getFirst().profile(), 0, 5)) {
             assertThat(solid.volume()).isCloseTo(1000 - 20 * Math.PI, org.assertj.core.data.Offset.offset(1e-6));
             assertThat(solid.contains(10, 5, 2)).isFalse();
@@ -119,6 +119,41 @@ class SharedEdgeProfileTest {
             }
         }
         assertThat(volume).isCloseTo(1500, org.assertj.core.data.Offset.offset(1e-6));
+    }
+
+    @Test
+    void lineBetweenHoleCentersLeavesBothHolesInTheExtrusion() {
+        var entities = new ArrayList<>(house().subList(0, 4));
+        entities.add(Sketches.entity("first", Kind.CIRCLE, false, 5, 5, 2));
+        entities.add(Sketches.entity("second", Kind.CIRCLE, false, 15, 5, 2));
+        entities.add(Sketches.entity("spacing", Kind.LINE, false, 5, 5, 15, 5));
+        var sketch = geometry(entities);
+        var faces = SketchProfiles.selectableRegions(sketch);
+        assertThat(faces).hasSize(3);
+        var feature = new dev.voxelbrew.api.model.Feature.Sketch(
+                "s",
+                "p",
+                new dev.voxelbrew.api.model.Feature.Plane("origin-xy", 0),
+                new dev.voxelbrew.api.model.Feature.Constrained(sketch));
+        for (int mask = 0; mask < 4; mask++) {
+            var ids = new ArrayList<>(List.of(faces.getFirst().id()));
+            boolean left = (mask & 1) != 0;
+            boolean right = (mask & 2) != 0;
+            if (left) ids.add(faces.get(1).id());
+            if (right) ids.add(faces.get(2).id());
+            var selected = SketchProfiles.referencedRegions(feature, SketchProfiles.selectedProfileId("p", ids));
+            assertThat(selected).hasSize(1);
+            try (var solid = Solid.profilePrism(selected.getFirst().profile(), 0, 5)) {
+                assertThat(solid.contains(5, 5, 2)).isEqualTo(left);
+                assertThat(solid.contains(15, 5, 2)).isEqualTo(right);
+                assertThat(solid.volume()).isCloseTo(1000 - (2 - Integer.bitCount(mask)) * 20 * Math.PI, within(1e-6));
+            }
+        }
+        try (var solid = Solid.profilePrism(SketchProfiles.profile(sketch), 0, 5)) {
+            assertThat(solid.volume()).isCloseTo(1000 - 40 * Math.PI, within(1e-6));
+            assertThat(solid.contains(5, 5, 2)).isFalse();
+            assertThat(solid.contains(15, 5, 2)).isFalse();
+        }
     }
 
     @Test

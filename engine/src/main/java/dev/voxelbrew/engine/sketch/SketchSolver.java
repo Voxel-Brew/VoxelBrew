@@ -15,6 +15,20 @@ import org.apache.commons.math3.linear.SingularValueDecomposition;
  * Damped least-squares constraint solver. No native kernel, UI toolkit, or mutable global state.
  */
 public final class SketchSolver {
+    private record Instances(List<Constraint> links, Set<String> targets) {
+        static Instances of(SketchGeometry geometry) {
+            var links =
+                    geometry.constraints().stream().filter(SketchCopies::linked).toList();
+            var targets = new HashSet<String>();
+            for (var link : links) targets.add(link.refs().get(1).entityId());
+            return new Instances(links, targets);
+        }
+
+        boolean independent(Entity entity) {
+            return !FaceProjection.reference(entity.id()) && !targets.contains(entity.id());
+        }
+    }
+
     public record Problem(String constraintId, String message) {}
 
     public record Result(
@@ -59,14 +73,19 @@ public final class SketchSolver {
     }
 
     private static Result classify(
-            SketchGeometry input, SketchGeometry current, double[] x, double[] residual, boolean parallel) {
+            SketchGeometry input,
+            SketchGeometry current,
+            double[] x,
+            double[] residual,
+            boolean parallel,
+            Instances instances) {
         var problems = problems(current);
         if (!problems.isEmpty()) return new Result(current, -1, 0, problems);
         if (x.length == 0 || residual.length == 0) {
             return new Result(current, x.length, residual.length, List.of(), Set.of(ORIGIN));
         }
         var decomposition = new SingularValueDecomposition(
-                new Array2DRowRealMatrix(jacobian(input, x, residual.length, parallel), false));
+                new Array2DRowRealMatrix(jacobian(input, x, residual.length, parallel, instances), false));
         var singular = decomposition.getSingularValues();
         double cutoff = Math.max(1e-7, singular[0] * 1e-8);
         int rank = 0;
@@ -80,16 +99,19 @@ public final class SketchSolver {
                 Math.max(0, x.length - rank),
                 Math.max(0, residual.length - rank),
                 List.of(),
-                constrainedReferences(current, decomposition.getV(), rank));
+                constrainedReferences(current, decomposition.getV(), rank, instances));
     }
 
     static Result solve(SketchGeometry input, boolean parallel) {
+        var instances = Instances.of(input);
         double[] x = input.entities().stream()
+                .filter(instances::independent)
                 .flatMap(e -> e.values().stream())
                 .mapToDouble(Double::doubleValue)
                 .toArray();
         SketchGeometry current = input;
         try {
+            current = SketchCopies.refresh(input, instances.links());
             SketchConstraints.validateGeometry(current);
             double[] residual = residual(current);
             double lambda = 1e-5;
@@ -97,7 +119,7 @@ public final class SketchSolver {
                 if (Thread.currentThread().isInterrupted()) throw new CancellationException("Sketch solve cancelled");
                 if (x.length == 0) break;
                 var svd = new SingularValueDecomposition(
-                        new Array2DRowRealMatrix(jacobian(input, x, residual.length, parallel), false));
+                        new Array2DRowRealMatrix(jacobian(input, x, residual.length, parallel, instances), false));
                 var singular = svd.getSingularValues();
                 var u = svd.getU();
                 var v = svd.getV();
@@ -116,7 +138,7 @@ public final class SketchSolver {
                     double[] candidate = x.clone();
                     for (int i = 0; i < x.length; i++) candidate[i] += step[i];
                     try {
-                        var geometry = unpack(input, candidate);
+                        var geometry = unpack(input, candidate, instances);
                         SketchConstraints.validateGeometry(geometry);
                         var next = residual(geometry);
                         if (cost(next) < oldCost) {
@@ -134,7 +156,7 @@ public final class SketchSolver {
                 }
                 if (!improved) break;
             }
-            return classify(input, current, x, residual, parallel);
+            return classify(input, current, x, residual, parallel, instances);
         } catch (IllegalArgumentException failure) {
             return new Result(input, -1, 0, List.of(new Problem("", failure.getMessage())));
         }
@@ -142,11 +164,17 @@ public final class SketchSolver {
 
     /** Classifies geometry by its remaining infinitesimal motion, including indirect constraints. */
     private static Set<Ref> constrainedReferences(
-            SketchGeometry geometry, org.apache.commons.math3.linear.RealMatrix v, int rank) {
+            SketchGeometry geometry, org.apache.commons.math3.linear.RealMatrix v, int rank, Instances instances) {
         var fixed = new HashSet<Ref>();
         fixed.add(ORIGIN);
         int offset = 0;
         for (var entity : geometry.entities()) {
+            if (instances.targets().contains(entity.id())) continue;
+            if (FaceProjection.reference(entity.id())) {
+                fixed.add(entity.ref());
+                fixed.addAll(entity.pointRefs());
+                continue;
+            }
             int count = entity.values().size();
             boolean entityFixed = true;
             for (int i = 0; i < count; i++) {
@@ -178,7 +206,19 @@ public final class SketchSolver {
             }
             offset += count;
         }
+        addFixedInstances(geometry, fixed, instances);
         return fixed;
+    }
+
+    private static void addFixedInstances(SketchGeometry geometry, Set<Ref> fixed, Instances instances) {
+        for (var link : instances.links()) {
+            var refs = link.refs();
+            if (fixed.contains(refs.getFirst()) && (refs.size() == 2 || fixed.contains(refs.get(2)))) {
+                var target = geometry.entity(refs.get(1).entityId());
+                fixed.add(target.ref());
+                fixed.addAll(target.pointRefs());
+            }
+        }
     }
 
     private static boolean hasNoFreedom(
@@ -220,7 +260,8 @@ public final class SketchSolver {
         return values.stream().mapToDouble(Double::doubleValue).toArray();
     }
 
-    private static double[][] jacobian(SketchGeometry definition, double[] x, int rows, boolean parallel) {
+    private static double[][] jacobian(
+            SketchGeometry definition, double[] x, int rows, boolean parallel, Instances instances) {
         double[][] result = new double[rows][x.length];
         java.util.function.IntConsumer column = col -> {
             if (Thread.currentThread().isInterrupted()) throw new CancellationException("Sketch solve cancelled");
@@ -228,7 +269,7 @@ public final class SketchSolver {
             double[] a = x.clone(), b = x.clone();
             a[col] += h;
             b[col] -= h;
-            double[] ra = residual(unpack(definition, a)), rb = residual(unpack(definition, b));
+            double[] ra = residual(unpack(definition, a, instances)), rb = residual(unpack(definition, b, instances));
             for (int row = 0; row < rows; row++) result[row][col] = (ra[row] - rb[row]) / (2 * h);
         };
         // Tiny sketches cost less than scheduling work. Columns write disjoint matrix entries.
@@ -240,15 +281,19 @@ public final class SketchSolver {
         return result;
     }
 
-    private static SketchGeometry unpack(SketchGeometry source, double[] values) {
+    private static SketchGeometry unpack(SketchGeometry source, double[] values, Instances instances) {
         int index = 0;
         var entities = new ArrayList<Entity>();
         for (var entity : source.entities()) {
+            if (!instances.independent(entity)) {
+                entities.add(entity);
+                continue;
+            }
             var parameters = new ArrayList<Double>();
             for (int i = 0; i < entity.values().size(); i++) parameters.add(values[index++]);
             entities.add(entity.withValues(parameters));
         }
-        return source.withEntities(entities);
+        return SketchCopies.refresh(source.withEntities(entities), instances.links());
     }
 
     private static double max(double[] values) {

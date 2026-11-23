@@ -31,6 +31,24 @@ VoxelBrew supports **Windows, macOS, and Linux**.
 - **Editable history:** revisit earlier modeling steps, roll back the timeline,
   and undo or redo changes.
 - **Save and reopen:** keep your editable designs in VoxelBrew's `.vxb` format.
+  The desktop app also keeps a recovery copy in `~/.voxelbrew/backups` after
+  five minutes of unsaved changes or ten editing operations, whichever comes
+  first. When you reopen a project with a backup, you can load the backup or
+  open the saved file. If you choose the saved file and it opens successfully,
+  VoxelBrew deletes the offered backup. A project saved after its backup session
+  closed opens directly. If the saved file cannot be read, VoxelBrew still
+  offers recovery.
+  Choosing recovery saves the recovered changes to the original project file.
+  If opening that file failed, recovery leaves the changes open for Save As.
+  For an untitled project, choose a destination in Save As.
+  Saving the current changes removes the session backup immediately. Further
+  edits can create a fresh backup.
+  A crash or failed save leaves the backup available. Starting VoxelBrew without
+  a project also offers recovery for an untitled design. Older backups created
+  before session tracking can still be opened directly from the backups folder.
+  Change either threshold
+  or disable backups in **Settings → Project autosave**. Turning autosave off
+  deletes the recovery copy for the current editing session only.
 - **3D printing workflow:** export STL and 3MF files, configure slicing, and
   inspect toolpaths before printing.
 - **Desktop and command line:** work visually in the JavaFX desktop application

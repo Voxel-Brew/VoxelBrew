@@ -82,6 +82,8 @@ public final class FeatureDimensions {
                 default -> ParameterUnit.NUMBER;
             };
             result.add(new Dimension(new ParameterSet.Target(c.id(), "value"), unit, c.value()));
+        } else if (BodyExtrusion.modifiesBody(feature)) {
+            length.accept("distance", BodyExtrusion.from(feature).extrusion().distance());
         } else if (feature instanceof Feature.Extrude e) {
             length.accept("distance", e.distance());
         } else if (feature instanceof Feature.EdgeFinish f) {
@@ -111,6 +113,9 @@ public final class FeatureDimensions {
         }
         if (feature instanceof Feature.Extrude e) {
             return new Feature.Extrude(e.id(), e.profile(), changes.getOrDefault("distance", e.distance()));
+        }
+        if (BodyExtrusion.modifiesBody(feature)) {
+            return BodyExtrusion.from(feature).withDistance(changes.get("distance"));
         }
         if (feature instanceof Feature.EdgeFinish f) {
             return new Feature.EdgeFinish(

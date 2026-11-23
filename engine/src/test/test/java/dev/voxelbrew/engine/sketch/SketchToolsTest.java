@@ -14,9 +14,36 @@ class SketchToolsTest {
         var points = new ArrayList<Vec>();
         for (int i = 0; i < xy.length; i += 2) points.add(new Vec(xy[i], xy[i + 1]));
         var result = SketchTools.add(
-                SketchGeometry.empty(), tool, "shape", points, List.of(), SketchTools.Options.defaults());
+                SketchGeometry.empty(), tool, "shape", points, List.of(), SketchTools.Options.defaults(tool));
         assertThat(SketchSolver.solve(result).solved()).isTrue();
         return result;
+    }
+
+    @Test
+    void freeTextStartsAlongPositiveY() {
+        assertThat(draw(TEXT, 3, 7).entity("shape").value(3)).isCloseTo(Math.PI / 2, within(1e-9));
+    }
+
+    @Test
+    void textCreationRejectsAnglesOutsideHalfATurn() {
+        var path = SketchGeometry.entity("path", Kind.LINE, true, 0, 0, 100, 0);
+        var source = new SketchGeometry(List.of(path), List.of(), List.of());
+        for (var tool : List.of(TEXT, TEXT_ON_PATH)) {
+            for (double degrees : new double[] {-181, -180, 180, 181}) {
+                var options = new SketchTools.Options(
+                        6, 3, false, false, 5, .5, "A", "SansSerif", 0, 10, Math.toRadians(degrees), 0);
+                var points = List.of(new Vec(10, 0));
+                var refs = tool == TEXT_ON_PATH ? List.of(path.ref()) : List.<Ref>of();
+                if (Math.abs(degrees) == 180) {
+                    var result = SketchTools.add(source, tool, "label", points, refs, options);
+                    assertThat(result.entity("label").value(3)).isEqualTo(options.angle());
+                } else {
+                    assertThatThrownBy(() -> SketchTools.add(source, tool, "label", points, refs, options))
+                            .isInstanceOf(IllegalArgumentException.class)
+                            .hasMessageContaining("rotation");
+                }
+            }
+        }
     }
 
     @Test
@@ -113,6 +140,22 @@ class SketchToolsTest {
     }
 
     @Test
+    void cursorVertexAndGuideCircleFollowPolygonRotation() {
+        var center = new Vec(-3, 8);
+        var cursor = new Vec(-12, 20);
+        var layout = SketchTools.PolygonLayout.fromVertex(center, cursor);
+        for (int sides : List.of(3, 5, 8, 32)) {
+            var polygon = layout.geometry("poly", sides);
+            var side = polygon.entities().getFirst();
+            assertThat(side.at(0).distance(cursor)).isLessThan(1e-9);
+            assertThat(layout.guideRadius(POLYGON_INSCRIBED, sides)).isCloseTo(center.distance(cursor), within(1e-9));
+            assertThat(layout.guideRadius(POLYGON_CIRCUMSCRIBED, sides))
+                    .isCloseTo(center.distance(side.at(.5)), within(1e-9));
+            SketchConstraints.requireSatisfied(polygon);
+        }
+    }
+
+    @Test
     void polygonModesPreserveTheRadiusApothemOrSelectedEdge() {
         assertThat(draw(POLYGON_INSCRIBED, 0, 0, 10, 0)
                         .entities()
@@ -147,6 +190,25 @@ class SketchToolsTest {
         assertThatThrownBy(() -> draw(ELLIPSE, 0, 0, 1, 0, 1, 0)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> draw(CIRCLE_THREE_POINT, 0, 0, 1, 0, 2, 0))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void textStartsAtTheClickedPositionInsideALineSegment() {
+        var line = SketchGeometry.entity("path", Kind.LINE, true, 10, 20, 110, 20);
+        var source = new SketchGeometry(List.of(line), List.of(), List.of());
+        var result = SketchTools.add(
+                source,
+                TEXT_ON_PATH,
+                "label",
+                List.of(new Vec(65, 21)),
+                List.of(line.ref()),
+                SketchTools.Options.defaults(TEXT_ON_PATH));
+        assertThat(result.entity("label").value(3)).isZero();
+        assertThat(SketchTools.pathCoordinates(line, new Vec(65, 18)).distance(new Vec(55, -2)))
+                .isLessThan(1e-9);
+        assertThat(result.entity("label").value(0)).isCloseTo(55, within(1e-9));
+        assertThat(SketchText.anchor(result, result.entity("label")).distance(new Vec(65, 20)))
+                .isLessThan(1e-9);
     }
 
     @Test

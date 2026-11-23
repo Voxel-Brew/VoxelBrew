@@ -4,17 +4,18 @@ import dev.voxelbrew.api.model.BodyInstance;
 import dev.voxelbrew.api.model.Transform;
 import dev.voxelbrew.api.model.printing.ManufacturingModel;
 import dev.voxelbrew.api.model.printing.MeshGeometry;
+import dev.voxelbrew.api.model.printing.SupportVolume;
 import java.awt.geom.Area;
 import java.awt.geom.Rectangle2D;
 import java.util.*;
 
-/** Conservative XY packing of placed object/support bounds; never changes rotation or height. */
+/** Packs object and support bounds in XY and seats each assembly on the bed in its current rotation. */
 public final class PrintArrangement {
-    private record Part(BodyInstance instance, Rectangle2D bounds) {}
+    private record Part(BodyInstance instance, Rectangle2D bounds, double minZ) {}
 
     /** Empty means no layout was found; callers must retain the original setup in that case. */
     public static Optional<List<BodyInstance>> arrange(ManufacturingModel model, double gap) {
-        if (!Double.isFinite(gap) || gap <= 0) throw new IllegalArgumentException("Gap must be positive");
+        if (!Double.isFinite(gap) || gap < 0) throw new IllegalArgumentException("Gap must be finite and nonnegative");
         var bed = MeshGeometry.polygon(model.profile().printer().bed());
         var plateBounds = bed.getBounds2D();
         for (var zone : model.profile().printer().excludedZones()) bed.subtract(MeshGeometry.polygon(zone));
@@ -62,7 +63,7 @@ public final class PrintArrangement {
                             Transform.translation(
                                             chosen.getX() - part.bounds().getX(),
                                             chosen.getY() - part.bounds().getY(),
-                                            0)
+                                            -part.minZ())
                                     .compose(source.transform())));
         }
         if (!occupied.isEmpty()) {
@@ -93,15 +94,17 @@ public final class PrintArrangement {
         var parts = new ArrayList<Part>();
         for (var instance : model.instances()) {
             var b = MeshGeometry.bounds(model.placedMesh(instance));
+            double minZ = b.minZ();
             Rectangle2D bounds = new Rectangle2D.Double(b.minX(), b.minY(), b.maxX() - b.minX(), b.maxY() - b.minY());
             for (var support : model.setup().supports()) {
                 if (support.instanceId().equals(instance.id())) {
                     var s = MeshGeometry.bounds(
                             MeshGeometry.transform(MeshGeometry.box(support), instance.transform()));
                     bounds.add(new Rectangle2D.Double(s.minX(), s.minY(), s.maxX() - s.minX(), s.maxY() - s.minY()));
+                    if (support.role() == SupportVolume.Role.SOLID_SUPPORT) minZ = Math.min(minZ, s.minZ());
                 }
             }
-            parts.add(new Part(instance, bounds));
+            parts.add(new Part(instance, bounds, minZ));
         }
         parts.sort(Comparator.comparingDouble(
                         (Part p) -> p.bounds().getWidth() * p.bounds().getHeight())

@@ -152,6 +152,21 @@ public final class Solid implements AutoCloseable {
         return contains(value(x, MILLIMETRE), value(y, MILLIMETRE), value(z, MILLIMETRE));
     }
 
+    public Solid combine(java.util.List<Solid> tools, boolean subtract) {
+        long[] handles = new long[tools.size()];
+        for (int i = 0; i < handles.length; i++) {
+            var tool = tools.get(i);
+            synchronized (tool.lock) {
+                tool.requireOpen();
+                handles[i] = tool.token;
+            }
+        }
+        synchronized (lock) {
+            requireOpen();
+            return new Solid(NativeKernel.combine(token, handles, subtract));
+        }
+    }
+
     public Solid cutThroughProfile(PlanarProfile profile) {
         synchronized (lock) {
             requireOpen();

@@ -142,6 +142,19 @@ message SketchText {
   uint32 style = 3;
   string path_id = 4;
   repeated SketchGlyph glyphs = 5;
+  enum Horizontal {
+    LEFT = 0;
+    CENTER = 1;
+    RIGHT = 2;
+  }
+  enum Vertical {
+    BASELINE = 0;
+    TOP = 1;
+    MIDDLE = 2;
+    BOTTOM = 3;
+  }
+  Horizontal horizontal = 6;
+  Vertical vertical = 7;
 }
 message SketchReference {
   enum Part {
@@ -191,6 +204,7 @@ message SketchConstraint {
     RHO = 24;
     TEXT_HEIGHT = 25;
     TEXT_SPACING = 26;
+    PATTERN_LINK = 27;
   }
   string id = 1;
   Type type = 2;
@@ -222,6 +236,13 @@ message ThroughCut {
   ProfileRef profile = 1;
   BodyRef body = 2;
   reserved 3 to 7;
+}
+// Payload for the built-in body extrusion stored in the versioned Custom
+// feature envelope.
+message BodyExtrusion {
+  Extrude extrusion = 1;
+  BodyRef target = 2;
+  bool subtract = 3;
 }
 message SplitBody {
   BodyRef body = 1;

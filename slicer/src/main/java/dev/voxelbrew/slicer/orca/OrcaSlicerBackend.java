@@ -21,6 +21,26 @@ public final class OrcaSlicerBackend implements ProcessSlicer {
         return name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
     }
 
+    private static void extractGcode(Path packageFile, Path output)
+            throws IOException, SlicerException.InvalidArtifact {
+        if (!Files.isRegularFile(packageFile) || Files.size(packageFile) > 48L * 1024 * 1024) {
+            throw new SlicerException.InvalidArtifact("Missing or oversized Orca package");
+        }
+        try (var zip = new ZipFile(packageFile.toFile())) {
+            var entry = zip.getEntry("Metadata/plate_1.gcode");
+            if (entry == null || entry.getSize() < 1 || entry.getSize() > 64L * 1024 * 1024) {
+                throw new SlicerException.InvalidArtifact("Orca package lacks bounded plate 1 G-code");
+            }
+            try (var input = zip.getInputStream(entry)) {
+                byte[] content = input.readNBytes(64 * 1024 * 1024 + 1);
+                if (content.length > 64 * 1024 * 1024) {
+                    throw new SlicerException.InvalidArtifact("Oversized packaged G-code");
+                }
+                Files.write(output, content);
+            }
+        }
+    }
+
     public OrcaSlicerBackend() {
         this(Map.of());
     }
@@ -112,6 +132,47 @@ public final class OrcaSlicerBackend implements ProcessSlicer {
         throw new SlicerException.Configuration("Expected a nonempty Orca " + key + " preset");
     }
 
+    private String filamentPresets(Request request, PlateFilaments palette, JsonObject machine)
+            throws IOException, SlicerException {
+        var base = readPreset("filament");
+        Map<String, JsonObject> catalog = null;
+        var files = new StringJoiner(";");
+        for (var slot : palette.slots()) {
+            var filament = base.deepCopy();
+            if (!base.has("filament_type")
+                    || !base.getAsJsonArray("filament_type")
+                            .get(0)
+                            .getAsString()
+                            .equalsIgnoreCase(slot.material())) {
+                if (catalog == null) {
+                    Path path = preset("machine").resolveSibling("voxelbrew-bbl");
+                    if (!Files.isDirectory(path)) {
+                        path = request.executable()
+                                .toAbsolutePath()
+                                .resolveSibling("resources")
+                                .resolve("profiles/BBL");
+                    }
+                    catalog = BundledOrcaPresets.readCatalog(path, request.cancellation());
+                }
+                filament = BundledOrcaPresets.filament(
+                                catalog,
+                                machine,
+                                machine.get("name").getAsString(),
+                                slot.material(),
+                                request.cancellation())
+                        .deepCopy();
+            }
+            var color = new JsonArray();
+            color.add(slot.color());
+            filament.add("filament_colour", color);
+            var file = request.workingDirectory()
+                    .resolve("filament-" + (palette.slots().indexOf(slot) + 1) + ".json");
+            Files.writeString(file, filament.toString());
+            files.add(file.toString());
+        }
+        return files.toString();
+    }
+
     private JsonObject machinePreset() throws IOException, SlicerException.Configuration {
         var machine = readPreset("machine");
         var model = machine.get("printer_model");
@@ -185,42 +246,68 @@ public final class OrcaSlicerBackend implements ProcessSlicer {
         overrides.put("internal-solid-filament-id", "0");
         overrides.put("support-filament", "1");
         overrides.put("support-interface-filament", "1");
-        overrides.put("enable-prime-tower", "0");
+        var palette = PlateFilaments.read(request.model().setup().workspaceSettings());
+        String filaments = preset("filament").toString();
+        if (!palette.slots().isEmpty()) {
+            overrides.keySet().removeIf(key -> key.contains("temp"));
+            filaments = filamentPresets(request, palette, machine);
+            overrides.put(
+                    "filament-colour",
+                    String.join(
+                            ";",
+                            palette.slots().stream()
+                                    .map(dev.voxelbrew.api.model.BodyStyle::color)
+                                    .toList()));
+        }
+        overrides.put("enable-prime-tower", palette.slots().size() > 1 ? "1" : "0");
         Path packageFile = request.workingDirectory().resolve("plate.gcode.3mf");
         var command = new ArrayList<>(List.of(
                 request.executable().toString(),
+                "--logfile",
+                request.workingDirectory().resolve("orca.log").toString(),
                 "--load-settings",
                 preset("machine") + ";" + preset("process"),
                 "--load-filaments",
-                preset("filament").toString(),
-                "--arrange",
-                "0",
-                "--orient",
-                "0",
+                filaments,
                 "--slice",
                 "1",
                 "--export-3mf",
                 packageFile.toString()));
         overrides.forEach((key, value) -> command.add("--" + key + "=" + value));
-        command.add(request.input().toString());
-        ProcessRunner.run(command, request.workingDirectory(), request.cancellation(), request.diagnostics());
-        request.cancellation().check();
-        if (!Files.isRegularFile(packageFile) || Files.size(packageFile) > 48L * 1024 * 1024) {
-            throw new SlicerException.InvalidArtifact("Missing or oversized Orca package");
-        }
-        try (var zip = new ZipFile(packageFile.toFile())) {
-            var entry = zip.getEntry("Metadata/plate_1.gcode");
-            if (entry == null || entry.getSize() < 1 || entry.getSize() > 64L * 1024 * 1024) {
-                throw new SlicerException.InvalidArtifact("Orca package lacks bounded plate 1 G-code");
+        if (palette.slots().size() > 1) {
+            var objects = new ArrayList<Map<String, Object>>();
+            for (var instance : request.model().instances()) {
+                objects.add(Map.of(
+                        "path",
+                        request.instanceFile(instance, objects.size()).toString(),
+                        "count",
+                        1,
+                        "filaments",
+                        List.of(palette.bodies().get(instance.bodyId())),
+                        "assemble_index",
+                        List.of(1)));
             }
-            try (var input = zip.getInputStream(entry)) {
-                byte[] content = input.readNBytes(64 * 1024 * 1024 + 1);
-                if (content.length > 64 * 1024 * 1024) {
-                    throw new SlicerException.InvalidArtifact("Oversized packaged G-code");
+            var plate = Map.of("plate_name", "VoxelBrew", "need_arrange", false, "objects", objects);
+            var assembly = request.workingDirectory().resolve("assembly.json");
+            Files.writeString(assembly, new Gson().toJson(Map.of("plates", List.of(plate))));
+            command.addAll(List.of("--load-assemble-list", assembly.toString()));
+        } else {
+            command.addAll(
+                    List.of("--arrange", "0", "--orient", "0", request.input().toString()));
+        }
+        try {
+            ProcessRunner.run(command, request.workingDirectory(), request.cancellation(), request.diagnostics());
+        } catch (SlicerException.Execution failure) {
+            var log = request.workingDirectory().resolve("orca.log");
+            if (Files.isRegularFile(log)) {
+                try (var lines = Files.lines(log)) {
+                    lines.forEach(request.diagnostics());
                 }
-                Files.write(request.output(), content);
             }
+            throw failure;
         }
+        request.cancellation().check();
+        extractGcode(packageFile, request.output());
         var metadata = Map.of(
                 "model",
                 model,
@@ -229,7 +316,9 @@ public final class OrcaSlicerBackend implements ProcessSlicer {
                 "nozzle_mm",
                 Double.toString(nozzle),
                 "tool",
-                "0",
+                java.util.stream.IntStream.range(0, Math.max(1, palette.slots().size()))
+                        .mapToObj(Integer::toString)
+                        .collect(java.util.stream.Collectors.joining(",")),
                 "backend",
                 "orca",
                 "revision",

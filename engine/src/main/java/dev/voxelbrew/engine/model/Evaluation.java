@@ -2,8 +2,10 @@ package dev.voxelbrew.engine.model;
 
 import dev.voxelbrew.api.model.CadDocument;
 import dev.voxelbrew.api.model.Feature;
+import dev.voxelbrew.api.model.sketch.SketchGeometry.Entity;
 import dev.voxelbrew.engine.geometry.Solid;
 import java.util.List;
+import java.util.Map;
 
 /** Owns all native replay results. Callers must close the evaluation, not its borrowed solids. */
 public final class Evaluation implements AutoCloseable {
@@ -15,6 +17,11 @@ public final class Evaluation implements AutoCloseable {
 
     private final List<Solid> owned;
     private final List<Feature> resolvedFeatures;
+
+    @lombok.Getter
+    @lombok.experimental.Accessors(fluent = true)
+    private Map<String, List<Entity>> projections = Map.of();
+
     private boolean closed;
     private java.util.Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction =
             java.util.Map.of();
@@ -49,6 +56,10 @@ public final class Evaluation implements AutoCloseable {
 
     void construction(java.util.Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> values) {
         construction = java.util.Map.copyOf(values);
+    }
+
+    void projections(Map<String, List<Entity>> values) {
+        projections = Map.copyOf(values);
     }
 
     public java.util.Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction() {

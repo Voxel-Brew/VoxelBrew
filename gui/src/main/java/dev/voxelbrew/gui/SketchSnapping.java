@@ -8,10 +8,22 @@ import dev.voxelbrew.api.model.sketch.SketchGeometry;
 final class SketchSnapping {
     record Snap(Ref ref, Vec position) {}
 
+    static Vec axis(Vec center, Vec pointer, double scale, boolean force) {
+        var delta = pointer.minus(center);
+        if (!force && Math.min(Math.abs(delta.x()), Math.abs(delta.y())) >= 5 / scale) return pointer;
+        return Math.abs(delta.x()) >= Math.abs(delta.y())
+                ? new Vec(pointer.x(), center.y())
+                : new Vec(center.x(), pointer.y());
+    }
+
     static Snap find(SketchGeometry geometry, Vec pointer, double scale) {
+        return find(geometry.entities(), pointer, scale);
+    }
+
+    static Snap find(java.util.List<Entity> entities, Vec pointer, double scale) {
         double best = 8 / scale;
         Snap result = null;
-        for (var entity : geometry.entities()) {
+        for (var entity : entities) {
             for (var ref : entity.pointRefs()) {
                 var point = entity.point(ref);
                 double distance = pointer.distance(point);
@@ -23,7 +35,7 @@ final class SketchSnapping {
         }
         if (pointer.length() < best) result = new Snap(ORIGIN, new Vec(0, 0));
         if (result != null) return result;
-        for (var entity : geometry.entities()) {
+        for (var entity : entities) {
             if (entity.kind() == Kind.POINT || entity.kind() == Kind.TEXT) continue;
             var point = nearest(entity, pointer);
             double distance = pointer.distance(point);

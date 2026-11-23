@@ -7,8 +7,11 @@ import dev.voxelbrew.api.model.ConstructionFeature;
 import dev.voxelbrew.api.model.Feature;
 import dev.voxelbrew.api.model.ModelException;
 import dev.voxelbrew.api.model.Transform;
+import dev.voxelbrew.api.model.sketch.SketchGeometry.Entity;
 import dev.voxelbrew.engine.feature.FeatureRegistry;
 import dev.voxelbrew.engine.geometry.Solid;
+import dev.voxelbrew.engine.sketch.FaceProjection;
+import dev.voxelbrew.engine.sketch.SketchSolver;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -24,6 +27,7 @@ public final class Evaluator {
         private final List<Solid> owned = new ArrayList<>();
         private final Map<String, Feature.Sketch> sketches = new LinkedHashMap<>();
         private final Map<String, Feature.Plane> planes = new LinkedHashMap<>();
+        private final Map<String, List<Entity>> projections = new LinkedHashMap<>();
         private final Map<Feature.BodyRef, Evaluation.Body> outputs = new LinkedHashMap<>();
         private final Map<String, Evaluation.Body> active = new LinkedHashMap<>();
         private final Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction =
@@ -34,8 +38,10 @@ public final class Evaluator {
             switch (feature) {
                 case ConstructionFeature definition -> rebuildConstructionFeature(definition);
                 case Feature.Sketch s -> rebuildSketch(s, index, resolved);
+                case Feature.Custom custom
+                when BodyExtrusion.modifiesBody(custom) -> rebuildExtrude(BodyExtrusion.from(custom));
                 case Feature.Custom custom -> rebuildCustom(custom, customEvaluator);
-                case Feature.Extrude e -> rebuildExtrude(e);
+                case Feature.Extrude e -> rebuildExtrude(BodyExtrusion.from(e));
                 case Feature.EdgeFinish finish -> rebuildEdgeFinish(finish);
                 case Feature.Shell shell -> rebuildShell(shell);
                 case Feature.SplitBody split -> rebuildSplitBody(split);
@@ -51,6 +57,46 @@ public final class Evaluator {
                             definition,
                             construction,
                             ref -> outputs.containsKey(ref) ? outputs.get(ref).solid() : null));
+        }
+
+        private Feature resolve(Feature feature, CadDocument document, Map<String, javax.measure.Quantity<?>> values) {
+            var projected = projectSupport(feature);
+            var resolved = dev.voxelbrew.engine.parameters.FeatureDimensions.resolve(
+                    projected, document.features(), document.parameters(), values);
+            if (feature instanceof Feature.Sketch old
+                    && projected instanceof Feature.Sketch next
+                    && old.profile() != next.profile()
+                    && resolved instanceof Feature.Sketch sketch
+                    && sketch.profile() instanceof Feature.Constrained c) {
+                return new Feature.Sketch(
+                        sketch.id(),
+                        sketch.profileId(),
+                        sketch.plane(),
+                        new Feature.Constrained(SketchSolver.solve(c.geometry()).requireSolved()));
+            }
+            return resolved;
+        }
+
+        private Feature projectSupport(Feature feature) {
+            if (!(feature instanceof Feature.Sketch s) || s.plane().support() == null) return feature;
+            var support = s.plane().support();
+            var source = outputs.get(support.body());
+            if (source == null) throw new ModelException(s.id(), "Missing supporting body output " + support.body());
+            var solid = source.solid();
+            var faces = solid.planarFaces();
+            var plane = new Feature.Plane(
+                    s.plane().id(),
+                    s.plane().offsetZ(),
+                    support.resolve(faces, s.plane().frame()),
+                    support);
+            var edges = FaceProjection.edges(plane, faces, solid.faceEdges(), solid.edgeSamples());
+            projections.put(s.id(), edges);
+            var profile = s.profile();
+            if (profile instanceof Feature.Constrained c) {
+                var next = FaceProjection.refresh(c.geometry(), edges);
+                if (next != c.geometry()) profile = new Feature.Constrained(next);
+            }
+            return new Feature.Sketch(s.id(), s.profileId(), plane, profile);
         }
 
         private void rebuildSketch(Feature.Sketch s, int index, List<Feature> resolved) {
@@ -71,20 +117,6 @@ public final class Evaluator {
                         s.profile());
                 resolved.set(index, s);
             }
-            if (s.plane().support() != null) {
-                var support = s.plane().support();
-                var source = outputs.get(support.body());
-                if (source == null) {
-                    throw new ModelException(s.id(), "Missing supporting body output " + support.body());
-                }
-                var plane = new Feature.Plane(
-                        s.plane().id(),
-                        s.plane().offsetZ(),
-                        support.resolve(source.solid().planarFaces(), s.plane().frame()),
-                        support);
-                s = new Feature.Sketch(s.id(), s.profileId(), plane, s.profile());
-                resolved.set(index, s);
-            }
             var earlier = planes.get(s.plane().id());
             if (earlier != null && !earlier.equals(s.plane())) {
                 throw new ModelException(
@@ -102,7 +134,8 @@ public final class Evaluator {
             active.put(body.id(), body);
         }
 
-        private void rebuildExtrude(Feature.Extrude e) {
+        private void rebuildExtrude(BodyExtrusion definition) {
+            var e = definition.extrusion();
             Feature.Sketch sketch = profile(e.id(), e.profile(), sketches);
             Solid solid;
             var additionalBodies = new ArrayList<Evaluation.Body>();
@@ -138,6 +171,21 @@ public final class Evaluator {
                 throw new ModelException(e.id(), "unsupported extrusion profile");
             }
             if (!owned.contains(solid)) owned.add(solid);
+            if (definition.target() != null) {
+                var input = outputs.get(definition.target());
+                if (input == null || active.get(input.id()) != input) {
+                    throw new ModelException(e.id(), "Extrusion target is missing or has been superseded");
+                }
+                var tools = new ArrayList<Solid>();
+                tools.add(solid);
+                additionalBodies.forEach(body -> tools.add(body.solid()));
+                var result = input.solid().combine(tools, definition.operation() == BodyExtrusion.Operation.CUT);
+                owned.add(result);
+                var body = new Evaluation.Body(input.id(), new Feature.BodyRef(e.id(), "body"), result);
+                outputs.put(body.output(), body);
+                active.put(body.id(), body);
+                return;
+            }
             var body = new Evaluation.Body(e.id() + ".body", new Feature.BodyRef(e.id(), "body"), solid);
             outputs.put(body.output(), body);
             active.put(body.id(), body);
@@ -256,7 +304,8 @@ public final class Evaluator {
 
     /** The registry lives only on the evaluating thread; results contain engine-owned solids. */
     public static Evaluation evaluate(CadDocument document, Path pluginDirectory) {
-        if (document.features().stream().noneMatch(Feature.Custom.class::isInstance)) {
+        if (document.features().stream()
+                .noneMatch(f -> f instanceof Feature.Custom && !BodyExtrusion.modifiesBody(f))) {
             return replay(document, custom -> {
                 throw new AssertionError("No custom features");
             });
@@ -318,8 +367,7 @@ public final class Evaluator {
                             throw new Blocked("input '" + input + "' did not rebuild");
                         }
                     }
-                    feature = dev.voxelbrew.engine.parameters.FeatureDimensions.resolve(
-                            feature, document.features(), document.parameters(), parameterValues);
+                    feature = geometry.resolve(feature, document, parameterValues);
                     resolved.set(index, feature);
                     FeatureValidation.validate(feature);
                     geometry.rebuild(feature, index, resolved, customEvaluator);
@@ -346,6 +394,7 @@ public final class Evaluator {
             var result = new Evaluation(
                     document, diagnostics, new ArrayList<>(geometry.active.values()), geometry.owned, resolved);
             result.construction(geometry.construction);
+            result.projections(geometry.projections);
             return result;
         } catch (Throwable failure) {
             geometry.owned.forEach(Solid::close);
@@ -383,6 +432,12 @@ public final class Evaluator {
         }
         if (feature instanceof Feature.Extrude e) {
             return List.of(e.profile().sketchId());
+        }
+        if (BodyExtrusion.modifiesBody(feature)) {
+            var definition = BodyExtrusion.from(feature);
+            return List.of(
+                    definition.extrusion().profile().sketchId(),
+                    definition.target().featureId());
         }
         if (feature instanceof Feature.ThroughCut c) {
             return List.of(c.profile().sketchId(), c.body().featureId());

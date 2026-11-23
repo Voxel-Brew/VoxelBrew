@@ -131,7 +131,9 @@ class PrintControllerTest {
             var provider = provider(() -> (model, window, cancellation, diagnostics) -> {
                 entered.countDown();
                 if (!release.await(10, TimeUnit.SECONDS)) throw new IOException("Fixture timed out");
-                if (expected == PrintController.State.FAILED) throw new IOException("Forced failure");
+                if (expected == PrintController.State.FAILED) {
+                    throw new IOException("Slicer exited with 1\nNo extrusions");
+                }
                 return slice(model, window, cancellation, diagnostics);
             });
             try (var controller = new PrintController(callbacks::add, session::document)) {
@@ -145,6 +147,11 @@ class PrintControllerTest {
                 release.countDown();
                 await(future::isDone);
                 assertThat(controller.state()).isEqualTo(expected);
+                if (expected == PrintController.State.FAILED) {
+                    assertThat(controller.diagnostics())
+                            .anySatisfy(entry -> assertThat(entry)
+                                    .matches("\\[\\d{2}:\\d{2}:\\d{2}\\] Slicer exited with 1\nNo extrusions"));
+                }
                 assertThat(controller.result()).isNull();
                 assertThat(controller.completedArtifacts()).isEmpty();
                 assertThat(future.isCompletedExceptionally()).isTrue();

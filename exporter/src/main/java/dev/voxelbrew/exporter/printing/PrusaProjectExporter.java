@@ -41,9 +41,15 @@ public final class PrusaProjectExporter extends MeshExporter {
     public static void writeProject(ManufacturingModel model, OutputStream output) throws IOException {
         // One multipart assembly keeps stacked CAD bodies at their declared Z coordinates.
         // Prusa's --merge flag does not merge objects already inside a single project file.
-        var volumes = model.instances().stream()
-                .flatMap(i -> volumes(model, i).stream())
-                .toList();
+        var palette = PlateFilaments.read(model.setup().workspaceSettings());
+        var volumes = new ArrayList<Volume>();
+        var tools = new IdentityHashMap<Volume, Integer>();
+        for (var instance : model.instances()) {
+            for (var volume : volumes(model, instance)) {
+                volumes.add(volume);
+                tools.put(volume, palette.bodies().get(instance.bodyId()));
+            }
+        }
         try (var zip = new ZipOutputStream(output, StandardCharsets.UTF_8)) {
             text(
                     zip,
@@ -122,6 +128,8 @@ public final class PrusaProjectExporter extends MeshExporter {
                 xml.writeAttribute("lastid", Integer.toString(first - 1));
                 metadata(xml, "volume", "name", volume.name());
                 metadata(xml, "volume", "volume_type", volume.type());
+                var tool = tools.get(volume);
+                if (tool != null) metadata(xml, "volume", "extruder", tool.toString());
                 xml.writeEndElement();
             }
             xml.writeEndElement();

@@ -270,6 +270,7 @@ if (project.name == "gui") {
             }
             into(installerStage)
         }
+    val associations = file("src/main/packaging/windows-associations.iss")
     val innoScript = layout.buildDirectory.file("installer/voxelbrew.iss")
     val generateInnoScript by
         tasks.registering {
@@ -295,6 +296,7 @@ if (project.name == "gui") {
                     DefaultDirName={localappdata}\Programs\VoxelBrew
                     DefaultGroupName=VoxelBrew
                     PrivilegesRequired=lowest
+                    ChangesAssociations=yes
                     OutputDir=$output
                     OutputBaseFilename=${installerName.removeSuffix(".exe")}
                     SetupIconFile=$icon
@@ -311,6 +313,8 @@ if (project.name == "gui") {
 
                     [Files]
                     Source: "$source\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
+
+                    #include "$associations"
 
                     [Icons]
                     Name: "{group}\VoxelBrew"; Filename: "{app}\VoxelBrew.exe"; WorkingDir: "{app}"
@@ -330,6 +334,7 @@ if (project.name == "gui") {
             dependsOn(generateInnoScript)
             inputs.dir(installerStage)
             inputs.file(innoScript)
+            inputs.file(associations)
             commandLine(
                 providers
                     .environmentVariable("INNO_SETUP_ISCC")

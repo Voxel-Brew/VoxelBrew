@@ -1,48 +1,55 @@
 package dev.voxelbrew.engine.printing;
 
 import dev.voxelbrew.api.model.Transform;
+import dev.voxelbrew.api.model.mesh.MeshData;
+import dev.voxelbrew.api.model.mesh.MeshValidation;
 import dev.voxelbrew.api.model.printing.MeshGeometry;
+import java.awt.geom.Rectangle2D;
 
 /** Shared automatic bed orientation for desktop and headless preparation. */
 public final class PrintOrientation {
-    /** Rank feasible planar bed faces by unsupported area, bed contact, then height. */
-    public static Transform autoOrient(dev.voxelbrew.api.model.mesh.MeshData mesh, Transform current) {
-        Transform best = null;
-        double bestOverhang = Double.POSITIVE_INFINITY, bestContact = -1, bestHeight = Double.POSITIVE_INFINITY;
-        for (int face :
-                java.util.Arrays.stream(mesh.faceIndices()).distinct().sorted().toArray()) {
-            Transform candidate;
-            try {
-                candidate = dev.voxelbrew.api.model.printing.MeshGeometry.layOnFace(mesh, face, current);
-            } catch (IllegalArgumentException unsuitable) {
-                continue;
-            }
-            var placed = dev.voxelbrew.api.model.printing.MeshGeometry.transform(mesh, candidate);
-            double overhang = 0, contact = 0;
-            for (int t = 0; t < placed.triangleCount(); t++) {
-                double[] n = dev.voxelbrew.api.model.mesh.MeshValidation.normal(placed, t);
-                double area = Math.sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]) / 2;
-                boolean onBed = true;
-                for (int c = 0; c < 3; c++) onBed &= Math.abs(placed.coordinate(placed.vertexIndex(t, c), 2)) < 0.001;
-                if (onBed) contact += area;
-                else if (n[2] < -2 * area * Math.cos(Math.PI / 4)) {
-                    overhang += area;
-                }
-            }
-            double height =
-                    dev.voxelbrew.api.model.printing.MeshGeometry.bounds(placed).maxZ();
-            if (overhang < bestOverhang - 1e-6
-                    || Math.abs(overhang - bestOverhang) < 1e-6
-                            && (contact > bestContact + 1e-6
-                                    || Math.abs(contact - bestContact) < 1e-6 && height < bestHeight)) {
+    /** Reduce the XY footprint while preserving the horizontal center and each vertex's height. */
+    public static Transform autoOrient(MeshData mesh, Transform current) {
+        var world = MeshGeometry.transform(mesh, current);
+        requireSurface(world);
+        var original = footprint(world, 0);
+        var best = original;
+        int bestAngle = 0;
+        // Bounding rectangle area repeats every quarter turn. Keep the current pose on a tie.
+        for (int degrees = -44; degrees <= 45; degrees++) {
+            if (degrees == 0) continue;
+            var candidate = footprint(world, degrees);
+            if (candidate.width * candidate.height < best.width * best.height * (1 - 1e-12)) {
                 best = candidate;
-                bestOverhang = overhang;
-                bestContact = contact;
-                bestHeight = height;
+                bestAngle = degrees;
             }
         }
-        if (best == null) throw new IllegalArgumentException("No planar face can support this object on the bed");
-        return best;
+        if (bestAngle == 0) return current;
+        return Transform.translation(
+                        original.getCenterX() - best.getCenterX(), original.getCenterY() - best.getCenterY(), 0)
+                .compose(Transform.rotation(0, 0, bestAngle))
+                .compose(current);
+    }
+
+    private static Rectangle2D.Double footprint(MeshData world, int degrees) {
+        double angle = Math.toRadians(degrees);
+        double cos = Math.cos(angle), sin = Math.sin(angle);
+        var bounds = new Rectangle2D.Double();
+        for (int vertex = 0; vertex < world.vertexCount(); vertex++) {
+            double x = world.coordinate(vertex, 0), y = world.coordinate(vertex, 1);
+            double rotatedX = cos * x - sin * y, rotatedY = sin * x + cos * y;
+            if (vertex == 0) bounds.setRect(rotatedX, rotatedY, 0, 0);
+            else bounds.add(rotatedX, rotatedY);
+        }
+        return bounds;
+    }
+
+    private static void requireSurface(MeshData mesh) {
+        for (int triangle = 0; triangle < mesh.triangleCount(); triangle++) {
+            var normal = MeshValidation.normal(mesh, triangle);
+            if (Math.hypot(Math.hypot(normal[0], normal[1]), normal[2]) >= 1e-12) return;
+        }
+        throw new IllegalArgumentException("Cannot orient a mesh with no nondegenerate triangles");
     }
 
     /** Rotate about the placed center in world/local axes, preserving bed clearance. */

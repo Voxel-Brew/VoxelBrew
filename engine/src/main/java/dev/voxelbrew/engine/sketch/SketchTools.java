@@ -2,7 +2,6 @@ package dev.voxelbrew.engine.sketch;
 
 import static dev.voxelbrew.api.model.sketch.SketchGeometry.*;
 
-import dev.voxelbrew.api.model.sketch.SketchCurves;
 import dev.voxelbrew.api.model.sketch.SketchGeometry;
 import dev.voxelbrew.api.model.sketch.SketchText;
 import java.util.*;
@@ -40,6 +39,10 @@ public final class SketchTools {
         TEXT_ON_PATH("Text on path", 1);
         private final String label;
         private final int clicks;
+
+        public int defaultTextAngleDegrees() {
+            return this == TEXT ? 90 : 0;
+        }
 
         public int clicks() {
             return clicks;
@@ -96,9 +99,57 @@ public final class SketchTools {
             int style,
             double height,
             double angle,
-            double spacing) {
+            double spacing,
+            SketchText.Horizontal horizontal,
+            SketchText.Vertical vertical) {
         public static Options defaults() {
-            return new Options(6, 3, false, false, 5, .5, "Text", "SansSerif", 0, 10, 0, 0);
+            return defaults(Tool.TEXT);
+        }
+
+        public static Options defaults(Tool tool) {
+            return new Options(
+                    6,
+                    3,
+                    false,
+                    false,
+                    5,
+                    .5,
+                    "Text",
+                    "SansSerif",
+                    0,
+                    10,
+                    Math.toRadians(tool.defaultTextAngleDegrees()),
+                    0);
+        }
+
+        public Options(
+                int sides,
+                int degree,
+                boolean closed,
+                boolean construction,
+                double radius,
+                double rho,
+                String text,
+                String font,
+                int style,
+                double height,
+                double angle,
+                double spacing) {
+            this(
+                    sides,
+                    degree,
+                    closed,
+                    construction,
+                    radius,
+                    rho,
+                    text,
+                    font,
+                    style,
+                    height,
+                    angle,
+                    spacing,
+                    SketchText.Horizontal.LEFT,
+                    SketchText.Vertical.BASELINE);
         }
 
         public Options {
@@ -106,6 +157,83 @@ public final class SketchTools {
                 if (!Double.isFinite(v)) throw new IllegalArgumentException("Tool options must be finite");
             }
         }
+    }
+
+    public record PolygonLayout(Vec center, double radius, double angle, double orientation) {
+        public static PolygonLayout fromVertex(Vec center, Vec vertex) {
+            var delta = vertex.minus(center);
+            return new PolygonLayout(center, delta.length(), Math.atan2(delta.y(), delta.x()), 1);
+        }
+
+        public double guideRadius(Tool mode, int sides) {
+            return mode == Tool.POLYGON_CIRCUMSCRIBED ? radius * Math.cos(Math.PI / sides) : radius;
+        }
+
+        public Vec vertex(int index, int sides) {
+            double direction = angle + orientation * Math.TAU * index / sides;
+            return center.plus(new Vec(radius * Math.cos(direction), radius * Math.sin(direction)));
+        }
+
+        public SketchGeometry geometry(String id, int sides) {
+            var base = Sketches.polygon(id, 0, 0, radius, sides);
+            var lines = new ArrayList<Entity>();
+            for (int i = 0; i < sides; i++) {
+                var start = vertex(i, sides);
+                var end = vertex((i + 1) % sides, sides);
+                lines.add(base.entities().get(i).withValues(List.of(start.x(), start.y(), end.x(), end.y())));
+            }
+            var polygon = base.withEntities(lines);
+            if (orientation < 0) {
+                return polygon.withConstraints(List.of(SketchConstraints.create(
+                        polygon,
+                        id + "-regular",
+                        Type.POLYGON,
+                        lines.stream().map(Entity::ref).toList(),
+                        0)));
+            }
+            return polygon;
+        }
+    }
+
+    public static PolygonLayout polygonLayout(Tool tool, Vec a, Vec b, Vec sidePoint, int sides) {
+        double angle = Math.atan2(b.y() - a.y(), b.x() - a.x());
+        double distance = a.distance(b);
+        if (tool == Tool.POLYGON_CIRCUMSCRIBED) {
+            double halfAngle = Math.PI / sides;
+            return new PolygonLayout(a, distance / Math.cos(halfAngle), angle - halfAngle, 1);
+        }
+        if (tool == Tool.POLYGON_EDGE) {
+            var d = b.minus(a);
+            double sign = Math.copySign(1, d.cross(sidePoint.minus(a)));
+            var center = a.mix(b, .5).plus(d.normal().times(sign / (2 * Math.tan(Math.PI / sides))));
+            return new PolygonLayout(
+                    center, center.distance(a), Math.atan2(a.y() - center.y(), a.x() - center.x()), sign);
+        }
+        return new PolygonLayout(a, distance, angle, 1);
+    }
+
+    public static double pathOffset(Entity curve, Vec point) {
+        return pathCoordinates(curve, point).x();
+    }
+
+    public static Vec pathCoordinates(Entity curve, Vec point) {
+        var samples = curve.sample();
+        double nearest = Double.POSITIVE_INFINITY, distance = 0, best = 0, normalOffset = 0;
+        for (int i = 1; i < samples.size(); i++) {
+            var start = samples.get(i - 1);
+            var delta = samples.get(i).minus(start);
+            double span = delta.length();
+            if (span == 0) continue;
+            double t = Math.clamp(point.minus(start).dot(delta) / (span * span), 0, 1);
+            double gap = start.plus(delta.times(t)).distance(point);
+            if (gap < nearest) {
+                nearest = gap;
+                best = distance + t * span;
+                normalOffset = delta.cross(point.minus(start)) / span;
+            }
+            distance += span;
+        }
+        return new Vec(best, normalOffset);
     }
 
     public static SketchGeometry add(
@@ -188,41 +316,8 @@ public final class SketchTools {
             }
             case POLYGON_INSCRIBED, POLYGON_CIRCUMSCRIBED, POLYGON_EDGE -> {
                 if (o.sides() < 3 || o.sides() > 32) throw new IllegalArgumentException("Sides must be 3–32");
-                Vec center = a;
-                double radius = a.distance(b), angle = Math.atan2(b.y() - a.y(), b.x() - a.x()), orientation = 1;
-                if (tool == Tool.POLYGON_CIRCUMSCRIBED) {
-                    radius /= Math.cos(Math.PI / o.sides());
-                    angle -= Math.PI / o.sides();
-                }
-                if (tool == Tool.POLYGON_EDGE) {
-                    var d = b.minus(a);
-                    double sign = Math.copySign(1, d.cross(p.get(2).minus(a)));
-                    orientation = sign;
-                    center = a.mix(b, .5)
-                            .plus(d.unit().normal().times(sign * d.length() / (2 * Math.tan(Math.PI / o.sides()))));
-                    radius = center.distance(a);
-                    angle = Math.atan2(a.y() - center.y(), a.x() - center.x());
-                }
-                var base = Sketches.polygon(id, 0, 0, radius, o.sides());
-                for (var e : base.entities()) {
-                    var values = new ArrayList<Double>();
-                    for (int i = 0; i < 4; i += 2) {
-                        var v = SketchCurves.rotate(new Vec(e.value(i), orientation * e.value(i + 1)), angle)
-                                .plus(center);
-                        values.add(v.x());
-                        values.add(v.y());
-                    }
-                    entities.add(e.withValues(values));
-                }
-                addition = base.withEntities(entities);
-                if (orientation < 0) {
-                    addition = addition.withConstraints(List.of(SketchConstraints.create(
-                            addition,
-                            id + "-regular",
-                            Type.POLYGON,
-                            entities.stream().map(Entity::ref).toList(),
-                            0)));
-                }
+                var layout = polygonLayout(tool, a, b, p.getLast(), o.sides());
+                addition = layout.geometry(id, o.sides());
             }
             case ELLIPSE -> {
                 var axis = b.minus(a);
@@ -280,6 +375,9 @@ public final class SketchTools {
                         b.y(),
                         o.rho()));
             case TEXT, TEXT_ON_PATH -> {
+                if (Math.abs(o.angle()) > Math.PI) {
+                    throw new IllegalArgumentException("Text rotation must be between -180 and 180 degrees");
+                }
                 String path = "";
                 double x = a.x(), y = a.y();
                 if (tool == Tool.TEXT_ON_PATH) {
@@ -288,17 +386,7 @@ public final class SketchTools {
                     }
                     path = refs.getFirst().entityId();
                     var curve = source.entity(path);
-                    var samples = curve.sample();
-                    double nearest = Double.POSITIVE_INFINITY, distance = 0, best = 0;
-                    for (int i = 0; i < samples.size(); i++) {
-                        if (i > 0) distance += samples.get(i - 1).distance(samples.get(i));
-                        double d = samples.get(i).distance(a);
-                        if (d < nearest) {
-                            nearest = d;
-                            best = distance;
-                        }
-                    }
-                    x = best;
+                    x = pathOffset(curve, a);
                     y = 0;
                 }
                 entities.add(SketchText.create(
@@ -312,7 +400,9 @@ public final class SketchTools {
                         o.angle(),
                         o.spacing(),
                         path,
-                        o.construction()));
+                        o.construction(),
+                        o.horizontal(),
+                        o.vertical()));
             }
         }
         if (addition == null) {

@@ -13,6 +13,33 @@ class GcodeReaderTest {
     Path directory;
 
     @Test
+    void filamentSummariesCombineToolsAndPreferReportedTotals() {
+        var prusa = FilamentUsage.fromLines(List.of(
+                "; filament_colour = #CC0033;#000000;#AABBCC",
+                "; filament used [mm] = 1200, 0, 45.5",
+                "; total filament used [g] = 4.7",
+                "; filament used [g] = 4.2, 0, 0.4",
+                "; total filament used for wipe tower [g] = 0.1"));
+        assertThat(prusa.millimeters()).hasValue(1245.5);
+        assertThat(prusa.grams()).hasValue(4.7);
+        assertThat(prusa.filaments()).extracting(FilamentUsage.Filament::slot).containsExactly(1, 3);
+        var third = prusa.filaments().getLast();
+        assertThat(third.color()).isEqualTo("#AABBCC");
+        assertThat(third.grams()).hasValue(0.4);
+        assertThat(third.millimeters()).hasValue(45.5);
+        assertThat(FilamentUsage.fromLines(List.of("; total filament length [mm] : 123"))
+                        .millimeters())
+                .hasValue(123);
+        assertThat(FilamentUsage.fromLines(List.of(";Filament used: 1.2m, 0.05m"))
+                        .millimeters())
+                .hasValue(1250);
+        var missing =
+                FilamentUsage.fromLines(List.of("G28", "; filament used [mm] = NaN", "; total filament used [g] = -1"));
+        assertThat(missing.millimeters()).isEmpty();
+        assertThat(missing.grams()).isEmpty();
+    }
+
+    @Test
     void orcaFeatureMarkersAndQuarterCircleRetainExtrusionAndLayer() throws Exception {
         var input =
                 new java.io.ByteArrayInputStream(("G90\nM83\nG1 Z0.2\n; FEATURE: Outer wall\n" + "G2 X1 Y1 I1 J0 E2\n")

@@ -133,15 +133,17 @@ public abstract class ProcessSlicerProvider implements SlicerProvider {
                 case "prusa-project" -> new PrusaProjectExporter();
                 default -> throw new IllegalStateException("Unsupported slicer input format " + format.exporterId());
             };
-            serializer.writeFile(
-                    ModelViews.from(model, ExportSelection.Contents.MODEL),
-                    new MeshExportDialog.Settings(
-                            new ExportSelection(
-                                    ExportSelection.Space.BUILD_PLATE, ExportSelection.Contents.MODEL, null, null),
-                            MeshOptions.DEFAULT,
-                            format.options(),
-                            new dev.voxelbrew.api.exporter.FileExportDialog.Destination(input, false),
-                            model));
+            if (!format.exporterId().equals("stl") || model.instances().size() == 1) {
+                serializer.writeFile(
+                        ModelViews.from(model, ExportSelection.Contents.MODEL),
+                        new MeshExportDialog.Settings(
+                                new ExportSelection(
+                                        ExportSelection.Space.BUILD_PLATE, ExportSelection.Contents.MODEL, null, null),
+                                MeshOptions.DEFAULT,
+                                format.options(),
+                                new dev.voxelbrew.api.exporter.FileExportDialog.Destination(input, false),
+                                model));
+            }
             cancellation.check();
             var run = process.slice(new ProcessSlicer.Request(
                     model, input, command, scratch.directory(), raw, cancellation, diagnostics));
@@ -158,8 +160,18 @@ public abstract class ProcessSlicerProvider implements SlicerProvider {
                 throw new SlicerException.InvalidArtifact("Slicer output has no identifiable model deposition layers");
             }
             var metadata = new LinkedHashMap<>(SliceService.provenance(model, descriptor.id()));
+            var palette = dev.voxelbrew.engine.printing.PlateFilaments.read(
+                    model.setup().workspaceSettings());
+            metadata.putAll(palette.metadata());
             metadata.put("backend_version", probe.actualVersion());
-            metadata.put("material", model.profile().material().id());
+            metadata.put(
+                    "material",
+                    palette.slots().isEmpty()
+                            ? model.profile().material().id()
+                            : palette.slots().stream()
+                                    .map(dev.voxelbrew.api.model.BodyStyle::material)
+                                    .distinct()
+                                    .collect(java.util.stream.Collectors.joining(", ")));
             metadata.put("firmware", model.profile().printer().firmware());
             metadata.put(
                     "format", run.artifact() == null ? "gcode" : run.artifact().format());

@@ -67,6 +67,58 @@ class ConstrainedSketchTest {
     }
 
     @Test
+    void sketchFilletKeepsPlateDimensionsAndExtrudesAfterRadiusEdit() throws Exception {
+        var rectangle = Sketches.rectangle("plate", 0, 0, 60, 40, true);
+        var top = rectangle.entity("plate-top").ref();
+        var right = rectangle.entity("plate-right").ref();
+        assertThatThrownBy(() -> SketchFillet.round(rectangle, "corner", top, right, 40))
+                .isInstanceOf(IllegalArgumentException.class);
+        var rounded = SketchFillet.round(rectangle, "corner", right, top, 5);
+        var session = new ModelSession(CadDocument.empty());
+        session.add(sketch(rounded));
+        session.add(new Feature.Extrude("plate-body", new Feature.ProfileRef("sketch", "profile"), 2));
+        assertThat(volume(session)).isCloseTo((2400 - 25 * (1 - Math.PI / 4)) * 2, within(0.001));
+        var file = directory.resolve("rounded.vxb");
+        DocumentWriter.save(session.document(), file, false);
+        var reopened = new ModelSession(DocumentReader.load(file));
+        reopened.editDimension("sketch", "corner-radius", 8);
+        assertThat(volume(reopened)).isCloseTo((2400 - 64 * (1 - Math.PI / 4)) * 2, within(0.001));
+    }
+
+    @Test
+    void joinAndCutMultipleRegionsUpdateThePlacedBodyAfterReopen() throws Exception {
+        var session = new ModelSession(CadDocument.empty());
+        session.add(sketch(Sketches.rectangle("base", 0, 0, 40, 30, true)));
+        var base = new Feature.Extrude("base-extrusion", new Feature.ProfileRef("sketch", "profile"), 5);
+        session.add(base);
+        var target = new Feature.BodyRef(base.id(), "body");
+        var instance = new BodyInstance("placed", "base-extrusion.body", Transform.translation(20, 10, 0));
+        session.setPrintSetup(session.document().printSetup().withInstances(List.of(instance)));
+        var first = Sketches.entity("dot1", Kind.CIRCLE, false, 10, 10, 2);
+        var second = Sketches.entity("dot2", Kind.CIRCLE, false, 20, 10, 2);
+        session.add(new Feature.Sketch(
+                "mark",
+                "dots",
+                new Feature.Plane("top", 5),
+                new Feature.Constrained(
+                        new SketchGeometry(List.of(first, second), List.of(), List.of(first.id(), second.id())))));
+        var extrusion = new Feature.Extrude("mark-extrusion", new Feature.ProfileRef("mark", "dots"), 2);
+        session.add(new BodyExtrusion(extrusion, BodyExtrusion.Operation.JOIN, target).feature());
+        assertThat(volume(session)).isCloseTo(6000 + 16 * Math.PI, within(.001));
+        session.replace(new BodyExtrusion(extrusion, BodyExtrusion.Operation.CUT, target).withDistance(-1));
+        var file = directory.resolve("engraved.vxb");
+        DocumentWriter.save(session.document(), file, false);
+        var reopened = new ModelSession(DocumentReader.load(file));
+        reopened.editDimension(extrusion.id(), "distance", -2);
+        assertThat(volume(reopened)).isCloseTo(6000 - 16 * Math.PI, within(.001));
+        var model = dev.voxelbrew.engine.printing.ManufacturingModels.evaluate(
+                reopened.document(), dev.voxelbrew.api.model.mesh.MeshOptions.DEFAULT);
+        assertThat(model.meshes()).containsOnlyKeys(instance.bodyId());
+        assertThat(model.instances()).containsExactly(instance);
+        assertThat(model.placedMesh(instance).triangleCount()).isGreaterThan(12);
+    }
+
+    @Test
     void signedArcAndExactBezierExtrusionsUseKernelCurvesRatherThanPolygons() {
         int handles = NativeKernel.liveHandles();
         for (double sweep : new double[] {Math.PI, -Math.PI}) {

@@ -96,18 +96,21 @@ public final class FeatureText {
                 // Reuse the persisted outlines when the text is unchanged, including offline fonts.
                 if (!content.equals(entity.text().content())
                         || !font.equals(entity.text().font())) {
-                    entity = SketchText.create(
-                            entity.id(),
-                            content,
-                            font,
-                            entity.text().style(),
-                            entity.value(0),
-                            entity.value(1),
-                            entity.value(2),
-                            entity.value(3),
-                            entity.value(4),
-                            entity.text().pathId(),
-                            entity.construction());
+                    entity = dev.voxelbrew.engine.sketch.TextMirror.of(entity)
+                            .apply(SketchText.create(
+                                    entity.id(),
+                                    content,
+                                    font,
+                                    entity.text().style(),
+                                    entity.value(0),
+                                    entity.value(1),
+                                    entity.value(2),
+                                    entity.value(3),
+                                    entity.value(4),
+                                    entity.text().pathId(),
+                                    entity.construction(),
+                                    entity.text().horizontal(),
+                                    entity.text().vertical()));
                 }
             }
             entities.add(entity);

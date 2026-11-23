@@ -14,6 +14,15 @@ class SketchSnappingTest {
     }
 
     @Test
+    void axisSnapUsesTheDrawingCenterAndAScreenSpaceTolerance() {
+        var center = new Vec(12, -7);
+        assertThat(SketchSnapping.axis(center, new Vec(-4, -7.3), 10, false)).isEqualTo(new Vec(-4, -7));
+        assertThat(SketchSnapping.axis(center, new Vec(12.3, 8), 10, false)).isEqualTo(new Vec(12, 8));
+        assertThat(SketchSnapping.axis(center, new Vec(12.3, 8), 20, false)).isEqualTo(new Vec(12.3, 8));
+        assertThat(SketchSnapping.axis(center, new Vec(16, 8), 20, true)).isEqualTo(new Vec(12, 8));
+    }
+
+    @Test
     void pointsWinOverCurvesAndToleranceUsesScreenPixels() {
         var line = Sketches.entity("line", Kind.LINE, false, 10, 10, 30, 10);
         var g = geometry(line);

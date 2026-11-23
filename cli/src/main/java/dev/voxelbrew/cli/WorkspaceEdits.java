@@ -313,7 +313,7 @@ final class WorkspaceEdits {
                 session.setPrintSetup(setup);
                 return save(s, session);
             });
-            if (operation.equals("arrange")) option(spec, "--gap", Double.class, false, "5", "Minimum spacing in mm");
+            if (operation.equals("arrange")) option(spec, "--gap", Double.class, false, "0", "Minimum spacing in mm");
             else {
                 option(spec, "--instance", String.class, false, null, "Instance ID");
                 option(spec, "--all", boolean.class, false, "false", "Orient every instance on the active plate");

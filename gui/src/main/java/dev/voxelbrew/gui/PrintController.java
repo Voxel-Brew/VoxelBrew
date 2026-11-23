@@ -10,6 +10,8 @@ import dev.voxelbrew.slicer.SliceService;
 import dev.voxelbrew.slicer.SlicerInstallation;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.*;
@@ -21,6 +23,8 @@ import lombok.experimental.Accessors;
 /** Owner-thread state with cancellable worker execution and revision-guarded publication. */
 @lombok.extern.slf4j.Slf4j
 public final class PrintController implements AutoCloseable {
+    private static final DateTimeFormatter LOG_TIME = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.ROOT);
+
     private final ExecutorService worker;
 
     private final Consumer<Runnable> dispatch;
@@ -32,6 +36,10 @@ public final class PrintController implements AutoCloseable {
     private final dev.voxelbrew.importer.GcodeSource gcodeReader;
 
     private final List<String> diagnostics = new ArrayList<>();
+
+    @Getter
+    @Accessors(fluent = true)
+    private String failureDiagnostic = "";
 
     private Map<String, List<String>> completedGcode = Map.of();
 
@@ -80,6 +88,10 @@ public final class PrintController implements AutoCloseable {
         OUTDATED
     }
 
+    static String timestampedDiagnostic(String text) {
+        return "[" + LocalTime.now().format(LOG_TIME) + "] " + text;
+    }
+
     public PrintController(Consumer<Runnable> dispatch, Supplier<CadDocument> current) {
         this(dispatch, current, dev.voxelbrew.engine.feature.FeatureRegistry.defaultDirectory());
     }
@@ -115,6 +127,15 @@ public final class PrintController implements AutoCloseable {
     }
 
     public List<String> diagnostics() {
+        if (!failureDiagnostic.isEmpty()) {
+            var entries = new ArrayList<>(diagnostics);
+            entries.add(failureDiagnostic);
+            return List.copyOf(entries);
+        }
+        return progressDiagnostics();
+    }
+
+    List<String> progressDiagnostics() {
         return List.copyOf(diagnostics);
     }
 
@@ -129,6 +150,7 @@ public final class PrintController implements AutoCloseable {
         revision = "";
         installationId = "";
         diagnostics.clear();
+        failureDiagnostic = "";
         state = State.IDLE;
         message = "Ready to slice";
         onChanged.run();
@@ -223,6 +245,7 @@ public final class PrintController implements AutoCloseable {
         completedGcode = Map.of();
         completedArtifacts = Map.of();
         diagnostics.clear();
+        failureDiagnostic = "";
         revision = DocumentCodec.fingerprint(document);
         installationId = SlicerInstallation.selectedId(document.printSetup());
         message = "Validating print setup";
@@ -253,6 +276,7 @@ public final class PrintController implements AutoCloseable {
                     var completed = SliceService.slice(
                                     provider,
                                     models.get(i),
+                                    dev.voxelbrew.engine.printing.PlateFilaments.from(request, models.get(i)),
                                     window,
                                     token,
                                     line -> dispatch.accept(() -> reportDiagnostic(ticket, label, line)))
@@ -292,7 +316,7 @@ public final class PrintController implements AutoCloseable {
                             case SliceService.OutdatedException ignored -> State.OUTDATED;
                             default -> State.FAILED;
                         };
-                        message = Objects.toString(failure.getMessage(), failure.toString());
+                        recordJobError(failure);
                     }
                     onChanged.run();
                     future.completeExceptionally(failure);
@@ -323,9 +347,14 @@ public final class PrintController implements AutoCloseable {
     private void reportDiagnostic(long ticket, String label, String line) {
         if (closed || ticket != generation || state != State.SLICING) return;
         if (diagnostics.size() == 100) diagnostics.removeFirst();
-        diagnostics.add(label + line);
         message = label + line;
+        diagnostics.add(timestampedDiagnostic(message));
         onChanged.run();
+    }
+
+    private void recordJobError(Throwable failure) {
+        message = Objects.toString(failure.getMessage(), failure.toString());
+        if (state == State.FAILED) failureDiagnostic = timestampedDiagnostic(message);
     }
 
     private void completeSlice(
@@ -372,7 +401,7 @@ public final class PrintController implements AutoCloseable {
                 });
             } catch (IOException | CancellationException failure) {
                 state = failure instanceof CancellationException ? State.CANCELLED : State.FAILED;
-                message = failure.getMessage();
+                recordJobError(failure);
                 future.completeExceptionally(failure);
             }
         }

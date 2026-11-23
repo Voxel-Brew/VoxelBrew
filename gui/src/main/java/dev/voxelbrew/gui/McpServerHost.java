@@ -13,6 +13,9 @@ import java.util.*;
 import java.util.concurrent.*;
 import org.eclipse.jetty.ee10.servlet.*;
 import org.eclipse.jetty.server.*;
+import reactor.core.Scannable;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 /** Window-owned, authenticated loopback transport. Never executes CAD on HTTP threads. */
 final class McpServerHost implements AutoCloseable {
@@ -22,6 +25,7 @@ final class McpServerHost implements AutoCloseable {
     private final Deque<Map<String, Object>> activity = new ArrayDeque<>();
     private Server http;
     private McpSyncServer mcp;
+    private Scheduler sessionSweeper;
     private volatile String token = token();
     private java.nio.file.Path credentialFile;
     private volatile int port;
@@ -56,11 +60,40 @@ final class McpServerHost implements AutoCloseable {
 
     synchronized void start(McpSettings settings) throws Exception {
         close();
+        try {
+            startListener(settings);
+        } catch (Exception failure) {
+            close();
+            throw failure;
+        }
+    }
+
+    private HttpServletStreamableServerTransportProvider transport(Duration interval) {
+        // MCP SDK 1.1.5 cancels the periodic task but leaves its private Reactor scheduler running.
+        // Capture only this transport's scheduler while its builder creates it synchronously.
+        var owner = Thread.currentThread();
+        String key = "voxelbrew-mcp-" + UUID.randomUUID();
+        Schedulers.addExecutorServiceDecorator(key, (scheduler, executor) -> {
+            if (Thread.currentThread() == owner
+                    && "single(\"streamable-http-server-transport-session-sweeper\")"
+                            .equals(Scannable.from(scheduler).name())) {
+                sessionSweeper = scheduler;
+            }
+            return executor;
+        });
+        try {
+            return HttpServletStreamableServerTransportProvider.builder()
+                    .mcpEndpoint("/mcp")
+                    .sessionSweepInterval(interval)
+                    .build();
+        } finally {
+            Schedulers.removeExecutorServiceDecorator(key);
+        }
+    }
+
+    private void startListener(McpSettings settings) throws Exception {
         historyLimit = settings.activityHistorySize();
-        var transport = HttpServletStreamableServerTransportProvider.builder()
-                .mcpEndpoint("/mcp")
-                .sessionSweepInterval(Duration.ofMinutes(settings.idleTimeoutMinutes()))
-                .build();
+        var transport = transport(Duration.ofMinutes(settings.idleTimeoutMinutes()));
         mcp = McpServer.sync(transport)
                 .serverInfo("voxelbrew", "1.0")
                 .capabilities(
@@ -150,13 +183,8 @@ final class McpServerHost implements AutoCloseable {
         servlet.setAsyncSupported(true);
         context.addServlet(servlet, "/mcp");
         http.setHandler(context);
-        try {
-            http.start();
-            port = connector.getLocalPort();
-        } catch (Exception failure) {
-            close();
-            throw failure;
-        }
+        http.start();
+        port = connector.getLocalPort();
     }
 
     private void register(String name, String description, Map<String, String> fields) {
@@ -231,17 +259,18 @@ final class McpServerHost implements AutoCloseable {
 
     @Override
     public synchronized void close() {
-        if (mcp != null) {
-            mcp.close();
+        try {
+            if (mcp != null) mcp.close();
+        } finally {
             mcp = null;
-        }
-        if (http != null) {
             try {
-                http.stop();
+                if (http != null) http.stop();
             } catch (Exception failure) {
                 throw new IllegalStateException("Cannot stop MCP listener", failure);
             } finally {
                 http = null;
+                if (sessionSweeper != null) sessionSweeper.dispose();
+                sessionSweeper = null;
             }
         }
     }

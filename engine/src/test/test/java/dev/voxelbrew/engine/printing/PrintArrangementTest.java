@@ -26,7 +26,7 @@ class PrintArrangementTest {
     }
 
     @Test
-    void separatesOverlapsAndPreservesRotationHeightAndOrder() {
+    void seatsObjectsOnBedAndPreservesRotationSpacingAndOrder() {
         var model = model(60, 4);
         var result = PrintArrangement.arrange(model, 5).orElseThrow();
         for (int i = 0; i < result.size(); i++) {
@@ -34,9 +34,10 @@ class PrintArrangementTest {
             var before = model.instances().get(i).transform().matrix();
             var after = result.get(i).transform().matrix();
             for (int j = 0; j < 12; j++) {
-                if (j != 3 && j != 7) assertThat(after[j]).isEqualTo(before[j]);
+                if (j % 4 != 3) assertThat(after[j]).isEqualTo(before[j]);
             }
             var bounds = MeshGeometry.bounds(model.placedMesh(result.get(i)));
+            assertThat(bounds.minZ()).isCloseTo(0, org.assertj.core.data.Offset.offset(1e-8));
             assertThat(bounds.minX() >= 5 - 1e-8
                             && bounds.minY() >= 5 - 1e-8
                             && bounds.maxX() <= 195 + 1e-8
@@ -51,6 +52,30 @@ class PrintArrangementTest {
                         .isTrue();
             }
         }
+    }
+
+    @Test
+    void restsOnSolidSupportEvenWhenABlockerExtendsBelowIt() {
+        var original = model(60, 1);
+        var support = new SupportVolume("support", "part0", SupportVolume.Role.SOLID_SUPPORT, 0, 0, -2, 5, 5, 2);
+        var blocker = new SupportVolume("blocker", "part0", SupportVolume.Role.BLOCKER, 0, 0, -4, 5, 5, 6);
+        var setup = original.setup().withSupports(List.of(support, blocker));
+        var model = new ManufacturingModel("doc", "rev", setup, original.profile(), original.meshes());
+        var instance = PrintArrangement.arrange(model, 0).orElseThrow().getFirst();
+        var placedSupport = MeshGeometry.transform(MeshGeometry.box(support), instance.transform());
+        assertThat(MeshGeometry.bounds(placedSupport).minZ()).isCloseTo(0, org.assertj.core.data.Offset.offset(1e-8));
+        assertThat(MeshGeometry.bounds(model.placedMesh(instance)).minZ())
+                .isCloseTo(2, org.assertj.core.data.Offset.offset(1e-8));
+    }
+
+    @Test
+    void zeroGapPlacesAdjacentBoundsInContact() {
+        var model = model(60, 2);
+        var arranged = PrintArrangement.arrange(model, 0).orElseThrow();
+        var left = MeshGeometry.bounds(model.placedMesh(arranged.getFirst()));
+        var right = MeshGeometry.bounds(model.placedMesh(arranged.getLast()));
+        assertThat(right.minX()).isCloseTo(left.maxX(), org.assertj.core.data.Offset.offset(1e-8));
+        assertThat(right.minY()).isCloseTo(left.minY(), org.assertj.core.data.Offset.offset(1e-8));
     }
 
     @Test

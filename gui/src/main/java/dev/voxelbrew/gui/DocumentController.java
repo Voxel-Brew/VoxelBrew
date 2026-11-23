@@ -2,6 +2,7 @@ package dev.voxelbrew.gui;
 
 import dev.voxelbrew.api.model.*;
 import dev.voxelbrew.api.model.mesh.*;
+import dev.voxelbrew.api.model.sketch.SketchGeometry.Entity;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.importer.ImportRuntime;
 import java.nio.file.Path;
@@ -60,11 +61,25 @@ public final class DocumentController implements AutoCloseable {
 
     private volatile boolean unsavedImport;
 
+    private volatile boolean lastSaveSucceeded;
+
+    @Setter
+    @Accessors(fluent = true, chain = false)
+    private Runnable onDocumentEnd = () -> {};
+
+    @Setter
+    @Accessors(fluent = true, chain = false)
+    private Consumer<Path> onProjectSaved = ignored -> {};
+
+    @Setter
+    @Accessors(fluent = true, chain = false)
+    private Function<Path, CompletableFuture<Void>> projectOpener = this::openOriginal;
+
     @Getter
     @Accessors(fluent = true)
     private Path path;
 
-    private Feature.Extrude preview;
+    private Feature preview;
 
     private String previewExpression = "";
 
@@ -165,7 +180,18 @@ public final class DocumentController implements AutoCloseable {
             boolean valid,
             List<Feature> features,
             Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction,
-            List<ConstructionFeature.Input> constructionInputs) {
+            List<ConstructionFeature.Input> constructionInputs,
+            Map<String, List<Entity>> projections) {
+        public Build(
+                List<Body> bodies,
+                List<Evaluation.Diagnostic> diagnostics,
+                boolean valid,
+                List<Feature> features,
+                Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction,
+                List<ConstructionFeature.Input> constructionInputs) {
+            this(bodies, diagnostics, valid, features, construction, constructionInputs, Map.of());
+        }
+
         public Build(
                 List<Body> bodies, List<Evaluation.Diagnostic> diagnostics, boolean valid, List<Feature> features) {
             this(bodies, diagnostics, valid, features, Map.of(), List.of());
@@ -181,6 +207,7 @@ public final class DocumentController implements AutoCloseable {
             features = List.copyOf(features);
             construction = Map.copyOf(construction);
             constructionInputs = List.copyOf(constructionInputs);
+            projections = Map.copyOf(projections);
         }
     }
 
@@ -241,7 +268,8 @@ public final class DocumentController implements AutoCloseable {
                     true,
                     evaluation.resolvedFeatures(),
                     evaluation.construction(),
-                    inputs);
+                    inputs,
+                    evaluation.projections());
         }
     }
 
@@ -292,6 +320,45 @@ public final class DocumentController implements AutoCloseable {
 
     long generation() {
         return documentGeneration.get();
+    }
+
+    Map<String, String> backupWorkspace() {
+        return Map.copyOf(printWorkspace.get());
+    }
+
+    CompletableFuture<Void> backup(Path destination, CadDocument document, Map<String, String> workspace) {
+        // The writer updates file metadata after publishing. Keep the live project's metadata separate.
+        var parameters = document.parameters();
+        var detached = new dev.voxelbrew.api.model.parameters.ParameterSet(
+                parameters.parameters(),
+                parameters.configurations(),
+                parameters.active(),
+                parameters.bindings(),
+                new UuidGenerator(parameters.uuidGenerator().nextValue()));
+        detached.builtins().fileVersion(parameters.builtins().fileVersion());
+        detached.builtins().projectPath(path);
+        var captured = new CadDocument(
+                document.id(),
+                document.features(),
+                document.cursor(),
+                document.printSetup().withWorkspaceSettings(workspace),
+                detached,
+                document.bodyStyles(),
+                document.bodyNames(),
+                document.featureNames(),
+                document.gcode(),
+                document.printArtifacts());
+        return CompletableFuture.runAsync(
+                () -> {
+                    try {
+                        var parent = destination.getParent();
+                        if (parent != null) java.nio.file.Files.createDirectories(parent);
+                        documentWriter.save(captured, destination, true);
+                    } catch (java.io.IOException failure) {
+                        throw new java.io.UncheckedIOException(failure);
+                    }
+                },
+                io);
     }
 
     public List<Feature> effectiveFeatures() {
@@ -345,13 +412,22 @@ public final class DocumentController implements AutoCloseable {
     }
 
     public boolean dirty() {
+        return dirty(session.document(), printWorkspace.get());
+    }
+
+    boolean dirty(CadDocument document, Map<String, String> workspace) {
         return unsavedImport
-                || !session.document().equals(saved)
-                || !printWorkspace.get().equals(session.document().printSetup().workspaceSettings());
+                || !document.equals(saved)
+                || !workspace.equals(document.printSetup().workspaceSettings());
     }
 
     public boolean hasPreview() {
         return preview != null;
+    }
+
+    boolean canCommitExtrusion() {
+        return preview != null
+                && (!BodyExtrusion.modifiesBody(preview) || !rebuilding && displayedPreview && build.valid());
     }
 
     public boolean canExport() {
@@ -371,13 +447,24 @@ public final class DocumentController implements AutoCloseable {
     }
 
     private void replace(CadDocument document, Path source) {
+        replace(document, source, false, () -> {});
+    }
+
+    boolean savedForClose() {
+        return lastSaveSucceeded && !ioBusy && !dirty();
+    }
+
+    private void replace(CadDocument document, Path source, boolean recovered, Runnable installed) {
         if (ioBusy) throw new IllegalStateException("Wait for the current file operation");
+        onDocumentEnd.run();
         session = new ModelSession(document);
         saved = document;
-        unsavedImport = false;
+        unsavedImport = recovered;
+        lastSaveSucceeded = false;
         path = source;
         preview = null;
         documentGeneration.incrementAndGet();
+        installed.run();
         build = new Build(List.of(), List.of(), true);
         schedule(document, false);
     }
@@ -419,14 +506,24 @@ public final class DocumentController implements AutoCloseable {
     }
 
     public void printSetup(dev.voxelbrew.api.model.printing.PrintSetup setup) {
-        var previous = session.document().printSetup();
+        var previous = session.document();
+        boolean workspaceOnly = !rebuilding
+                && !hasPreview()
+                && !displayedPreview
+                && previous.printSetup()
+                        .withWorkspaceSettings(setup.workspaceSettings())
+                        .equals(setup);
+        boolean reuseGeometry = canExport() || workspaceOnly;
         session.setPrintSetup(setup);
+        var current = session.document();
         preview = null;
-        if (previous.withWorkspaceSettings(setup.workspaceSettings()).equals(setup)) {
+        // The model shares the built-ins instance across setups with the same expression inputs.
+        if (reuseGeometry
+                && previous.parameters().builtins() == current.parameters().builtins()) {
             onChanged.run();
             return;
         }
-        schedule(session.document(), false);
+        schedule(current, false);
     }
 
     void gcode(java.util.Map<String, java.util.List<String>> jobs) {
@@ -503,11 +600,24 @@ public final class DocumentController implements AutoCloseable {
     }
 
     public void previewExtrusion(Feature.Sketch sketch, String profileId, double distance) {
+        previewExtrusion(sketch, profileId, distance, BodyExtrusion.Operation.NEW_BODY, null);
+    }
+
+    private void previewExtrusion(
+            Feature.Sketch sketch,
+            String profileId,
+            double distance,
+            BodyExtrusion.Operation operation,
+            Feature.BodyRef target) {
         previewExpression = "";
         String id = preview == null
                 ? "extrude-" + session.document().uuidGenerator().next()
                 : preview.id();
-        var candidate = new Feature.Extrude(id, new Feature.ProfileRef(sketch.id(), profileId), distance);
+        var candidate = new BodyExtrusion(
+                        new Feature.Extrude(id, new Feature.ProfileRef(sketch.id(), profileId), distance),
+                        operation,
+                        target)
+                .feature();
         var temporary = new ModelSession(session.document());
         temporary.add(candidate);
         preview = candidate;
@@ -519,9 +629,18 @@ public final class DocumentController implements AutoCloseable {
     }
 
     public void previewExtrusion(Feature.Sketch sketch, String profileId, String expression) {
+        previewExtrusion(sketch, profileId, expression, BodyExtrusion.Operation.NEW_BODY, null);
+    }
+
+    void previewExtrusion(
+            Feature.Sketch sketch,
+            String profileId,
+            String expression,
+            BodyExtrusion.Operation operation,
+            Feature.BodyRef target) {
         double value =
                 session.document().parameters().value(expression, dev.voxelbrew.api.model.parameters.ParameterUnit.MM);
-        previewExtrusion(sketch, profileId, value);
+        previewExtrusion(sketch, profileId, value, operation, target);
         if (!expression.matches("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?")) {
             previewExpression = expression;
         }
@@ -553,6 +672,19 @@ public final class DocumentController implements AutoCloseable {
 
     public CompletableFuture<Void> open(Path source) {
         requireIdleIo();
+        return projectOpener.apply(source);
+    }
+
+    CompletableFuture<Void> openOriginal(Path source) {
+        return open(source, source.toAbsolutePath(), false, () -> {});
+    }
+
+    CompletableFuture<Void> recover(Path backup, Path original, Runnable installed) {
+        return open(backup, original == null ? null : original.toAbsolutePath(), true, installed);
+    }
+
+    private CompletableFuture<Void> open(Path source, Path original, boolean recovered, Runnable installed) {
+        requireIdleIo();
         ioBusy = true;
         onChanged.run();
         var result = new CompletableFuture<Void>();
@@ -565,8 +697,9 @@ public final class DocumentController implements AutoCloseable {
                         return;
                     }
                     ioBusy = false;
-                    replace(document, source.toAbsolutePath());
-                    onFileUsed.accept(source);
+                    if (recovered) document.parameters().builtins().projectPath(original);
+                    replace(document, original, recovered, installed);
+                    if (original != null) onFileUsed.accept(original);
                     log.info("Opened document {} from {}", document.id(), source);
                     result.complete(null);
                 });
@@ -579,6 +712,7 @@ public final class DocumentController implements AutoCloseable {
 
     public CompletableFuture<Void> save(Path destination, boolean overwrite) {
         requireIdleIo();
+        lastSaveSucceeded = false;
         capturePrintWorkspace();
         var captured = session.document();
         long generation = documentGeneration.get();
@@ -598,6 +732,8 @@ public final class DocumentController implements AutoCloseable {
                         saved = captured;
                         unsavedImport = false;
                         path = destination.toAbsolutePath();
+                        lastSaveSucceeded = true;
+                        onProjectSaved.accept(path);
                     }
                     onFileUsed.accept(destination);
                     onChanged.run();
@@ -622,14 +758,14 @@ public final class DocumentController implements AutoCloseable {
                             document, destination.path().toAbsolutePath().normalize(), destination.overwrite());
                     return selected;
                 };
-        return exportDocument(exporter, "vxb", true, parent, captureExportDocument());
+        return exportDocument(exporter, "vxb", true, parent, captureExportDocument(true));
     }
 
     public CompletableFuture<Void> exportDocument(
             dev.voxelbrew.api.exporter.ExporterProvider<?> provider, dev.voxelbrew.api.exporter.ExportWindow parent) {
         String id = provider.descriptor().id();
         var exporter = provider.create();
-        var captured = captureExportDocument();
+        var captured = captureExportDocument(id.equals("vxb"));
         if (id.equals("3mf") && captured.printSetup().instances().isEmpty()) {
             return CompletableFuture.failedFuture(
                     new java.io.IOException("No objects on the active plate; place a model in the Slicer first"));
@@ -641,8 +777,9 @@ public final class DocumentController implements AutoCloseable {
         return exportDocument(exporter, id, id.equals("vxb"), parent, captured);
     }
 
-    private CadDocument captureExportDocument() {
+    private CadDocument captureExportDocument(boolean savesDocument) {
         requireIdleIo();
+        if (savesDocument) lastSaveSucceeded = false;
         capturePrintWorkspace();
         return session.document();
     }
@@ -735,6 +872,8 @@ public final class DocumentController implements AutoCloseable {
                                 saved = captured;
                                 unsavedImport = false;
                                 path = savedPath;
+                                lastSaveSucceeded = true;
+                                onProjectSaved.accept(path);
                                 onFileUsed.accept(savedPath);
                             }
                             onChanged.run();
@@ -975,6 +1114,7 @@ public final class DocumentController implements AutoCloseable {
 
     @Override
     public void close() {
+        if (closed) return;
         log.debug("Closing document controller for {}", session.document().id());
         closed = true;
         sequence.incrementAndGet();
@@ -983,5 +1123,6 @@ public final class DocumentController implements AutoCloseable {
         }
         worker.shutdown();
         io.shutdown();
+        onDocumentEnd.run();
     }
 }

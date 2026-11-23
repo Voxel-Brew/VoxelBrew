@@ -34,6 +34,59 @@ class PrintingTest {
         return s;
     }
 
+    static ManufacturingModel twoFilamentModel(ModelSession session, boolean reverse) {
+        var original = ManufacturingModels.evaluate(session.document(), MeshOptions.DEFAULT);
+        var left = original.instances().getFirst();
+        var right = new BodyInstance("copy", "other.body", Transform.translation(100, 30, 0));
+        session.setBodyStyle(left.bodyId(), new BodyStyle("PLA", "#AA0033"));
+        session.setBodyStyle(right.bodyId(), new BodyStyle("PETG", "#55BB22"));
+        var setup = original.setup().withInstances(reverse ? List.of(right, left) : List.of(left, right));
+        var mesh = original.mesh(left.bodyId());
+        return new ManufacturingModel(
+                original.documentId(),
+                original.revision(),
+                setup,
+                original.profile(),
+                Map.of(left.bodyId(), mesh, right.bodyId(), mesh));
+    }
+
+    @Test
+    void prusaUsesTheSameFilamentForEachBodyAfterReordering() throws Exception {
+        var session = reference();
+        PlateFilaments previous = null;
+        for (boolean reverse : List.of(false, true)) {
+            var model = twoFilamentModel(session, reverse);
+            var palette = PlateFilaments.from(session.document(), model);
+            if (previous != null) assertThat(palette).isEqualTo(previous);
+            previous = palette;
+            var result = SliceService.slice(
+                            new dev.voxelbrew.slicer.prusa.PrusaSlicerProvider(),
+                            model,
+                            palette,
+                            SlicerTestSupport.window(Map.of()),
+                            new Cancellation(),
+                            System.out::println)
+                    .orElseThrow();
+            assertThat(PlateFilaments.read(result.artifact().metadata())).isEqualTo(palette);
+            assertThat(result.job().lines())
+                    .contains("; filament_colour = #55BB22;#AA0033", "; filament_type = PETG;PLA");
+            int tool = -1;
+            var deposits = new HashSet<Integer>();
+            for (String line : result.job().lines()) {
+                if (line.startsWith("T0 ")) tool = 0;
+                if (line.startsWith("T1 ")) tool = 1;
+                if (line.startsWith("G1 X") && line.contains(" E") && tool >= 0) {
+                    double x = Double.parseDouble(line.substring(4, line.indexOf(' ', 4)));
+                    if (x >= 20 && x <= 80 || x >= 100 && x <= 160) {
+                        assertThat(tool).as(line).isEqualTo(x >= 100 ? 0 : 1);
+                        deposits.add(tool);
+                    }
+                }
+            }
+            assertThat(deposits).containsExactlyInAnyOrder(0, 1);
+        }
+    }
+
     @Test
     void disabledSupportsExcludeManualAutomaticAndRaftOutputWithoutDeletingSettings() throws Exception {
         var session = reference();

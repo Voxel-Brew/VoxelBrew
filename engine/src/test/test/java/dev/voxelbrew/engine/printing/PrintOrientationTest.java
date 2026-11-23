@@ -74,15 +74,21 @@ class PrintOrientationTest {
     }
 
     @Test
-    void automaticOrientationChoosesABroadBedFaceAndPreservesHorizontalCenter() {
+    void automaticOrientationReducesFootprintAndPreservesVertexHeights() {
         var mesh = box();
         var source = new BodyInstance(
-                "instance", "body", Transform.translation(20, 30, 7).compose(Transform.rotation(90, 0, 0)));
+                "instance", "body", Transform.translation(20, 30, 7).compose(Transform.rotation(43, 0, 30)));
         var before = MeshGeometry.bounds(MeshGeometry.transform(mesh, source.transform()));
         var result = PrintOrientation.autoOrient(mesh, source.transform());
         var after = MeshGeometry.bounds(MeshGeometry.transform(mesh, result));
-        assertThat(after.minZ()).isCloseTo(0, org.assertj.core.data.Offset.offset(1e-8));
-        assertThat(after.maxZ()).isCloseTo(8, org.assertj.core.data.Offset.offset(1e-8));
+        var original = MeshGeometry.transform(mesh, source.transform());
+        var oriented = MeshGeometry.transform(mesh, result);
+        for (int vertex = 0; vertex < mesh.vertexCount(); vertex++) {
+            assertThat(oriented.coordinate(vertex, 2)).isEqualTo(original.coordinate(vertex, 2));
+        }
+        assertThat((after.maxX() - after.minX()) * (after.maxY() - after.minY()))
+                .isLessThan((before.maxX() - before.minX()) * (before.maxY() - before.minY()));
+        assertThat(PrintOrientation.autoOrient(mesh, result)).isSameAs(result);
         assertThat((after.minX() + after.maxX()) / 2)
                 .isCloseTo((before.minX() + before.maxX()) / 2, org.assertj.core.data.Offset.offset(1e-8));
         assertThat((after.minY() + after.maxY()) / 2)
@@ -90,7 +96,7 @@ class PrintOrientationTest {
     }
 
     @Test
-    void automaticOrientationRejectsMeshesWithoutASupportingPlanarFace() {
+    void automaticOrientationRejectsDegenerateMeshes() {
         var mesh = new MeshData(new double[] {0, 0, 0, 1, 0, 0, 2, 0, 0}, new int[] {0, 1, 2}, new int[] {0});
         assertThatThrownBy(() -> PrintOrientation.autoOrient(mesh, Transform.IDENTITY))
                 .isInstanceOf(IllegalArgumentException.class);

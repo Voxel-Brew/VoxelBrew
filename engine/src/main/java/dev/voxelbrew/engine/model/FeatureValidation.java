@@ -9,6 +9,8 @@ final class FeatureValidation {
     static void validate(Feature feature) {
         if (feature instanceof Feature.Sketch sketch) {
             validateSketch(sketch);
+        } else if (BodyExtrusion.modifiesBody(feature)) {
+            validate(BodyExtrusion.from(feature).extrusion());
         } else if (feature instanceof Feature.Extrude extrusion) {
             finite(feature.id(), "distance", extrusion.distance());
             if (Math.abs(extrusion.distance()) < 1e-6) {

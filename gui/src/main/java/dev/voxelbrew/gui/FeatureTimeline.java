@@ -3,6 +3,7 @@ package dev.voxelbrew.gui;
 import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.CadDocument;
 import dev.voxelbrew.api.model.Feature;
+import dev.voxelbrew.engine.model.BodyExtrusion;
 import dev.voxelbrew.engine.model.Evaluation;
 import java.util.List;
 import java.util.Objects;
@@ -88,7 +89,7 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
                 path("M2 6L10 2L18 6L10 10Z", "timeline-cube-top"),
                 path("M2 6L10 10V20L2 16Z", "timeline-cube-left"),
                 path("M10 10L18 6V16L10 20Z", "timeline-cube-right"));
-        if (feature instanceof Feature.Extrude) {
+        if (feature instanceof Feature.Extrude || BodyExtrusion.modifiesBody(feature)) {
             cube.getChildren().add(path("M17 5L20 1L23 5H21V14H19V5Z", "timeline-extrude-icon"));
         } else if (feature instanceof Feature.ThroughCut) {
             cube.getChildren().add(path("M8 5L10 4L13 5L13 8L11 9L8 8Z M10 9V16", "timeline-cut-icon"));

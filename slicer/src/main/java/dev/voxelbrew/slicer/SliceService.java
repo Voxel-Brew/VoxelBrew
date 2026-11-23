@@ -102,6 +102,17 @@ public class SliceService {
             Cancellation cancellation,
             Consumer<String> diagnostics)
             throws Exception {
+        return slice(provider, model, new PlateFilaments(List.of(), Map.of()), window, cancellation, diagnostics);
+    }
+
+    public static Optional<Result> slice(
+            SlicerProvider provider,
+            ManufacturingModel model,
+            PlateFilaments filaments,
+            SlicerWindow window,
+            Cancellation cancellation,
+            Consumer<String> diagnostics)
+            throws Exception {
         cancellation.check();
         var validation = PrintValidation.validate(model);
         if (!validation.valid()) {
@@ -116,7 +127,7 @@ public class SliceService {
         var input = new ManufacturingModel(
                 model.documentId(),
                 model.revision(),
-                setup.withWorkspaceSettings(Map.of()).withPrintTarget(target),
+                setup.withWorkspaceSettings(filaments.metadata()).withPrintTarget(target),
                 model.profile(),
                 model.meshes());
         var artifact = provider.create().slice(input, window, cancellation, diagnostics);

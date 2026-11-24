@@ -1859,8 +1859,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             finish.setDisable(!controller.canFinish()
                     || controller.definition().entities().isEmpty());
             status.setText(solverStatus());
-            profileWarning.setVisible(
-                    !controller.busy() && !controller.extrusionIssue().isEmpty());
+            profileWarning.setVisible(!controller.extrusionIssue().isEmpty());
             profileWarning.setText(translations.translate("action.extrude") + ": " + controller.extrusionIssue());
             if (!controller.busy() && !controller.interactionError().isEmpty()) {
                 error.setText(controller.interactionError());

@@ -3123,16 +3123,18 @@ class WorkbenchUiTest {
                                 .degreesOfFreedom()
                         > 0))
                 .isTrue();
-        assertSketchGeometryColor(20, 10, true);
+        click("sketch-fit");
+        // Probe the strokes away from midpoint dimension labels.
+        assertSketchGeometryColor(26, 10, true);
         assertSketchGeometryColor(10, 10, true);
-        assertSketchGeometryColor(20, 30, false);
+        assertSketchGeometryColor(26, 30, false);
         assertSketchGeometryColor(40, 10, true);
         assertSketchGeometryColor(50, 10, false);
         sketchReference("fixed");
         assertThat(fx(() -> ((Label) node("#sketch-selection")).getText().isBlank()))
                 .isFalse();
         click("sketch-clear-selection");
-        assertSketchGeometryColor(20, 10, true);
+        assertSketchGeometryColor(26, 10, true);
         fx(() -> {
             Screenshot.save(
                     stage.getScene(),
@@ -3552,7 +3554,9 @@ class WorkbenchUiTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(dimension.refs().getFirst().part()).isEqualTo(SketchGeometry.Part.CENTER);
-        assertThat(dimension.values()).containsExactly(15.);
+        assertThat(dimension.values().getFirst()).isEqualTo(15.);
+        assertThat(dev.voxelbrew.engine.sketch.SketchConstraints.labelPosition(dimension))
+                .isPresent();
         key(KeyCode.ESCAPE);
         fx(() -> {
             Screenshot.save(
@@ -8343,8 +8347,14 @@ class WorkbenchUiTest {
         sketchDrag(30, 10, 35, 15, false);
         var moved =
                 fx(() -> ((SketchEditor) node("#sketch-editor")).controller().definition());
-        assertThat(moved.entities().getFirst().at(1).x()).isCloseTo(35, org.assertj.core.data.Offset.offset(0.3));
-        assertThat(moved.entities().getFirst().at(1).y()).isCloseTo(15, org.assertj.core.data.Offset.offset(0.3));
+        var screenError = fx(() -> {
+            var editor = (SketchEditor) node("#sketch-editor");
+            var end = editor.modelToScreen(moved.entities().getFirst().at(1));
+            return end.distance(editor.modelToScreen(new SketchGeometry.Vec(35, 15)));
+        });
+        assertThat(screenError)
+                .as("Dragged endpoint distance from the pointer in pixels")
+                .isLessThan(1.5);
         assertThat(moved.entities().getFirst().at(1).y())
                 .isCloseTo(moved.entities().getFirst().at(0).y(), org.assertj.core.data.Offset.offset(1e-6));
         click("sketch-undo");

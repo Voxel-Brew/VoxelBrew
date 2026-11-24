@@ -2967,6 +2967,39 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void largeExtrusionRegionListScrollsIndependently() throws Exception {
+        var entities = new ArrayList<SketchGeometry.Entity>();
+        for (int i = 0; i < 12; i++) {
+            entities.add(
+                    Sketches.entity("circle-" + i, SketchGeometry.Kind.CIRCLE, false, (i % 4) * 8, (i / 4) * 8, 3));
+        }
+        var geometry = new SketchGeometry(
+                entities,
+                List.of(),
+                entities.stream().map(SketchGeometry.Entity::id).toList());
+        var sketch =
+                new Feature.Sketch("circles", "profile", Feature.Plane.origin("XY"), new Feature.Constrained(geometry));
+        var file = directory.resolve("many-regions.vxb");
+        DocumentWriter.save(new CadDocument("regions", List.of(sketch), 1), file, false);
+        open(file);
+        click("history-0");
+        click("extrude");
+        ready();
+        modelClick(24, 16, 0);
+        ready();
+        assertThat(volume()).isCloseTo(45 * Math.PI, org.assertj.core.data.Offset.offset(.001));
+        fx(() -> {
+            var list = (javafx.scene.control.ScrollPane) node("#extrude-region-list");
+            assertThat(list.getViewportBounds().getHeight())
+                    .isLessThan(list.getContent().getLayoutBounds().getHeight());
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "extrusion-profile-list.png"));
+            return null;
+        });
+    }
+
+    @Test
     void extrusionRegionChoiceKeepsOnlyRectangle() throws Exception {
         var rectangle = Sketches.rectangle("r", 0, 0, 20, 10, false);
         var entities = new ArrayList<>(rectangle.entities());

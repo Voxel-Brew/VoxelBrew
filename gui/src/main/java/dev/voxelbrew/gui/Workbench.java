@@ -1300,9 +1300,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                             "edit-sketch-constraints",
                             () -> editSketch(s)));
 
-            var plane =
-                    new Label(translations.translate("feature.plane", s.plane().id()));
-            plane.setWrapText(true);
+            var plane = sketchPlaneLabel(s);
             var changePlane =
                     button(translations.translate("plane.change"), "change-sketch-plane", () -> beginPlaneSelection(s));
             form.getChildren().add(new FlowPane(6, 4, plane, changePlane));
@@ -1476,6 +1474,29 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         return controller.snapshot().document().featureName(id, id);
     }
 
+    private String planeName(Feature.Plane plane) {
+        var document = controller.snapshot().document();
+        if (!plane.constructionSupport().isEmpty()) {
+            String id = plane.constructionSupport();
+            return document.featureName(id, featureBaseName(id));
+        }
+        if (plane.support() != null) {
+            var source = plane.support().body();
+            String bodyId =
+                    controller.build().bodyIds().getOrDefault(source, source.featureId() + "." + source.outputName());
+            String featureName = document.featureNames().get(source.featureId());
+            return document.bodyName(bodyId, featureName == null ? bodyLabel(bodyId) : featureName);
+        }
+        return plane.isOrigin() ? plane.id().substring("origin-".length()).toUpperCase(Locale.ROOT) : plane.id();
+    }
+
+    private Label sketchPlaneLabel(Feature.Sketch sketch) {
+        var label = new Label(translations.translate("feature.plane", planeName(sketch.plane())));
+        label.setId("sketch-plane-name");
+        label.setWrapText(true);
+        return label;
+    }
+
     private void sketchNameEditor(Feature.Sketch sketch) {
         var name = new TextField(sketchReferenceName(sketch.id()));
         name.setId("sketch-name");
@@ -1491,10 +1512,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         form.getChildren().addAll(label, new HBox(6, name, rename));
     }
 
-    private void referenceEditor(Feature feature, Feature.ProfileRef profile, Feature.BodyRef body) {
-        var earlier = controller.snapshot().document().features().stream()
-                .takeWhile(f -> !f.id().equals(feature.id()))
-                .toList();
+    private ComboBox<String> sketchInput(List<Feature> earlier, Feature.ProfileRef profile) {
         var sketches = new ComboBox<String>();
         sketches.setId("repair-sketch");
         UiText.choices(sketches, this::sketchReferenceName);
@@ -1502,9 +1520,30 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 .filter(f -> f instanceof Feature.Sketch)
                 .forEach(f -> sketches.getItems().add(f.id()));
         if (profile != null) {
-            sketches.setValue(profile.sketchId());
             form.getChildren().addAll(new Label(translations.translate("gui.input_sketch")), sketches);
+            var plane = new Label();
+            plane.setId("sketch-plane-name");
+            plane.setWrapText(true);
+            sketches.valueProperty().addListener((o, previous, id) -> {
+                plane.setText(earlier.stream()
+                        .filter(Feature.Sketch.class::isInstance)
+                        .map(Feature.Sketch.class::cast)
+                        .filter(s -> s.id().equals(id))
+                        .map(s -> translations.translate("feature.plane", planeName(s.plane())))
+                        .findFirst()
+                        .orElse(""));
+            });
+            sketches.setValue(profile.sketchId());
+            form.getChildren().add(plane);
         }
+        return sketches;
+    }
+
+    private void referenceEditor(Feature feature, Feature.ProfileRef profile, Feature.BodyRef body) {
+        var earlier = controller.snapshot().document().features().stream()
+                .takeWhile(f -> !f.id().equals(feature.id()))
+                .toList();
+        var sketches = sketchInput(earlier, profile);
         var bodies = new ComboBox<String>();
         bodies.setId("repair-body");
         var output = new TextField(body == null ? "body" : body.outputName());
@@ -1897,6 +1936,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 translations.translate("gui.extrude_profile") + " · " + sketchReferenceName(sketch.id()));
         form.getChildren().clear();
         fields.clear();
+        form.getChildren().add(sketchPlaneLabel(sketch));
         var whole = new CheckBox(translations.translate("gui.extrude_all_regions"));
         whole.setId("extrude-whole");
         whole.setSelected(true);

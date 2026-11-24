@@ -181,7 +181,19 @@ public final class DocumentController implements AutoCloseable {
             List<Feature> features,
             Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction,
             List<ConstructionFeature.Input> constructionInputs,
-            Map<String, List<Entity>> projections) {
+            Map<String, List<Entity>> projections,
+            Map<Feature.BodyRef, String> bodyIds) {
+        public Build(
+                List<Body> bodies,
+                List<Evaluation.Diagnostic> diagnostics,
+                boolean valid,
+                List<Feature> features,
+                Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction,
+                List<ConstructionFeature.Input> constructionInputs,
+                Map<String, List<Entity>> projections) {
+            this(bodies, diagnostics, valid, features, construction, constructionInputs, projections, Map.of());
+        }
+
         public Build(
                 List<Body> bodies,
                 List<Evaluation.Diagnostic> diagnostics,
@@ -208,6 +220,7 @@ public final class DocumentController implements AutoCloseable {
             construction = Map.copyOf(construction);
             constructionInputs = List.copyOf(constructionInputs);
             projections = Map.copyOf(projections);
+            bodyIds = Map.copyOf(bodyIds);
         }
     }
 
@@ -269,7 +282,8 @@ public final class DocumentController implements AutoCloseable {
                     evaluation.resolvedFeatures(),
                     evaluation.construction(),
                     inputs,
-                    evaluation.projections());
+                    evaluation.projections(),
+                    evaluation.bodyIds());
         }
     }
 

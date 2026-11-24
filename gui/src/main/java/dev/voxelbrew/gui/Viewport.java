@@ -69,6 +69,7 @@ public final class Viewport extends StackPane {
     private final Map<javafx.scene.control.Label, Feature.Plane> originLabels = new LinkedHashMap<>();
 
     private final java.util.ArrayList<SketchPick> sketchPicks = new java.util.ArrayList<>();
+    private final Map<SketchDisplay, SketchOverlay> constrainedOverlays = new LinkedHashMap<>();
 
     private final Group handle = new Group();
 
@@ -123,6 +124,10 @@ public final class Viewport extends StackPane {
     private Map<String, dev.voxelbrew.api.model.BodyStyle> bodyStyles = Map.of();
 
     private record SketchPick(String featureId, Point3D a, Point3D b) {}
+
+    private record SketchDisplay(String id, boolean selected) {}
+
+    private record SketchOverlay(Group group, List<SketchPick> picks) {}
 
     public static Point3D toView(double x, double y, double z) {
         return new Point3D(x, -z, y);
@@ -604,7 +609,11 @@ public final class Viewport extends StackPane {
 
     public void showSketches(List<Feature> features, String selectedSketch) {
         sketches.setDepthTest(planeClick == null ? DepthTest.INHERIT : DepthTest.DISABLE);
-        if (shownSketches.equals(features) && java.util.Objects.equals(shownSketchSelection, selectedSketch)) return;
+        if (shownSketches.equals(features)) {
+            if (java.util.Objects.equals(shownSketchSelection, selectedSketch)) return;
+        } else {
+            constrainedOverlays.clear();
+        }
         shownSketches = List.copyOf(features);
         shownSketchSelection = selectedSketch;
         sketches.getChildren().clear();
@@ -627,8 +636,11 @@ public final class Viewport extends StackPane {
             if (feature instanceof Feature.Sketch sketch) {
                 if (consumed.contains(sketch.id()) && !sketch.id().equals(selectedSketch)) continue;
                 if (sketch.profile() instanceof Feature.Constrained constrained) {
-                    showConstrainedSketch(
-                            sketch, constrained.geometry(), sketch.id().equals(selectedSketch));
+                    var display = new SketchDisplay(sketch.id(), sketch.id().equals(selectedSketch));
+                    var overlay = constrainedOverlays.computeIfAbsent(
+                            display, key -> constrainedOverlay(sketch, constrained.geometry(), key.selected()));
+                    sketches.getChildren().add(overlay.group());
+                    sketchPicks.addAll(overlay.picks());
                     continue;
                 }
                 showProfile(sketch, selectedSketch);
@@ -636,9 +648,10 @@ public final class Viewport extends StackPane {
         }
     }
 
-    private void showConstrainedSketch(
+    private SketchOverlay constrainedOverlay(
             Feature.Sketch sketch, dev.voxelbrew.api.model.sketch.SketchGeometry geometry, boolean chosen) {
         var group = new Group();
+        var picks = new java.util.ArrayList<SketchPick>();
         group.getTransforms().add(viewTransform(sketch.plane().frame()));
         if (chosen) addProfileHighlight(group, geometry, sketch.plane().offsetZ());
         for (var entity : geometry.entities()) {
@@ -651,7 +664,7 @@ public final class Viewport extends StackPane {
             var segments = sketchSegments(curves, entity.construction());
             if (!segments.isEmpty()) {
                 for (var segment : segments) {
-                    sketchPicks.add(new SketchPick(
+                    picks.add(new SketchPick(
                             sketch.id(),
                             sketchPoint(sketch.plane(), segment.a()),
                             sketchPoint(sketch.plane(), segment.b())));
@@ -669,7 +682,7 @@ public final class Viewport extends StackPane {
                 e.consume();
             }
         });
-        sketches.getChildren().add(group);
+        return new SketchOverlay(group, List.copyOf(picks));
     }
 
     void pickExtrusionRegion(Feature.Plane plane, Consumer<Point3D> pick) {

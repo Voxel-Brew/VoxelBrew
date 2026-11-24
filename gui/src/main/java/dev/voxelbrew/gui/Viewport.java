@@ -314,22 +314,25 @@ public final class Viewport extends StackPane {
             camera.setTranslateZ(-distance);
             e.consume();
         });
-        scene.addEventFilter(MouseEvent.MOUSE_CLICKED, e -> {
-            if (extrusionPick != null && e.getButton() == MouseButton.PRIMARY && e.isStillSincePress()) {
-                extrusionPick.accept(e);
-                e.consume();
-            } else if (planeClick != null && e.getButton() == MouseButton.PRIMARY && e.isStillSincePress()) {
-                var local = scene.screenToLocal(e.getScreenX(), e.getScreenY());
-                var point = pointOnPlane(local.getX(), local.getY(), planeZ);
-                if (point != null) planeClick.accept(point);
-                e.consume();
-            } else if (pressedSketch != null && e.getButton() == MouseButton.PRIMARY && e.isStillSincePress()) {
-                var featureId = pressedSketch;
-                pressedSketch = null;
-                selection.accept(featureId, -1);
-                e.consume();
-            }
-        });
+        scene.addEventFilter(MouseEvent.MOUSE_CLICKED, this::pickSketchOnClick);
+    }
+
+    private void pickSketchOnClick(MouseEvent e) {
+        if (e.getButton() != MouseButton.PRIMARY || !e.isStillSincePress()) return;
+        if (extrusionPick != null) {
+            extrusionPick.accept(e);
+            e.consume();
+        } else if (planeClick != null) {
+            var local = scene.screenToLocal(e.getScreenX(), e.getScreenY());
+            var point = pointOnPlane(local.getX(), local.getY(), planeZ);
+            if (point != null) planeClick.accept(point);
+            e.consume();
+        } else if (pressedSketch != null) {
+            var featureId = pressedSketch;
+            pressedSketch = null;
+            selection.accept(featureId, -1);
+            e.consume();
+        }
     }
 
     QuickMenu quickMenu(

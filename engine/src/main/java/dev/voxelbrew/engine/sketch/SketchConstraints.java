@@ -16,6 +16,24 @@ public final class SketchConstraints {
         }
     }
 
+    /** Optional sketch-space annotation coordinates follow the driving value in the model. */
+    public static java.util.Optional<Vec> labelPosition(Constraint c) {
+        return c.type().dimension() && c.values().size() == 3
+                ? java.util.Optional.of(new Vec(c.values().get(1), c.values().get(2)))
+                : java.util.Optional.empty();
+    }
+
+    public static Constraint positionLabel(Constraint c, Vec position) {
+        return new Constraint(c.id(), c.type(), c.refs(), List.of(c.values().getFirst(), position.x(), position.y()));
+    }
+
+    public static Constraint drivingValue(Constraint c, double value) {
+        var updated = c.withValue(value);
+        return labelPosition(c)
+                .map(position -> positionLabel(updated, position))
+                .orElse(updated);
+    }
+
     public static java.util.Optional<PointLineDistance> pointLineDistance(SketchGeometry geometry, List<Ref> refs) {
         if (refs.size() != 2) return java.util.Optional.empty();
         var first = refs.getFirst();
@@ -111,7 +129,7 @@ public final class SketchConstraints {
         var refs = c.refs();
         var values = c.values();
         int n = refs.size();
-        if (c.type().dimension() && values.size() != 1) {
+        if (c.type().dimension() && values.size() != 1 && values.size() != 3) {
             throw new IllegalArgumentException("One driving value is required");
         }
         switch (c.type()) {

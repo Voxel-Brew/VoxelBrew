@@ -154,7 +154,7 @@ public final class FeatureDimensions {
             var next = c.geometry()
                     .withConstraints(c.geometry().constraints().stream()
                             .map(d -> changes.containsKey("constraint:" + d.id())
-                                    ? d.withValue(changes.get("constraint:" + d.id()))
+                                    ? SketchConstraints.drivingValue(d, changes.get("constraint:" + d.id()))
                                     : d)
                             .toList());
             profile = new Feature.Constrained(SketchSolver.solve(next).requireSolved());
@@ -295,7 +295,7 @@ public final class FeatureDimensions {
             }
         }
         return geometry.withConstraints(geometry.constraints().stream()
-                .map(c -> changes.containsKey(c.id()) ? c.withValue(changes.get(c.id())) : c)
+                .map(c -> changes.containsKey(c.id()) ? SketchConstraints.drivingValue(c, changes.get(c.id())) : c)
                 .toList());
     }
 

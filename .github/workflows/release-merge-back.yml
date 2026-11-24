@@ -5,14 +5,14 @@ on:
   workflow_dispatch:
     inputs:
       source:
-        description: "Release branch commit to merge (blank uses the current tip)"
+        description: "Optional commit that must be present on the release branch"
         required: false
         type: string
 permissions:
   contents: write
   pull-requests: write
 concurrency:
-  group: release-merge-back
+  group: release-merge-back-${{ github.ref_name }}
   cancel-in-progress: false
 jobs:
   merge:
@@ -48,6 +48,6 @@ jobs:
             echo "Prepared branch: https://github.com/$GITHUB_REPOSITORY/compare/master...$PR_BRANCH?expand=1" >> "$GITHUB_STEP_SUMMARY"
             url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base master --head "$PR_BRANCH" \
               --title "Merge $RELEASE_BRANCH changes back into master" \
-              --body "Apply release changes from ${PR_BRANCH##*/} while preserving the master development version.")
+              --body "Apply the latest changes from $RELEASE_BRANCH while preserving the master development version.")
           fi
           echo "Merge-back pull request: $url" >> "$GITHUB_STEP_SUMMARY"

@@ -401,13 +401,15 @@ class Release {
       "--latest=false",
     ]);
   }
-  mergeBack(branch, source) {
+  mergeBack(branch, requestedSource) {
     check(/^release\/(0|[1-9]\d*)\.(0|[1-9]\d*)\.x$/.test(branch), "Expected release/A.B.x.");
-    check(/^[a-f0-9]{40}$/.test(source), "Expected full release commit SHA.");
     this.clean();
-    const releaseHead = this.fetch(branch),
-      target = this.fetch("master");
-    this.git("merge-base", "--is-ancestor", source, releaseHead);
+    const source = this.fetch(branch);
+    if (requestedSource) {
+      check(/^[a-f0-9]{40}$/.test(requestedSource), "Expected full release commit SHA.");
+      this.git("merge-base", "--is-ancestor", requestedSource, source);
+    }
+    const target = this.fetch("master");
     try {
       this.git("merge-base", "--is-ancestor", source, target);
       return false;
@@ -477,22 +479,21 @@ class Release {
       );
       const tree = this.git("write-tree");
       this.git("merge", "--abort");
-      if (tree === this.git("rev-parse", `${target}^{tree}`)) return false;
-      const head = `merge-back/${branch.slice("release/".length)}/${source}`;
+      const head = `mb2m/${branch}`;
       const ref = `refs/heads/${head}`;
-      const existing = this.remote(ref);
-      if (!existing) {
-        const commit = this.git(
-          "commit-tree",
-          tree,
-          "-p",
-          target,
-          "-m",
-          `fix: merge ${branch} back into master\n\n${marker}${source}`,
-        );
-        this.push([{ ref, expected: "", commit }]);
+      const existing = this.remote(ref) ? this.fetch(head) : "";
+      const hasChanges = tree !== this.git("rev-parse", `${target}^{tree}`);
+      if (!hasChanges && !existing) return false;
+
+      const message = `fix: merge ${branch} back into master\n\n${marker}${source}`;
+      if (
+        !existing ||
+        this.git("show", "-s", "--format=%T%n%P%n%B", existing) !== `${tree}\n${target}\n${message}`
+      ) {
+        const commit = this.git("commit-tree", tree, "-p", target, "-m", message);
+        this.git("push", `--force-with-lease=${ref}:${existing}`, "origin", `${commit}:${ref}`);
       }
-      return head;
+      return hasChanges ? head : false;
     } catch (error) {
       try {
         this.git("merge", "--abort");
@@ -541,11 +542,10 @@ function main() {
     const m = release.load(path.resolve(directory), selected, branch);
     release.publish(m, path.resolve(process.argv[4]));
   } else if (mode === "merge-back") {
-    const source = process.env.RELEASE_SOURCE || release.fetch(branch);
-    const head = release.mergeBack(branch, source);
+    const head = release.mergeBack(branch, process.env.RELEASE_SOURCE);
     if (head && process.env.GITHUB_OUTPUT)
       fs.appendFileSync(process.env.GITHUB_OUTPUT, `head=${head}\n`);
-    if (!head) console.log(`Master already contains the changes from ${branch} at ${source}.`);
+    if (!head) console.log(`No changes to propose from ${branch}.`);
   } else if (mode === "dispatch-merge") {
     const m = JSON.parse(fs.readFileSync(path.join(directory, "release.json")));
     check(

@@ -9,6 +9,33 @@ import org.junit.jupiter.api.Test;
 
 class SketchDimensionsTest {
     @Test
+    void keyboardSizesCreateEditableConstraintsOnlyForEnteredFields() {
+        var g = dev.voxelbrew.engine.sketch.Sketches.rectangle("r", 0, 0, 20, 8, false);
+        for (var shape : List.of(SketchSizeEntry.Shape.RECTANGLE, SketchSizeEntry.Shape.CENTER_RECTANGLE)) {
+            var sized = new SketchSizeEntry.Dimensions(shape, 20., 8.).apply(g, "r");
+            assertThat(sized.constraints().stream()
+                            .filter(c -> c.type().dimension())
+                            .map(c -> c.values().getFirst()))
+                    .containsExactly(20., 8.);
+        }
+        var line = new Entity("line", Kind.LINE, List.of(0., 0., -3., 4.), false);
+        var circle = new Entity("circle", Kind.CIRCLE, List.of(1., 2., 6.), false);
+        var curves = new SketchGeometry(List.of(line, circle), List.of(), List.of());
+        var length = new SketchSizeEntry.Dimensions(SketchSizeEntry.Shape.LINE, 5., null).apply(curves, "line");
+        assertThat(length.constraints())
+                .singleElement()
+                .satisfies(c -> assertThat(c.values()).containsExactly(5.));
+        var angle = new SketchSizeEntry.Dimensions(SketchSizeEntry.Shape.LINE, null, 45.).apply(curves, "line");
+        assertThat(angle.constraints())
+                .singleElement()
+                .satisfies(c -> assertThat(c.type()).isEqualTo(Type.ANGLE));
+        var radius = new SketchSizeEntry.Dimensions(SketchSizeEntry.Shape.CIRCLE, 6., null).apply(curves, "circle");
+        assertThat(radius.constraints())
+                .singleElement()
+                .satisfies(c -> assertThat(c.values()).containsExactly(6.));
+    }
+
+    @Test
     void standalonePointsAndEndpointsSupportTruePointToPointDistance() {
         var a = new Entity("a", Kind.POINT, List.of(10., 10.), false);
         var b = new Entity("b", Kind.POINT, List.of(40., 50.), false);

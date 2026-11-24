@@ -957,6 +957,10 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
     }
 
     private void finishAdvanced() {
+        finishAdvanced(null);
+    }
+
+    private void finishAdvanced(SketchSizeEntry.Dimensions sizes) {
         if (tool != Draw.ADVANCED) return;
         try {
             String entityId = id(advanced.name().toLowerCase(Locale.ROOT));
@@ -967,6 +971,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                     List.copyOf(drawing),
                     List.copyOf(selection),
                     options());
+            if (sizes != null) next = sizes.apply(next, entityId);
             if (advanced == SketchTools.Tool.TEXT || advanced == SketchTools.Tool.TEXT_ON_PATH) {
                 next = next.replace(new TextMirror(mirrorHorizontal.isSelected(), mirrorVertical.isSelected())
                         .apply(next.entity(entityId)));
@@ -1193,11 +1198,16 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         if (sizeEntry != null && sides.getParent() == sizeEntry && !acceptPolygonSides()) return;
         closeSizeEntry();
         var position = drawingPosition(event);
-        placeDrawingPoint(position, hoverSnap);
+        placeDrawingPoint(position, hoverSnap, null);
     }
 
-    private void placeDrawingPoint(Vec p, SketchSnapping.Snap hit) {
+    private void placeDrawingPoint(Vec p, SketchSnapping.Snap hit, SketchSizeEntry.Dimensions sizes) {
         try {
+            if (tool == Draw.ADVANCED && sizes != null) {
+                drawing.add(p);
+                finishAdvanced(sizes);
+                return;
+            }
             if (tool == Draw.ADVANCED) {
                 if (advanced == SketchTools.Tool.POLYGON_CIRCUMSCRIBED && drawing.size() == 1) {
                     // The numeric tool takes a side midpoint. Mouse placement tracks a vertex.
@@ -1223,7 +1233,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             SketchGeometry addition;
             var a = drawing.getFirst();
             var b = drawing.getLast();
-            addition = drawnGeometry(id, a, b);
+            addition = drawnGeometry(id, a, b, sizes);
             if (construction.isSelected()) {
                 addition = addition.withEntities(addition.entities().stream()
                                 .map(e -> e.withConstruction(true))
@@ -2250,10 +2260,10 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                     hoverSnap = null;
                     draw();
                 },
-                point -> {
+                (point, sizes) -> {
                     closeSizeEntry();
                     hoverSnap = null;
-                    placeDrawingPoint(point, null);
+                    placeDrawingPoint(point, null, sizes);
                     canvas.requestFocus();
                 });
         showSizeEntry(entry);
@@ -2550,7 +2560,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         return false;
     }
 
-    private SketchGeometry drawnGeometry(String id, Vec a, Vec b) {
+    private SketchGeometry drawnGeometry(String id, Vec a, Vec b, SketchSizeEntry.Dimensions sizes) {
         SketchGeometry addition;
         if (tool == Draw.RECTANGLE) {
             addition = Sketches.rectangle(
@@ -2591,7 +2601,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                 default -> throw new IllegalArgumentException(translations.translate("gui.choose_a_drawing_tool"));
             };
             addition = new SketchGeometry(List.of(entity), List.of(), entity.construction() ? List.of() : List.of(id));
-            if (tool == Draw.LINE && auto.isSelected()) {
+            if (tool == Draw.LINE && auto.isSelected() && (sizes == null || sizes.second() == null)) {
                 if (Math.abs(a.y() - b.y()) < 1e-9) {
                     addition = addition.add(SketchConstraints.create(
                             addition, id + "-horizontal", Type.HORIZONTAL, List.of(entity.ref()), 0));
@@ -2601,7 +2611,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                 }
             }
         }
-        return addition;
+        return sizes == null ? addition : sizes.apply(addition, id);
     }
 
     private String solverStatus() {

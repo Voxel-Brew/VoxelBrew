@@ -102,8 +102,6 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
 
     private final List<Feature> documentFeatures;
 
-    private final Map<String, Vec> dimensionPositions = new HashMap<>();
-
     private final List<DimensionHit> dimensionHits = new ArrayList<>();
 
     private final QuickMenu quickMenu;
@@ -133,7 +131,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
 
     private DimensionHit draggedDimension;
 
-    private Vec previousDimensionPosition;
+    private Vec dragLabelPosition;
 
     private Ref dragPoint;
     private Entity rotatingText;
@@ -641,11 +639,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
 
     private void cancelDrawing() {
         if (draggedDimension != null) {
-            if (previousDimensionPosition == null) {
-                dimensionPositions.remove(draggedDimension.constraint().id());
-            } else {
-                dimensionPositions.put(draggedDimension.constraint().id(), previousDimensionPosition);
-            }
+            dragLabelPosition = null;
             draggedDimension = null;
         }
         if (dragPoint != null) controller.cancelDrag();
@@ -1169,7 +1163,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             String constraintId = constraint.map(Constraint::id).orElseGet(() -> id("dimension"));
             if (constraint.isPresent()) {
                 geometry = geometry.withConstraints(geometry.constraints().stream()
-                        .map(c -> c.id().equals(constraintId) ? c.withValue(value) : c)
+                        .map(c -> c.id().equals(constraintId) ? SketchConstraints.drivingValue(c, value) : c)
                         .toList());
             } else {
                 geometry = geometry.add(
@@ -1394,7 +1388,10 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
 
     private void editDimensionValue() {
         var chosen = constraints.getSelectionModel().getSelectedItem();
-        editDimensionValue(chosen == null ? cursor : dimensionPositions.getOrDefault(chosen.id(), cursor));
+        editDimensionValue(
+                chosen == null
+                        ? cursor
+                        : SketchConstraints.labelPosition(chosen).orElse(cursor));
     }
 
     private void editDimensionValue(Vec position) {
@@ -1414,21 +1411,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         Runnable commit = () -> {
             if (controller.busy()) return;
             dimensionValue.setText(input.getText());
-            int before = controller.definition().constraints().size();
             if (dimension()) {
-                var added = controller.definition().constraints();
-                var chosen = constraints.getSelectionModel().getSelectedItem();
-                String id;
-                if (added.size() > before) {
-                    id = added.getLast().id();
-                } else {
-                    if (chosen == null) {
-                        id = null;
-                    } else {
-                        id = chosen.id();
-                    }
-                }
-                if (id != null) dimensionPositions.put(id, position);
                 closeDimensionEntry();
                 if (dimensionTool) selection.clear();
                 draw();
@@ -1482,12 +1465,17 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             SketchGeometry next;
             if (chosen != null && chosen.type().dimension()) {
                 next = g.withConstraints(g.constraints().stream()
-                        .map(c -> c.id().equals(id) ? c.withValue(value) : c)
+                        .map(c -> c.id().equals(id) ? SketchConstraints.drivingValue(c, value) : c)
                         .toList());
             } else {
                 requireDrivingSelection();
                 next = g.add(SketchConstraints.create(
                         g, id, type, SketchDimensions.references(g, List.copyOf(selection)), value));
+            }
+            if (dimensionEntry != null) {
+                next = next.withConstraints(next.constraints().stream()
+                        .map(c -> c.id().equals(id) ? SketchConstraints.positionLabel(c, dimensionEntryPosition) : c)
+                        .toList());
             }
             var parameters = controller
                     .parameters()
@@ -2050,7 +2038,11 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         var endpoints = dimensionEndpoints(c, g);
         var a = endpoints.start();
         var b = endpoints.end();
-        var label = dimensionPositions.getOrDefault(c.id(), a.plus(b).times(0.5).plus(new Vec(0, 20 / scale)));
+        var label = draggedDimension != null
+                        && draggedDimension.constraint().id().equals(c.id())
+                        && dragLabelPosition != null
+                ? dragLabelPosition
+                : SketchConstraints.labelPosition(c).orElse(a.plus(b).times(0.5).plus(new Vec(0, 20 / scale)));
         double x = px(label), y = py(label);
         String text = dimensionLabel(c);
         double width = Math.max(40, text.length() * 8);
@@ -2368,8 +2360,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             }
             draggedDimension = hitDimension(e.getX(), e.getY());
             if (draggedDimension != null) {
-                previousDimensionPosition =
-                        dimensionPositions.get(draggedDimension.constraint().id());
+                dragLabelPosition = null;
                 constraints.getSelectionModel().select(draggedDimension.constraint());
                 e.consume();
                 return;
@@ -2390,9 +2381,8 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         } else if (draggedDimension != null && e.isPrimaryButtonDown()) {
             if (Math.hypot(e.getX() - pressX, e.getY() - pressY) > 3) {
                 moving = true;
-                dimensionPositions.put(
-                        draggedDimension.constraint().id(),
-                        draggedDimension.label().plus(model(e.getX(), e.getY()).minus(model(pressX, pressY))));
+                dragLabelPosition =
+                        draggedDimension.label().plus(model(e.getX(), e.getY()).minus(model(pressX, pressY)));
                 draw();
             }
         } else if (boxCandidate && e.isPrimaryButtonDown() && Math.hypot(e.getX() - pressX, e.getY() - pressY) > 3) {
@@ -2457,7 +2447,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         if (constraint.isPresent()) {
             var dimension = constraint.get();
             geometry = geometry.withConstraints(geometry.constraints().stream()
-                    .map(c -> c.equals(dimension) ? c.withValue(Measurements.degrees(angle)) : c)
+                    .map(c -> c.equals(dimension) ? SketchConstraints.drivingValue(c, Measurements.degrees(angle)) : c)
                     .toList());
         }
         controller.edit(geometry);
@@ -2474,8 +2464,16 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             return;
         }
         if (draggedDimension != null) {
+            if (dragLabelPosition != null) {
+                var g = controller.definition();
+                controller.edit(g.withConstraints(g.constraints().stream()
+                        .map(c -> c.id().equals(draggedDimension.constraint().id())
+                                ? SketchConstraints.positionLabel(c, dragLabelPosition)
+                                : c)
+                        .toList()));
+            }
             draggedDimension = null;
-            previousDimensionPosition = null;
+            dragLabelPosition = null;
             e.consume();
             return;
         }
@@ -2792,9 +2790,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                 var measurement = SketchDimensions.measure(g, List.copyOf(selection), dimensionEntryPosition);
                 var preview = SketchConstraints.create(
                         g, "dimension-preview", measurement.type(), List.copyOf(selection), measurement.value());
-                dimensionPositions.put(preview.id(), dimensionEntryPosition);
-                drawDimension(preview, g);
-                dimensionPositions.remove(preview.id());
+                drawDimension(SketchConstraints.positionLabel(preview, dimensionEntryPosition), g);
             } catch (IllegalArgumentException invalidSelection) {
                 // A selection may be removed while an inline edit is open.
             }

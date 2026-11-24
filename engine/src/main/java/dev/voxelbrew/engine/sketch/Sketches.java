@@ -118,7 +118,7 @@ public final class Sketches {
             throw new IllegalArgumentException("Constraint is not a driving dimension: " + id);
         }
         return SketchSolver.solve(g.withConstraints(g.constraints().stream()
-                        .map(c -> c.id().equals(id) ? c.withValue(value) : c)
+                        .map(c -> c.id().equals(id) ? SketchConstraints.drivingValue(c, value) : c)
                         .toList()))
                 .requireSolved();
     }

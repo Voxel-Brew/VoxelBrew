@@ -2,6 +2,7 @@ package dev.voxelbrew.gui;
 
 import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.parameters.Expressions;
+import java.util.stream.Stream;
 import javafx.geometry.Side;
 import javafx.scene.Node;
 import javafx.scene.control.*;
@@ -47,21 +48,23 @@ final class FormulaHelp {
                 && !ParameterSuggestions.insideQuotedString(input, start)
                 && !ParameterSuggestions.insideQuotedString(input, end);
         constants.setDisable(!editable);
-        for (var symbol : new String[][] {
-            {"π", "pi", "π ≈ 3.14159"},
-            {"τ", "tau", "τ = 2π"},
-            {"φ", "phi", "φ = (1 + √5) / 2"},
-            {"e", "e", "e ≈ 2.71828"}
-        }) {
-            var item = new MenuItem(symbol[1] + "     " + symbol[2]);
-            item.setId("formula-insert-" + symbol[1]);
-            item.setOnAction(event -> {
-                field.replaceText(start, end, symbol[0]);
-                field.requestFocus();
-                field.positionCaret(start + symbol[0].length());
-            });
-            constants.getItems().add(item);
-        }
+        record Constant(String symbol, String alias, String description) {}
+
+        Stream.of(
+                        new Constant("π", "pi", "π ≈ 3.14159"),
+                        new Constant("τ", "tau", "τ = 2π"),
+                        new Constant("φ", "phi", "φ = (1 + √5) / 2"),
+                        new Constant("e", "e", "e ≈ 2.71828"))
+                .forEachOrdered(constant -> {
+                    var item = new MenuItem(constant.alias() + "     " + constant.description());
+                    item.setId("formula-insert-" + constant.alias());
+                    item.setOnAction(event -> {
+                        field.replaceText(start, end, constant.symbol());
+                        field.requestFocus();
+                        field.positionCaret(start + constant.symbol().length());
+                    });
+                    constants.getItems().add(item);
+                });
         var reference = new Menu(translations.translate("formula.reference"));
         reference
                 .getItems()

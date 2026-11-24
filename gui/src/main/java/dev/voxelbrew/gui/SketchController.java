@@ -243,7 +243,8 @@ final class SketchController implements AutoCloseable {
                 if (closed || request.sequence() != sequence.get()) return;
                 busy = false;
                 result = completed;
-                extrusionIssue = issue;
+                // Drag previews retain the committed profile warning so the canvas stays under the pointer.
+                if (request.point() == null) extrusionIssue = issue;
                 displayed = completed.solved() ? completed.geometry() : definition;
                 if (request.point() == null && completed.solved()) definition = completed.geometry();
                 if (request.commitDrag()) {

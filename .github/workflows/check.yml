@@ -26,10 +26,14 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: gradle/actions/setup-gradle@v4
+      - uses: ./.github/actions/cache-protoc
       - name: Check Java member order
         run: ./gradlew --build-cache checkJavaMemberOrder -PbundleSlicers=false
       - name: Check Java sources and analyze application and fixture bytecode
         run: ./gradlew --build-cache basicChecks checkstyleAll :engine:checkExporterFixture -PbundleSlicers=false -x :checkJavaMemberOrder
+      - uses: ./.github/actions/cache-protoc
+        with:
+          save: "true"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -52,6 +56,7 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: gradle/actions/setup-gradle@v4
+      - uses: ./.github/actions/cache-protoc
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
@@ -64,6 +69,9 @@ jobs:
           key: bundled-slicers-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/bundle-slicers.py') }}
       - name: Run unit tests
         run: ./gradlew --build-cache test
+      - uses: ./.github/actions/cache-protoc
+        with:
+          save: "true"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

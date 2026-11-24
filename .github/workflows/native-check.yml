@@ -59,6 +59,7 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: gradle/actions/setup-gradle@v4
+      - uses: ./.github/actions/cache-protoc
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -158,6 +159,9 @@ jobs:
         env:
           GRADLE_SUITE: ${{ inputs.suite }}
         run: ./gradlew --build-cache "$GRADLE_SUITE"
+      - uses: ./.github/actions/cache-protoc
+        with:
+          save: "true"
       - name: Archive app images
         if: inputs.archive
         shell: bash

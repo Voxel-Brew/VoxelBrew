@@ -1808,12 +1808,22 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             var faces = SketchProfiles.selectableRegions(constrained.geometry());
             if (faces.size() > 1) {
                 form.getChildren().add(whole);
+                var choices = new VBox(5);
                 for (var face : faces) {
                     int number = regions.size() + 1;
                     var box = new CheckBox(translations.translate("gui.extrude_region") + " " + number);
                     box.setId("extrude-region-" + number);
                     regions.put(box, face.id());
-                    form.getChildren().add(box);
+                    choices.getChildren().add(box);
+                }
+                if (faces.size() > 4) {
+                    var scroll = new ScrollPane(choices);
+                    scroll.setId("extrude-region-list");
+                    scroll.setFitToWidth(true);
+                    scroll.setPrefViewportHeight(96);
+                    form.getChildren().add(scroll);
+                } else {
+                    form.getChildren().add(choices);
                 }
             }
         }

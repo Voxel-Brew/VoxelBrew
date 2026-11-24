@@ -1470,7 +1470,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             } else {
                 requireDrivingSelection();
                 next = g.add(SketchConstraints.create(
-                        g, id, type, SketchDimensions.references(g, List.copyOf(selection)), value));
+                        g, id, type, SketchDimensions.drivingReferences(g, List.copyOf(selection), type), value));
             }
             if (dimensionEntry != null) {
                 next = next.withConstraints(next.constraints().stream()
@@ -2789,7 +2789,11 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                 g = withReferences(g, selection);
                 var measurement = SketchDimensions.measure(g, List.copyOf(selection), dimensionEntryPosition);
                 var preview = SketchConstraints.create(
-                        g, "dimension-preview", measurement.type(), List.copyOf(selection), measurement.value());
+                        g,
+                        "dimension-preview",
+                        measurement.type(),
+                        SketchDimensions.drivingReferences(g, List.copyOf(selection), measurement.type()),
+                        measurement.value());
                 drawDimension(SketchConstraints.positionLabel(preview, dimensionEntryPosition), g);
             } catch (IllegalArgumentException invalidSelection) {
                 // A selection may be removed while an inline edit is open.

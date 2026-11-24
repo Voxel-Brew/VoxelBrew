@@ -131,6 +131,26 @@ public final class SketchProfiles {
                 .toList();
     }
 
+    /** Display contours for each selectable face, including its immediate interior holes. */
+    public static Map<String, List<List<Vec>>> regionContours(SketchGeometry geometry) {
+        var loops = profileLoops(geometry, true);
+        var polygons = loops.stream().map(SketchProfiles::samples).toList();
+        var parents = enclosingLoops(
+                loops,
+                polygons,
+                polygons.stream().mapToDouble(SketchProfiles::area).toArray());
+        var faces = new LinkedHashMap<String, List<List<Vec>>>();
+        for (int i = 0; i < loops.size(); i++) {
+            var rings = new ArrayList<List<Vec>>();
+            rings.add(polygons.get(i));
+            for (int j = 0; j < parents.length; j++) {
+                if (parents[j] == i) rings.add(polygons.get(j));
+            }
+            faces.put(regionId(loops.get(i)), List.copyOf(rings));
+        }
+        return faces;
+    }
+
     private static List<List<Edge>> profileLoops(SketchGeometry g, boolean individual) {
         SketchConstraints.requireSatisfied(g);
         if (g.boundary().isEmpty()) {

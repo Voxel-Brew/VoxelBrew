@@ -92,8 +92,11 @@ public final class Evaluator {
                     support.resolve(faces, s.plane().frame()),
                     support);
             var edges = FaceProjection.edges(plane, faces, solid.faceEdges(), solid.edgeSamples());
-            projections.put(s.id(), edges);
             var profile = s.profile();
+            if (profile instanceof Feature.Constrained c) {
+                edges = FaceProjection.retainReferenceIds(c.geometry(), edges);
+            }
+            projections.put(s.id(), edges);
             if (profile instanceof Feature.Constrained c) {
                 var next = FaceProjection.refresh(c.geometry(), edges);
                 if (next != c.geometry()) profile = new Feature.Constrained(next);

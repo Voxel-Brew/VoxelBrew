@@ -200,6 +200,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     private Feature.Sketch extrusionSketch;
 
     private ModelSession.Snapshot planeSnapshot;
+    private long profileEditRevision;
+    private long profileEditGeneration;
 
     private Feature.Sketch planeRepair;
 
@@ -234,8 +236,36 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         NONE,
         PLANE,
         EXTRUDE,
+        EDIT_PROFILE,
         MODIFY,
         CONSTRUCTION
+    }
+
+    private record ProfileChoices(CheckBox whole, Map<CheckBox, String> regions) {
+        List<String> selectedIds() {
+            return regions.entrySet().stream()
+                    .filter(e -> e.getKey().isSelected())
+                    .map(Map.Entry::getValue)
+                    .toList();
+        }
+
+        String profileId(Feature.Sketch sketch) {
+            return whole.isSelected()
+                    ? sketch.profileId()
+                    : SketchProfiles.selectedProfileId(sketch.profileId(), selectedIds());
+        }
+
+        void onChange(Runnable update) {
+            whole.setOnAction(event -> {
+                if (whole.isSelected()) regions.keySet().forEach(box -> box.setSelected(false));
+                update.run();
+            });
+            regions.keySet()
+                    .forEach(box -> box.setOnAction(event -> {
+                        whole.setSelected(false);
+                        update.run();
+                    }));
+        }
     }
 
     private final class BodyTreeCell extends TreeCell<Entry> {
@@ -872,7 +902,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 translations,
                 position -> attempt(() -> controller.cursor(position)),
                 this::selectFeature,
-                this::editSelectedSketch,
+                this::editSelectedFeature,
                 this::shortName,
                 (from, to) -> attempt(() -> controller.deleteFeatures(from, to)));
         progress.setPrefSize(16, 16);
@@ -1089,7 +1119,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         try {
             var snapshot = controller.snapshot();
             var document = snapshot.document();
-            refreshWorkspaceTabs(document);
+            refreshWorkspaceTabs(document, snapshot.revision());
             var effective = controller.effectiveFeatures();
             boolean buildStateChanged = lastBuild != controller.build()
                     || lastRebuilding != controller.rebuilding()
@@ -1101,7 +1131,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             controller.build().bodies().forEach(b -> styles.put(b.id(), document.bodyStyle(b.id())));
             viewport.setBodyStyles(styles);
             synchronizeTreeSelection();
-            viewport.showSketches(effective.subList(0, document.cursor()), selectedFeature);
+            if (tool != Tool.EDIT_PROFILE) {
+                viewport.showSketches(effective.subList(0, document.cursor()), selectedFeature);
+            }
             if (tool == Tool.NONE && (changed || selectedBody != null && buildStateChanged)) inspect();
             lastRebuilding = controller.rebuilding();
             lastIoBusy = controller.ioBusy();
@@ -1603,7 +1635,14 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         boolean extrusion = feature instanceof Feature.Extrude || BodyExtrusion.modifiesBody(feature);
         var operation =
                 extrusion ? extrusionOperation(BodyExtrusion.from(feature).operation()) : null;
-        if (extrusion) form.getChildren().addAll(new Label(translations.translate("extrude.operation")), operation);
+        if (extrusion) {
+            form.getChildren()
+                    .add(button(
+                            translations.translate("extrude.editProfile"),
+                            "edit-extrusion-profile",
+                            () -> beginProfileEdit(feature, sketches.getValue())));
+            form.getChildren().addAll(new Label(translations.translate("extrude.operation")), operation);
+        }
         if (body != null || extrusion) {
             earlier.stream()
                     .filter(f -> !(f instanceof Feature.Sketch || f instanceof ConstructionFeature))
@@ -1705,8 +1744,13 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         return number(fields.get(key), key);
     }
 
-    private void editSelectedSketch() {
-        if (selected() instanceof Feature.Sketch sketch) attempt(() -> editSketch(sketch));
+    private void editSelectedFeature() {
+        var feature = selected();
+        if (feature instanceof Feature.Sketch sketch) attempt(() -> editSketch(sketch));
+        else if (feature instanceof Feature.Extrude || BodyExtrusion.modifiesBody(feature)) {
+            attempt(() -> beginProfileEdit(
+                    feature, BodyExtrusion.from(feature).extrusion().profile().sketchId()));
+        }
     }
 
     private void editSketch(Feature.Sketch sketch) {
@@ -1934,18 +1978,33 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         return target;
     }
 
-    private Map<CheckBox, String> extrusionRegions(Feature.Sketch sketch, CheckBox whole) {
+    private ProfileChoices extrusionRegions(Feature.Sketch sketch, VBox container) {
+        var whole = new CheckBox(translations.translate("gui.extrude_all_regions"));
+        whole.setId("extrude-whole");
+        whole.setSelected(true);
         var regions = new LinkedHashMap<CheckBox, String>();
         if (sketch.profile() instanceof Feature.Constrained constrained) {
-            var faces = SketchProfiles.selectableRegions(constrained.geometry());
-            if (faces.size() > 1) {
-                form.getChildren().add(whole);
+            boolean editing = tool == Tool.EDIT_PROFILE;
+            var contours = editing
+                    ? SketchProfiles.regionContours(constrained.geometry())
+                    : Map.<String, List<List<dev.voxelbrew.api.model.sketch.SketchGeometry.Vec>>>of();
+            var faces = editing
+                    ? List.copyOf(contours.keySet())
+                    : SketchProfiles.selectableRegions(constrained.geometry()).stream()
+                            .map(SketchProfiles.Region::id)
+                            .toList();
+            if (faces.size() > 1 || tool == Tool.EDIT_PROFILE) {
+                container.getChildren().add(whole);
                 var choices = new VBox(5);
                 for (var face : faces) {
                     int number = regions.size() + 1;
                     var box = new CheckBox(translations.translate("gui.extrude_region") + " " + number);
                     box.setId("extrude-region-" + number);
-                    regions.put(box, face.id());
+                    regions.put(box, face);
+                    if (editing) {
+                        var highlight = viewport.editingHighlight(sketch.plane(), contours.get(face));
+                        highlight.visibleProperty().bind(box.selectedProperty());
+                    }
                     choices.getChildren().add(box);
                 }
                 if (faces.size() > 4) {
@@ -1953,9 +2012,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     scroll.setId("extrude-region-list");
                     scroll.setFitToWidth(true);
                     scroll.setPrefViewportHeight(96);
-                    form.getChildren().add(scroll);
+                    container.getChildren().add(scroll);
                 } else {
-                    form.getChildren().add(choices);
+                    container.getChildren().add(choices);
                 }
                 viewport.pickExtrusionRegion(
                         sketch.plane(),
@@ -1966,9 +2025,86 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                                 .ifPresent(id -> regions.forEach((box, region) -> {
                                     if (region.equals(id)) box.fire();
                                 })));
+                if (editing) viewport.editingWholeHighlight(sketch, constrained.geometry(), whole.selectedProperty());
             }
         }
-        return regions;
+        return new ProfileChoices(whole, regions);
+    }
+
+    private void beginProfileEdit(Feature feature, String initialSketch) {
+        var document = controller.snapshot().document();
+        var definition = document.features().stream()
+                .filter(f -> f.id().equals(feature.id()))
+                .map(BodyExtrusion::from)
+                .findFirst()
+                .orElseThrow();
+        var earlier = controller.effectiveFeatures().stream()
+                .takeWhile(f -> !f.id().equals(feature.id()))
+                .toList();
+        tool = Tool.EDIT_PROFILE;
+        profileEditRevision = controller.snapshot().revision();
+        profileEditGeneration = controller.generation();
+        form.getChildren().clear();
+        fields.clear();
+        selectionLabel.setText(translations.translate("extrude.editProfile"));
+        var sketches = sketchInput(earlier, definition.extrusion().profile());
+        sketches.setValue(initialSketch);
+        var choices = new VBox(5);
+        form.getChildren().add(choices);
+        var apply = new Button(translations.translate("gui.apply"));
+        apply.setId("apply-extrusion-profile");
+        apply.getStyleClass().add("primary");
+        toolActions
+                .getChildren()
+                .setAll(apply, button(translations.translate("action.cancel"), "cancel-tool", this::cancelTool));
+        viewport.isolateProfile(true);
+        Runnable update = () -> {
+            choices.getChildren().clear();
+            viewport.clearHandle();
+            apply.setDisable(true);
+            error.setText("");
+            var sketch = earlier.stream()
+                    .filter(Feature.Sketch.class::isInstance)
+                    .map(Feature.Sketch.class::cast)
+                    .filter(s -> s.id().equals(sketches.getValue()))
+                    .findFirst();
+            viewport.showSketches(sketch.stream().map(Feature.class::cast).toList(), null);
+            sketch.ifPresent(s -> attempt(() -> editProfileRegions(definition, s, choices, apply)));
+        };
+        sketches.setOnAction(event -> update.run());
+        update.run();
+        refresh();
+    }
+
+    private void editProfileRegions(BodyExtrusion definition, Feature.Sketch sketch, VBox choices, Button apply) {
+        var selection = extrusionRegions(sketch, choices);
+        var original = definition.extrusion().profile();
+        boolean all =
+                !original.sketchId().equals(sketch.id()) || original.profileId().equals(sketch.profileId());
+        selection.whole().setSelected(all);
+        var saved = original.profileId();
+        String prefix = sketch.profileId() + "/regions/";
+        var ids = saved.startsWith(prefix)
+                ? Arrays.asList(saved.substring(prefix.length()).split("\\."))
+                : List.<String>of();
+        selection
+                .regions()
+                .forEach((box, id) -> box.setSelected(
+                        !all && (saved.equals(sketch.profileId() + "/region/" + id) || ids.contains(id))));
+        selection.onChange(() -> apply.setDisable(
+                !selection.whole().isSelected() && selection.selectedIds().isEmpty()));
+        apply.setDisable(!all && (selection.selectedIds().isEmpty() || !saved.equals(selection.profileId(sketch))));
+        apply.setOnAction(event -> attempt(() -> {
+            String profileId = selection.profileId(sketch);
+            var extrusion = definition.extrusion();
+            var replacement = new BodyExtrusion(
+                    new Feature.Extrude(
+                            extrusion.id(), new Feature.ProfileRef(sketch.id(), profileId), extrusion.distance()),
+                    definition.operation(),
+                    definition.target());
+            controller.replaceFeature(replacement.feature());
+            cancelTool();
+        }));
     }
 
     private void beginExtrusion() {
@@ -1984,10 +2120,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         form.getChildren().clear();
         fields.clear();
         form.getChildren().add(sketchPlaneLabel(sketch));
-        var whole = new CheckBox(translations.translate("gui.extrude_all_regions"));
-        whole.setId("extrude-whole");
-        whole.setSelected(true);
-        var regions = extrusionRegions(sketch, whole);
+        var regions = extrusionRegions(sketch, form);
         var operation = extrusionOperation(BodyExtrusion.Operation.NEW_BODY);
         var target = extrusionTarget(sketch);
         operation.setDisable(target.getItems().isEmpty());
@@ -2015,11 +2148,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                         .document()
                         .parameters()
                         .value(distance.getText(), dev.voxelbrew.api.model.parameters.ParameterUnit.MM);
-                var ids = regions.entrySet().stream()
-                        .filter(entry -> entry.getKey().isSelected())
-                        .map(Map.Entry::getValue)
-                        .toList();
-                if (!whole.isSelected() && ids.isEmpty()) {
+                if (!regions.whole().isSelected() && regions.selectedIds().isEmpty()) {
                     controller.cancelPreview();
                     finish.setDisable(true);
                     error.setText(translations.translate("gui.select_a_closed_sketch_profile"));
@@ -2027,9 +2156,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 }
                 controller.previewExtrusion(
                         sketch,
-                        whole.isSelected()
-                                ? sketch.profileId()
-                                : SketchProfiles.selectedProfileId(sketch.profileId(), ids),
+                        regions.profileId(sketch),
                         distance.getText().strip(),
                         operation.getValue(),
                         target.isDisabled() || target.getValue() == null
@@ -2044,15 +2171,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             }
         };
         distance.textProperty().addListener((o, a, b) -> updatePreview.run());
-        whole.setOnAction(event -> {
-            if (whole.isSelected()) regions.keySet().forEach(box -> box.setSelected(false));
-            updatePreview.run();
-        });
-        regions.keySet()
-                .forEach(box -> box.setOnAction(event -> {
-                    whole.setSelected(false);
-                    updatePreview.run();
-                }));
+        regions.onChange(updatePreview);
         target.setOnAction(event -> updatePreview.run());
         operation.setOnAction(event -> {
             if (operation.getValue() == BodyExtrusion.Operation.CUT
@@ -2391,6 +2510,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     }
 
     private void cancelTool() {
+        if (tool == Tool.EDIT_PROFILE) viewport.isolateProfile(false);
         if (constructionEditor != null) {
             constructionEditor.close();
             constructionEditor = null;
@@ -3252,7 +3372,14 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         Dialogs.show(help, stage, translations);
     }
 
-    private void refreshWorkspaceTabs(CadDocument document) {
+    private void refreshWorkspaceTabs(CadDocument document, long revision) {
+        if (tool == Tool.EDIT_PROFILE
+                && (revision != profileEditRevision || controller.generation() != profileEditGeneration)) {
+            tool = Tool.NONE;
+            viewport.clearHandle();
+            viewport.isolateProfile(false);
+            inspect();
+        }
         printTab.setDisable(controller.build().bodies().isEmpty());
         if (printTab.isDisable() && printTab.isSelected()) {
             workspaces.getSelectionModel().select(designTab);

@@ -35,6 +35,8 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
 
     private final Consumer<String> select;
 
+    private final Runnable editSelectedSketch;
+
     private final java.util.function.BiConsumer<Integer, Integer> delete;
 
     private final Function<Feature, String> name;
@@ -105,11 +107,13 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
             TranslationService translations,
             IntConsumer moveCursor,
             Consumer<String> select,
+            Runnable editSelectedSketch,
             Function<Feature, String> name,
             java.util.function.BiConsumer<Integer, Integer> delete) {
         this.translations = translations;
         this.moveCursor = moveCursor;
         this.select = select;
+        this.editSelectedSketch = editSelectedSketch;
         this.name = name;
         this.delete = delete;
         setId("feature-timeline");
@@ -273,6 +277,14 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
                 select.accept(feature.id());
             });
             button.resizeRelocate(INSET + i * STEP + 3, 10, STEP - 6, 32);
+            if (feature instanceof Feature.Sketch) {
+                button.setOnMouseClicked(event -> {
+                    if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2 && !rebuilding) {
+                        editSelectedSketch.run();
+                        event.consume();
+                    }
+                });
+            }
             button.setMinSize(STEP - 6, 32);
             button.setMaxSize(STEP - 6, 32);
             button.setManaged(false);

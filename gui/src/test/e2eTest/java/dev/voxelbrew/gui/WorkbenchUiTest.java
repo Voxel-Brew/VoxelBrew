@@ -2228,7 +2228,12 @@ class WorkbenchUiTest {
     }
 
     private void doubleClickPlate(String id) throws Exception {
-        var point = centerOf("print-plate-" + id);
+        doubleClick("print-plate-" + id);
+        assertThat(fx(() -> node("#print-plate-name"))).isNotNull();
+    }
+
+    private void doubleClick(String id) throws Exception {
+        var point = centerOf(id);
         fx(() -> {
             robot.mouseMove(point);
             robot.mouseClick(MouseButton.PRIMARY);
@@ -2240,7 +2245,6 @@ class WorkbenchUiTest {
             return null;
         });
         Thread.sleep(180);
-        assertThat(fx(() -> node("#print-plate-name"))).isNotNull();
     }
 
     @Test
@@ -3114,8 +3118,7 @@ class WorkbenchUiTest {
         DocumentWriter.save(session.document(), file, false);
         open(file);
         choice("appearance", 1);
-        click("history-0");
-        click("edit-sketch-constraints");
+        doubleClick("history-0");
         sketchReady();
         assertThat(fx(() -> ((SketchEditor) node("#sketch-editor"))
                                 .controller()

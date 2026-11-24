@@ -865,6 +865,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 translations,
                 position -> attempt(() -> controller.cursor(position)),
                 this::selectFeature,
+                () -> {
+                    if (selected() instanceof Feature.Sketch sketch) attempt(() -> editSketch(sketch));
+                },
                 this::shortName,
                 (from, to) -> attempt(() -> controller.deleteFeatures(from, to)));
         progress.setPrefSize(16, 16);

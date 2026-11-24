@@ -61,7 +61,7 @@ final class ParameterSuggestions {
         while (start > 0 && identifier(text.charAt(start - 1))) start--;
         if (start == 0 || text.charAt(start - 1) != '$') return null;
         if (start < caret && !asciiLetter(text.charAt(start))) return null;
-        if (insideQuotedString(text, start)) return null;
+        if (insideQuotedString(text, start - 1)) return null;
         int end = caret;
         while (end < text.length() && identifier(text.charAt(end))) end++;
         return new Reference(start - 1, end, text.substring(start, caret));
@@ -75,11 +75,11 @@ final class ParameterSuggestions {
         return asciiLetter(c) || c >= '0' && c <= '9' || c == '_' || c == '.';
     }
 
-    static boolean insideQuotedString(String text, int start) {
+    static boolean insideQuotedString(String text, int boundary) {
         boolean quoted = false;
-        for (int i = 0; i < start - 1; i++) {
+        for (int i = 0; i < boundary; i++) {
             if (text.charAt(i) != '"') continue;
-            if (quoted && i + 1 < start - 1 && text.charAt(i + 1) == '"') i++;
+            if (quoted && i + 1 < text.length() && text.charAt(i + 1) == '"') i++;
             else {
                 quoted = !quoted;
             }

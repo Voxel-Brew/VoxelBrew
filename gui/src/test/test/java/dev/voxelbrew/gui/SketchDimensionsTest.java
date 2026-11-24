@@ -9,6 +9,26 @@ import org.junit.jupiter.api.Test;
 
 class SketchDimensionsTest {
     @Test
+    void labelsFollowEachProjectedArrowAndStayReadableAfterEveryQuarterTurn() {
+        for (boolean clockwise : List.of(true, false)) {
+            var view = SketchViewBasis.DEFAULT;
+            for (int turn = 0; turn < 4; turn++) {
+                for (var arrow : List.of(new Vec(1, 0), new Vec(0, 1), new Vec(-3, 4), new Vec(3, -4))) {
+                    var projected = view.project(arrow);
+                    double dx = projected.x(), dy = -projected.y();
+                    var baseline = SketchEditor.dimensionBaseline(dx, dy);
+                    assertThat(baseline.x() * dy - baseline.y() * dx).isCloseTo(0, within(1e-10));
+                    assertThat(Math.hypot(baseline.x(), baseline.y())).isCloseTo(1, within(1e-10));
+                    assertThat(baseline.x() > 0 || (baseline.x() == 0 && baseline.y() < 0))
+                            .isTrue();
+                }
+                view = view.quarterTurn(clockwise);
+            }
+        }
+        assertThat(SketchEditor.dimensionBaseline(0, 0)).isEqualTo(new Vec(1, 0));
+    }
+
+    @Test
     void keyboardSizesCreateEditableConstraintsOnlyForEnteredFields() {
         var g = dev.voxelbrew.engine.sketch.Sketches.rectangle("r", 0, 0, 20, 8, false);
         for (var shape : List.of(SketchSizeEntry.Shape.RECTANGLE, SketchSizeEntry.Shape.CENTER_RECTANGLE)) {

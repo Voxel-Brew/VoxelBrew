@@ -180,10 +180,19 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             double x,
             double y,
             double width,
+            Vec baseline,
             double ax,
             double ay,
             double bx,
             double by) {}
+
+    static Vec dimensionBaseline(double dx, double dy) {
+        double length = Math.hypot(dx, dy);
+        if (length < 1e-9) return new Vec(1, 0);
+        // Read left to right along the arrow, or bottom to top for a vertical dimension.
+        if (dx < 0 || (dx == 0 && dy > 0)) length = -length;
+        return new Vec(dx / length, dy / length);
+    }
 
     static void show(
             Stage stage,
@@ -2127,8 +2136,10 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
 
     private DimensionHit hitDimension(double x, double y) {
         for (var hit : dimensionHits.reversed()) {
-            var local = viewBasis.annotationOffset(x - hit.x(), y - hit.y());
-            if (Math.abs(local.x()) <= hit.width() / 2 + 3 && Math.abs(local.y()) <= 11) return hit;
+            double dx = x - hit.x(), dy = y - hit.y();
+            var axis = hit.baseline();
+            if (Math.abs(dx * axis.x() + dy * axis.y()) <= hit.width() / 2 + 3
+                    && Math.abs(dy * axis.x() - dx * axis.y()) <= 11) return hit;
         }
         if (!dimensionHits.isEmpty() && tool == Draw.SELECT && !dimensionTool && activeConstraint == null) {
             var point = hitPoint(x, y, 7);
@@ -2228,21 +2239,18 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         } else {
             graphics.strokeLine(px(a), py(a), x, y);
         }
-        paintDimensionLabel(c, text, x, y, width);
-        for (double dx = -width / 2 + 8; dx < width / 2; dx += 16) {
-            var offset = viewBasis.screenOffset(dx, 0);
-            badges.add(new Badge(c, x + offset.x(), y + offset.y()));
-        }
+        var baseline = dimensionBaseline(lineBx - lineAx, lineBy - lineAy);
+        paintDimensionLabel(c, text, x, y, width, baseline);
         if (!c.id().equals("dimension-preview")) {
-            dimensionHits.add(new DimensionHit(c, label, x, y, width, lineAx, lineAy, lineBx, lineBy));
+            dimensionHits.add(new DimensionHit(c, label, x, y, width, baseline, lineAx, lineAy, lineBx, lineBy));
         }
     }
 
-    private void paintDimensionLabel(Constraint c, String text, double x, double y, double width) {
+    private void paintDimensionLabel(Constraint c, String text, double x, double y, double width, Vec baseline) {
         var graphics = canvas.getGraphicsContext2D();
         graphics.save();
         graphics.translate(x, y);
-        graphics.rotate(viewBasis.clockwiseDegrees());
+        graphics.rotate(Math.toDegrees(Math.atan2(baseline.y(), baseline.x())));
         graphics.setFill(Color.web(dark ? "#161c23" : "#f8fafc"));
         if (SketchConstraints.referenceDimension(c)) {
             graphics.setFill(Color.web(dark ? "#283b49" : "#e4edf3"));
@@ -2720,7 +2728,6 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             var local = viewBasis.annotationOffset(e.getX() - badge.x(), e.getY() - badge.y());
             if (Math.abs(local.x()) < 11 && Math.abs(local.y()) < 9) {
                 constraints.getSelectionModel().select(badge.constraint());
-                if (badge.constraint().type().dimension() && e.getClickCount() == 2) editDimensionValue();
                 return true;
             }
         }

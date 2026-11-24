@@ -97,7 +97,7 @@ class SketchDimensionsTest {
     }
 
     @Test
-    void infersLineCircleAndSignedPointMeasurements() {
+    void infersLineCircleAndPositivePointMeasurements() {
         var line = new Entity("line", Kind.LINE, List.of(0., 0., 30., 40.), false);
         var circle = new Entity("circle", Kind.CIRCLE, List.of(10., 10., 3.), false);
         var g = new SketchGeometry(List.of(line, circle), List.of(), List.of());
@@ -107,9 +107,22 @@ class SketchDimensionsTest {
                 .isEqualTo(new SketchDimensions.Measurement(Type.RADIUS, 3));
         var refs = List.of(line.ref(Part.END), line.ref(Part.START));
         assertThat(SketchDimensions.measure(g, refs, new Vec(15, 60)))
-                .isEqualTo(new SketchDimensions.Measurement(Type.DISTANCE_X, -30));
+                .isEqualTo(new SketchDimensions.Measurement(Type.DISTANCE_X, 30));
         assertThat(SketchDimensions.measure(g, refs, new Vec(50, 20)))
-                .isEqualTo(new SketchDimensions.Measurement(Type.DISTANCE_Y, -40));
+                .isEqualTo(new SketchDimensions.Measurement(Type.DISTANCE_Y, 40));
+        for (var order : List.of(refs, refs.reversed())) {
+            for (var position : List.of(new Vec(15, 60), new Vec(50, 20))) {
+                var measurement = SketchDimensions.measure(g, order, position);
+                var constraint = dev.voxelbrew.engine.sketch.SketchConstraints.create(
+                        g,
+                        "dimension",
+                        measurement.type(),
+                        SketchDimensions.drivingReferences(g, order, measurement.type()),
+                        measurement.value());
+                assertThat(dev.voxelbrew.engine.sketch.SketchConstraints.residuals(g, constraint))
+                        .containsExactly(0.0);
+            }
+        }
         assertThatThrownBy(() -> SketchDimensions.measure(g, List.of(), new Vec(0, 0)))
                 .isInstanceOf(IllegalArgumentException.class);
     }

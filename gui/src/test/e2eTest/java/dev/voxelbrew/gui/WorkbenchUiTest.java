@@ -2677,6 +2677,18 @@ class WorkbenchUiTest {
             assertThat(fx(() -> ((Label) node("#slicer-installation-status")).getText()))
                     .contains("Bundled and read-only");
         }
+        if (dev.voxelbrew.slicer.internal.SlicerDownload.find("prusa-slicer").isPresent() && bundled.isEmpty()) {
+            chooseSlicerProvider("prusa-slicer");
+            fx(() -> {
+                var install = (Button) node("#slicer-installation-download");
+                assertThat(install.isVisible()).isTrue();
+                assertThat(install.getText()).contains("MiB");
+                assertThat(install.getWidth()).isGreaterThanOrEqualTo(Math.floor(install.prefWidth(-1)));
+                Screenshot.save(
+                        stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "slicer-download.png"));
+                return null;
+            });
+        }
         openPrusaInstallation("Prusa first");
         assertSlicerInstallationRejected("export-check", "Choose a slicer executable");
         assertThat(store.load()).allMatch(dev.voxelbrew.slicer.SlicerInstallation::bundled);
@@ -3710,6 +3722,28 @@ class WorkbenchUiTest {
         assertThat(fx(() -> field.getBoundsInLocal().getWidth() >= 200))
                 .as("Inline input must display the expression, not just the fx mark")
                 .isTrue();
+        fx(() -> {
+            field.lookup(".formula-help").setId("inline-dimension-help");
+            return null;
+        });
+        for (String expression : List.of("=$missing", "=$plateWidth")) {
+            text("sketch-inline-dimension", expression);
+            click("inline-dimension-help");
+            fx(() -> {
+                assertThat(stage.getScene().lookup("#sketch-inline-dimension")).isSameAs(field);
+                var help = Window.getWindows().stream()
+                        .filter(ContextMenu.class::isInstance)
+                        .map(ContextMenu.class::cast)
+                        .filter(menu -> menu.getOwnerNode() == field)
+                        .findFirst();
+                assertThat(help)
+                        .as("Clicking ? opens help without submitting the dimension")
+                        .isPresent();
+                assertThat(((Label) node("#sketch-error")).getText()).isBlank();
+                help.orElseThrow().hide();
+                return null;
+            });
+        }
         text("sketch-inline-dimension", "=missingParameter");
         key(KeyCode.ENTER);
         assertThat(fx(() -> node("#sketch-inline-dimension")))
@@ -5265,6 +5299,85 @@ class WorkbenchUiTest {
                         .getTooltip()
                         .getText()))
                 .isEqualTo(folder.toString());
+    }
+
+    @Test
+    void formulaHelpPreservesSelectionsAndInsertsConstantsInExpressions() throws Exception {
+        ready();
+        var translations = TranslationCatalogs.forLocale(Locale.ENGLISH, directory);
+        for (boolean numeric : List.of(true, false)) {
+            String theme = numeric ? "light" : "dark";
+            var field = fx(() -> {
+                var editor = numeric
+                        ? FormulaField.number("=tau", ParameterSet::empty, ParameterUnit.NUMBER, translations)
+                        : FormulaField.text("=tau", ParameterSet::empty, translations);
+                var layout = new javafx.scene.layout.StackPane(editor);
+                layout.getStyleClass().add(theme);
+                var scene = new Scene(layout, 420, 100);
+                scene.getStylesheets()
+                        .add(FormulaField.class.getResource("workbench.css").toExternalForm());
+                stage.setScene(scene);
+                stage.requestFocus();
+                editor.requestFocus();
+                editor.selectRange(1, 4);
+                return editor;
+            });
+            fx(() -> {
+                field.applyCss();
+                field.lookup(".formula-help").setId("test-formula-help");
+                return null;
+            });
+            click("test-formula-help");
+            var popup = fx(() -> Window.getWindows().stream()
+                    .filter(ContextMenu.class::isInstance)
+                    .map(ContextMenu.class::cast)
+                    .filter(menu -> menu.getOwnerNode() == field)
+                    .findFirst()
+                    .orElseThrow());
+            var instructionRow = fx(() -> {
+                var instructions = (CustomMenuItem) popup.getItems().get(1);
+                assertThat(instructions.isDisable()).isTrue();
+                var row = (javafx.scene.layout.Region) instructions.getStyleableNode();
+                var bounds = row.localToScreen(row.getBoundsInLocal());
+                robot.mouseMove(bounds.getCenterX(), bounds.getCenterY());
+                return row;
+            });
+            fx(() -> {
+                assertThat(instructionRow.getOpacity()).isEqualTo(1);
+                assertThat(instructionRow.getBackground().getFills())
+                        .allMatch(fill -> javafx.scene.paint.Color.TRANSPARENT.equals(fill.getFill()));
+                Screenshot.save(
+                        popup.getScene(),
+                        Path.of(System.getProperty("voxelbrew.ui.artifacts"), "formula-help-" + theme + ".png"));
+                return null;
+            });
+            fx(() -> {
+                popup.hide();
+                return null;
+            });
+            assertThat(fx(field::getSelectedText)).isEqualTo("tau");
+            fx(() -> {
+                field.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.F1, false, false, false, false));
+                return null;
+            });
+            fx(() -> {
+                assertThat(popup.isShowing())
+                        .as("F1 reopens the same help as clicking ?")
+                        .isTrue();
+                var item = popup.getItems().stream()
+                        .filter(Menu.class::isInstance)
+                        .map(Menu.class::cast)
+                        .flatMap(WorkbenchUiTest::menuItems)
+                        .filter(entry -> "formula-insert-pi".equals(entry.getId()))
+                        .findFirst()
+                        .orElseThrow();
+                assertThat(item.isDisable()).isFalse();
+                item.fire();
+                popup.hide();
+                return null;
+            });
+            assertThat(fx(() -> field.getText())).isEqualTo("=π");
+        }
     }
 
     @Test

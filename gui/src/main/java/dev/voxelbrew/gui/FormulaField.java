@@ -35,7 +35,9 @@ final class FormulaField extends TextField {
 
     private final Tooltip preview = UiHelp.tooltip("");
 
-    private final Tooltip syntax = UiHelp.tooltip("");
+    private final ParameterSuggestions suggestions;
+
+    private final FormulaHelp formulaHelp;
 
     private final TranslationService translations;
 
@@ -101,7 +103,14 @@ final class FormulaField extends TextField {
             if (b != null) refreshFormula();
         });
         preview.setOnShowing(e -> refreshFormula());
-        new ParameterSuggestions(this, parameters, translations);
+        suggestions = new ParameterSuggestions(this, parameters, translations);
+        formulaHelp = new FormulaHelp(this, translations);
+        addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == javafx.scene.input.KeyCode.F1) {
+                event.consume();
+                showHelp();
+            }
+        });
         if (expressionType == ExpressionType.NUMBER) new NumericFieldDrag(this);
     }
 
@@ -109,10 +118,15 @@ final class FormulaField extends TextField {
         return expressionType;
     }
 
+    void showHelp() {
+        suggestions.dismiss();
+        preview.hide();
+        formulaHelp.show();
+    }
+
     private void localizeHelp() {
         setPromptText(translations.translate(unit == null ? "formula.textPrompt" : "formula.numberPrompt"));
-        syntax.setText(translations.translate(unit == null ? "formula.textSyntax" : "formula.numberSyntax"));
-        setAccessibleHelp(syntax.getText());
+        setAccessibleHelp(translations.translate(unit == null ? "formula.textSyntax" : "formula.numberSyntax"));
     }
 
     double value() {
@@ -260,18 +274,14 @@ final class FormulaField extends TextField {
                 }
                 help.getStyleClass().add("formula-help");
                 help.setManaged(false);
-                help.setTooltip(syntax);
-                help.accessibleTextProperty().bind(syntax.textProperty());
-                help.accessibleHelpProperty().bind(syntax.textProperty());
+                help.setFocusTraversable(false);
+                var title = translations.translate("formula.helpTitle") + " (F1)";
+                help.setAccessibleText(title);
+                help.accessibleHelpProperty().bind(FormulaField.this.accessibleHelpProperty());
+                help.setTooltip(UiHelp.tooltip(title));
                 help.setOnAction(event -> {
-                    preview.hide();
-                    if (syntax.isShowing()) {
-                        syntax.hide();
-                    } else {
-                        var bounds = help.localToScreen(help.getBoundsInLocal());
-                        if (bounds != null) syntax.show(help, bounds.getMinX(), bounds.getMaxY());
-                    }
                     event.consume();
+                    showHelp();
                 });
                 getChildren().addAll(mark, minimum, unitLabel, maximum, help);
             }

@@ -38,7 +38,7 @@ class FormulaIntegrationTest {
     @Test
     void numericAndTextFormulasPersistAndFollowConfigurationsHistoryAndRename() throws Exception {
         var session = new ModelSession(CadDocument.empty());
-        var text = SketchText.create("label", "Width: 60", "SansSerif", 0, 0, 50, 5, 0, 0, "", false);
+        var text = SketchText.create("label", "Width: 6 cm", "SansSerif", 0, 0, 50, 5, 0, 0, "", false);
         session.add(new Feature.Sketch(
                 "plate", "profile", new Feature.Plane("origin-xy", 0), new Feature.Rectangle(0, 0, 30, 40)));
         session.add(new Feature.Extrude("solid", new Feature.ProfileRef("plate", "profile"), 5));
@@ -51,27 +51,28 @@ class FormulaIntegrationTest {
                 .put("width", ParameterUnit.MM, "=60", "")
                 .addConfiguration("Wide", false)
                 .override("width", "Wide", "=80"));
-        session.bindExpression("plate", "width", "=$width/2");
+        session.bindExpression("plate", "width", "=clamp($width/2, 1 mm, 100 mm)");
         session.bindExpression("solid", "distance", "=1+2/3");
-        session.bindExpression("annotation", FeatureText.key("label", "content"), "=\"Width: \" + $width");
+        session.bindExpression(
+                "annotation", FeatureText.key("label", "content"), "=\"Width: \" + formatUnit($width, cm)");
         session.bindExpression("annotation", FeatureText.key("label", "font"), "=\"Sans\" + \"Serif\"");
-        verify(session, 30, "Width: 60");
+        verify(session, 30, "Width: 6 cm");
         session.selectConfiguration("Wide");
-        verify(session, 40, "Width: 80");
+        verify(session, 40, "Width: 8 cm");
         assertThat(session.undo()).isTrue();
-        verify(session, 30, "Width: 60");
+        verify(session, 30, "Width: 6 cm");
         assertThat(session.redo()).isTrue();
         var path = directory.resolve("formula part.vxb");
         DocumentWriter.save(session.document(), path, false);
         assertThat(DocumentReader.load(path)).isEqualTo(session.document());
         var reopened = new ModelSession(DocumentReader.load(path));
-        verify(reopened, 40, "Width: 80");
+        verify(reopened, 40, "Width: 8 cm");
         reopened.setParameters(reopened.document().parameters().rename("width", "plateWidth"));
         assertThat(reopened.document()
                         .parameters()
                         .binding(new ParameterSet.Target("annotation", "text:label:content")))
-                .isEqualTo("=\"Width: \" + $plateWidth");
-        verify(reopened, 40, "Width: 80");
+                .isEqualTo("=\"Width: \" + formatUnit($plateWidth, cm)");
+        verify(reopened, 40, "Width: 8 cm");
         assertThatThrownBy(() -> reopened.document().parameters().remove("plateWidth"))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> reopened.bindExpression("plate", "width", "=\"invalid\""))

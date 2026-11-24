@@ -8213,6 +8213,29 @@ class WorkbenchUiTest {
         ready();
         click("history-2");
         click("extrude");
+        fx(() -> {
+            var operations = (ComboBox<?>) node("#extrude-operation");
+            assertThat(operations.getButtonCell().getGraphic()).isNotNull();
+            operations.show();
+            return null;
+        });
+        fx(() -> {
+            var operations = (ComboBox<?>) node("#extrude-operation");
+            var skin = (javafx.scene.control.skin.ComboBoxListViewSkin<?>) operations.getSkin();
+            var rows = skin.getPopupContent().lookupAll(".list-cell").stream()
+                    .map(row -> (javafx.scene.control.ListCell<?>) row)
+                    .filter(cell -> !cell.isEmpty())
+                    .toList();
+            assertThat(rows).hasSize(3).allSatisfy(cell -> {
+                assertThat(cell.getText()).isNotBlank();
+                assertThat(cell.getGraphic()).isNotNull();
+            });
+            Screenshot.save(
+                    skin.getPopupContent().getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "extrusion-operation-icons.png"));
+            operations.hide();
+            return null;
+        });
         choice("extrude-operation", 1);
         text("extrude-distance", "2");
         ready();

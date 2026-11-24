@@ -7626,14 +7626,22 @@ class WorkbenchUiTest {
         click("parameters-cancel");
         assertThat(fx(() -> workbench.controller().snapshot())).isEqualTo(before);
         click("parameters");
-        fx(() -> {
+        var parameterNameCenter = fx(() -> {
             var cell = node("#parameter-table").lookupAll(".table-cell").stream()
                     .filter(n -> n instanceof TableCell<?, ?> c && "width".equals(c.getText()))
                     .findFirst()
                     .orElseThrow();
             var bounds = cell.localToScreen(cell.getBoundsInLocal());
-            robot.mouseMove(bounds.getCenterX(), bounds.getCenterY());
+            return new Point2D(bounds.getCenterX(), bounds.getCenterY());
+        });
+        fx(() -> {
+            robot.mouseMove(parameterNameCenter);
             robot.mouseClick(MouseButton.PRIMARY);
+            return null;
+        });
+        // Give GTK time to deliver the first native click before sending the second.
+        Thread.sleep(90);
+        fx(() -> {
             robot.mouseClick(MouseButton.PRIMARY);
             return null;
         });

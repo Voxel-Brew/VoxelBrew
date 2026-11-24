@@ -1,7 +1,12 @@
 package dev.voxelbrew.gui;
 
 import dev.voxelbrew.api.i18n.TranslationService;
+import dev.voxelbrew.api.model.sketch.SketchGeometry;
+import dev.voxelbrew.api.model.sketch.SketchGeometry.Type;
 import dev.voxelbrew.api.model.sketch.SketchGeometry.Vec;
+import dev.voxelbrew.engine.sketch.SketchConstraints;
+import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
@@ -18,6 +23,27 @@ final class SketchSizeEntry extends HBox {
     private final Vec anchor;
     private final Vec direction;
     private final double rectangleFactor;
+
+    private boolean firstEdited;
+    private boolean secondEdited;
+
+    record Dimensions(Shape shape, Double first, Double second) {
+        private static SketchGeometry add(SketchGeometry g, String id, Type type, double value) {
+            var entity = g.entity(id);
+            return g.add(SketchConstraints.create(g, id + "-" + type.name(), type, List.of(entity.ref()), value));
+        }
+
+        SketchGeometry apply(SketchGeometry g, String id) {
+            if (shape == Shape.RECTANGLE || shape == Shape.CENTER_RECTANGLE) {
+                if (first != null) g = add(g, id + "-bottom", Type.LENGTH, first);
+                if (second != null) g = add(g, id + "-right", Type.LENGTH, second);
+            } else {
+                if (first != null) g = add(g, id, shape == Shape.CIRCLE ? Type.RADIUS : Type.LENGTH, first);
+                if (second != null) g = add(g, id, Type.ANGLE, second);
+            }
+            return g;
+        }
+    }
 
     enum Shape {
         LINE,
@@ -57,7 +83,7 @@ final class SketchSizeEntry extends HBox {
             Shape shape,
             TranslationService translations,
             Consumer<Vec> preview,
-            Consumer<Vec> finish) {
+            BiConsumer<Vec, Dimensions> finish) {
         super(5);
         this.anchor = anchor;
         this.shape = shape;
@@ -87,7 +113,9 @@ final class SketchSizeEntry extends HBox {
             default -> throw new IllegalArgumentException("Unsupported sketch shape: " + shape);
         }
         getChildren().add(new Label(shape == Shape.LINE ? "°" : "mm"));
-        javafx.beans.InvalidationListener changed = ignored -> submit(false, preview);
+        javafx.beans.InvalidationListener changed = ignored -> submit(false, (point, sizes) -> preview.accept(point));
+        first.textProperty().addListener(ignored -> firstEdited = true);
+        if (second != null) second.textProperty().addListener(ignored -> secondEdited = true);
         first.textProperty().addListener(changed);
         if (second != null) second.textProperty().addListener(changed);
         addEventFilter(KeyEvent.KEY_PRESSED, event -> {
@@ -101,24 +129,29 @@ final class SketchSizeEntry extends HBox {
         });
     }
 
-    private void submit(boolean validate, Consumer<Vec> accept) {
+    private void submit(boolean validate, BiConsumer<Vec, Dimensions> accept) {
         double size = readValue(first, validate, 1e-6);
         if (!Double.isFinite(size)) return;
+        Double firstValue = firstEdited || !secondEdited ? size : null;
         if (shape == Shape.LINE) {
             double degrees = readValue(second, validate, Double.NEGATIVE_INFINITY);
             if (Double.isFinite(degrees)) {
                 double radians = Math.toRadians(degrees % 360);
-                accept.accept(anchor.plus(new Vec(Math.cos(radians), Math.sin(radians)).times(size)));
+                accept.accept(
+                        anchor.plus(new Vec(Math.cos(radians), Math.sin(radians)).times(size)),
+                        new Dimensions(shape, firstValue, secondEdited ? degrees : null));
             }
         } else if (second == null) {
             var axis = direction.length() > 0 ? direction.unit() : new Vec(1, 0);
-            accept.accept(anchor.plus(axis.times(size)));
+            accept.accept(anchor.plus(axis.times(size)), new Dimensions(shape, size, null));
         } else {
             double h = readValue(second, validate, 1e-6);
             if (Double.isFinite(h)) {
-                accept.accept(anchor.plus(new Vec(
-                        Math.copySign(size / rectangleFactor, direction.x()),
-                        Math.copySign(h / rectangleFactor, direction.y()))));
+                accept.accept(
+                        anchor.plus(new Vec(
+                                Math.copySign(size / rectangleFactor, direction.x()),
+                                Math.copySign(h / rectangleFactor, direction.y()))),
+                        new Dimensions(shape, firstValue, secondEdited ? h : null));
             }
         }
     }

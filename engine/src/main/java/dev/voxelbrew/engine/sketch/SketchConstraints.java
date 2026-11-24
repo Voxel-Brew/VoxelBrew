@@ -16,6 +16,45 @@ public final class SketchConstraints {
         }
     }
 
+    /** Reference dimensions carry no driving value, only an optional pair of label coordinates. */
+    public static boolean referenceDimension(Constraint c) {
+        return c.type().dimension() && (c.values().isEmpty() || c.values().size() == 2);
+    }
+
+    public static boolean drivingDimension(Constraint c) {
+        return c.type().dimension() && !referenceDimension(c);
+    }
+
+    public static Constraint referenceDimension(SketchGeometry g, String id, Type type, List<Ref> refs) {
+        var c = new Constraint(id, type, refs, List.of());
+        measuredValue(g, c);
+        return c;
+    }
+
+    /** Optional sketch-space annotation coordinates follow the driving value in the model. */
+    public static java.util.Optional<Vec> labelPosition(Constraint c) {
+        int offset = referenceDimension(c) ? 0 : 1;
+        return c.type().dimension() && c.values().size() == offset + 2
+                ? java.util.Optional.of(
+                        new Vec(c.values().get(offset), c.values().get(offset + 1)))
+                : java.util.Optional.empty();
+    }
+
+    public static Constraint positionLabel(Constraint c, Vec position) {
+        var values = referenceDimension(c)
+                ? List.of(position.x(), position.y())
+                : List.of(c.values().getFirst(), position.x(), position.y());
+        return new Constraint(c.id(), c.type(), c.refs(), values);
+    }
+
+    public static Constraint drivingValue(Constraint c, double value) {
+        if (referenceDimension(c)) throw new IllegalArgumentException("Reference dimensions are read-only");
+        var updated = c.withValue(value);
+        return labelPosition(c)
+                .map(position -> positionLabel(updated, position))
+                .orElse(updated);
+    }
+
     public static java.util.Optional<PointLineDistance> pointLineDistance(SketchGeometry geometry, List<Ref> refs) {
         if (refs.size() != 2) return java.util.Optional.empty();
         var first = refs.getFirst();
@@ -98,7 +137,9 @@ public final class SketchConstraints {
     }
 
     public static double[] residuals(SketchGeometry g, Constraint c) {
-        if (SketchCopies.linked(c)) return new double[0]; // Derived poses are evaluated by substitution.
+        if (SketchCopies.linked(c) || referenceDimension(c)) {
+            return new double[0];
+        }
         try {
             return equations(g, c);
         } catch (IllegalArgumentException failure) {
@@ -111,7 +152,7 @@ public final class SketchConstraints {
         var refs = c.refs();
         var values = c.values();
         int n = refs.size();
-        if (c.type().dimension() && values.size() != 1) {
+        if (c.type().dimension() && values.size() != 1 && values.size() != 3) {
             throw new IllegalArgumentException("One driving value is required");
         }
         switch (c.type()) {
@@ -303,22 +344,62 @@ public final class SketchConstraints {
                 }
                 return array(residual);
             }
+            default -> {
+                return dimensionResiduals(g, c);
+            }
+        }
+    }
+
+    private static double[] dimensionResiduals(SketchGeometry g, Constraint c) {
+        double target = c.values().getFirst();
+        switch (c.type()) {
+            case LENGTH, RADIUS, DIAMETER, MAJOR_RADIUS, MINOR_RADIUS, TEXT_HEIGHT -> positive(target);
+            case DISTANCE -> {
+                if (target < 0) throw new IllegalArgumentException("Distance cannot be negative");
+            }
+            case RHO -> {
+                if (target <= .000001 || target >= .999999) {
+                    throw new IllegalArgumentException("Rho must be between 0 and 1");
+                }
+            }
+            case TEXT_SPACING -> {
+                if (target < -.5) throw new IllegalArgumentException("Spacing must be at least -0.5 em");
+            }
+            default -> {}
+        }
+        double delta = measuredValue(g, c) - target;
+        if (c.type() == Type.ANGLE) {
+            double radians = Math.toRadians(delta);
+            return new double[] {10 * Math.atan2(Math.sin(radians), Math.cos(radians))};
+        }
+        if (c.type() == Type.DISTANCE
+                && c.refs().stream()
+                        .allMatch(r -> r.part() == Part.OBJECT
+                                && g.entity(r.entityId()).kind() == Kind.LINE)) {
+            var a = direction(line(g, c.refs().getFirst())).unit();
+            var b = direction(line(g, c.refs().getLast())).unit();
+            return new double[] {10 * a.cross(b), delta};
+        }
+        return new double[] {delta};
+    }
+
+    public static double measuredValue(SketchGeometry g, Constraint c) {
+        var refs = c.refs();
+        int n = refs.size();
+        switch (c.type()) {
             case LENGTH -> {
                 count(c, 1);
-                positive(values.getFirst());
-                return new double[] {direction(line(g, refs.getFirst())).length() - values.getFirst()};
+                return direction(line(g, refs.getFirst())).length();
             }
             case RADIUS, DIAMETER -> {
                 count(c, 1);
-                positive(values.getFirst());
                 var curve = object(g, refs.getFirst());
                 circular(curve);
-                return new double[] {curve.value(2) * (c.type() == Type.DIAMETER ? 2 : 1) - values.getFirst()};
+                return curve.value(2) * (c.type() == Type.DIAMETER ? 2 : 1);
             }
             case DISTANCE, DISTANCE_X, DISTANCE_Y -> {
                 count(c, 2);
                 if (c.type() == Type.DISTANCE && refs.stream().allMatch(r -> r.part() == Part.OBJECT)) {
-                    if (values.getFirst() < 0) throw new IllegalArgumentException("Distance cannot be negative");
                     var first = object(g, refs.getFirst());
                     var second = object(g, refs.getLast());
                     if (first.kind() == Kind.CIRCLE || second.kind() == Kind.CIRCLE) {
@@ -327,33 +408,24 @@ public final class SketchConstraints {
                         double distance = Math.abs(direction(edge)
                                 .unit()
                                 .cross(circle.point(Part.CENTER).minus(edge.at(0))));
-                        return new double[] {distance - circle.value(2) - values.getFirst()};
+                        return distance - circle.value(2);
                     }
                     var a = line(g, refs.get(0));
                     var b = line(g, refs.get(1));
                     var u = direction(a).unit();
-                    return new double[] {
-                        10 * u.cross(direction(b).unit()),
-                        Math.abs(u.cross(b.at(0).minus(a.at(0)))) - values.getFirst()
-                    };
-                }
-                if (c.type() == Type.DISTANCE && values.getFirst() < 0) {
-                    throw new IllegalArgumentException("Distance cannot be negative");
+                    return Math.abs(u.cross(b.at(0).minus(a.at(0))));
                 }
                 if (c.type() == Type.DISTANCE) {
                     var measurement = pointLineDistance(g, refs);
                     if (measurement.isPresent()) {
-                        return new double[] {measurement.get().value() - values.getFirst()};
+                        return measurement.get().value();
                     }
                 }
                 var d = g.point(refs.get(1)).minus(g.point(refs.get(0)));
-                return new double[] {
-                    (switch (c.type()) {
-                                case DISTANCE -> d.length();
-                                case DISTANCE_X -> d.x();
-                                default -> d.y();
-                            })
-                            - values.getFirst()
+                return switch (c.type()) {
+                    case DISTANCE -> d.length();
+                    case DISTANCE_X -> referenceDimension(c) ? Math.abs(d.x()) : d.x();
+                    default -> referenceDimension(c) ? Math.abs(d.y()) : d.y();
                 };
             }
             case ANGLE -> {
@@ -361,16 +433,12 @@ public final class SketchConstraints {
                 if (n == 1) {
                     var entity = object(g, refs.getFirst());
                     if (entity.kind() == Kind.ELLIPSE || entity.kind() == Kind.TEXT) {
-                        double delta = entity.value(entity.kind() == Kind.ELLIPSE ? 4 : 3)
-                                - dev.voxelbrew.api.model.units.Measurements.radians(values.getFirst());
-                        return new double[] {10 * Math.atan2(Math.sin(delta), Math.cos(delta))};
+                        return Math.toDegrees(entity.value(entity.kind() == Kind.ELLIPSE ? 4 : 3));
                     }
                 }
                 var a = n == 1 ? new Vec(1, 0) : direction(line(g, refs.get(0)));
                 var b = direction(line(g, refs.getLast()));
-                double delta = Math.atan2(a.cross(b), a.dot(b))
-                        - dev.voxelbrew.api.model.units.Measurements.radians(values.getFirst());
-                return new double[] {10 * Math.atan2(Math.sin(delta), Math.cos(delta))};
+                return Math.toDegrees(Math.atan2(a.cross(b), a.dot(b)));
             }
             case MAJOR_RADIUS, MINOR_RADIUS, RHO, TEXT_HEIGHT, TEXT_SPACING -> {
                 count(c, 1);
@@ -386,23 +454,13 @@ public final class SketchConstraints {
                     }
                 }
                 if (entity.kind() != expected) throw new IllegalArgumentException(selectionHint(c.type()));
-                double value = values.getFirst();
-                if (c.type() == Type.RHO) {
-                    if (value <= .000001 || value >= .999999) {
-                        throw new IllegalArgumentException("Rho must be between 0 and 1");
-                    }
-                } else if (c.type() == Type.TEXT_SPACING) {
-                    if (value < -.5) throw new IllegalArgumentException("Spacing must be at least -0.5 em");
-                } else {
-                    positive(value);
-                }
                 int index = switch (c.type()) {
                     case MAJOR_RADIUS, TEXT_HEIGHT -> 2;
                     case MINOR_RADIUS -> 3;
                     case TEXT_SPACING -> 4;
                     default -> 6;
                 };
-                return new double[] {entity.value(index) - value};
+                return entity.value(index);
             }
         }
         throw new IllegalArgumentException("Unsupported constraint");
@@ -413,6 +471,9 @@ public final class SketchConstraints {
             validateConicSections(e);
             validateSplineAndText(g, e);
             validatePrimitive(e);
+        }
+        for (var c : g.constraints()) {
+            if (referenceDimension(c)) measuredValue(g, c);
         }
         for (String id : g.boundary()) {
             var e = g.entity(id);

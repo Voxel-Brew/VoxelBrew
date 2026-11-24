@@ -66,6 +66,9 @@ public final class DefaultCliFactory implements CliComponent.Factory {
             commands.put(PrintingCommands.RemoveSupport.class, () -> printingCommandsRemoveSupport());
             commands.put(PrintingCommands.Setup.class, () -> printingCommandsSetup());
             commands.put(PrintingCommands.Validate.class, () -> printingCommandsValidate());
+            commands.put(
+                    PrintingCommands.InstallSlicer.class,
+                    () -> new PrintingCommands.InstallSlicer(application.configuration()));
             commands.put(PrintingCommands.Slicers.class, () -> printingCommandsSlicers());
             commands.put(PrintingCommands.Slice.class, () -> printingCommandsSlice());
             commands.put(PrintingCommands.InspectJob.class, () -> printingCommandsInspectJob());

@@ -24,9 +24,22 @@ class BundledSlicerIntegrationTest {
             throws Exception {
         var store = new SlicerInstallationStore(
                 new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties"));
+        var download = dev.voxelbrew.slicer.internal.SlicerDownload.find(providerId);
+        if (download.isPresent() && store.load().isEmpty()) {
+            var asset = download.get();
+            var cached = Path.of(System.getProperty("voxelbrew.test.slicerCache"))
+                    .resolve(Path.of(asset.url().getPath()).getFileName());
+            assumeTrue(java.nio.file.Files.isRegularFile(cached), "Pinned vendor fixture unavailable");
+            var local = new dev.voxelbrew.slicer.internal.SlicerDownload(
+                    providerId, cached.toUri(), asset.sha256(), asset.size(), asset.executable());
+            var home = new dev.voxelbrew.util.preferences.UserConfigServiceImpl(directory, "config.properties");
+            local.install(home.slicersFolder(), new Cancellation(), ignored -> {});
+            assertThat(store.load()).extracting(SlicerInstallation::providerId).containsExactly(providerId);
+            // Reopening and slicing must work without contacting the download source.
+        }
         var installed = store.load();
         assumeTrue(!installed.isEmpty(), "This is a thin build");
-        assertThat(installed).hasSize(2).allMatch(SlicerInstallation::bundled);
+        assertThat(installed).isNotEmpty().allMatch(SlicerInstallation::bundled);
         var installation = installed.stream()
                 .filter(entry -> entry.providerId().equals(providerId))
                 .findFirst()

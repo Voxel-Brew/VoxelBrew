@@ -66,6 +66,10 @@ final class SketchController implements AutoCloseable {
     @Accessors(fluent = true)
     private String interactionError = "";
 
+    @Getter(AccessLevel.PACKAGE)
+    @Accessors(fluent = true)
+    private String extrusionIssue = "";
+
     private volatile boolean closed;
 
     interface Factory {
@@ -81,6 +85,11 @@ final class SketchController implements AutoCloseable {
             boolean commitDrag) {}
 
     private record State(SketchGeometry geometry, ParameterSet parameters) {}
+
+    private static String extrusionIssue(Request request, SketchSolver.Result solved) {
+        if (request.point() != null || !solved.solved()) return "";
+        return SketchProfiles.extrusionIssue(solved.geometry());
+    }
 
     SketchController(SketchGeometry geometry, Consumer<Runnable> dispatch) {
         this(geometry, dispatch, SketchSolver::solve);
@@ -229,10 +238,12 @@ final class SketchController implements AutoCloseable {
                         java.util.List.of(new SketchSolver.Problem("", "Solver failed: " + failure.getMessage())));
             }
             var completed = solved;
+            String issue = extrusionIssue(request, completed);
             dispatch.accept(() -> {
                 if (closed || request.sequence() != sequence.get()) return;
                 busy = false;
                 result = completed;
+                extrusionIssue = issue;
                 displayed = completed.solved() ? completed.geometry() : definition;
                 if (request.point() == null && completed.solved()) definition = completed.geometry();
                 if (request.commitDrag()) {

@@ -157,6 +157,27 @@ class SharedEdgeProfileTest {
     }
 
     @Test
+    void dividerMeetingUnsplitWallsProducesTwoExtrudableFaces() {
+        var entities = new ArrayList<>(house().subList(0, 4));
+        entities.add(Sketches.entity("partition", Kind.LINE, false, 0, 3, 20, 3));
+        var g = geometry(entities);
+        var regions = SketchProfiles.selectableRegions(g);
+        assertThat(regions).hasSize(2);
+        var volumes = new ArrayList<Double>();
+        for (var region : regions) {
+            try (var solid = Solid.profilePrism(region.profile(), 0, 5)) {
+                volumes.add(solid.volume());
+            }
+        }
+        assertThat(volumes)
+                .usingElementComparator(new org.assertj.core.util.DoubleComparator(1e-6))
+                .containsExactlyInAnyOrder(300., 700.);
+        try (var solid = Solid.profilePrism(SketchProfiles.profile(g), 0, 5)) {
+            assertThat(solid.volume()).isCloseTo(1000, within(1e-6));
+        }
+    }
+
+    @Test
     void danglingEdgeStillRejectsExtrusion() {
         var entities = new ArrayList<>(house());
         entities.add(Sketches.entity("open", Kind.LINE, false, 10, 20, 10, 25));

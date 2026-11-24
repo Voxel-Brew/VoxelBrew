@@ -5268,6 +5268,63 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void formulaHelpPreservesSelectionsAndInsertsConstantsInExpressions() throws Exception {
+        ready();
+        var translations = TranslationCatalogs.forLocale(Locale.ENGLISH, directory);
+        for (boolean numeric : List.of(true, false)) {
+            String theme = numeric ? "light" : "dark";
+            var field = fx(() -> {
+                var editor = numeric
+                        ? FormulaField.number("=tau", ParameterSet::empty, ParameterUnit.NUMBER, translations)
+                        : FormulaField.text("=tau", ParameterSet::empty, translations);
+                var layout = new javafx.scene.layout.StackPane(editor);
+                layout.getStyleClass().add(theme);
+                var scene = new Scene(layout, 420, 100);
+                scene.getStylesheets()
+                        .add(FormulaField.class.getResource("workbench.css").toExternalForm());
+                stage.setScene(scene);
+                stage.requestFocus();
+                editor.requestFocus();
+                editor.selectRange(1, 4);
+                return editor;
+            });
+            fx(() -> {
+                field.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.F1, false, false, false, false));
+                return null;
+            });
+            var popup = fx(() -> Window.getWindows().stream()
+                    .filter(ContextMenu.class::isInstance)
+                    .map(ContextMenu.class::cast)
+                    .filter(menu -> menu.getOwnerNode() == field)
+                    .findFirst()
+                    .orElseThrow());
+            fx(() -> {
+                Screenshot.save(
+                        popup.getScene(),
+                        Path.of(System.getProperty("voxelbrew.ui.artifacts"), "formula-help-" + theme + ".png"));
+                return null;
+            });
+            key(KeyCode.ESCAPE);
+            assertThat(fx(field::getSelectedText)).isEqualTo("tau");
+            fx(() -> {
+                ((Button) field.lookup(".formula-help")).fire();
+                var item = popup.getItems().stream()
+                        .filter(Menu.class::isInstance)
+                        .map(Menu.class::cast)
+                        .flatMap(WorkbenchUiTest::menuItems)
+                        .filter(entry -> "formula-insert-pi".equals(entry.getId()))
+                        .findFirst()
+                        .orElseThrow();
+                assertThat(item.isDisable()).isFalse();
+                item.fire();
+                popup.hide();
+                return null;
+            });
+            assertThat(fx(() -> field.getText())).isEqualTo("=π");
+        }
+    }
+
+    @Test
     void exportNotificationShowsDismissIconInBothThemes() throws Exception {
         openPrepared("plate-5mm.vxb");
         for (int palette : List.of(1, 2)) {

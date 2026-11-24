@@ -2,6 +2,7 @@ package dev.voxelbrew.gui;
 
 import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.Feature;
+import dev.voxelbrew.api.model.Transform;
 import dev.voxelbrew.api.model.mesh.MeshData;
 import dev.voxelbrew.engine.model.BodyExtrusion;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -107,6 +108,8 @@ public final class Viewport extends StackPane {
 
     private double planeZ;
 
+    private Consumer<MouseEvent> extrusionPick;
+
     private double handleDistance;
 
     private Point3D handleAnchor, handleNormal;
@@ -138,6 +141,11 @@ public final class Viewport extends StackPane {
     private static Point3D sketchPoint(Feature.Plane plane, dev.voxelbrew.api.model.sketch.SketchGeometry.Vec point) {
         var model = plane.frame().apply(point.x(), point.y(), plane.offsetZ() + .04);
         return new Point3D(model[0], model[1], model[2]);
+    }
+
+    private static Point3D transformPoint(Transform transform, Point3D point) {
+        var result = transform.apply(point.getX(), point.getY(), point.getZ());
+        return new Point3D(result[0], result[1], result[2]);
     }
 
     private static Cylinder line(Point3D a, Point3D b, double radius, Color color) {
@@ -307,7 +315,10 @@ public final class Viewport extends StackPane {
             e.consume();
         });
         scene.addEventFilter(MouseEvent.MOUSE_CLICKED, e -> {
-            if (planeClick != null && e.getButton() == MouseButton.PRIMARY && e.isStillSincePress()) {
+            if (extrusionPick != null && e.getButton() == MouseButton.PRIMARY && e.isStillSincePress()) {
+                extrusionPick.accept(e);
+                e.consume();
+            } else if (planeClick != null && e.getButton() == MouseButton.PRIMARY && e.isStillSincePress()) {
                 var local = scene.screenToLocal(e.getScreenX(), e.getScreenY());
                 var point = pointOnPlane(local.getX(), local.getY(), planeZ);
                 if (point != null) planeClick.accept(point);
@@ -570,12 +581,18 @@ public final class Viewport extends StackPane {
     }
 
     public Point3D pointOnPlane(double x, double y, double z) {
+        return pointOnPlane(x, y, z, Transform.IDENTITY);
+    }
+
+    private Point3D pointOnPlane(double x, double y, double z, Transform worldToPlane) {
         double scale = 2
                 * Math.tan(dev.voxelbrew.api.model.units.Measurements.radians(camera.getFieldOfView() / 2))
                 / scene.getHeight();
         Point3D a = toModel(world.parentToLocal(new Point3D(0, 0, -distance)));
         Point3D b = toModel(world.parentToLocal(
                 new Point3D((x - scene.getWidth() / 2) * scale, (y - scene.getHeight() / 2) * scale, 1 - distance)));
+        a = transformPoint(worldToPlane, a);
+        b = transformPoint(worldToPlane, b);
         Point3D direction = b.subtract(a);
         if (Math.abs(direction.getZ()) < 1e-10) return null;
         double t = (z - a.getZ()) / direction.getZ();
@@ -652,7 +669,17 @@ public final class Viewport extends StackPane {
         sketches.getChildren().add(group);
     }
 
+    void pickExtrusionRegion(Feature.Plane plane, Consumer<Point3D> pick) {
+        var inverse = plane.placement().inverse();
+        extrusionPick = event -> {
+            var local = scene.screenToLocal(event.getScreenX(), event.getScreenY());
+            var point = pointOnPlane(local.getX(), local.getY(), 0, inverse);
+            if (point != null) pick.accept(point);
+        };
+    }
+
     public void clearHandle() {
+        extrusionPick = null;
         handle.getChildren().clear();
     }
 

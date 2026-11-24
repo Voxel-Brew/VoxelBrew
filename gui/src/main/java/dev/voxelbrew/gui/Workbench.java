@@ -1897,6 +1897,16 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     whole.setSelected(false);
                     updatePreview.run();
                 }));
+        if (!regions.isEmpty() && sketch.profile() instanceof Feature.Constrained constrained) {
+            viewport.pickExtrusionRegion(
+                    sketch.plane(),
+                    point -> SketchProfiles.regionAt(
+                                    constrained.geometry(),
+                                    new dev.voxelbrew.api.model.sketch.SketchGeometry.Vec(point.getX(), point.getY()))
+                            .ifPresent(id -> regions.forEach((box, region) -> {
+                                if (region.equals(id)) box.fire();
+                            })));
+        }
         target.setOnAction(event -> updatePreview.run());
         operation.setOnAction(event -> {
             if (operation.getValue() == BodyExtrusion.Operation.CUT

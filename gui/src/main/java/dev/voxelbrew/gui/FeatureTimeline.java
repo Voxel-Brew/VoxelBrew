@@ -271,7 +271,6 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
                 e.consume();
             });
             button.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-            button.setAccessibleText((i + 1) + ". " + name.apply(feature));
             button.setOnAction(e -> {
                 stop();
                 select.accept(feature.id());
@@ -417,6 +416,9 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
         for (int i = 0; i < definitions.size(); i++) {
             var feature = definitions.get(i);
             var button = (Button) features.getChildren().get(i);
+            String displayName = name.apply(feature);
+            button.setText(displayName);
+            button.setAccessibleText((i + 1) + ". " + displayName);
             button.getStyleClass()
                     .setAll("button", "timeline-feature", i < position ? "history-active" : "history-future");
             if (feature.id().equals(selection)) button.getStyleClass().add("history-selected");
@@ -429,7 +431,7 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
             if (broken) button.getStyleClass().add("history-error");
             String description = (i + 1)
                     + " · "
-                    + name.apply(feature)
+                    + displayName
                     + "\n"
                     + translations.translate(i < position ? "timeline.evaluated" : "timeline.rolledBack")
                     + (broken ? "\n" + diagnostic.orElseThrow().message() : "")

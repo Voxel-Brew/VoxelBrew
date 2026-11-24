@@ -7,11 +7,13 @@ import java.io.IOException;
 import java.util.List;
 import java.util.function.Supplier;
 import javafx.application.Platform;
+import javafx.geometry.Bounds;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.VBox;
 import javafx.stage.Popup;
+import javafx.stage.Screen;
 
 /** Non-modal completion: typing remains in the field; accepting a name never applies its value. */
 final class ParameterSuggestions {
@@ -151,6 +153,26 @@ final class ParameterSuggestions {
             field.getTooltip().hide();
             popup.show(field, bounds.getMinX(), bounds.getMaxY() + 3);
         }
+        positionPopup(bounds);
+    }
+
+    private void positionPopup(Bounds bounds) {
+        // Filtering changes the popup height. Reanchor it so auto-fix cannot leave
+        // the shorter list covering the field and its help button.
+        content.applyCss();
+        popup.sizeToScene();
+        var screen = Screen.getScreensForRectangle(
+                        bounds.getMinX(), bounds.getMinY(), bounds.getWidth(), bounds.getHeight())
+                .stream()
+                .findFirst()
+                .orElse(Screen.getPrimary())
+                .getVisualBounds();
+        double below = screen.getMaxY() - bounds.getMaxY();
+        double above = bounds.getMinY() - screen.getMinY();
+        popup.setAnchorY(
+                popup.getHeight() + 3 > below && above > below
+                        ? bounds.getMinY() - popup.getHeight() - 3
+                        : bounds.getMaxY() + 3);
     }
 
     private void createPopup() {

@@ -4855,16 +4855,42 @@ class WorkbenchUiTest {
         click("window-close");
         assertThat(fx(stage::isShowing)).isTrue();
         assertThat(fx(() -> workbench.controller().dirty())).isTrue();
-        click("window-close");
+        click("exit");
         click("unsaved-cancel");
         assertThat(document()).isEqualTo(original);
-        click("window-close");
+        click("exit");
         click("unsaved-save");
         Path file = directory.resolve("Saved by integrated Close.vxb");
         text("file-path", file.toString());
         click("file-confirm");
         awaitWindowClosed();
         assertThat(DocumentReader.load(file)).isEqualTo(original);
+    }
+
+    @Test
+    void fileExitVisitsOtherDesignsAndStopsWhenCancelled() throws Exception {
+        rectangle(0);
+        var original = document();
+        var secondStage = fx(() -> {
+            var second = new Stage();
+            var other = Workbench.create(
+                    second,
+                    directory.resolve("plugins with spaces"),
+                    new dev.voxelbrew.util.di.ApplicationModule(
+                            configuration, updates::service, startupTranslations(configuration, CONFIG_FILE_NAME)),
+                    new FileIoModule());
+            second.setScene(other.createScene(964, 648));
+            second.show();
+            Platform.runLater(() -> command(other, "exit").fire());
+            return second;
+        });
+        click("unsaved-cancel");
+        assertThat(fx(secondStage::isShowing)).isFalse();
+        assertThat(fx(stage::isShowing)).isTrue();
+        assertThat(document()).isEqualTo(original);
+        click("exit");
+        click("unsaved-discard");
+        awaitWindowClosed();
     }
 
     @Test
@@ -6097,7 +6123,7 @@ class WorkbenchUiTest {
         }
         String menu = switch (id) {
             case "extrude", "cut", "fillet", "chamfer", "shell", "split-body" -> "operations-menu";
-            case "new", "open", "import", "save", "save-as", "export" -> "menu-file";
+            case "new", "open", "import", "save", "save-as", "export", "exit" -> "menu-file";
             case "language", "updates", "about", "keyboard-shortcuts" -> "menu-settings";
             case "appearance", "menu-fit" -> "menu-view";
             default -> null;

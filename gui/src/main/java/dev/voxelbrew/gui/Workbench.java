@@ -676,7 +676,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                         saveItem,
                         saveAsItem,
                         new SeparatorMenuItem(),
-                        export);
+                        export,
+                        new SeparatorMenuItem(),
+                        menuItem(translations.translate("action.exit"), "exit", false, this::exitApplication));
         var editMenu = menu("menu-edit");
         editMenu.getItems()
                 .addAll(mirror(undo, true), mirror(redo, true), new SeparatorMenuItem(), mirror(parameters, true));
@@ -893,17 +895,34 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         installShortcuts(menuBar, newItem, openItem, importItem, saveItem, saveAsItem, constructionMenu, solidCommands);
         stage.setOnCloseRequest(e -> {
             e.consume();
-            requestChange(() -> {
-                close();
-                stage.hide();
-            });
+            requestChange(this::closeWindow);
         });
+        stage.getProperties().put(Workbench.class, this);
         applyAppearance();
         refresh();
     }
 
     private Stage stage() {
         return stage;
+    }
+
+    private void closeWindow() {
+        close();
+        stage.hide();
+    }
+
+    private void exitApplication() {
+        stage.toFront();
+        if (isDisabled()) return;
+        requestChange(() -> {
+            closeWindow();
+            javafx.stage.Window.getWindows().stream()
+                    .map(open -> open.getProperties().get(Workbench.class))
+                    .filter(Workbench.class::isInstance)
+                    .map(Workbench.class::cast)
+                    .findFirst()
+                    .ifPresent(Workbench::exitApplication);
+        });
     }
 
     javafx.scene.Scene createScene(double width, double height) {
@@ -2788,6 +2807,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     public void close() {
         if (closed) return;
         closed = true;
+        stage.getProperties().remove(Workbench.class);
         backupTimer.stop();
         if (exportNotification != null) exportNotification.hide();
         quickMenus.forEach(QuickMenu::close);

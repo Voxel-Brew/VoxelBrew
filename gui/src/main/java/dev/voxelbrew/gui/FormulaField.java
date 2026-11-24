@@ -276,6 +276,7 @@ final class FormulaField extends TextField {
                 help.setManaged(false);
                 var title = translations.translate("formula.helpTitle") + " (F1)";
                 help.setAccessibleText(title);
+                help.accessibleHelpProperty().bind(FormulaField.this.accessibleHelpProperty());
                 help.setTooltip(UiHelp.tooltip(title));
                 help.setOnAction(event -> showHelp());
                 getChildren().addAll(mark, minimum, unitLabel, maximum, help);

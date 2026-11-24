@@ -67,6 +67,21 @@ public final class SketchProfiles {
         return regions(g, true);
     }
 
+    /** Pick the innermost bounded face at a point in sketch coordinates. */
+    public static Optional<String> regionAt(SketchGeometry geometry, Vec point) {
+        double smallest = Double.POSITIVE_INFINITY;
+        String picked = null;
+        for (var loop : profileLoops(geometry, true)) {
+            var polygon = samples(loop);
+            double size = Math.abs(area(polygon));
+            if (size < smallest && inside(point, polygon)) {
+                smallest = size;
+                picked = regionId(loop);
+            }
+        }
+        return Optional.ofNullable(picked);
+    }
+
     public static String regionProfileId(String profileId, Region region) {
         return profileId + "/region/" + region.id();
     }

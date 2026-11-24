@@ -2981,10 +2981,10 @@ class WorkbenchUiTest {
         click("extrude");
         ready();
         assertThat(volume()).isCloseTo(1500, org.assertj.core.data.Offset.offset(.001));
-        click("extrude-region-1");
+        modelClick(4, 4, 0);
         ready();
         assertThat(volume()).isCloseTo(1000, org.assertj.core.data.Offset.offset(.001));
-        click("extrude-region-2");
+        modelClick(10, 15, 0);
         ready();
         assertThat(volume()).isCloseTo(1500, org.assertj.core.data.Offset.offset(.001));
         click("extrude-region-1");

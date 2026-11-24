@@ -3710,6 +3710,28 @@ class WorkbenchUiTest {
         assertThat(fx(() -> field.getBoundsInLocal().getWidth() >= 200))
                 .as("Inline input must display the expression, not just the fx mark")
                 .isTrue();
+        fx(() -> {
+            field.lookup(".formula-help").setId("inline-dimension-help");
+            return null;
+        });
+        for (String expression : List.of("=$missing", "=$plateWidth")) {
+            text("sketch-inline-dimension", expression);
+            click("inline-dimension-help");
+            fx(() -> {
+                assertThat(stage.getScene().lookup("#sketch-inline-dimension")).isSameAs(field);
+                var help = Window.getWindows().stream()
+                        .filter(ContextMenu.class::isInstance)
+                        .map(ContextMenu.class::cast)
+                        .filter(menu -> menu.getOwnerNode() == field)
+                        .findFirst();
+                assertThat(help)
+                        .as("Clicking ? opens help without submitting the dimension")
+                        .isPresent();
+                assertThat(((Label) node("#sketch-error")).getText()).isBlank();
+                help.orElseThrow().hide();
+                return null;
+            });
+        }
         text("sketch-inline-dimension", "=missingParameter");
         key(KeyCode.ENTER);
         assertThat(fx(() -> node("#sketch-inline-dimension")))

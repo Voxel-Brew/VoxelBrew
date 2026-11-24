@@ -279,7 +279,10 @@ final class FormulaField extends TextField {
                 help.setAccessibleText(title);
                 help.accessibleHelpProperty().bind(FormulaField.this.accessibleHelpProperty());
                 help.setTooltip(UiHelp.tooltip(title));
-                help.setOnAction(event -> showHelp());
+                help.setOnAction(event -> {
+                    event.consume();
+                    showHelp();
+                });
                 getChildren().addAll(mark, minimum, unitLabel, maximum, help);
             }
 

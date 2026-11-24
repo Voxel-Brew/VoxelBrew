@@ -865,9 +865,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 translations,
                 position -> attempt(() -> controller.cursor(position)),
                 this::selectFeature,
-                () -> {
-                    if (selected() instanceof Feature.Sketch sketch) attempt(() -> editSketch(sketch));
-                },
+                this::editSelectedSketch,
                 this::shortName,
                 (from, to) -> attempt(() -> controller.deleteFeatures(from, to)));
         progress.setPrefSize(16, 16);
@@ -1595,6 +1593,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         return number(fields.get(key), key);
     }
 
+    private void editSelectedSketch() {
+        if (selected() instanceof Feature.Sketch sketch) attempt(() -> editSketch(sketch));
+    }
+
     private void editSketch(Feature.Sketch sketch) {
         openSketch(sketch, sketch.plane());
     }
@@ -1825,6 +1827,15 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 } else {
                     form.getChildren().add(choices);
                 }
+                viewport.pickExtrusionRegion(
+                        sketch.plane(),
+                        point -> SketchProfiles.regionAt(
+                                        constrained.geometry(),
+                                        new dev.voxelbrew.api.model.sketch.SketchGeometry.Vec(
+                                                point.getX(), point.getY()))
+                                .ifPresent(id -> regions.forEach((box, region) -> {
+                                    if (region.equals(id)) box.fire();
+                                })));
             }
         }
         return regions;
@@ -1910,16 +1921,6 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     whole.setSelected(false);
                     updatePreview.run();
                 }));
-        if (!regions.isEmpty() && sketch.profile() instanceof Feature.Constrained constrained) {
-            viewport.pickExtrusionRegion(
-                    sketch.plane(),
-                    point -> SketchProfiles.regionAt(
-                                    constrained.geometry(),
-                                    new dev.voxelbrew.api.model.sketch.SketchGeometry.Vec(point.getX(), point.getY()))
-                            .ifPresent(id -> regions.forEach((box, region) -> {
-                                if (region.equals(id)) box.fire();
-                            })));
-        }
         target.setOnAction(event -> updatePreview.run());
         operation.setOnAction(event -> {
             if (operation.getValue() == BodyExtrusion.Operation.CUT

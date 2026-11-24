@@ -7,11 +7,13 @@ import java.io.IOException;
 import java.util.List;
 import java.util.function.Supplier;
 import javafx.application.Platform;
+import javafx.geometry.Bounds;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.VBox;
 import javafx.stage.Popup;
+import javafx.stage.Screen;
 
 /** Non-modal completion: typing remains in the field; accepting a name never applies its value. */
 final class ParameterSuggestions {
@@ -61,7 +63,7 @@ final class ParameterSuggestions {
         while (start > 0 && identifier(text.charAt(start - 1))) start--;
         if (start == 0 || text.charAt(start - 1) != '$') return null;
         if (start < caret && !asciiLetter(text.charAt(start))) return null;
-        if (insideQuotedString(text, start)) return null;
+        if (insideQuotedString(text, start - 1)) return null;
         int end = caret;
         while (end < text.length() && identifier(text.charAt(end))) end++;
         return new Reference(start - 1, end, text.substring(start, caret));
@@ -75,11 +77,11 @@ final class ParameterSuggestions {
         return asciiLetter(c) || c >= '0' && c <= '9' || c == '_' || c == '.';
     }
 
-    private static boolean insideQuotedString(String text, int start) {
+    static boolean insideQuotedString(String text, int boundary) {
         boolean quoted = false;
-        for (int i = 0; i < start - 1; i++) {
+        for (int i = 0; i < boundary; i++) {
             if (text.charAt(i) != '"') continue;
-            if (quoted && i + 1 < start - 1 && text.charAt(i + 1) == '"') i++;
+            if (quoted && i + 1 < text.length() && text.charAt(i + 1) == '"') i++;
             else {
                 quoted = !quoted;
             }
@@ -151,6 +153,26 @@ final class ParameterSuggestions {
             field.getTooltip().hide();
             popup.show(field, bounds.getMinX(), bounds.getMaxY() + 3);
         }
+        positionPopup(bounds);
+    }
+
+    private void positionPopup(Bounds bounds) {
+        // Filtering changes the popup height. Reanchor it so auto-fix cannot leave
+        // the shorter list covering the field and its help button.
+        content.applyCss();
+        popup.sizeToScene();
+        var screen = Screen.getScreensForRectangle(
+                        bounds.getMinX(), bounds.getMinY(), bounds.getWidth(), bounds.getHeight())
+                .stream()
+                .findFirst()
+                .orElse(Screen.getPrimary())
+                .getVisualBounds();
+        double below = screen.getMaxY() - bounds.getMaxY();
+        double above = bounds.getMinY() - screen.getMinY();
+        popup.setAnchorY(
+                popup.getHeight() + 3 > below && above > below
+                        ? bounds.getMinY() - popup.getHeight() - 3
+                        : bounds.getMaxY() + 3);
     }
 
     private void createPopup() {
@@ -242,7 +264,7 @@ final class ParameterSuggestions {
         }
     }
 
-    private void dismiss() {
+    void dismiss() {
         dismissed = true;
         hide();
     }

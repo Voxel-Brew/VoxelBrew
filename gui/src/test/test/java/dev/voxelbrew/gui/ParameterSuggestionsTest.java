@@ -9,6 +9,14 @@ import org.junit.jupiter.api.Test;
 
 class ParameterSuggestionsTest {
     @Test
+    void quoteStateUsesTheExactInsertionBoundary() {
+        assertThat(ParameterSuggestions.insideQuotedString("=\"\"", 2)).isTrue();
+        assertThat(ParameterSuggestions.insideQuotedString("=\"abc\"", 1)).isFalse();
+        assertThat(ParameterSuggestions.insideQuotedString("=\"abc\"", 6)).isFalse();
+        assertThat(ParameterSuggestions.insideQuotedString("=\"a\"\"b\"", 4)).isTrue();
+    }
+
+    @Test
     void freezesOnlyReferencingSketchTextAtTheActiveConfigurationValue() {
         var translations = dev.voxelbrew.util.services.Services.load(dev.voxelbrew.api.i18n.TranslationService.class);
         var target = new ParameterSet.Target("sketch-20", "text:text-4:content");

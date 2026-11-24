@@ -86,6 +86,8 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
     private final ComboBox<SketchTools.Tool> polygonMode = new ComboBox<>();
     private final CheckBox construction = new CheckBox(""), auto = new CheckBox(""), showBadges = new CheckBox("");
     private final Label selected = new Label(""), status = new Label(""), error = new Label(), hint = new Label();
+    private final Label profileWarning = new Label();
+
     private final Label pointerHint = new Label();
     private final Button finish, undo, redo;
 
@@ -527,7 +529,11 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         error.setId("sketch-error");
         error.setWrapText(true);
         error.getStyleClass().add("error");
-        setBottom(new VBox(5, status, error));
+        profileWarning.setId("sketch-profile-warning");
+        profileWarning.setWrapText(true);
+        profileWarning.getStyleClass().add("error");
+        profileWarning.managedProperty().bind(profileWarning.visibleProperty());
+        setBottom(new VBox(5, status, profileWarning, error));
         BorderPane.setMargin(getBottom(), new Insets(8, 0, 0, 0));
         controller.onChanged(this::refresh);
         installGestures();
@@ -1770,6 +1776,9 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             finish.setDisable(!controller.canFinish()
                     || controller.definition().entities().isEmpty());
             status.setText(solverStatus());
+            profileWarning.setVisible(
+                    !controller.busy() && !controller.extrusionIssue().isEmpty());
+            profileWarning.setText(translations.translate("action.extrude") + ": " + controller.extrusionIssue());
             if (!controller.busy() && !controller.interactionError().isEmpty()) {
                 error.setText(controller.interactionError());
             } else if (!controller.busy()

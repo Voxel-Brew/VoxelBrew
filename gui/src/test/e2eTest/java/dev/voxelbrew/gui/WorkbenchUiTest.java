@@ -3366,6 +3366,32 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void sketchShowsWhichTextCrossesTheExtrusionBoundary() throws Exception {
+        ready();
+        rectangleDraft(60, 20, 0);
+        sketchType(SketchTools.Tool.TEXT);
+        text("sketch-text-content", "Door");
+        text("sketch-text-angle", "0");
+        text("sketch-text-height", "10");
+        sketchNumericPoint(10, 18);
+        click("sketch-fit");
+        fx(() -> {
+            var warning = (Label) node("#sketch-profile-warning");
+            assertThat(warning.isVisible()).isTrue();
+            assertThat(warning.getText()).contains("Door", "-top");
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "sketch-profile-warning.png"));
+            return null;
+        });
+        click("sketch-undo");
+        sketchReady();
+        assertThat(fx(() -> stage.getScene().lookup("#sketch-profile-warning").isVisible()))
+                .isFalse();
+        click("constraint-cancel");
+    }
+
+    @Test
     void pointerGuidesCirclePlacementAndDimensionSelection() throws Exception {
         ready();
         click("constrained-sketch");

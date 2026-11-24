@@ -1272,6 +1272,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             edit.setOnAction(event -> beginConstruction(construction.tool(), construction));
             form.getChildren().add(edit);
         } else if (feature instanceof Feature.Sketch s) {
+            sketchNameEditor(s);
             if (s.profile() instanceof Feature.Rectangle r) {
                 dimension(feature, "x", r.x());
                 dimension(feature, "y", r.y());
@@ -1471,12 +1472,32 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 .ifPresent(controller::parameters);
     }
 
+    private String sketchReferenceName(String id) {
+        return controller.snapshot().document().featureName(id, id);
+    }
+
+    private void sketchNameEditor(Feature.Sketch sketch) {
+        var name = new TextField(sketchReferenceName(sketch.id()));
+        name.setId("sketch-name");
+        var label = new Label(translations.translate("gui.name"));
+        label.setLabelFor(name);
+        var rename = button(translations.translate("body.rename"), "rename-sketch", () -> {
+            if (!name.getText().strip().equals(sketchReferenceName(sketch.id()))) {
+                controller.renameFeature(sketch.id(), name.getText());
+            }
+        });
+        name.setOnAction(event -> rename.fire());
+        HBox.setHgrow(name, Priority.ALWAYS);
+        form.getChildren().addAll(label, new HBox(6, name, rename));
+    }
+
     private void referenceEditor(Feature feature, Feature.ProfileRef profile, Feature.BodyRef body) {
         var earlier = controller.snapshot().document().features().stream()
                 .takeWhile(f -> !f.id().equals(feature.id()))
                 .toList();
         var sketches = new ComboBox<String>();
         sketches.setId("repair-sketch");
+        UiText.choices(sketches, this::sketchReferenceName);
         earlier.stream()
                 .filter(f -> f instanceof Feature.Sketch)
                 .forEach(f -> sketches.getItems().add(f.id()));
@@ -1849,7 +1870,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         cancelTool();
         extrusionSketch = sketch;
         tool = Tool.EXTRUDE;
-        selectionLabel.setText(translations.translate("gui.extrude_profile"));
+        selectionLabel.setText(
+                translations.translate("gui.extrude_profile") + " · " + sketchReferenceName(sketch.id()));
         form.getChildren().clear();
         fields.clear();
         var whole = new CheckBox(translations.translate("gui.extrude_all_regions"));

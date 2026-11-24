@@ -5030,6 +5030,24 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void renamedSketchIdentifiesNewAndExistingExtrusions() throws Exception {
+        createRenameBodies();
+        click("history-0");
+        text("sketch-name", "Base profile");
+        key(KeyCode.ENTER);
+        ready();
+        assertThat(fx(() -> ((Button) node("#history-0")).getText())).isEqualTo("Base profile");
+        click("extrude");
+        assertThat(fx(() -> ((Label) node(".selection-title")).getText())).contains("Base profile");
+        click("cancel-tool");
+        click("history-1");
+        assertThat(fx(() -> ((javafx.scene.control.ListCell<?>) node("#repair-sketch .list-cell")).getText()))
+                .isEqualTo("Base profile");
+        assertThat(((Feature.Extrude) document().features().get(1)).profile().sketchId())
+                .isEqualTo("named-sketch0");
+    }
+
+    @Test
     void polishBodyRenameTargetsTheClickedBodyAndSupportsDarkPalette() throws Exception {
         createRenameBodies();
         choice("appearance", 2);

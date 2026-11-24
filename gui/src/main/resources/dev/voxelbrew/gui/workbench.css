@@ -548,6 +548,10 @@
   -fx-text-fill: #d65c46;
 }
 
+.menu-item.formula-help-information:disabled {
+  -fx-background-color: transparent;
+  -fx-opacity: 1;
+}
 .formula-help-line {
   -fx-fill: -fx-text-background-color;
 }

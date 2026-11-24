@@ -3,6 +3,7 @@ package dev.voxelbrew.gui;
 import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.parameters.Expressions;
 import javafx.geometry.Side;
+import javafx.scene.Node;
 import javafx.scene.control.*;
 import lombok.RequiredArgsConstructor;
 
@@ -12,6 +13,13 @@ final class FormulaHelp {
     private final FormulaField field;
     private final TranslationService translations;
     private final ContextMenu popup = new ContextMenu();
+
+    private static CustomMenuItem information(Node content) {
+        var item = new CustomMenuItem(content, false);
+        item.setDisable(true);
+        item.getStyleClass().add("formula-help-information");
+        return item;
+    }
 
     void show() {
         if (popup.isShowing()) {
@@ -38,6 +46,7 @@ final class FormulaHelp {
                 && (numeric || (formula && start > input.indexOf('=')))
                 && !ParameterSuggestions.insideQuotedString(input, start)
                 && !ParameterSuggestions.insideQuotedString(input, end);
+        constants.setDisable(!editable);
         for (var symbol : new String[][] {
             {"π", "pi", "π ≈ 3.14159"},
             {"τ", "tau", "τ = 2π"},
@@ -46,7 +55,6 @@ final class FormulaHelp {
         }) {
             var item = new MenuItem(symbol[1] + "     " + symbol[2]);
             item.setId("formula-insert-" + symbol[1]);
-            item.setDisable(!editable);
             item.setOnAction(event -> {
                 field.replaceText(start, end, symbol[0]);
                 field.requestFocus();
@@ -72,9 +80,9 @@ final class FormulaHelp {
                         reference("geometry", "$side * sqrt(2)      $side * sqrt(3)", "(360 deg) / phi^2"));
         popup.getItems()
                 .setAll(
-                        new CustomMenuItem(title, false),
-                        new CustomMenuItem(intro, false),
-                        new CustomMenuItem(conversion, false),
+                        information(title),
+                        information(intro),
+                        information(conversion),
                         new SeparatorMenuItem(),
                         constants,
                         reference);
@@ -100,7 +108,7 @@ final class FormulaHelp {
 
     private Menu reference(String key, String syntax, String example) {
         var section = new Menu(translations.translate("formula." + key));
-        section.getItems().add(new CustomMenuItem(new Label(syntax + "\n" + example), false));
+        section.getItems().add(information(new Label(syntax + "\n" + example)));
         return section;
     }
 }

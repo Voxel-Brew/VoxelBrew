@@ -75,7 +75,7 @@ final class ParameterSuggestions {
         return asciiLetter(c) || c >= '0' && c <= '9' || c == '_' || c == '.';
     }
 
-    private static boolean insideQuotedString(String text, int start) {
+    static boolean insideQuotedString(String text, int start) {
         boolean quoted = false;
         for (int i = 0; i < start - 1; i++) {
             if (text.charAt(i) != '"') continue;
@@ -242,7 +242,7 @@ final class ParameterSuggestions {
         }
     }
 
-    private void dismiss() {
+    void dismiss() {
         dismissed = true;
         hide();
     }

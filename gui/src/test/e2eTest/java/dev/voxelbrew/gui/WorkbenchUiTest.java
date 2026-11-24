@@ -3276,7 +3276,14 @@ class WorkbenchUiTest {
         });
         key(KeyCode.TAB);
         double preview = fx(() -> Double.parseDouble(((TextField) node("#sketch-size-length")).getText()));
-        assertThat(preview).isCloseTo(30, within(.5));
+        // Both the start click and the pointer move are quantized to screen pixels.
+        double pointerTolerance = fx(() -> {
+            var editor = (SketchEditor) node("#sketch-editor");
+            return 2
+                    / editor.modelToScreen(new SketchGeometry.Vec(0, 0))
+                            .distance(editor.modelToScreen(new SketchGeometry.Vec(1, 0)));
+        });
+        assertThat(preview).isCloseTo(30, within(pointerTolerance));
         key(KeyCode.DIGIT2);
         key(KeyCode.DIGIT5);
         key(KeyCode.TAB);
@@ -3289,6 +3296,9 @@ class WorkbenchUiTest {
         key(KeyCode.TAB);
         key(KeyCode.ENTER);
         sketchReady();
+        assertThat(sketchGeometry().constraints())
+                .extracting(SketchGeometry.Constraint::type)
+                .contains(SketchGeometry.Type.LENGTH, SketchGeometry.Type.ANGLE);
         var line = sketchGeometry().entities().getFirst();
         assertThat(line.at(0).distance(line.at(1))).isCloseTo(25, within(1e-6));
         var delta = line.at(1).minus(line.at(0));
@@ -3296,7 +3306,7 @@ class WorkbenchUiTest {
         moveSketchPointer(line.at(1).x(), line.at(1).y() + 20);
         key(KeyCode.TAB);
         double next = fx(() -> Double.parseDouble(((TextField) node("#sketch-size-length")).getText()));
-        assertThat(next).isCloseTo(20, within(.5));
+        assertThat(next).isCloseTo(20, within(pointerTolerance));
         key(KeyCode.ESCAPE);
         click("constraint-cancel");
     }
@@ -3339,6 +3349,10 @@ class WorkbenchUiTest {
         assertThat(bottom.at(1).x() - bottom.at(0).x()).isCloseTo(24, within(1e-6));
         assertThat(lines.get(1).at(1).y() - bottom.at(0).y()).isCloseTo(12, within(1e-6));
         assertThat(bottom.at(0).x()).isLessThan(25);
+        assertThat(sketchGeometry().constraints().stream()
+                        .filter(c -> c.type().dimension())
+                        .map(c -> c.values().getFirst()))
+                .containsExactlyInAnyOrder(7., 24., 12.);
         click("sketch-tool-circle");
         sketchClick(45, 15, false);
         key(KeyCode.TAB);

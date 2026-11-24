@@ -3050,6 +3050,48 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void editsAnEarlierExtrusionProfileAndRebuildsItsDependents() throws Exception {
+        var entities = List.of(
+                Sketches.entity("small", SketchGeometry.Kind.CIRCLE, false, 0, 0, 2),
+                Sketches.entity("large", SketchGeometry.Kind.CIRCLE, false, 15, 0, 4));
+        var geometry = new SketchGeometry(entities, List.of(), List.of("small", "large"));
+        var sketch =
+                new Feature.Sketch("base", "profile", Feature.Plane.origin("XY"), new Feature.Constrained(geometry));
+        var small = dev.voxelbrew.engine.sketch.SketchProfiles.regionAt(geometry, new SketchGeometry.Vec(0, 0))
+                .orElseThrow();
+        var extrude = new Feature.Extrude("first", new Feature.ProfileRef("base", "profile/region/" + small), 8);
+        var mirror = new BodyPattern(
+                        BodyPattern.Kind.MIRROR, new Feature.BodyRef("first", "body"), BodyPattern.Axis.Z, 2, 1, 0, 0)
+                .feature("later");
+        var file = directory.resolve("earlier-extrusion.vxb");
+        DocumentWriter.save(new CadDocument("history", List.of(sketch, extrude, mirror), 3), file, false);
+        open(file);
+        doubleClick("history-1");
+        assertThat(fx(() -> ((CheckBox) node("#extrude-whole")).isSelected())).isFalse();
+        modelClick(0, 0, 0);
+        assertThat(fx(() -> node("#apply-extrusion-profile").isDisabled())).isTrue();
+        modelClick(15, 0, 0);
+        fx(() -> {
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "historical-extrusion-profile.png"));
+            return null;
+        });
+        click("apply-extrusion-profile");
+        ready();
+        assertThat(document().features().getLast()).isEqualTo(mirror);
+        assertThat(document().cursor()).isEqualTo(3);
+        assertThat(fx(() -> workbench.controller().build().bodies().stream()
+                        .map(DocumentController.Body::volume)
+                        .toList()))
+                .hasSize(2)
+                .allSatisfy(v -> assertThat(v).isCloseTo(128 * Math.PI, within(.001)));
+        click("undo");
+        ready();
+        assertThat(document().features()).containsExactly(sketch, extrude, mirror);
+    }
+
+    @Test
     void constructionMenuCreatesEditablePlaneAndCancelsDraftWithoutHistory() throws Exception {
         ready();
         click("construction-menu");

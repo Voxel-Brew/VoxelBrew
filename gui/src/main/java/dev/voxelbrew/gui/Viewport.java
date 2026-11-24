@@ -72,6 +72,7 @@ public final class Viewport extends StackPane {
     private final Map<SketchDisplay, SketchOverlay> constrainedOverlays = new LinkedHashMap<>();
 
     private final Group handle = new Group();
+    private final Group profileHighlights = new Group();
 
     private final Group planeTargets = new Group(), faceHighlight = new Group(), selectedEdges = new Group();
 
@@ -191,18 +192,25 @@ public final class Viewport extends StackPane {
 
     private static void addProfileHighlight(
             Group group, dev.voxelbrew.api.model.sketch.SketchGeometry geometry, double offset) {
-        var fill = new Path();
         try {
-            for (var ring : dev.voxelbrew.engine.sketch.SketchProfiles.profileContours(geometry)) {
-                var first = ring.getFirst();
-                fill.getElements().add(new MoveTo(first.x(), first.y()));
-                for (var point : ring.subList(1, ring.size())) {
-                    fill.getElements().add(new LineTo(point.x(), point.y()));
-                }
-                fill.getElements().add(new ClosePath());
-            }
+            group.getChildren()
+                    .add(profileHighlight(
+                            dev.voxelbrew.engine.sketch.SketchProfiles.profileContours(geometry), offset));
         } catch (IllegalArgumentException incompleteProfile) {
-            return;
+            // An open sketch still displays its curves.
+        }
+    }
+
+    private static Path profileHighlight(
+            List<List<dev.voxelbrew.api.model.sketch.SketchGeometry.Vec>> rings, double offset) {
+        var fill = new Path();
+        for (var ring : rings) {
+            var first = ring.getFirst();
+            fill.getElements().add(new MoveTo(first.x(), first.y()));
+            for (var point : ring.subList(1, ring.size())) {
+                fill.getElements().add(new LineTo(point.x(), point.y()));
+            }
+            fill.getElements().add(new ClosePath());
         }
         fill.setFillRule(FillRule.EVEN_ODD);
         fill.setStroke(null);
@@ -211,7 +219,7 @@ public final class Viewport extends StackPane {
         fill.getStyleClass().add("sketch-profile-highlight");
         fill.getTransforms().add(new Rotate(90, Rotate.X_AXIS));
         fill.setTranslateY(-offset - 0.035);
-        group.getChildren().add(fill);
+        return fill;
     }
 
     private static List<SketchStrokes.Segment> sketchSegments(
@@ -243,6 +251,7 @@ public final class Viewport extends StackPane {
                         bodies,
                         outlines,
                         sketches,
+                        profileHighlights,
                         handle,
                         planeTargets,
                         faceHighlight,
@@ -694,8 +703,32 @@ public final class Viewport extends StackPane {
         };
     }
 
+    void isolateProfile(boolean isolate) {
+        bodies.setVisible(!isolate);
+        outlines.setVisible(!isolate);
+        construction.setVisible(!isolate);
+    }
+
+    Path editingHighlight(Feature.Plane plane, List<List<dev.voxelbrew.api.model.sketch.SketchGeometry.Vec>> rings) {
+        var path = profileHighlight(rings, plane.offsetZ());
+        profileHighlights.getChildren().add(path);
+        return path;
+    }
+
+    void editingWholeHighlight(
+            Feature.Sketch sketch,
+            dev.voxelbrew.api.model.sketch.SketchGeometry geometry,
+            javafx.beans.value.ObservableBooleanValue whole) {
+        profileHighlights.getTransforms().setAll(viewTransform(sketch.plane().frame()));
+        var group = new Group();
+        addProfileHighlight(group, geometry, sketch.plane().offsetZ());
+        group.visibleProperty().bind(whole);
+        profileHighlights.getChildren().add(group);
+    }
+
     public void clearHandle() {
         extrusionPick = null;
+        profileHighlights.getChildren().clear();
         handle.getChildren().clear();
     }
 

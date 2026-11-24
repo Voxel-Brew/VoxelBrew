@@ -31,6 +31,19 @@ class SketchPlaneTest {
     }
 
     @Test
+    void retainsAnUnambiguousProjectedEdgeWhenItsFamilyChangesSize() {
+        var old = Sketches.entity("face-projection-line-0-2-1", SketchGeometry.Kind.LINE, true, 0, 0, 5, 0);
+        var next = Sketches.entity("face-projection-line-0-3-1", SketchGeometry.Kind.LINE, true, 0, 0, 5, 0);
+        var duplicate = Sketches.entity("face-projection-line-0-3-2", SketchGeometry.Kind.LINE, true, 0, 0, 5, 0);
+        var geometry = new SketchGeometry(List.of(old), List.of(), List.of());
+        assertThat(FaceProjection.retainReferenceIds(geometry, List.of(next))).containsExactly(old);
+        var ambiguous = FaceProjection.retainReferenceIds(geometry, List.of(next, duplicate));
+        assertThatThrownBy(() -> FaceProjection.refresh(geometry, ambiguous))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(old.id());
+    }
+
+    @Test
     void everyOriginPlaneSupportsSignedExtrusionThroughCutsAndPersistence() throws Exception {
         for (var plane : List.of(
                 Feature.Plane.origin("XY"),

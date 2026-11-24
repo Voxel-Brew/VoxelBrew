@@ -5289,9 +5289,11 @@ class WorkbenchUiTest {
                 return editor;
             });
             fx(() -> {
-                field.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.F1, false, false, false, false));
+                field.applyCss();
+                field.lookup(".formula-help").setId("test-formula-help");
                 return null;
             });
+            click("test-formula-help");
             var popup = fx(() -> Window.getWindows().stream()
                     .filter(ContextMenu.class::isInstance)
                     .map(ContextMenu.class::cast)
@@ -5304,10 +5306,19 @@ class WorkbenchUiTest {
                         Path.of(System.getProperty("voxelbrew.ui.artifacts"), "formula-help-" + theme + ".png"));
                 return null;
             });
-            key(KeyCode.ESCAPE);
+            fx(() -> {
+                popup.hide();
+                return null;
+            });
             assertThat(fx(field::getSelectedText)).isEqualTo("tau");
             fx(() -> {
-                ((Button) field.lookup(".formula-help")).fire();
+                field.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.F1, false, false, false, false));
+                return null;
+            });
+            fx(() -> {
+                assertThat(popup.isShowing())
+                        .as("F1 reopens the same help as clicking ?")
+                        .isTrue();
                 var item = popup.getItems().stream()
                         .filter(Menu.class::isInstance)
                         .map(Menu.class::cast)

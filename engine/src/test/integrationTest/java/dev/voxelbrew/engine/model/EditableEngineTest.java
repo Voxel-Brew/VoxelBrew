@@ -388,6 +388,32 @@ class EditableEngineTest {
     }
 
     @Test
+    void insertsBodyOperationBeforeExistingCutAndRestoresItsInputOnUndo() throws Exception {
+        var session = reference();
+        var original = session.document().features();
+        session.setCursor(3);
+        var joined = new BodyExtrusion(
+                        new Feature.Extrude("extend", new Feature.ProfileRef("plate", "plate.profile"), 8),
+                        BodyExtrusion.Operation.JOIN,
+                        new Feature.BodyRef("thickness", "body"))
+                .feature();
+        session.add(joined);
+        assertThat(session.document().cursor()).isEqualTo(4);
+        assertThat(((Feature.ThroughCut) session.document().features().getLast()).body())
+                .isEqualTo(new Feature.BodyRef("extend", "body"));
+        assertThat(session.undo()).isTrue();
+        assertThat(session.document().features()).isEqualTo(original);
+        assertThat(session.document().cursor()).isEqualTo(3);
+        assertThat(session.redo()).isTrue();
+        assertThat(session.document().cursor()).isEqualTo(4);
+        var file = directory.resolve("inserted.vxb");
+        DocumentWriter.save(session.document(), file, false);
+        var reopened = new ModelSession(DocumentReader.load(file));
+        reopened.setCursor(5);
+        assertReference(reopened, 8, 4);
+    }
+
+    @Test
     void undoRedoFeatureCreationKeepsCursorAtEnd() {
         var session = reference();
         assertThat(session.undo()).isTrue();

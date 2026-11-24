@@ -3050,6 +3050,34 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void insertsExtrusionAtTheTimelineMarkerAndReplaysLaterSteps() throws Exception {
+        var plane = Feature.Plane.origin("XY");
+        var base = new Feature.Sketch("base", "profile", plane, new Feature.Rectangle(0, 0, 20, 10));
+        var later = new Feature.Sketch("later", "circle", plane, new Feature.Circle(30, 30, 6));
+        var file = directory.resolve("insert-extrusion.vxb");
+        DocumentWriter.save(new CadDocument("insert", List.of(base, later), 2), file, false);
+        open(file);
+        click("timeline-previous");
+        ready();
+        click("history-0");
+        click("extrude");
+        ready();
+        click("commit-extrusion");
+        ready();
+        var operations = document().features();
+        assertThat(operations).hasSize(3);
+        assertThat(operations.get(1)).isInstanceOf(Feature.Extrude.class);
+        assertThat(operations.getLast()).isEqualTo(later);
+        assertThat(document().cursor()).isEqualTo(2);
+        assertThat(fx(() -> node("#history-1").getStyleClass().contains("history-selected")))
+                .isTrue();
+        click("timeline-last");
+        ready();
+        assertThat(document().cursor()).isEqualTo(3);
+        assertThat(volume()).isCloseTo(1000, within(.001));
+    }
+
+    @Test
     void editsAnEarlierExtrusionProfileAndRebuildsItsDependents() throws Exception {
         var entities = List.of(
                 Sketches.entity("small", SketchGeometry.Kind.CIRCLE, false, 0, 0, 2),
@@ -4301,7 +4329,7 @@ class WorkbenchUiTest {
         click("timeline-first");
         ready();
         assertThat(document().cursor()).isEqualTo(0);
-        assertThat(fx(() -> node("#constrained-sketch").isDisabled())).isTrue();
+        assertThat(fx(() -> node("#constrained-sketch").isDisabled())).isFalse();
         assertThat(fx(() -> node("#history-0").getStyleClass().contains("history-future")))
                 .isTrue();
         click("timeline-next");

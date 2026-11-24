@@ -444,16 +444,19 @@ public final class DocumentController implements AutoCloseable {
                 && (!BodyExtrusion.modifiesBody(preview) || !rebuilding && displayedPreview && build.valid());
     }
 
-    public boolean canExport() {
-        var d = session.document();
+    boolean hasEditableBodies() {
         return !closed
                 && !rebuilding
                 && !ioBusy
                 && !hasPreview()
                 && !displayedPreview
                 && build.valid()
-                && !build.bodies().isEmpty()
-                && d.cursor() == d.features().size();
+                && !build.bodies().isEmpty();
+    }
+
+    public boolean canExport() {
+        var d = session.document();
+        return hasEditableBodies() && d.cursor() == d.features().size();
     }
 
     public void newDocument() {

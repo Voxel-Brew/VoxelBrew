@@ -5030,6 +5030,42 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void facePlaneLabelFollowsBodyRenameInSketchAndExtrusion() throws Exception {
+        openPrepared("plate-5mm.vxb");
+        var body = fx(() -> workbench.controller().build().bodies().getFirst());
+        var face = body.planarFaces().stream()
+                .filter(f -> f.nz() > .99)
+                .findFirst()
+                .orElseThrow();
+        var plane = dev.voxelbrew.api.model.FaceSupport.attach(body.output(), body.planarFaces(), face.faceIndex());
+        fx(() -> {
+            workbench.controller().add(new Feature.Sketch("boss", "profile", plane, new Feature.Circle(0, 0, 4)));
+            return null;
+        });
+        ready();
+        click("history-2");
+        fx(() -> {
+            workbench.controller().renameBody(body.id(), "Housing");
+            return null;
+        });
+        ready();
+        assertThat(fx(() -> ((Label) node("#sketch-plane-name")).getText())).isEqualTo("Plane: Housing");
+        click("extrude");
+        ready();
+        assertThat(fx(() -> ((Label) node("#sketch-plane-name")).getText())).isEqualTo("Plane: Housing");
+        click("commit-extrusion");
+        ready();
+        fx(() -> {
+            workbench.controller().renameBody(body.id(), "Main casing");
+            return null;
+        });
+        ready();
+        click("history-3");
+        assertThat(fx(() -> ((Label) node("#sketch-plane-name")).getText())).isEqualTo("Plane: Main casing");
+        assertThat(((Feature.Sketch) document().features().get(2)).plane()).isEqualTo(plane);
+    }
+
+    @Test
     void renamedSketchIdentifiesNewAndExistingExtrusions() throws Exception {
         createRenameBodies();
         click("history-0");

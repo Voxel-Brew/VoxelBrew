@@ -395,6 +395,7 @@ public final class Evaluator {
                     document, diagnostics, new ArrayList<>(geometry.active.values()), geometry.owned, resolved);
             result.construction(geometry.construction);
             result.projections(geometry.projections);
+            result.indexBodyOutputs(geometry.outputs);
             return result;
         } catch (Throwable failure) {
             geometry.owned.forEach(Solid::close);

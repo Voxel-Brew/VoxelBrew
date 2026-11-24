@@ -79,6 +79,12 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
     }
 
     static Node featureIcon(Feature feature) {
+        if (dev.voxelbrew.engine.model.BodyPattern.matches(feature)) {
+            return OperationIcons.icon(dev.voxelbrew.engine.model.BodyPattern.from(feature)
+                    .kind()
+                    .name()
+                    .toLowerCase(java.util.Locale.ROOT));
+        }
         if (feature instanceof dev.voxelbrew.api.model.ConstructionFeature construction) {
             return ConstructionIcons.icon(construction.tool());
         }

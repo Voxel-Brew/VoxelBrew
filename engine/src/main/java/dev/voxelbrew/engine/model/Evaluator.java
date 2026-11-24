@@ -40,6 +40,8 @@ public final class Evaluator {
                 case Feature.Sketch s -> rebuildSketch(s, index, resolved);
                 case Feature.Custom custom
                 when BodyExtrusion.modifiesBody(custom) -> rebuildExtrude(BodyExtrusion.from(custom));
+                case Feature.Custom custom
+                when BodyPattern.matches(custom) -> rebuildPattern(custom.id(), BodyPattern.from(custom));
                 case Feature.Custom custom -> rebuildCustom(custom, customEvaluator);
                 case Feature.Extrude e -> rebuildExtrude(BodyExtrusion.from(e));
                 case Feature.EdgeFinish finish -> rebuildEdgeFinish(finish);
@@ -195,6 +197,27 @@ public final class Evaluator {
             }
         }
 
+        private void rebuildPattern(String id, BodyPattern pattern) {
+            var source = outputs.get(pattern.source());
+            if (source == null || active.get(source.id()) != source) {
+                throw new ModelException(id, "Pattern source is missing or superseded");
+            }
+            var copies = new ArrayList<Evaluation.Body>();
+            for (int j = 0; j < pattern.secondCount(); j++) {
+                for (int i = 0; i < pattern.firstCount(); i++) {
+                    if (i == 0 && j == 0) continue;
+                    var solid = pattern.copy(source.solid(), i, j);
+                    owned.add(solid);
+                    var name = "copy-" + i + "-" + j;
+                    copies.add(new Evaluation.Body(id + "." + name, new Feature.BodyRef(id, name), solid));
+                }
+            }
+            for (var body : copies) {
+                outputs.put(body.output(), body);
+                active.put(body.id(), body);
+            }
+        }
+
         private void rebuildEdgeFinish(Feature.EdgeFinish finish) {
             Evaluation.Body input = outputs.get(finish.body());
             if (input == null) {
@@ -305,7 +328,8 @@ public final class Evaluator {
     /** The registry lives only on the evaluating thread; results contain engine-owned solids. */
     public static Evaluation evaluate(CadDocument document, Path pluginDirectory) {
         if (document.features().stream()
-                .noneMatch(f -> f instanceof Feature.Custom && !BodyExtrusion.modifiesBody(f))) {
+                .noneMatch(f ->
+                        f instanceof Feature.Custom && !BodyExtrusion.modifiesBody(f) && !BodyPattern.matches(f))) {
             return replay(document, custom -> {
                 throw new AssertionError("No custom features");
             });
@@ -442,6 +466,9 @@ public final class Evaluator {
         }
         if (feature instanceof Feature.ThroughCut c) {
             return List.of(c.profile().sketchId(), c.body().featureId());
+        }
+        if (BodyPattern.matches(feature)) {
+            return List.of(BodyPattern.from(feature).source().featureId());
         }
         if (feature instanceof Feature.SplitBody split) {
             return List.of(split.body().featureId());

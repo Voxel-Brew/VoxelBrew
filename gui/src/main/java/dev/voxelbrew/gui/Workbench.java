@@ -1136,6 +1136,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     }
 
     private String defaultFeatureName(Feature feature) {
+        if (BodyPattern.matches(feature)) {
+            return patternName(BodyPattern.from(feature).kind());
+        }
         if (BodyExtrusion.modifiesBody(feature)) {
             return translations.translate("gui.extrude") + " · "
                     + translations.translate(
@@ -1359,35 +1362,44 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         } else if (feature instanceof Feature.SplitBody s) {
             dimension(feature, "offset", s.plane().offset());
             referenceEditor(feature, null, s.body());
-        } else if (feature instanceof Feature.Custom custom) {
-            var metadata =
-                    new Label(custom.providerId() + "/" + custom.type() + " · payload v" + custom.payloadVersion());
-            metadata.setWrapText(true);
-            form.getChildren().add(metadata);
-            try (var features = featureProviders.open(pluginDirectory)) {
-                var values = features.parameters(custom);
-                for (var parameter : features.descriptor(custom).parameters()) {
-                    editableDimension(
-                            parameter.key(),
-                            parameter.label(),
-                            values.get(parameter.key()),
-                            FormulaField.unit(parameter.unit()),
-                            input -> controller.edit(custom.id(), parameter.key(), input.declaredValue()));
-                }
-            } catch (IOException | RuntimeException failure) {
-                var message = new Label(failure.getMessage());
-                message.setWrapText(true);
-                message.getStyleClass().add("error");
-                form.getChildren().add(message);
-            }
+        } else if (BodyPattern.matches(feature)) {
+            var pattern = BodyPattern.from(feature);
             form.getChildren()
-                    .add(button(translations.translate("gui.reload_plugin_and_rebuild"), "custom-rebuild", () -> {
-                        inspect();
-                        controller.rebuild();
-                    }));
+                    .add(button(
+                            translations.translate("parameter.edit"),
+                            "edit-body-pattern",
+                            () -> editBodyPattern(pattern.kind(), feature)));
+        } else if (feature instanceof Feature.Custom custom) {
+            inspectPlugin(custom);
         }
         form.getChildren().add(featureDiagnostics);
         updateFeatureDiagnostics();
+    }
+
+    private void inspectPlugin(Feature.Custom custom) {
+        var metadata = new Label(custom.providerId() + "/" + custom.type() + " · payload v" + custom.payloadVersion());
+        metadata.setWrapText(true);
+        form.getChildren().add(metadata);
+        try (var features = featureProviders.open(pluginDirectory)) {
+            var values = features.parameters(custom);
+            for (var parameter : features.descriptor(custom).parameters()) {
+                editableDimension(
+                        parameter.key(),
+                        parameter.label(),
+                        values.get(parameter.key()),
+                        FormulaField.unit(parameter.unit()),
+                        input -> controller.edit(custom.id(), parameter.key(), input.declaredValue()));
+            }
+        } catch (IOException | RuntimeException failure) {
+            var message = new Label(failure.getMessage());
+            message.setWrapText(true);
+            message.getStyleClass().add("error");
+            form.getChildren().add(message);
+        }
+        form.getChildren().add(button(translations.translate("gui.reload_plugin_and_rebuild"), "custom-rebuild", () -> {
+            inspect();
+            controller.rebuild();
+        }));
     }
 
     private void bodyStyleEditor(String bodyId) {
@@ -2238,6 +2250,54 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 translations.translate("gui.selected_geometry", modificationEdges.size(), modificationFaces.size()));
     }
 
+    private String patternName(BodyPattern.Kind kind) {
+        return translations.translate("sketch.copy." + kind.name().toLowerCase(Locale.ROOT));
+    }
+
+    private void editBodyPattern(BodyPattern.Kind kind, Feature existing) {
+        var sources = new LinkedHashMap<Feature.BodyRef, String>();
+        BodyPattern initial;
+        if (existing == null) {
+            cancelTool();
+            var bodies = controller.build().bodies();
+            if (bodies.isEmpty()) return;
+            for (var body : bodies) sources.put(body.output(), bodyLabel(body.id()));
+            var source = bodies.stream()
+                    .filter(b -> b.id().equals(selectedBody))
+                    .findFirst()
+                    .orElse(bodies.getFirst())
+                    .output();
+            initial = new BodyPattern(
+                    kind,
+                    source,
+                    BodyPattern.Axis.Z,
+                    kind == BodyPattern.Kind.CIRCULAR ? 4 : 2,
+                    1,
+                    switch (kind) {
+                        case RECTANGULAR -> 20;
+                        case CIRCULAR -> 360;
+                        case MIRROR -> 0;
+                    },
+                    kind == BodyPattern.Kind.RECTANGULAR ? 20 : 0);
+        } else {
+            initial = BodyPattern.from(existing);
+            var ref = initial.source();
+            var bodyId = controller.build().bodyIds().get(ref);
+            sources.put(ref, bodyId == null ? ref.featureId() + "." + ref.outputName() : bodyLabel(bodyId));
+        }
+        BodyPatternDialog.show(stage, patternName(kind), translations, initial, sources, pattern -> {
+            if (existing == null) {
+                var id = "pattern-"
+                        + controller.snapshot().document().uuidGenerator().next();
+                controller.add(pattern.feature(id));
+                selectedFeature = id;
+                selectedBody = null;
+            } else {
+                controller.replaceFeature(pattern.feature(existing.id()));
+            }
+        });
+    }
+
     private void beginSplit() {
         cancelTool();
         var dialog = new Dialog<Void>();
@@ -2944,6 +3004,13 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             var item = menuItem(command.getText(), command.getId(), true, command::fire);
             item.setGraphic(OperationIcons.icon(command.getId()));
             item.disableProperty().bind(disabledProperty().or(command.disabledProperty()));
+            solidCommands.getItems().add(item);
+        }
+        for (var kind : BodyPattern.Kind.values()) {
+            var key = kind.name().toLowerCase(Locale.ROOT);
+            var item = menuItem(patternName(kind), "body-" + key, false, () -> editBodyPattern(kind, null));
+            item.setGraphic(OperationIcons.icon(key));
+            item.disableProperty().bind(disabledProperty().or(splitBody.disabledProperty()));
             solidCommands.getItems().add(item);
         }
     }

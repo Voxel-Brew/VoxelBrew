@@ -705,9 +705,9 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                 super.updateItem(value, empty);
                 if (empty || value == null) setText(null);
                 else {
-                    setText(symbol(value.type()) + " "
-                            + translations.translate(
-                                    "constraint." + value.type().name())
+                    var screenType = SketchViewBasis.DEFAULT.mapAxisConstraint(value.type());
+                    setText(symbol(screenType) + " "
+                            + translations.translate("constraint." + screenType.name())
                             + (value.type().dimension()
                                     ? " = " + number(value.values().getFirst())
                                     : "") + " · " + value.id());
@@ -1281,11 +1281,11 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         tool = Draw.SELECT;
         drawing.clear();
         snaps.clear();
-        activeConstraint = type;
+        activeConstraint = SketchViewBasis.DEFAULT.mapAxisConstraint(type);
         hint.setText(translations.translate("constraint." + type.name())
                 + " · "
                 + translations.translate("constraint.hint." + type.name()));
-        if (enough(type)) apply(type);
+        if (enough(activeConstraint)) apply(activeConstraint);
         draw();
     }
 
@@ -2841,7 +2841,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                     graphics.fillRoundRect(x - 9, y - 8, 18, 16, 4, 4);
                     graphics.setFill(Color.web(
                             c.equals(constraints.getSelectionModel().getSelectedItem()) ? "#e6a239" : "#d15d55"));
-                    graphics.fillText(symbol(c.type()), x - 6, y + 4, 14);
+                    graphics.fillText(symbol(SketchViewBasis.DEFAULT.mapAxisConstraint(c.type())), x - 6, y + 4, 14);
                 } catch (IllegalArgumentException broken) {
                     /* Broken references remain removable in the constraint list. */
                 }

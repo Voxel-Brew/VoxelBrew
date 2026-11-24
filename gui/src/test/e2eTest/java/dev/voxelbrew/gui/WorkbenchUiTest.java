@@ -3378,6 +3378,44 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void axisConstraintButtonsAlignTheLineWithTheirScreenIcons() throws Exception {
+        ready();
+        click("constrained-sketch");
+        click("choose-plane-xy");
+        sketchReady();
+        click("sketch-tool-line");
+        sketchClick(10, 10, false);
+        sketchClick(35, 30, false);
+        key(KeyCode.ESCAPE);
+        sketchReady();
+        String id = sketchGeometry().entities().getFirst().id();
+        for (boolean horizontal : List.of(true, false)) {
+            String button = horizontal ? "constraint-horizontal" : "constraint-vertical";
+            sketchReference(id);
+            click(button);
+            sketchReady();
+            fx(() -> {
+                var editor = (SketchEditor) node("#sketch-editor");
+                var line = editor.controller().definition().entity(id);
+                var delta = editor.modelToScreen(line.at(1)).subtract(editor.modelToScreen(line.at(0)));
+                assertThat(horizontal ? delta.getY() : delta.getX()).isCloseTo(0, within(1e-4));
+                assertThat(Math.abs(horizontal ? delta.getX() : delta.getY())).isGreaterThan(1);
+                String icon = ((Button) node("#" + button)).getText();
+                assertThat(icon).isEqualTo(horizontal ? "—" : "│");
+                var list = (ListView<?>) node("#sketch-constraints");
+                assertThat(list.lookupAll(".list-cell").stream()
+                                .map(cell -> ((ListCell<?>) cell).getText())
+                                .filter(java.util.Objects::nonNull))
+                        .anyMatch(label -> label.startsWith(icon + (horizontal ? " Horizontal" : " Vertical")));
+                return null;
+            });
+            click("sketch-undo");
+            sketchReady();
+        }
+        click("constraint-cancel");
+    }
+
+    @Test
     void sketchShowsWhichTextCrossesTheExtrusionBoundary() throws Exception {
         ready();
         rectangleDraft(60, 20, 0);

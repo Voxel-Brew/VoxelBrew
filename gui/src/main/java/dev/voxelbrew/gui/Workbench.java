@@ -341,7 +341,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             super.updateItem(entry, empty);
             if (!isEditing()) {
                 setText(empty || entry == null ? null : entry.label());
-                setGraphic(null);
+                setGraphic(
+                        empty || entry == null || getTreeItem() == null
+                                ? null
+                                : getTreeItem().getGraphic());
             }
             if (empty || entry == null || entry.id() == null) setContextMenu(null);
             else setContextMenu(entry.body() ? menu : featureMenu);
@@ -456,7 +459,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             editingEntry = null;
             editingSnapshot = null;
             setText(getItem() == null ? null : getItem().label());
-            setGraphic(null);
+            setGraphic(getTreeItem() == null ? null : getTreeItem().getGraphic());
         }
     }
 
@@ -1166,7 +1169,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     private void rebuildTree(CadDocument document) {
         tree.edit(null);
         var root = new TreeItem<>(new Entry(null, translations.translate("gui.document"), false));
-        var features = new TreeItem<>(new Entry(null, translations.translate("gui.features"), false));
+        var features = new TreeItem<>(
+                new Entry(null, translations.translate("gui.features"), false), OperationIcons.icon("features"));
         features.setExpanded(true);
         for (int i = 0; i < document.features().size(); i++) {
             var feature = document.features().get(i);
@@ -1176,17 +1180,21 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     .findFirst()
                     .orElse("");
             var item = new TreeItem<>(new Entry(feature.id(), (i + 1) + "  " + shortName(feature) + diagnostic, false));
+            item.setGraphic(FeatureTimeline.featureIcon(feature));
             features.getChildren().add(item);
         }
-        var bodies = new TreeItem<>(new Entry(null, translations.translate("gui.bodies"), true));
+        var bodies = new TreeItem<>(
+                new Entry(null, translations.translate("gui.bodies"), true), OperationIcons.icon("bodies"));
         bodies.setExpanded(true);
         int index = 1;
         for (var body : controller.build().bodies()) {
             bodies.getChildren()
-                    .add(new TreeItem<>(new Entry(
-                            body.id(),
-                            document.bodyName(body.id(), translations.translate("feature.body", index++)),
-                            true)));
+                    .add(new TreeItem<>(
+                            new Entry(
+                                    body.id(),
+                                    document.bodyName(body.id(), translations.translate("feature.body", index++)),
+                                    true),
+                            OperationIcons.icon("new-body")));
         }
         root.getChildren().add(features);
         root.getChildren().add(bodies);
@@ -1893,12 +1901,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     return;
                 }
                 setText(choice.getConverter().toString(operation));
-                setGraphic(OperationIcons.icon(
-                        switch (operation) {
-                            case NEW_BODY -> "new-body";
-                            case JOIN -> "join";
-                            case CUT -> "cut";
-                        }));
+                setGraphic(OperationIcons.extrusion(operation));
             }
         };
     }

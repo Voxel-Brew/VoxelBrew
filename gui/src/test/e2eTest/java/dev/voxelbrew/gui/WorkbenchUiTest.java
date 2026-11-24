@@ -5013,6 +5013,23 @@ class WorkbenchUiTest {
         key(KeyCode.ESCAPE);
         assertThat(fx(() -> workbench.controller().snapshot().revision())).isEqualTo(renamed);
         assertThat(document().bodyNames().get("named0.body")).isEqualTo("Mounting plate");
+        fx(() -> {
+            var tree = (TreeView<?>) node("#model-tree");
+            var rows = tree.lookupAll(".tree-cell").stream()
+                    .map(node -> (TreeCell<?>) node)
+                    .filter(cell -> !cell.isEmpty())
+                    .toList();
+            assertThat(rows).hasSize(tree.getExpandedItemCount());
+            for (var row : rows) {
+                assertThat(row.getGraphic())
+                        .as(row.getText())
+                        .isNotNull()
+                        .isSameAs(row.getTreeItem().getGraphic());
+            }
+            Screenshot.save(
+                    tree.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "model-tree-icons.png"));
+            return null;
+        });
         bodyTreeClick("Mounting plate", MouseButton.PRIMARY, 2);
         text("body-rename-field", "Uncommitted");
         click("body-material-name");

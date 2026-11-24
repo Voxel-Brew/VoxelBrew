@@ -5,6 +5,15 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.SVGPath;
 
 final class OperationIcons {
+    static Group extrusion(dev.voxelbrew.engine.model.BodyExtrusion.Operation operation) {
+        return icon(
+                switch (operation) {
+                    case NEW_BODY -> "new-body";
+                    case JOIN -> "join";
+                    case CUT -> "cut";
+                });
+    }
+
     static Group icon(String command) {
         return icon(command, Color.web("#658dcc"));
     }
@@ -13,6 +22,9 @@ final class OperationIcons {
         var shape = new SVGPath();
         shape.setContent(
                 switch (command) {
+                    case "features" -> "M2 3H5V6H2Z M8 5H19 M2 9H5V12H2Z M8 11H19 M2 15H5V18H2Z M8 17H19";
+                    case "bodies" ->
+                        "M1 8V4L7 1L13 4V6 M1 4L7 7L13 4 M7 7V10 M5 11L12 8L19 11V17L12 20L5 17Z M5 11L12 14L19 11 M12 14V20";
                     case "constrained-sketch" -> "M2 2H13V6 M2 2V18H13V14 M7 13L9 9L16 2L19 5L12 12Z";
                     case "extrude" ->
                         "M2 11L10 7L18 11V16L10 20L2 16Z M2 11L10 15L18 11 M10 15V20 M10 10V1 M6 5L10 1L14 5";

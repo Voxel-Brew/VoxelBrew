@@ -78,7 +78,7 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
         return path;
     }
 
-    private static Node featureIcon(Feature feature) {
+    static Node featureIcon(Feature feature) {
         if (feature instanceof dev.voxelbrew.api.model.ConstructionFeature construction) {
             return ConstructionIcons.icon(construction.tool());
         }
@@ -87,11 +87,18 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
                     path("M2 4H15V17H2Z", "timeline-sketch-icon"),
                     path("M7 18L8 14L17 5L20 8L11 17Z", "timeline-pencil-icon"));
         }
+        if (BodyExtrusion.modifiesBody(feature)) {
+            return OperationIcons.extrusion(BodyExtrusion.from(feature).operation());
+        }
+        if (feature instanceof Feature.EdgeFinish finish) {
+            return OperationIcons.icon(finish.kind() == Feature.EdgeFinish.Kind.FILLET ? "fillet" : "chamfer");
+        }
+        if (feature instanceof Feature.Shell) return OperationIcons.icon("shell");
         var cube = new Group(
                 path("M2 6L10 2L18 6L10 10Z", "timeline-cube-top"),
                 path("M2 6L10 10V20L2 16Z", "timeline-cube-left"),
                 path("M10 10L18 6V16L10 20Z", "timeline-cube-right"));
-        if (feature instanceof Feature.Extrude || BodyExtrusion.modifiesBody(feature)) {
+        if (feature instanceof Feature.Extrude) {
             cube.getChildren().add(path("M17 5L20 1L23 5H21V14H19V5Z", "timeline-extrude-icon"));
         } else if (feature instanceof Feature.ThroughCut) {
             cube.getChildren().add(path("M8 5L10 4L13 5L13 8L11 9L8 8Z M10 9V16", "timeline-cut-icon"));

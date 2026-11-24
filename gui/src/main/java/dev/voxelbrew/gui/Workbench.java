@@ -1805,8 +1805,31 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         choice.setId("extrude-operation");
         choice.getItems().setAll(BodyExtrusion.Operation.values());
         UiText.enums(choice, translations, "extrude.");
+        choice.setCellFactory(list -> extrusionOperationCell(choice));
+        choice.setButtonCell(extrusionOperationCell(choice));
         choice.setValue(initial);
         return choice;
+    }
+
+    private ListCell<BodyExtrusion.Operation> extrusionOperationCell(ComboBox<BodyExtrusion.Operation> choice) {
+        return new ListCell<>() {
+            @Override
+            protected void updateItem(BodyExtrusion.Operation operation, boolean empty) {
+                super.updateItem(operation, empty);
+                if (empty || operation == null) {
+                    setText(null);
+                    setGraphic(null);
+                    return;
+                }
+                setText(choice.getConverter().toString(operation));
+                setGraphic(OperationIcons.icon(
+                        switch (operation) {
+                            case NEW_BODY -> "new-body";
+                            case JOIN -> "join";
+                            case CUT -> "cut";
+                        }));
+            }
+        };
     }
 
     private ComboBox<DocumentController.Body> extrusionTarget(Feature.Sketch sketch) {

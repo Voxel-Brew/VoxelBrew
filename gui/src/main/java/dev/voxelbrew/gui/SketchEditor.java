@@ -86,6 +86,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
     private final ComboBox<SketchTools.Tool> polygonMode = new ComboBox<>();
     private final CheckBox construction = new CheckBox(""), auto = new CheckBox(""), showBadges = new CheckBox("");
     private final Label selected = new Label(""), status = new Label(""), error = new Label(), hint = new Label();
+    private final Label valueCaption = new Label();
     private final Label profileWarning = new Label();
 
     private final Label pointerHint = new Label();
@@ -678,11 +679,13 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         var add = button(translations.translate("gui.add_to_selection"), "sketch-select-ref", () -> {
             if (dimensionTool && (dimensionEntry != null || selection.size() >= 2)) return;
             if (references.getValue() != null) {
+                constraints.getSelectionModel().clearSelection();
                 selection.add(references.getValue());
                 selectionChanged();
             }
         });
         var clear = button(translations.translate("gui.clear"), "sketch-clear-selection", () -> {
+            constraints.getSelectionModel().clearSelection();
             selection.clear();
             activeConstraint = null;
             selectionChanged();
@@ -692,11 +695,15 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                 .getItems()
                 .setAll(Arrays.stream(Type.values()).filter(Type::dimension).toList());
         dimension.setValue(Type.LENGTH);
-        dimension.valueProperty().addListener(o -> dimensionValue.refreshFormula());
+        dimension.valueProperty().addListener(o -> {
+            dimensionValue.refreshFormula();
+            refreshDimensionValue();
+        });
         dimension.setMaxWidth(Double.MAX_VALUE);
         dimensionValue.setId("sketch-dimension-value");
         dimensionValue.setOnAction(e -> dimension());
         var apply = button(translations.translate("gui.apply_dimension"), "sketch-apply-dimension", this::dimension);
+        valueCaption.setText(translations.translate("gui.driving_value_mm_degrees_ratio"));
         constraints.setId("sketch-constraints");
         constraints.setPrefHeight(140);
         constraints.setCellFactory(view -> new ListCell<>() {
@@ -706,11 +713,14 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                 if (empty || value == null) setText(null);
                 else {
                     var screenType = SketchViewBasis.DEFAULT.mapAxisConstraint(value.type());
-                    setText(symbol(screenType) + " "
-                            + translations.translate("constraint." + screenType.name())
-                            + (value.type().dimension()
-                                    ? " = " + number(value.values().getFirst())
-                                    : "") + " · " + value.id());
+                    String label = symbol(screenType) + " " + translations.translate("constraint." + screenType.name());
+                    if (SketchConstraints.referenceDimension(value)) {
+                        label += " = " + dimensionLabel(value, controller.definition()) + "  "
+                                + translations.translate("sketch.referenceDimension");
+                    } else if (value.type().dimension()) {
+                        label += " = " + number(value.values().getFirst());
+                    }
+                    setText(label + " · " + value.id());
                 }
                 if (!empty && value != null) {
                     setTooltip(UiHelp.tooltip(value.refs().toString()));
@@ -718,6 +728,10 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             }
         });
         constraints.getSelectionModel().selectedItemProperty().addListener((o, a, b) -> {
+            boolean reference = b != null && SketchConstraints.referenceDimension(b);
+            apply.setDisable(reference);
+            dimension.setDisable(reference);
+            if (!refreshing) refreshDimensionValue();
             dimensionValue.refreshFormula();
             if (refreshing || b == null) return;
             activeConstraint = null;
@@ -727,7 +741,8 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                 dimension.setValue(b.type());
                 String expression =
                         controller.parameters().binding(new ParameterSet.Target(featureId, "constraint:" + b.id()));
-                dimensionValue.setText(expression.isEmpty() ? number(b.values().getFirst()) : expression);
+                dimensionValue.setText(
+                        expression.isEmpty() ? number(dimensionValue(b, controller.definition())) : expression);
             }
             selectionChanged();
         });
@@ -746,7 +761,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                     if (activeConstraint != null) apply(activeConstraint);
                 }),
                 new Separator(),
-                new Label(translations.translate("gui.driving_value_mm_degrees_ratio")),
+                valueCaption,
                 dimension,
                 dimensionValue,
                 apply,
@@ -852,6 +867,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                                 + (centerPolygonTool() ? SketchTools.Tool.POLYGON_INSCRIBED : advanced).name());
                 });
         showToolOptions();
+        refreshDimensionValue();
         if (polygonTool()) canvas.requestFocus();
         draw();
     }
@@ -1165,7 +1181,9 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
 
     private Optional<Constraint> textConstraint(Entity text, Type type) {
         return controller.definition().constraints().stream()
-                .filter(c -> c.type() == type && c.refs().equals(List.of(text.ref())))
+                .filter(c -> !SketchConstraints.referenceDimension(c)
+                        && c.type() == type
+                        && c.refs().equals(List.of(text.ref())))
                 .findFirst();
     }
 
@@ -1313,6 +1331,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
     }
 
     private void selectionChanged() {
+        refreshDimensionValue();
         if (dimensionTool) {
             List<Ref> refs;
             try {
@@ -1402,10 +1421,10 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
     private void placeDimension(Vec position) {
         if (dimensionEntry != null || controller.busy()) return;
         try {
-            requireDrivingSelection();
             var candidate = SketchDimensions.measure(
                     withReferences(controller.displayed(), selection), List.copyOf(selection), position);
             dimension.setValue(candidate.type());
+            if (addReferenceDimension(candidate.type(), position)) return;
             dimensionValue.setText(number(candidate.value()));
             editDimensionValue(position);
         } catch (RuntimeException failure) {
@@ -1415,6 +1434,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
 
     private void editDimensionValue() {
         var chosen = constraints.getSelectionModel().getSelectedItem();
+        if (chosen != null && SketchConstraints.referenceDimension(chosen)) return;
         editDimensionValue(
                 chosen == null
                         ? cursor
@@ -1485,36 +1505,14 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         try {
             var g = withReferences(controller.definition(), selection);
             var chosen = constraints.getSelectionModel().getSelectedItem();
-            var type = chosen != null && chosen.type().dimension() ? chosen.type() : dimension.getValue();
-            String expression = dimensionValue.getText().strip();
-            double value = controller.parameters().value(expression, FeatureDimensions.unit(type));
-            String id = chosen != null && chosen.type().dimension() ? chosen.id() : id("dimension");
-            SketchGeometry next;
-            if (chosen != null && chosen.type().dimension()) {
-                next = g.withConstraints(g.constraints().stream()
-                        .map(c -> c.id().equals(id) ? SketchConstraints.drivingValue(c, value) : c)
-                        .toList());
-            } else {
-                requireDrivingSelection();
-                next = g.add(SketchConstraints.create(
-                        g, id, type, SketchDimensions.drivingReferences(g, List.copyOf(selection), type), value));
+            if (controller.busy()) return false;
+            if (chosen != null && !chosen.type().dimension()) chosen = null;
+            var type = chosen == null ? dimension.getValue() : chosen.type();
+            if (chosen != null && SketchConstraints.referenceDimension(chosen)) return false;
+            if (chosen == null && addReferenceDimension(type, dimensionEntry == null ? null : dimensionEntryPosition)) {
+                return true;
             }
-            if (dimensionEntry != null) {
-                next = next.withConstraints(next.constraints().stream()
-                        .map(c -> c.id().equals(id) ? SketchConstraints.positionLabel(c, dimensionEntryPosition) : c)
-                        .toList());
-            }
-            var parameters = controller
-                    .parameters()
-                    .bind(
-                            new ParameterSet.Target(featureId, "constraint:" + id),
-                            expression.matches("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
-                                    ? ""
-                                    : expression);
-            parameters.validate();
-            error.setText("");
-            dimensionValue.getStyleClass().remove("invalid");
-            controller.edit(next, parameters);
+            driveDimension(g, chosen, type);
             return true;
         } catch (RuntimeException failure) {
             error.setText(failure.getMessage());
@@ -1523,10 +1521,83 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         }
     }
 
-    private void requireDrivingSelection() {
-        if (!selection.isEmpty() && selection.stream().allMatch(r -> FaceProjection.reference(r.entityId()))) {
-            throw new IllegalArgumentException(translations.translate("sketch.projection.readOnly"));
+    private void driveDimension(SketchGeometry g, Constraint chosen, Type type) {
+        String expression = dimensionValue.getText().strip();
+        double value = controller.parameters().value(expression, FeatureDimensions.unit(type));
+        String id = chosen != null ? chosen.id() : id("dimension");
+        SketchGeometry next;
+        if (chosen != null) {
+            next = g.withConstraints(g.constraints().stream()
+                    .map(c -> c.id().equals(id) ? SketchConstraints.drivingValue(c, value) : c)
+                    .toList());
+        } else {
+            next = g.add(SketchConstraints.create(
+                    g, id, type, SketchDimensions.drivingReferences(g, List.copyOf(selection), type), value));
         }
+        if (dimensionEntry != null) {
+            next = next.withConstraints(next.constraints().stream()
+                    .map(c -> c.id().equals(id) ? SketchConstraints.positionLabel(c, dimensionEntryPosition) : c)
+                    .toList());
+        }
+        var parameters = controller
+                .parameters()
+                .bind(
+                        new ParameterSet.Target(featureId, "constraint:" + id),
+                        expression.matches("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
+                                ? ""
+                                : expression);
+        parameters.validate();
+        error.setText("");
+        dimensionValue.getStyleClass().remove("invalid");
+        controller.edit(next, parameters);
+    }
+
+    private void refreshDimensionValue() {
+        var chosen = constraints.getSelectionModel().getSelectedItem();
+        boolean readOnly = chosen != null && SketchConstraints.referenceDimension(chosen);
+        if (readOnly) {
+            dimensionValue.setText(number(SketchConstraints.measuredValue(controller.definition(), chosen)));
+        } else if (chosen == null && fixedSelection()) {
+            readOnly = true;
+            try {
+                var g = withReferences(controller.displayed(), selection);
+                var type = dimension.getValue();
+                var refs = SketchDimensions.drivingReferences(g, List.copyOf(selection), type);
+                dimensionValue.setText(
+                        number(SketchConstraints.measuredValue(g, new Constraint("preview", type, refs, List.of()))));
+            } catch (IllegalArgumentException invalidSelection) {
+                dimensionValue.clear();
+            }
+        }
+        dimensionValue.setDisable(readOnly);
+        valueCaption.setText(
+                translations.translate(readOnly ? "sketch.referenceDimension" : "gui.driving_value_mm_degrees_ratio"));
+    }
+
+    private boolean fixedSelection() {
+        if (selection.isEmpty()
+                || controller.busy()
+                || controller.result() == null
+                || !controller.result().solved()) return false;
+        var fixed = controller.result().fullyConstrainedReferences();
+        return selection.stream().allMatch(ref -> fixed.contains(ref) || FaceProjection.reference(ref.entityId()));
+    }
+
+    private boolean addReferenceDimension(Type type, Vec position) {
+        if (!fixedSelection()) return false;
+        var g = withReferences(controller.displayed(), selection);
+        var refs = SketchDimensions.drivingReferences(g, List.copyOf(selection), type);
+        var reference = SketchConstraints.referenceDimension(g, id("dimension"), type, refs);
+        if (position == null) {
+            var ends = dimensionEndpoints(reference, g);
+            position = ends.start().mix(ends.end(), .5).minus(new Vec(0, 24 / scale));
+        }
+        reference = SketchConstraints.positionLabel(reference, position);
+        edit(g.add(reference));
+        constraints.getSelectionModel().select(reference);
+        selection.clear();
+        hint.setText(translations.translate("sketch.referenceDimension"));
+        return true;
     }
 
     private void removeConstraint() {
@@ -1782,6 +1853,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             references.getItems().setAll(refs);
             references.setValue(refs.contains(selectedRef) ? selectedRef : ORIGIN);
             selection.removeIf(r -> !refs.contains(r));
+            refreshDimensionValue();
             undo.setDisable(!controller.canUndo());
             redo.setDisable(!controller.canRedo());
             finish.setDisable(!controller.canFinish()
@@ -2074,7 +2146,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                 ? dragLabelPosition
                 : SketchConstraints.labelPosition(c).orElse(a.plus(b).times(0.5).plus(new Vec(0, 20 / scale)));
         double x = px(label), y = py(label);
-        String text = dimensionLabel(c);
+        String text = dimensionLabel(c, g);
         double width = Math.max(40, text.length() * 8);
         double lineAx = px(a), lineAy = py(a), lineBx = x, lineBy = y;
         graphics.setStroke(Color.web(dark ? "#bacbdd" : "#263746"));
@@ -2104,17 +2176,27 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         } else {
             graphics.strokeLine(px(a), py(a), x, y);
         }
+        paintDimensionLabel(c, text, x, y, width);
+        for (double dx = -width / 2 + 8; dx < width / 2; dx += 16) badges.add(new Badge(c, x + dx, y));
+        if (!c.id().equals("dimension-preview")) {
+            dimensionHits.add(new DimensionHit(c, label, x, y, width, lineAx, lineAy, lineBx, lineBy));
+        }
+    }
+
+    private void paintDimensionLabel(Constraint c, String text, double x, double y, double width) {
+        var graphics = canvas.getGraphicsContext2D();
         graphics.setFill(Color.web(dark ? "#161c23" : "#f8fafc"));
-        graphics.fillRect(x - width / 2, y - 10, width, 20);
+        if (SketchConstraints.referenceDimension(c)) {
+            graphics.setFill(Color.web(dark ? "#283b49" : "#e4edf3"));
+            graphics.fillRoundRect(x - width / 2, y - 10, width, 20, 8, 8);
+        } else {
+            graphics.fillRect(x - width / 2, y - 10, width, 20);
+        }
         Color labelColor = Color.web(dark ? "#bacbdd" : "#263746");
         graphics.setFill(
                 c.equals(constraints.getSelectionModel().getSelectedItem()) ? Color.web("#2688ed") : labelColor);
         graphics.setFont(Font.font(13));
         graphics.fillText(text, x - width / 2 + 3, y + 5);
-        for (double dx = -width / 2 + 8; dx < width / 2; dx += 16) badges.add(new Badge(c, x + dx, y));
-        if (!c.id().equals("dimension-preview")) {
-            dimensionHits.add(new DimensionHit(c, label, x, y, width, lineAx, lineAy, lineBx, lineBy));
-        }
     }
 
     private void dimensionArrow(double x, double y, double towardX, double towardY) {
@@ -3017,7 +3099,13 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         }
     }
 
-    private String dimensionLabel(Constraint c) {
+    private double dimensionValue(Constraint c, SketchGeometry g) {
+        return SketchConstraints.referenceDimension(c)
+                ? SketchConstraints.measuredValue(g, c)
+                : c.values().getFirst();
+    }
+
+    private String dimensionLabel(Constraint c, SketchGeometry g) {
         String prefix = switch (c.type()) {
             case DIAMETER -> "Ø";
             case RADIUS -> "R";
@@ -3026,9 +3114,9 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         String expression = controller.parameters().binding(new ParameterSet.Target(featureId, "constraint:" + c.id()));
         String text = (expression.isEmpty() ? "" : "fx: ")
                 + prefix
-                + String.format(Locale.ROOT, "%.2f", c.values().getFirst())
+                + String.format(Locale.ROOT, "%.2f", dimensionValue(c, g))
                 + (c.type() == Type.ANGLE ? "°" : "");
-        return text;
+        return SketchConstraints.referenceDimension(c) ? "(" + text + ")" : text;
     }
 
     private SketchGeometry addSnapConstraints(SketchGeometry next, SketchGeometry addition, String id) {

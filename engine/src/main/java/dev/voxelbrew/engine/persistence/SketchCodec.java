@@ -28,6 +28,12 @@ class SketchCodec {
                                                     r.getIndex()))
                                             .toList(),
                                     c.getValuesList());
+                            if (constraint.type().dimension()
+                                    && (c.getReferenceDimension()
+                                            ? !constraint.values().isEmpty()
+                                            : constraint.values().size() != 1)) {
+                                throw new IllegalArgumentException("Invalid sketch dimension value");
+                            }
                             return c.hasLabelPosition()
                                     ? SketchConstraints.positionLabel(
                                             constraint,
@@ -108,6 +114,7 @@ class SketchCodec {
         for (var c : geometry.constraints()) {
             var constraint = DocumentProto.SketchConstraint.newBuilder()
                     .setId(c.id())
+                    .setReferenceDimension(SketchConstraints.referenceDimension(c))
                     .setType(
                             dev.voxelbrew.engine.sketch.SketchCopies.linked(c)
                                     ? DocumentProto.SketchConstraint.Type.PATTERN_LINK
@@ -115,11 +122,12 @@ class SketchCodec {
                                             c.type().name()));
             var position = SketchConstraints.labelPosition(c);
             if (position.isPresent()) {
-                constraint
-                        .addValues(c.values().getFirst())
-                        .setLabelPosition(DocumentProto.SketchLabelPosition.newBuilder()
-                                .setX(position.get().x())
-                                .setY(position.get().y()));
+                if (!SketchConstraints.referenceDimension(c)) {
+                    constraint.addValues(c.values().getFirst());
+                }
+                constraint.setLabelPosition(DocumentProto.SketchLabelPosition.newBuilder()
+                        .setX(position.get().x())
+                        .setY(position.get().y()));
             } else {
                 constraint.addAllValues(c.values());
             }

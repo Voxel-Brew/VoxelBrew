@@ -175,6 +175,10 @@ message SketchReference {
   Part part = 2;
   uint32 index = 3;
 }
+message SketchLabelPosition {
+  double x = 1;
+  double y = 2;
+}
 message SketchConstraint {
   enum Type {
     TYPE_UNSPECIFIED = 0;
@@ -210,6 +214,8 @@ message SketchConstraint {
   Type type = 2;
   repeated SketchReference refs = 3;
   repeated double values = 4;
+  SketchLabelPosition label_position = 5;
+  bool reference_dimension = 6;
 }
 message ConstrainedSketch {
   repeated SketchEntity entities = 1;

@@ -3,6 +3,7 @@ package dev.voxelbrew.engine.persistence;
 import dev.voxelbrew.api.model.sketch.SketchGeometry;
 import dev.voxelbrew.api.model.sketch.SketchText;
 import dev.voxelbrew.engine.persistence.proto.DocumentProto;
+import dev.voxelbrew.engine.sketch.SketchConstraints;
 
 /** Protobuf remains an implementation detail; enum names are the compatibility contract. */
 @lombok.experimental.UtilityClass
@@ -12,20 +13,35 @@ class SketchCodec {
         return new SketchGeometry(
                 message.getEntitiesList().stream().map(SketchCodec::entity).toList(),
                 message.getConstraintsList().stream()
-                        .map(c -> new SketchGeometry.Constraint(
-                                c.getId(),
-                                c.getType() == DocumentProto.SketchConstraint.Type.PATTERN_LINK
-                                        ? SketchGeometry.Type.FIX
-                                        : SketchGeometry.Type.valueOf(
-                                                c.getType().name()),
-                                c.getRefsList().stream()
-                                        .map(r -> new SketchGeometry.Ref(
-                                                r.getEntityId(),
-                                                SketchGeometry.Part.valueOf(
-                                                        r.getPart().name()),
-                                                r.getIndex()))
-                                        .toList(),
-                                c.getValuesList()))
+                        .map(c -> {
+                            var constraint = new SketchGeometry.Constraint(
+                                    c.getId(),
+                                    c.getType() == DocumentProto.SketchConstraint.Type.PATTERN_LINK
+                                            ? SketchGeometry.Type.FIX
+                                            : SketchGeometry.Type.valueOf(
+                                                    c.getType().name()),
+                                    c.getRefsList().stream()
+                                            .map(r -> new SketchGeometry.Ref(
+                                                    r.getEntityId(),
+                                                    SketchGeometry.Part.valueOf(
+                                                            r.getPart().name()),
+                                                    r.getIndex()))
+                                            .toList(),
+                                    c.getValuesList());
+                            if (constraint.type().dimension()
+                                    && (c.getReferenceDimension()
+                                            ? !constraint.values().isEmpty()
+                                            : constraint.values().size() != 1)) {
+                                throw new IllegalArgumentException("Invalid sketch dimension value");
+                            }
+                            return c.hasLabelPosition()
+                                    ? SketchConstraints.positionLabel(
+                                            constraint,
+                                            new SketchGeometry.Vec(
+                                                    c.getLabelPosition().getX(),
+                                                    c.getLabelPosition().getY()))
+                                    : constraint;
+                        })
                         .toList(),
                 message.getBoundaryList());
     }
@@ -98,12 +114,23 @@ class SketchCodec {
         for (var c : geometry.constraints()) {
             var constraint = DocumentProto.SketchConstraint.newBuilder()
                     .setId(c.id())
+                    .setReferenceDimension(SketchConstraints.referenceDimension(c))
                     .setType(
                             dev.voxelbrew.engine.sketch.SketchCopies.linked(c)
                                     ? DocumentProto.SketchConstraint.Type.PATTERN_LINK
                                     : DocumentProto.SketchConstraint.Type.valueOf(
-                                            c.type().name()))
-                    .addAllValues(c.values());
+                                            c.type().name()));
+            var position = SketchConstraints.labelPosition(c);
+            if (position.isPresent()) {
+                if (!SketchConstraints.referenceDimension(c)) {
+                    constraint.addValues(c.values().getFirst());
+                }
+                constraint.setLabelPosition(DocumentProto.SketchLabelPosition.newBuilder()
+                        .setX(position.get().x())
+                        .setY(position.get().y()));
+            } else {
+                constraint.addAllValues(c.values());
+            }
             for (var r : c.refs()) {
                 constraint.addRefs(DocumentProto.SketchReference.newBuilder()
                         .setEntityId(r.entityId())

@@ -157,5 +157,25 @@ def main(platform, cache, destination):
         output.replace(destination)
 
 
-if __name__ == "__main__":
+def write_preset_archive(source, target):
+    if sha256(source) != ORCA_SOURCE_SHA256:
+        raise ValueError("Orca source checksum mismatch")
+    with tempfile.TemporaryDirectory() as temporary:
+        directory = Path(temporary)
+        copy_orca_presets(source, directory)
+        with zipfile.ZipFile(target, "w") as archive:
+            for preset in sorted(directory.rglob("*.json")):
+                name = "voxelbrew-bbl/" + preset.relative_to(directory).as_posix()
+                archive.writestr(zipfile.ZipInfo(name), preset.read_bytes(), zipfile.ZIP_DEFLATED, 9)
+
+
+if __name__ == "__main__" and sys.argv[1] == "presets":
+    write_preset_archive(Path(sys.argv[2]), Path(sys.argv[3]))
+elif __name__ == "__main__" and sys.argv[1] == "test-downloads":
+    platform = sys.argv[2]
+    cache = Path(sys.argv[3])
+    cache.mkdir(parents=True, exist_ok=True)
+    for base, (name, digest) in zip((PRUSA, ORCA), ASSETS[platform]):
+        fetch(cache, name, digest, base + urllib.parse.quote(name))
+elif __name__ == "__main__":
     main(sys.argv[1], Path(sys.argv[2]).resolve(), Path(sys.argv[3]).resolve())

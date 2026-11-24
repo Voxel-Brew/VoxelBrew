@@ -13,6 +13,8 @@ import java.util.*;
 public final class SketchProfiles {
     public record Region(String id, PlanarProfile profile) {}
 
+    private record Junction(String id, Vec position) {}
+
     private record Edge(Entity entity, boolean reversed) {
         Vec start() {
             return entity.at(reversed ? 1 : 0);
@@ -123,12 +125,125 @@ public final class SketchProfiles {
         if (g.boundary().isEmpty()) {
             throw new IllegalArgumentException("Select closed profile geometry in Edit sketch before extruding");
         }
-        var remaining = new ArrayList<>(g.boundary().stream()
-                .map(g::entity)
-                .flatMap(e -> g.curves(e).stream())
-                .toList());
+        var boundary = g.boundary().stream().map(g::entity).toList();
+        var endpoints = new ArrayList<Junction>();
+        for (var entity : boundary) {
+            if (entity.kind() == Kind.TEXT || entity.loop()) continue;
+            endpoints.add(new Junction(entity.id(), entity.at(0)));
+            endpoints.add(new Junction(entity.id(), entity.at(1)));
+        }
+        var remaining = new ArrayList<Entity>();
+        for (var entity : boundary) {
+            if (entity.kind() == Kind.LINE) remaining.addAll(splitAtJunctions(entity, endpoints));
+            else remaining.addAll(g.curves(entity));
+        }
         if (remaining.isEmpty()) throw new IllegalArgumentException("Profile has no curves");
         return boundaryLoops(remaining, individual);
+    }
+
+    /** Reports profile problems while the sketch can still be edited or saved as an open sketch. */
+    public static String extrusionIssue(SketchGeometry g) {
+        if (g.entities().isEmpty()) return "";
+        try {
+            var loops = profileLoops(g, false);
+            var texts = g.boundary().stream()
+                    .map(g::entity)
+                    .filter(e -> e.kind() == Kind.TEXT)
+                    .toList();
+            if (texts.isEmpty()) return "";
+            // Interior dividers are absent from the whole profile. Only test its actual boundary.
+            var walls = new LinkedHashMap<Entity, String>();
+            for (var loop : loops) {
+                for (var edge : loop) {
+                    var wall = edge.entity();
+                    if (wall.kind() != Kind.LINE) continue;
+                    for (var id : g.boundary()) {
+                        var source = g.entity(id);
+                        if (source.kind() == Kind.LINE
+                                && onSegment(source, wall.at(0))
+                                && onSegment(source, wall.at(1))) {
+                            walls.put(wall, id);
+                            break;
+                        }
+                    }
+                }
+            }
+            for (var text : texts) {
+                for (var curve : g.curves(text)) {
+                    var points = curve.sample();
+                    for (var wall : walls.entrySet()) {
+                        if (crosses(points, wall.getKey())) {
+                            return "Text '" + text.text().content() + "' (" + text.id() + ") crosses profile edge "
+                                    + wall.getValue()
+                                    + ". Move the text clear of the edge or exclude it from the profile.";
+                        }
+                    }
+                }
+            }
+            return "";
+        } catch (IllegalArgumentException invalid) {
+            return invalid.getMessage();
+        }
+    }
+
+    private static boolean onSegment(Entity line, Vec point) {
+        var start = line.at(0);
+        var direction = line.at(1).minus(start);
+        var offset = point.minus(start);
+        var unit = direction.unit();
+        return Math.abs(offset.cross(unit)) <= TOLERANCE
+                && offset.dot(unit) >= -TOLERANCE
+                && offset.dot(unit) <= direction.length() + TOLERANCE;
+    }
+
+    private static boolean crosses(List<Vec> points, Entity line) {
+        var start = line.at(0);
+        var unit = line.at(1).minus(start).unit();
+        var previous = points.getFirst();
+        double side = previous.minus(start).cross(unit);
+        for (int i = 1; i < points.size(); i++) {
+            var point = points.get(i);
+            double next = point.minus(start).cross(unit);
+            if (side * next < 0 && onSegment(line, previous.mix(point, side / (side - next)))) return true;
+            previous = point;
+            side = next;
+        }
+        return false;
+    }
+
+    private static List<Entity> splitAtJunctions(Entity line, List<Junction> endpoints) {
+        var start = line.at(0);
+        var end = line.at(1);
+        var delta = end.minus(start);
+        double length = delta.length();
+        var unit = delta.unit();
+        var cuts = new TreeMap<Double, String>();
+        for (var endpoint : endpoints) {
+            var offset = endpoint.position().minus(start);
+            double along = offset.dot(unit);
+            if (along <= TOLERANCE || along >= length - TOLERANCE || Math.abs(offset.cross(unit)) > TOLERANCE) continue;
+            cuts.merge(along, endpoint.id(), (a, b) -> a.compareTo(b) < 0 ? a : b);
+        }
+        if (cuts.isEmpty()) return List.of(line);
+        // Name each span by its bounding junctions so unrelated cuts do not renumber it.
+        boolean ascending = Math.abs(delta.x()) > Math.abs(delta.y()) ? delta.x() > 0 : delta.y() > 0;
+        var previous = start;
+        String previousKey = ascending ? "@low" : "@high";
+        var spans = new ArrayList<Entity>();
+        cuts.put(length, ascending ? "@high" : "@low");
+        for (var cut : cuts.entrySet()) {
+            var point = cut.getKey() == length ? end : start.plus(unit.times(cut.getKey()));
+            if (point.distance(previous) <= TOLERANCE) continue;
+            String key = cut.getValue();
+            String pair = previousKey.compareTo(key) < 0 ? previousKey + ":" + key : key + ":" + previousKey;
+            String id = UUID.nameUUIDFromBytes(
+                            (line.id() + ":" + pair).getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                    .toString();
+            spans.add(Sketches.entity(id, Kind.LINE, false, previous.x(), previous.y(), point.x(), point.y()));
+            previous = point;
+            previousKey = key;
+        }
+        return spans;
     }
 
     private static List<Region> regions(SketchGeometry g, boolean individual) {

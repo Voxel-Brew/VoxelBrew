@@ -38,6 +38,14 @@ public final class WorkbenchApplication extends Application {
         return workbench;
     }
 
+    private static java.util.List<String> launchArguments(java.util.List<String> args) {
+        if (args.size() == 1
+                && args.getFirst().toLowerCase(java.util.Locale.ROOT).endsWith(".vxb")) {
+            return java.util.List.of("--open", args.getFirst());
+        }
+        return args;
+    }
+
     @Override
     public void start(Stage stage) throws java.io.IOException {
         var application = ApplicationModule.system(ApplicationImage.Component.GUI);
@@ -45,7 +53,7 @@ public final class WorkbenchApplication extends Application {
         if (!Platform.isSupported(ConditionalFeature.SCENE3D)) {
             throw new IllegalStateException(translations.translate("graphics.unavailable"));
         }
-        var args = getParameters().getRaw();
+        var args = launchArguments(getParameters().getRaw());
         Path
                 plugins =
                         dev.voxelbrew.util.services.Services.load(dev.voxelbrew.api.userconfig.UserConfigService.class)
@@ -60,7 +68,7 @@ public final class WorkbenchApplication extends Application {
                 smokeOutput = Path.of(args.get(++i));
             } else if (!args.get(i).equals("--smoke-test")) {
                 throw new IllegalArgumentException(
-                        "Usage: gui [--open design.vxb] [--plugin-dir directory] [--smoke-test] [--smoke-output screenshot.png]");
+                        "Usage: gui [design.vxb | --open design.vxb] [--plugin-dir directory] [--smoke-test] [--smoke-output screenshot.png]");
             }
         }
         if (open != null && args.contains("--smoke-test")) {
@@ -68,6 +76,7 @@ public final class WorkbenchApplication extends Application {
         }
         workbench = openWindow(stage, plugins, open, application);
         if (open == null && !args.contains("--smoke-test")) workbench.openWithRecovery(null);
+        enableFinderOpen(stage, plugins);
         workbench.startMcpIfConfigured();
         checkForUpdates(stage, translations);
         if (args.contains("--smoke-test")) {
@@ -81,6 +90,23 @@ public final class WorkbenchApplication extends Application {
                     "cut", new Feature.ProfileRef("hole", "hole.profile"), new Feature.BodyRef("thickness", "body")));
             PackageSmoke.verify(workbench, stage, smokeOutput);
         }
+    }
+
+    private void enableFinderOpen(Stage stage, Path plugins) {
+        if (!System.getProperty("os.name").startsWith("Mac")) return;
+        MacDocumentEvents.install(path -> {
+            var controller = workbench.controller();
+            if (stage.isShowing() && controller.path() == null && !controller.dirty() && !controller.ioBusy()) {
+                controller.open(path).exceptionally(failure -> null);
+                stage.toFront();
+            } else {
+                try {
+                    openWindow(new Stage(), plugins, path);
+                } catch (java.io.IOException failure) {
+                    log.error("Cannot open window for {}", path, failure);
+                }
+            }
+        });
     }
 
     private void checkForUpdates(Stage stage, TranslationService translations) {

@@ -2677,6 +2677,18 @@ class WorkbenchUiTest {
             assertThat(fx(() -> ((Label) node("#slicer-installation-status")).getText()))
                     .contains("Bundled and read-only");
         }
+        if (dev.voxelbrew.slicer.internal.SlicerDownload.find("prusa-slicer").isPresent() && bundled.isEmpty()) {
+            chooseSlicerProvider("prusa-slicer");
+            fx(() -> {
+                var install = (Button) node("#slicer-installation-download");
+                assertThat(install.isVisible()).isTrue();
+                assertThat(install.getText()).contains("MiB");
+                assertThat(install.getWidth()).isGreaterThanOrEqualTo(Math.floor(install.prefWidth(-1)));
+                Screenshot.save(
+                        stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "slicer-download.png"));
+                return null;
+            });
+        }
         openPrusaInstallation("Prusa first");
         assertSlicerInstallationRejected("export-check", "Choose a slicer executable");
         assertThat(store.load()).allMatch(dev.voxelbrew.slicer.SlicerInstallation::bundled);
@@ -3111,16 +3123,18 @@ class WorkbenchUiTest {
                                 .degreesOfFreedom()
                         > 0))
                 .isTrue();
-        assertSketchGeometryColor(20, 10, true);
+        click("sketch-fit");
+        // Probe the strokes away from midpoint dimension labels.
+        assertSketchGeometryColor(26, 10, true);
         assertSketchGeometryColor(10, 10, true);
-        assertSketchGeometryColor(20, 30, false);
+        assertSketchGeometryColor(26, 30, false);
         assertSketchGeometryColor(40, 10, true);
         assertSketchGeometryColor(50, 10, false);
         sketchReference("fixed");
         assertThat(fx(() -> ((Label) node("#sketch-selection")).getText().isBlank()))
                 .isFalse();
         click("sketch-clear-selection");
-        assertSketchGeometryColor(20, 10, true);
+        assertSketchGeometryColor(26, 10, true);
         fx(() -> {
             Screenshot.save(
                     stage.getScene(),
@@ -3154,6 +3168,43 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void dimensionToolMeasuresFixedEndpointsWhileOtherGeometryCanMove() throws Exception {
+        ready();
+        click("constrained-sketch");
+        click("choose-plane-xy");
+        sketchReady();
+        var line = dev.voxelbrew.engine.sketch.Sketches.entity("edge", SketchGeometry.Kind.LINE, false, 10, 10, 10, 40);
+        var point = dev.voxelbrew.engine.sketch.Sketches.entity("free", SketchGeometry.Kind.POINT, true, 35, 25);
+        var geometry = new SketchGeometry(List.of(line, point), List.of(), List.of(line.id()));
+        fx(() -> {
+            ((SketchEditor) node("#sketch-editor"))
+                    .controller()
+                    .edit(geometry.add(dev.voxelbrew.engine.sketch.SketchConstraints.create(
+                            geometry, "fixed", SketchGeometry.Type.FIX, List.of(line.ref()), 0)));
+            return null;
+        });
+        sketchReady();
+        click("sketch-dimension");
+        sketchReference("edge.start");
+        sketchReference("edge.end");
+        sketchReady();
+        var reference = sketchGeometry().constraints().getLast();
+        assertThat(dev.voxelbrew.engine.sketch.SketchConstraints.referenceDimension(reference))
+                .isTrue();
+        assertThat(dev.voxelbrew.engine.sketch.SketchConstraints.measuredValue(sketchGeometry(), reference))
+                .isEqualTo(30);
+        assertThat(fx(() -> stage.getScene().lookup("#sketch-inline-dimension")))
+                .isNull();
+        key(KeyCode.ESCAPE);
+        click("sketch-dimension");
+        sketchReference("edge.start");
+        sketchReference("free.point");
+        assertThat(fx(() -> node("#sketch-inline-dimension").isDisabled())).isFalse();
+        key(KeyCode.ESCAPE);
+        click("constraint-cancel");
+    }
+
+    @Test
     void dimensionLabelsAndLinesDragWithoutChangingGeometryAndEscapeRestoresPlacement() throws Exception {
         ready();
         rectangleDraft(60, 40, 0);
@@ -3175,13 +3226,19 @@ class WorkbenchUiTest {
         sketchDrag(x, 20, x + 10, 25, false);
         assertDimensionLineInk(x + 10, 8, true);
         assertDimensionLineInk(x, 8, false);
-        assertThat(sketchGeometry()).isEqualTo(before);
+        assertThat(sketchGeometry().entities()).isEqualTo(before.entities());
         sketchDrag(x + 10, 8, x + 20, 8, false);
         assertDimensionLineInk(x + 20, 8, true);
         assertDimensionLineInk(x + 10, 8, false);
         sketchDrag(x + 20, 8, x + 30, 8, true);
         assertDimensionLineInk(x + 20, 8, true);
         assertDimensionLineInk(x + 30, 8, false);
+        assertThat(sketchGeometry().entities()).isEqualTo(before.entities());
+        click("sketch-undo");
+        sketchReady();
+        assertDimensionLineInk(x + 10, 8, true);
+        click("sketch-undo");
+        sketchReady();
         assertThat(sketchGeometry()).isEqualTo(before);
         click("sketch-undo");
         sketchReady();
@@ -3270,7 +3327,14 @@ class WorkbenchUiTest {
         });
         key(KeyCode.TAB);
         double preview = fx(() -> Double.parseDouble(((TextField) node("#sketch-size-length")).getText()));
-        assertThat(preview).isCloseTo(30, within(.5));
+        // Both the start click and the pointer move are quantized to screen pixels.
+        double pointerTolerance = fx(() -> {
+            var editor = (SketchEditor) node("#sketch-editor");
+            return 2
+                    / editor.modelToScreen(new SketchGeometry.Vec(0, 0))
+                            .distance(editor.modelToScreen(new SketchGeometry.Vec(1, 0)));
+        });
+        assertThat(preview).isCloseTo(30, within(pointerTolerance));
         key(KeyCode.DIGIT2);
         key(KeyCode.DIGIT5);
         key(KeyCode.TAB);
@@ -3283,6 +3347,9 @@ class WorkbenchUiTest {
         key(KeyCode.TAB);
         key(KeyCode.ENTER);
         sketchReady();
+        assertThat(sketchGeometry().constraints())
+                .extracting(SketchGeometry.Constraint::type)
+                .contains(SketchGeometry.Type.LENGTH, SketchGeometry.Type.ANGLE);
         var line = sketchGeometry().entities().getFirst();
         assertThat(line.at(0).distance(line.at(1))).isCloseTo(25, within(1e-6));
         var delta = line.at(1).minus(line.at(0));
@@ -3290,7 +3357,7 @@ class WorkbenchUiTest {
         moveSketchPointer(line.at(1).x(), line.at(1).y() + 20);
         key(KeyCode.TAB);
         double next = fx(() -> Double.parseDouble(((TextField) node("#sketch-size-length")).getText()));
-        assertThat(next).isCloseTo(20, within(.5));
+        assertThat(next).isCloseTo(20, within(pointerTolerance));
         key(KeyCode.ESCAPE);
         click("constraint-cancel");
     }
@@ -3333,6 +3400,10 @@ class WorkbenchUiTest {
         assertThat(bottom.at(1).x() - bottom.at(0).x()).isCloseTo(24, within(1e-6));
         assertThat(lines.get(1).at(1).y() - bottom.at(0).y()).isCloseTo(12, within(1e-6));
         assertThat(bottom.at(0).x()).isLessThan(25);
+        assertThat(sketchGeometry().constraints().stream()
+                        .filter(c -> c.type().dimension())
+                        .map(c -> c.values().getFirst()))
+                .containsExactlyInAnyOrder(7., 24., 12.);
         click("sketch-tool-circle");
         sketchClick(45, 15, false);
         key(KeyCode.TAB);
@@ -3342,6 +3413,71 @@ class WorkbenchUiTest {
         assertThat(fx(() -> node("#sketch-size-radius").getStyleClass())).contains("invalid");
         key(KeyCode.ESCAPE);
         assertThat(sketchGeometry().entities()).hasSize(5);
+        click("constraint-cancel");
+    }
+
+    @Test
+    void axisConstraintButtonsAlignTheLineWithTheirScreenIcons() throws Exception {
+        ready();
+        click("constrained-sketch");
+        click("choose-plane-xy");
+        sketchReady();
+        click("sketch-tool-line");
+        sketchClick(10, 10, false);
+        sketchClick(35, 30, false);
+        key(KeyCode.ESCAPE);
+        sketchReady();
+        String id = sketchGeometry().entities().getFirst().id();
+        for (boolean horizontal : List.of(true, false)) {
+            String button = horizontal ? "constraint-horizontal" : "constraint-vertical";
+            sketchReference(id);
+            click(button);
+            sketchReady();
+            fx(() -> {
+                var editor = (SketchEditor) node("#sketch-editor");
+                var line = editor.controller().definition().entity(id);
+                var delta = editor.modelToScreen(line.at(1)).subtract(editor.modelToScreen(line.at(0)));
+                assertThat(horizontal ? delta.getY() : delta.getX()).isCloseTo(0, within(1e-4));
+                assertThat(Math.abs(horizontal ? delta.getX() : delta.getY())).isGreaterThan(1);
+                String icon = ((Button) node("#" + button)).getText();
+                assertThat(icon).isEqualTo(horizontal ? "—" : "│");
+                var list = (ListView<?>) node("#sketch-constraints");
+                assertThat(list.lookupAll(".list-cell").stream()
+                                .map(cell -> ((ListCell<?>) cell).getText())
+                                .filter(java.util.Objects::nonNull))
+                        .anyMatch(label -> label.startsWith(icon + (horizontal ? " Horizontal" : " Vertical")));
+                return null;
+            });
+            click("sketch-undo");
+            sketchReady();
+        }
+        click("constraint-cancel");
+    }
+
+    @Test
+    void sketchShowsWhichTextCrossesTheExtrusionBoundary() throws Exception {
+        ready();
+        rectangleDraft(60, 20, 0);
+        sketchType(SketchTools.Tool.TEXT);
+        text("sketch-text-content", "Door");
+        text("sketch-text-angle", "0");
+        text("sketch-text-height", "10");
+        sketchNumericPoint(10, 18);
+        key(KeyCode.ESCAPE);
+        click("sketch-fit");
+        fx(() -> {
+            var warning = (Label) node("#sketch-profile-warning");
+            assertThat(warning.isVisible()).isTrue();
+            assertThat(warning.getText()).contains("Door", "-top");
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "sketch-profile-warning.png"));
+            return null;
+        });
+        click("sketch-undo");
+        sketchReady();
+        assertThat(fx(() -> stage.getScene().lookup("#sketch-profile-warning").isVisible()))
+                .isFalse();
         click("constraint-cancel");
     }
 
@@ -3418,7 +3554,9 @@ class WorkbenchUiTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(dimension.refs().getFirst().part()).isEqualTo(SketchGeometry.Part.CENTER);
-        assertThat(dimension.values()).containsExactly(15.);
+        assertThat(dimension.values().getFirst()).isEqualTo(15.);
+        assertThat(dev.voxelbrew.engine.sketch.SketchConstraints.labelPosition(dimension))
+                .isPresent();
         key(KeyCode.ESCAPE);
         fx(() -> {
             Screenshot.save(
@@ -7200,8 +7338,6 @@ class WorkbenchUiTest {
                 .orElseThrow();
         assertThat(textEntity.text().content()).isEqualTo("Width: 5");
         assertThat(textEntity.value(2)).isCloseTo(5, org.assertj.core.data.Offset.offset(.00001));
-        sketchReference(textEntity.id());
-        click("sketch-edit-text");
         assertThat(fx(() -> ((TextField) node("#sketch-edit-text-content")).getText()))
                 .isEqualTo("=\"Width: \" + 5");
         text("sketch-edit-text-content", "=\"Width: \" + $missing");
@@ -7652,6 +7788,9 @@ class WorkbenchUiTest {
         checkTextAngleBounds("sketch-text-angle");
         text("sketch-text-height", "8");
         sketchNumericPoint(40, 10);
+        assertThat(fx(() -> ((TextField) node("#sketch-edit-text-content")).getText()))
+                .isEqualTo("OB");
+        key(KeyCode.ESCAPE);
         String textId = sketchGeometry().entities().stream()
                 .filter(e -> e.kind() == SketchGeometry.Kind.TEXT)
                 .findFirst()
@@ -7682,8 +7821,15 @@ class WorkbenchUiTest {
         click("sketch-undo");
         sketchReady();
         assertThat(sketchGeometry()).isEqualTo(beforeRotation);
-        sketchReference(textId);
-        click("sketch-edit-text");
+        fx(() -> {
+            var editor = (SketchEditor) node("#sketch-editor");
+            var geometry = editor.controller().definition();
+            var outline = geometry.curves(geometry.entity(textId)).getLast();
+            robot.mouseMove(editor.modelToScreen(outline.at(.5)));
+            robot.mouseClick(MouseButton.PRIMARY);
+            robot.mouseClick(MouseButton.PRIMARY);
+            return null;
+        });
         text("sketch-edit-text-content", "OC");
         checkTextAngleBounds("sketch-edit-text-angle");
         text("sketch-edit-text-angle", "181");
@@ -7782,6 +7928,9 @@ class WorkbenchUiTest {
         text("sketch-text-height", "4");
         sketchClick(50, 20, false);
         sketchReady();
+        assertThat(fx(() -> ((ComboBox<?>) node("#sketch-edit-text-path")).getValue()))
+                .isEqualTo(arc);
+        key(KeyCode.ESCAPE);
         var text = sketchGeometry().entities().stream()
                 .filter(e -> e.kind() == SketchGeometry.Kind.TEXT)
                 .findFirst()
@@ -7841,20 +7990,31 @@ class WorkbenchUiTest {
         sketchClick(0, 20, false);
         sketchDimension(0, "40");
         assertThat(fx(() -> ((Label) node("#sketch-solve-status")).getText())).isEqualTo("Fully constrained");
-        // Select the edge away from its midpoint label to add a conflicting dimension.
+        // A second measurement on the fixed edge is a live, read-only annotation.
         sketchClick(12, 0, false);
-        sketchDimension(0, "80");
-        assertThat(fx(() -> node("#constraint-finish").isDisabled())).isTrue();
-        assertThat(fx(() -> ((Label) node("#sketch-error")).getText().contains("cannot satisfy")))
+        assertThat(fx(() -> node("#sketch-dimension-value").isDisabled())).isTrue();
+        click("sketch-apply-dimension");
+        sketchReady();
+        var reference = sketchGeometry().constraints().getLast();
+        assertThat(dev.voxelbrew.engine.sketch.SketchConstraints.referenceDimension(reference))
                 .isTrue();
+        assertThat(dev.voxelbrew.engine.sketch.SketchConstraints.measuredValue(sketchGeometry(), reference))
+                .isCloseTo(60, within(1e-6));
+        assertThat(fx(() -> node("#sketch-dimension-value").isDisabled())).isTrue();
+        assertThat(fx(() -> node("#sketch-apply-dimension").isDisabled())).isTrue();
+        assertThat(fx(() -> node("#constraint-finish").isDisabled())).isFalse();
+        fx(() -> {
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "sketch-reference-dimension.png"));
+            return null;
+        });
         click("sketch-undo");
         sketchReady();
-        assertThat(fx(() -> node("#constraint-finish").isDisabled())).isFalse();
+        assertThat(sketchGeometry().constraints()).doesNotContain(reference);
         click("sketch-redo");
         sketchReady();
-        assertThat(fx(() -> node("#constraint-finish").isDisabled())).isTrue();
-        click("sketch-undo");
-        sketchReady();
+        assertThat(sketchGeometry().constraints()).contains(reference);
         sketchType(SketchTools.Tool.CIRCLE_CENTER);
         sketchNumericPoint(10, 10);
         sketchNumericPoint(12, 10);
@@ -7870,8 +8030,8 @@ class WorkbenchUiTest {
         click("sketch-clear-selection");
         sketchReference(circleId + ".center");
         sketchReference("origin.point");
-        sketchDimension(2, "-10");
-        sketchDimension(3, "-10");
+        sketchDimension(2, "10");
+        sketchDimension(3, "10");
         assertThat(fx(() -> ((Label) node("#sketch-solve-status")).getText())).isEqualTo("Fully constrained");
         assertThat(document().features().size())
                 .as("Sketch editing stays transient until Finish")
@@ -8187,8 +8347,14 @@ class WorkbenchUiTest {
         sketchDrag(30, 10, 35, 15, false);
         var moved =
                 fx(() -> ((SketchEditor) node("#sketch-editor")).controller().definition());
-        assertThat(moved.entities().getFirst().at(1).x()).isCloseTo(35, org.assertj.core.data.Offset.offset(0.3));
-        assertThat(moved.entities().getFirst().at(1).y()).isCloseTo(15, org.assertj.core.data.Offset.offset(0.3));
+        var screenError = fx(() -> {
+            var editor = (SketchEditor) node("#sketch-editor");
+            var end = editor.modelToScreen(moved.entities().getFirst().at(1));
+            return end.distance(editor.modelToScreen(new SketchGeometry.Vec(35, 15)));
+        });
+        assertThat(screenError)
+                .as("Dragged endpoint distance from the pointer in pixels")
+                .isLessThan(1.5);
         assertThat(moved.entities().getFirst().at(1).y())
                 .isCloseTo(moved.entities().getFirst().at(0).y(), org.assertj.core.data.Offset.offset(1e-6));
         click("sketch-undo");

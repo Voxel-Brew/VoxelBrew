@@ -67,7 +67,7 @@ public final class FeatureDimensions {
                 length.accept("diameter", c.diameter());
             } else if (s.profile() instanceof Feature.Constrained c) {
                 for (var d : c.geometry().constraints()) {
-                    if (d.type().dimension()) {
+                    if (SketchConstraints.drivingDimension(d)) {
                         result.add(new Dimension(
                                 new ParameterSet.Target(s.id(), "constraint:" + d.id()),
                                 unit(d.type()),
@@ -154,7 +154,7 @@ public final class FeatureDimensions {
             var next = c.geometry()
                     .withConstraints(c.geometry().constraints().stream()
                             .map(d -> changes.containsKey("constraint:" + d.id())
-                                    ? d.withValue(changes.get("constraint:" + d.id()))
+                                    ? SketchConstraints.drivingValue(d, changes.get("constraint:" + d.id()))
                                     : d)
                             .toList());
             profile = new Feature.Constrained(SketchSolver.solve(next).requireSolved());
@@ -261,7 +261,7 @@ public final class FeatureDimensions {
     public static ParameterSet retainSketchBindings(ParameterSet parameters, String id, SketchGeometry geometry) {
         var fields = new HashSet<String>();
         geometry.constraints().stream()
-                .filter(c -> c.type().dimension())
+                .filter(c -> SketchConstraints.drivingDimension(c))
                 .forEach(c -> fields.add("constraint:" + c.id()));
         FeatureText.list(id, geometry).forEach(f -> fields.add(f.target().field()));
         return new ParameterSet(
@@ -286,7 +286,7 @@ public final class FeatureDimensions {
             if (b.target().featureId().equals(featureId) && b.target().field().startsWith("constraint:")) {
                 String id = b.target().field().substring(11);
                 var c = geometry.constraints().stream()
-                        .filter(d -> d.id().equals(id) && d.type().dimension())
+                        .filter(d -> d.id().equals(id) && SketchConstraints.drivingDimension(d))
                         .findFirst()
                         .orElseThrow(() -> new IllegalArgumentException("Missing bound sketch dimension: " + id));
                 changes.put(
@@ -295,7 +295,7 @@ public final class FeatureDimensions {
             }
         }
         return geometry.withConstraints(geometry.constraints().stream()
-                .map(c -> changes.containsKey(c.id()) ? c.withValue(changes.get(c.id())) : c)
+                .map(c -> changes.containsKey(c.id()) ? SketchConstraints.drivingValue(c, changes.get(c.id())) : c)
                 .toList());
     }
 

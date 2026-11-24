@@ -24,6 +24,21 @@ VoxelBrew supports **Windows, macOS, and Linux**.
 
 [Download the latest release](https://github.com/Voxel-Brew/VoxelBrew/releases/latest).
 
+### Install the desktop application and CLI
+
+Each desktop installer includes the `VoxelBrewCLI` launcher and a bundled Java runtime.
+
+| Platform         | Install                                                                          | Try the CLI                                                                                                             |
+| ---------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Windows          | Run the `-Setup.exe` installer.                                                  | In PowerShell, run `& "$env:LOCALAPPDATA\Programs\VoxelBrew\VoxelBrewCLI.exe" --help` for the default install location. |
+| Debian or Ubuntu | From the download directory, run `sudo apt install ./VoxelBrew-*-linux-x64.deb`. | Run `VoxelBrewCLI --help`.                                                                                              |
+| macOS            | Open the DMG and drag VoxelBrew to Applications.                                 | Run `/Applications/VoxelBrew.app/Contents/MacOS/VoxelBrewCLI --help`.                                                   |
+
+The Windows installer, Debian/Ubuntu package, and macOS app register VoxelBrew as an editor for `.vxb` designs. Double-click a design in your file manager or choose VoxelBrew from **Open with** if another app is your default.
+
+On other Linux distributions, extract the desktop ZIP and run `./VoxelBrew/bin/VoxelBrewCLI --help`.
+For a CLI-only installation, extract the separate `VoxelBrewCLI` ZIP for your platform.
+
 ### Features
 
 - **Parametric modeling:** create dimensioned sketches, extrude solids, and cut
@@ -73,10 +88,12 @@ Choose a sketch plane, then draw your profile with precise dimensions.
 
 **Slicer** — prepare a plate and preview its generated toolpaths.
 
-Choose the bundled PrusaSlicer or OrcaSlicer in the **Process** tab. Both are
-read-only in **Slicers → Configure slicers**, where you can also test and save
-your own installations. Bundled OrcaSlicer uses compatible Bambu printer
-and nozzle presets.
+On Windows and Linux, open **Slicers > Configure slicers**, choose PrusaSlicer
+or OrcaSlicer, and click **Install**. The CLI offers the same downloads with
+`slicer install prusa-slicer` and `slicer install orca`. Both frontends share
+installed engines, which work offline. You can also configure an existing
+executable. Select your installation in the **Process** tab. macOS includes
+both engines. Managed OrcaSlicer installations include Bambu printer and nozzle presets.
 
 ![Slicer workspace in the light theme](docs/screenshots/slicer-light.png)
 

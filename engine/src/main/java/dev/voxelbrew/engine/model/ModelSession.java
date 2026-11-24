@@ -233,7 +233,9 @@ public final class ModelSession {
     public synchronized void editDimension(
             String featureId, String field, double value, java.nio.file.Path pluginDirectory) {
         Feature feature = features.get(index(featureId));
-        if (feature instanceof Feature.Custom custom && !BodyExtrusion.modifiesBody(feature)) {
+        if (feature instanceof Feature.Custom custom
+                && !BodyExtrusion.modifiesBody(feature)
+                && !BodyPattern.matches(feature)) {
             try (var registry = new dev.voxelbrew.engine.feature.FeatureRegistry(pluginDirectory)) {
                 replace(registry.edit(custom, java.util.Map.of(field, value)));
             } catch (java.io.IOException failure) {

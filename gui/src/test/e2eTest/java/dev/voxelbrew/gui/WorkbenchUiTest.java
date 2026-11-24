@@ -6139,7 +6139,15 @@ class WorkbenchUiTest {
             return;
         }
         String menu = switch (id) {
-            case "extrude", "cut", "fillet", "chamfer", "shell", "split-body" -> "operations-menu";
+            case "extrude",
+                    "cut",
+                    "fillet",
+                    "chamfer",
+                    "shell",
+                    "split-body",
+                    "body-rectangular",
+                    "body-circular",
+                    "body-mirror" -> "operations-menu";
             case "new", "open", "import", "save", "save-as", "export", "exit" -> "menu-file";
             case "language", "updates", "about", "keyboard-shortcuts" -> "menu-settings";
             case "appearance", "menu-fit" -> "menu-view";
@@ -9322,6 +9330,41 @@ class WorkbenchUiTest {
         assertThat(sketchGeometry().entities().size()).isEqualTo(4);
         click("constraint-cancel");
         ready();
+    }
+
+    @Test
+    void operationsMenuBuildsAndEditsSolidPatterns() throws Exception {
+        openPrepared("plate-5mm.vxb");
+        int count = fx(() -> workbench.controller().build().bodies().size());
+        click("body-rectangular");
+        text("pattern-rows", "2");
+        click("pattern-apply");
+        ready();
+        assertThat(fx(() -> workbench.controller().build().bodies().size())).isEqualTo(count + 3);
+        click("body-circular");
+        click("pattern-apply");
+        ready();
+        assertThat(fx(() -> workbench.controller().build().bodies().size())).isEqualTo(count + 6);
+        click("body-mirror");
+        text("pattern-step", "10");
+        click("pattern-apply");
+        ready();
+        assertThat(fx(() -> workbench.controller().build().bodies().size())).isEqualTo(count + 7);
+        click("history-" + (document().features().size() - 1));
+        click("edit-body-pattern");
+        text("pattern-step", "15");
+        click("pattern-apply");
+        ready();
+        assertThat(BodyPattern.from(document().features().getLast()).firstStep())
+                .isEqualTo(15);
+        click("operations-menu");
+        fx(() -> {
+            Screenshot.save(
+                    node("#body-circular").getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "body-pattern-menu.png"));
+            return null;
+        });
+        key(KeyCode.ESCAPE);
     }
 
     @Test

@@ -250,6 +250,15 @@ message BodyExtrusion {
   BodyRef target = 2;
   bool subtract = 3;
 }
+message BodyPattern {
+  BodyRef source = 1;
+  string kind = 2;
+  string axis = 3;
+  uint32 first_count = 4;
+  uint32 second_count = 5;
+  double first_step = 6;
+  double second_step = 7;
+}
 message SplitBody {
   BodyRef body = 1;
   double normal_x = 2;

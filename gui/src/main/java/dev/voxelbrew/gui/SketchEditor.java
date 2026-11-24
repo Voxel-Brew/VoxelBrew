@@ -43,6 +43,8 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
 
     private final Canvas canvas = new Canvas();
 
+    private final Canvas gizmoAxes = new Canvas(52, 52);
+
     private final LinkedHashSet<Ref> selection = new LinkedHashSet<>();
     private final List<Entity> projection;
 
@@ -120,6 +122,8 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
     private Runnable dismiss = () -> {};
 
     private Draw tool = Draw.SELECT;
+
+    private SketchViewBasis viewBasis = SketchViewBasis.DEFAULT;
 
     private Type activeConstraint;
 
@@ -518,7 +522,10 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         rotationEntry.setStyle("-fx-background-color: -fx-control-inner-background; -fx-padding: 3;");
         rotationEntry.setManaged(false);
         rotationEntry.setVisible(false);
-        var canvasHost = new StackPane(canvas, pointerHint, rotationEntry);
+        var gizmo = viewGizmo();
+        var canvasHost = new StackPane(canvas, gizmo, pointerHint, rotationEntry);
+        StackPane.setAlignment(gizmo, Pos.TOP_RIGHT);
+        StackPane.setMargin(gizmo, new Insets(6));
         canvasHost.setMinSize(250, 200);
         canvas.widthProperty().bind(canvasHost.widthProperty());
         canvas.heightProperty().bind(canvasHost.heightProperty());
@@ -712,7 +719,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                 super.updateItem(value, empty);
                 if (empty || value == null) setText(null);
                 else {
-                    var screenType = SketchViewBasis.DEFAULT.mapAxisConstraint(value.type());
+                    var screenType = viewBasis.mapAxisConstraint(value.type());
                     String label = symbol(screenType) + " " + translations.translate("constraint." + screenType.name());
                     if (SketchConstraints.referenceDimension(value)) {
                         label += " = " + dimensionLabel(value, controller.definition()) + "  "
@@ -819,7 +826,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             var anchor = model(e.getX(), e.getY());
             scale = Math.clamp(scale * Math.exp(e.getDeltaY() * 0.002), 0.15, 100);
             var moved = model(e.getX(), e.getY());
-            var offset = SketchViewBasis.DEFAULT.project(anchor.minus(moved));
+            var offset = viewBasis.project(anchor.minus(moved));
             centerX += offset.x();
             centerY += offset.y();
             draw();
@@ -1310,7 +1317,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         tool = Draw.SELECT;
         drawing.clear();
         snaps.clear();
-        activeConstraint = SketchViewBasis.DEFAULT.mapAxisConstraint(type);
+        activeConstraint = viewBasis.mapAxisConstraint(type);
         hint.setText(translations.translate("constraint." + type.name())
                 + " · "
                 + translations.translate("constraint.hint." + type.name()));
@@ -1912,11 +1919,56 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                 || controller.definition().constraints().stream().anyMatch(c -> c.id().equals(id));
     }
 
+    private HBox viewGizmo() {
+        var axes = gizmoAxes.getGraphicsContext2D();
+        axes.setLineWidth(2);
+        axes.setStroke(Color.web("#ce6663"));
+        axes.strokeLine(24, 24, 24, 43);
+        axes.setFill(Color.web("#ce6663"));
+        axes.fillText("X", 29, 46);
+        axes.setStroke(Color.web("#52a287"));
+        axes.strokeLine(24, 24, 43, 24);
+        axes.setFill(Color.web("#52a287"));
+        axes.fillText("Y", 39, 20);
+        var controls = new HBox(2, turnButton(false), gizmoAxes, turnButton(true));
+        controls.setId("sketch-view-gizmo");
+        controls.setAlignment(Pos.CENTER);
+        controls.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+        controls.setStyle(
+                "-fx-background-color: -fx-control-inner-background; -fx-background-radius: 5; -fx-padding: 3;");
+        return controls;
+    }
+
+    private Button turnButton(boolean clockwise) {
+        var id = clockwise ? "sketch-view-clockwise" : "sketch-view-anticlockwise";
+        var button = new Button(clockwise ? "↻" : "↺");
+        button.setId(id);
+        button.setStyle("-fx-font-size: 18px; -fx-padding: 2 6;");
+        String description = translations.translate("help." + id);
+        button.setAccessibleText(description);
+        UiHelp.describe(button, description);
+        button.setOnAction(event -> {
+            var center = viewBasis.unproject(centerX, centerY);
+            viewBasis = viewBasis.quarterTurn(clockwise);
+            var projected = viewBasis.project(center);
+            centerX = projected.x();
+            centerY = projected.y();
+            gizmoAxes.setRotate(viewBasis.clockwiseDegrees());
+            constraints.refresh();
+            hoverSnap = null;
+            pointer = null;
+            positionSizeEntry();
+            draw();
+            canvas.requestFocus();
+        });
+        return button;
+    }
+
     private void fit(boolean centerOnOrigin) {
         var points = visibleEntities(controller.displayed()).stream()
                 .flatMap(e -> displayCurves(controller.displayed(), e).stream())
                 .flatMap(e -> e.sample().stream())
-                .map(SketchViewBasis.DEFAULT::project)
+                .map(viewBasis::project)
                 .toList();
         if (points.isEmpty()) {
 
@@ -1925,8 +1977,8 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             scale = Math.max(
                     0.15,
                     Math.min(
-                            canvas.getWidth() / span(SketchViewBasis.DEFAULT.right(), 150, 120),
-                            canvas.getHeight() / span(SketchViewBasis.DEFAULT.up(), 150, 120)));
+                            canvas.getWidth() / span(viewBasis.right(), 150, 120),
+                            canvas.getHeight() / span(viewBasis.up(), 150, 120)));
             draw();
             return;
         }
@@ -1956,16 +2008,16 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
     }
 
     private Vec model(double x, double y) {
-        return SketchViewBasis.DEFAULT.unproject(
+        return viewBasis.unproject(
                 centerX + (x - canvas.getWidth() / 2) / scale, centerY - (y - canvas.getHeight() / 2) / scale);
     }
 
     private double px(Vec point) {
-        return canvas.getWidth() / 2 + (SketchViewBasis.DEFAULT.right().dot(point) - centerX) * scale;
+        return canvas.getWidth() / 2 + (viewBasis.right().dot(point) - centerX) * scale;
     }
 
     private double py(Vec point) {
-        return canvas.getHeight() / 2 - (SketchViewBasis.DEFAULT.up().dot(point) - centerY) * scale;
+        return canvas.getHeight() / 2 - (viewBasis.up().dot(point) - centerY) * scale;
     }
 
     private Hit hitPoint(double x, double y, double radius) {
@@ -2075,7 +2127,8 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
 
     private DimensionHit hitDimension(double x, double y) {
         for (var hit : dimensionHits.reversed()) {
-            if (Math.abs(x - hit.x()) <= hit.width() / 2 + 3 && Math.abs(y - hit.y()) <= 11) return hit;
+            var local = viewBasis.annotationOffset(x - hit.x(), y - hit.y());
+            if (Math.abs(local.x()) <= hit.width() / 2 + 3 && Math.abs(local.y()) <= 11) return hit;
         }
         if (!dimensionHits.isEmpty() && tool == Draw.SELECT && !dimensionTool && activeConstraint == null) {
             var point = hitPoint(x, y, 7);
@@ -2176,7 +2229,10 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             graphics.strokeLine(px(a), py(a), x, y);
         }
         paintDimensionLabel(c, text, x, y, width);
-        for (double dx = -width / 2 + 8; dx < width / 2; dx += 16) badges.add(new Badge(c, x + dx, y));
+        for (double dx = -width / 2 + 8; dx < width / 2; dx += 16) {
+            var offset = viewBasis.screenOffset(dx, 0);
+            badges.add(new Badge(c, x + offset.x(), y + offset.y()));
+        }
         if (!c.id().equals("dimension-preview")) {
             dimensionHits.add(new DimensionHit(c, label, x, y, width, lineAx, lineAy, lineBx, lineBy));
         }
@@ -2184,18 +2240,22 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
 
     private void paintDimensionLabel(Constraint c, String text, double x, double y, double width) {
         var graphics = canvas.getGraphicsContext2D();
+        graphics.save();
+        graphics.translate(x, y);
+        graphics.rotate(viewBasis.clockwiseDegrees());
         graphics.setFill(Color.web(dark ? "#161c23" : "#f8fafc"));
         if (SketchConstraints.referenceDimension(c)) {
             graphics.setFill(Color.web(dark ? "#283b49" : "#e4edf3"));
-            graphics.fillRoundRect(x - width / 2, y - 10, width, 20, 8, 8);
+            graphics.fillRoundRect(-width / 2, -10, width, 20, 8, 8);
         } else {
-            graphics.fillRect(x - width / 2, y - 10, width, 20);
+            graphics.fillRect(-width / 2, -10, width, 20);
         }
         Color labelColor = Color.web(dark ? "#bacbdd" : "#263746");
         graphics.setFill(
                 c.equals(constraints.getSelectionModel().getSelectedItem()) ? Color.web("#2688ed") : labelColor);
         graphics.setFont(Font.font(13));
-        graphics.fillText(text, x - width / 2 + 3, y + 5);
+        graphics.fillText(text, -width / 2 + 3, 5);
+        graphics.restore();
     }
 
     private void dimensionArrow(double x, double y, double towardX, double towardY) {
@@ -2415,6 +2475,11 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         ((StackPane) canvas.getParent()).getChildren().add(sizeEntry);
         sizeEntry.applyCss();
         sizeEntry.autosize();
+        positionSizeEntry();
+    }
+
+    private void positionSizeEntry() {
+        if (sizeEntry == null) return;
         sizeEntry.relocate(
                 hintCoordinate(px(cursor), sizeEntry.getWidth(), canvas.getWidth()),
                 hintCoordinate(py(cursor), sizeEntry.getHeight(), canvas.getHeight()));
@@ -2652,7 +2717,8 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
 
     private boolean selectBadge(MouseEvent e) {
         for (var badge : badges) {
-            if (Math.abs(e.getX() - badge.x()) < 11 && Math.abs(e.getY() - badge.y()) < 9) {
+            var local = viewBasis.annotationOffset(e.getX() - badge.x(), e.getY() - badge.y());
+            if (Math.abs(local.x()) < 11 && Math.abs(local.y()) < 9) {
                 constraints.getSelectionModel().select(badge.constraint());
                 if (badge.constraint().type().dimension() && e.getClickCount() == 2) editDimensionValue();
                 return true;
@@ -2764,12 +2830,10 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         graphics.setStroke(Color.web(dark ? "#2a3541" : "#e1e7ed"));
         double spacing = Math.pow(10, Math.floor(Math.log10(60 / Math.max(scale, 0.15))));
         var center = model(w / 2, h / 2);
-        double halfX = (Math.abs(SketchViewBasis.DEFAULT.right().x()) * w
-                        + Math.abs(SketchViewBasis.DEFAULT.up().x()) * h)
-                / (2 * scale);
-        double halfY = (Math.abs(SketchViewBasis.DEFAULT.right().y()) * w
-                        + Math.abs(SketchViewBasis.DEFAULT.up().y()) * h)
-                / (2 * scale);
+        double halfX =
+                (Math.abs(viewBasis.right().x()) * w + Math.abs(viewBasis.up().x()) * h) / (2 * scale);
+        double halfY =
+                (Math.abs(viewBasis.right().y()) * w + Math.abs(viewBasis.up().y()) * h) / (2 * scale);
         double minX = center.x() - halfX, maxX = center.x() + halfX;
         double minY = center.y() - halfY, maxY = center.y() + halfY;
         double firstX = Math.ceil(minX / spacing) * spacing;
@@ -2926,14 +2990,19 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                     }
                     var ref = c.refs().getFirst();
                     var p = ref.part() == Part.OBJECT ? g.entity(ref.entityId()).at(0.5) : g.point(ref);
-                    double x = px(p) + 14 + (index % 3) * 18, y = py(p) + 14 + (index / 3 % 2) * 18;
+                    var offset = viewBasis.screenOffset(14 + (index % 3) * 18, 14 + (index / 3 % 2) * 18);
+                    double x = px(p) + offset.x(), y = py(p) + offset.y();
                     index++;
                     badges.add(new Badge(c, x, y));
+                    graphics.save();
+                    graphics.translate(x, y);
+                    graphics.rotate(viewBasis.clockwiseDegrees());
                     graphics.setFill(Color.web(dark ? "#28323e" : "#ffffff"));
-                    graphics.fillRoundRect(x - 9, y - 8, 18, 16, 4, 4);
+                    graphics.fillRoundRect(-9, -8, 18, 16, 4, 4);
                     graphics.setFill(Color.web(
                             c.equals(constraints.getSelectionModel().getSelectedItem()) ? "#e6a239" : "#d15d55"));
-                    graphics.fillText(symbol(SketchViewBasis.DEFAULT.mapAxisConstraint(c.type())), x - 6, y + 4, 14);
+                    graphics.fillText(symbol(SketchViewBasis.DEFAULT.mapAxisConstraint(c.type())), -6, 4, 14);
+                    graphics.restore();
                 } catch (IllegalArgumentException broken) {
                     /* Broken references remain removable in the constraint list. */
                 }

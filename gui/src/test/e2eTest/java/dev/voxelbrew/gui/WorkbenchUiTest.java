@@ -3784,14 +3784,35 @@ class WorkbenchUiTest {
                 .filter(c -> c.type() == SketchGeometry.Type.DISTANCE_Y)
                 .findFirst()
                 .orElseThrow();
-        // The point-pair dimension label is offset along the sketch's positive X axis.
+        var origin = new SketchGeometry.Vec(0, 0);
+        var point = new SketchGeometry.Vec(0, 20);
+        var initial = fx(() -> ((SketchEditor) node("#sketch-editor")).modelToScreen(point));
+        click("sketch-view-clockwise");
+        fx(() -> {
+            var editor = (SketchEditor) node("#sketch-editor");
+            var delta = editor.modelToScreen(point).subtract(editor.modelToScreen(origin));
+            assertThat(delta.getX()).isCloseTo(0, within(.01));
+            assertThat(delta.getY()).isPositive();
+            return null;
+        });
+        click("sketch-view-anticlockwise");
+        assertThat(fx(() -> ((SketchEditor) node("#sketch-editor"))
+                        .modelToScreen(point)
+                        .distance(initial)))
+                .isLessThan(.01);
+        click("sketch-view-clockwise");
+        assertThat(sketchGeometry()).isEqualTo(before);
+        // Pick near the end of the now vertical dimension label.
         fx(() -> {
             var editor = (SketchEditor) node("#sketch-editor");
             var midpoint = editor.modelToScreen(new SketchGeometry.Vec(0, 20));
             var axis = editor.modelToScreen(new SketchGeometry.Vec(1, 20))
                     .subtract(midpoint)
                     .normalize();
-            robot.mouseMove(midpoint.add(axis.multiply(20)));
+            robot.mouseMove(midpoint.add(axis.multiply(20)).add(0, 15));
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "rotated-sketch-dimension.png"));
             robot.mouseClick(MouseButton.PRIMARY);
             return null;
         });

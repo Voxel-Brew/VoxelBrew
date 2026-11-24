@@ -21,6 +21,7 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: gradle/actions/setup-gradle@v4
+      - uses: ./.github/actions/cache-protoc
       - name: Check Java member order
         run: ./gradlew checkJavaMemberOrder
       - uses: actions/setup-node@v4
@@ -30,3 +31,6 @@ jobs:
         with:
           python-version: "3.12"
       - run: ./gradlew spotlessCheck basicChecks test verifyFrontendIoDependencies -x :checkJavaMemberOrder
+      - uses: ./.github/actions/cache-protoc
+        with:
+          save: "true"

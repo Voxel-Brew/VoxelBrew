@@ -24,20 +24,21 @@ try {
     if ((Get-Item -LiteralPath $handlers).GetValueNames() -notcontains 'VoxelBrew.Design') { throw 'Missing .vxb handler' }
     $command = (Get-Item -LiteralPath (Join-Path $design 'shell\open\command')).GetValue('')
     if ($command -ne ('"{0}\VoxelBrew.exe" --open "%1"' -f $installed)) { throw "Incorrect .vxb open command: $command" }
-    $document = Join-Path $evidence 'associated design.vxb'
+    $document = Join-Path $evidence ('associated design {0}.vxb' -f [guid]::NewGuid())
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../fixtures/reference-8mm.vxb') -Destination $document
     $opened = Start-Process -FilePath $document -Verb Open -PassThru
     if (!$opened) { throw 'Windows did not launch a process for the .vxb document' }
     try {
         $deadline = [DateTime]::UtcNow.AddSeconds(60)
-        while ([DateTime]::UtcNow -lt $deadline -and !$opened.HasExited) {
-            $opened.Refresh()
-            if ($opened.MainWindowTitle.Contains('associated design.vxb')) { break }
+        $log = Join-Path $env:USERPROFILE '.voxelbrew\log\app.log'
+        do {
+            $loaded = Select-String -LiteralPath $log -SimpleMatch " from $document" -Quiet -ErrorAction SilentlyContinue
+            if ($loaded) { break }
             Start-Sleep -Milliseconds 250
-        }
-        if ($opened.HasExited -or !$opened.MainWindowTitle.Contains('associated design.vxb')) { throw 'Explorer did not open the design in VoxelBrew' }
+        } while ([DateTime]::UtcNow -lt $deadline)
+        if (!$loaded) { throw "VoxelBrew did not log opening $document" }
     } finally {
-        if (!$opened.HasExited) { Stop-Process -Id $opened.Id -Force }
+        if (!$opened.HasExited) { taskkill.exe /PID $opened.Id /T /F | Out-Null }
     }
     Push-Location $env:TEMP
     try {
@@ -46,7 +47,7 @@ try {
         $launched = Start-Process -FilePath $shortcut -PassThru
         Start-Sleep -Seconds 5
         if ($launched.HasExited) { throw 'Start menu launch exited before opening the GUI' }
-        Stop-Process -Id $launched.Id -Force
+        taskkill.exe /PID $launched.Id /T /F | Out-Null
     } finally { Pop-Location }
     $png = Join-Path $evidence 'installed-gui.png'
     Remove-Item -LiteralPath $png -ErrorAction SilentlyContinue

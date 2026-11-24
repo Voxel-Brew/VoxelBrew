@@ -33,8 +33,8 @@ jobs:
   native:
     name: ${{ inputs.suite }} (${{ inputs.os }})
     runs-on: ${{ inputs.os }}
-    # macOS package checks also build and upload both app archives.
-    timeout-minutes: ${{ inputs.release-candidate && 90 || inputs.suite == 'headlessPackageCheck' && 30 || 20 }}
+    # Ubuntu platform shards and jobs that archive packages need extra runner time.
+    timeout-minutes: ${{ inputs.release-candidate && 90 || (inputs.archive || (inputs.os == 'ubuntu-24.04' && inputs.suite == ':gui:e2eTest')) && 30 || 20 }}
     env:
       ORG_GRADLE_PROJECT_uiTestShard: ${{ inputs.ui-shard }}
       ORG_GRADLE_PROJECT_uiTestShardCount: ${{ inputs.ui-shard-count }}
@@ -172,6 +172,8 @@ jobs:
         run: ./gradlew :gui:packageInstaller ${{ runner.os == 'Windows' && '''-PvsGenerator=Visual Studio 17 2022''' || '' }}
       - name: Verify installed Linux desktop and CLI
         if: inputs.release-candidate && runner.os == 'Linux' && steps.candidate.outputs.linux_gui_installer == 'true'
+        env:
+          _JAVA_OPTIONS: -Dprism.order=es2 -Dprism.forceGPU=true
         run: |
           sudo apt-get install -y ./gui/build/distributions/VoxelBrew-*-linux-x64.deb
           VoxelBrewCLI designer native-demo

@@ -1144,9 +1144,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             lastParameters = document.parameters();
             lastDocument = document.id();
             refreshCommands(document, snapshot);
-            boolean atEnd = document.cursor() == document.features().size() && !controller.ioBusy();
-            refreshSolidCommands(atEnd);
-            refreshSketchCommands(atEnd);
+            refreshSolidCommands();
+            refreshSketchCommands(document);
             refreshStatus();
         } finally {
             refreshing = false;
@@ -1292,7 +1291,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         try {
             synchronizeTreeSelection();
             refreshCommands(document, snapshot);
-            refreshSketchCommands(document.cursor() == document.features().size() && !controller.ioBusy());
+            refreshSketchCommands(document);
         } finally {
             refreshing = wasRefreshing;
         }
@@ -2205,8 +2204,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         planeRepair = null;
         viewport.stopPlaneSelection();
         viewport.clearHandle();
-        var features = controller.snapshot().document().features();
-        selectedFeature = features.getLast().id();
+        var document = controller.snapshot().document();
+        selectedFeature = document.features().get(document.cursor() - 1).id();
         inspect();
         refresh();
     }
@@ -2234,8 +2233,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     new Feature.ProfileRef(sketch.id(), sketch.profileId()),
                     target.output()));
             tool = Tool.NONE;
-            selectedFeature =
-                    controller.snapshot().document().features().getLast().id();
+            var document = controller.snapshot().document();
+            selectedFeature = document.features().get(document.cursor() - 1).id();
             inspect();
             refresh();
         });
@@ -2495,10 +2494,6 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 || controller.ioBusy()
                 || (original == null && !controller.build().valid())) {
             return;
-        }
-        var document = controller.snapshot().document();
-        if (document.cursor() != document.features().size()) {
-            throw new IllegalStateException(translations.translate("construction.end"));
         }
         cancelTool();
         tool = Tool.CONSTRUCTION;
@@ -3458,24 +3453,26 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         fileBusy.set(controller.ioBusy());
     }
 
-    private void refreshSolidCommands(boolean atEnd) {
+    private void refreshSolidCommands() {
         if (tool == Tool.EXTRUDE && finish != null) {
             finish.setDisable(
                     !controller.canCommitExtrusion() || !error.getText().isEmpty());
         }
-        splitBody.setDisable(tool != Tool.NONE
-                || !controller.canExport()
-                || controller.build().bodies().isEmpty());
+        splitBody.setDisable(tool != Tool.NONE || !controller.hasEditableBodies());
         fillet.setDisable(splitBody.isDisabled());
         chamfer.setDisable(splitBody.isDisabled());
         shell.setDisable(splitBody.isDisabled());
         printing.documentChanged();
-        customFeature.setDisable(!atEnd || tool != Tool.NONE || controller.rebuilding());
-        constrainedSketch.setDisable(!atEnd || tool != Tool.NONE || controller.rebuilding());
+        customFeature.setDisable(controller.ioBusy() || tool != Tool.NONE || controller.rebuilding());
+        constrainedSketch.setDisable(customFeature.isDisabled());
     }
 
-    private void refreshSketchCommands(boolean atEnd) {
-        if (!atEnd || tool != Tool.NONE || !(selected() instanceof Feature.Sketch sketch)) {
+    private void refreshSketchCommands(CadDocument document) {
+        if (controller.ioBusy()
+                || tool != Tool.NONE
+                || !(selected() instanceof Feature.Sketch sketch)
+                || document.features().subList(0, document.cursor()).stream()
+                        .noneMatch(f -> f.id().equals(sketch.id()))) {
             extrude.setDisable(true);
             cut.setDisable(true);
             return;

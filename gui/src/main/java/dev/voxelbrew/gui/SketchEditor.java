@@ -978,7 +978,8 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                     List.copyOf(selection),
                     options());
             if (sizes != null) next = sizes.apply(next, entityId);
-            if (advanced == SketchTools.Tool.TEXT || advanced == SketchTools.Tool.TEXT_ON_PATH) {
+            boolean placingText = advanced == SketchTools.Tool.TEXT || advanced == SketchTools.Tool.TEXT_ON_PATH;
+            if (placingText) {
                 next = next.replace(new TextMirror(mirrorHorizontal.isSelected(), mirrorVertical.isSelected())
                         .apply(next.entity(entityId)));
                 var parameters = bindText(controller.parameters(), entityId, textContent, textFont);
@@ -1010,6 +1011,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             drawing.clear();
             snaps.clear();
             tool(Draw.SELECT);
+            if (placingText) editText(next.entity(entityId));
         } catch (RuntimeException failure) {
             error.setText(failure.getMessage());
             // Numeric options can be repaired and the same points retried with Enter.
@@ -1018,15 +1020,23 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
     }
 
     private void editText() {
+        selection.stream()
+                .flatMap(ref -> editableText(ref).stream())
+                .findFirst()
+                .ifPresentOrElse(
+                        this::editText, () -> error.setText(translations.translate("gui.select_a_text_entity_first")));
+    }
+
+    private Optional<Entity> editableText(Ref ref) {
+        var geometry = controller.definition();
+        String id = SketchCopies.originalId(geometry, ref.entityId());
+        return geometry.entities().stream()
+                .filter(e -> e.kind() == Kind.TEXT && e.id().equals(id))
+                .findFirst();
+    }
+
+    private void editText(Entity chosen) {
         try {
-            var chosen = selection.stream()
-                    .map(r -> controller
-                            .definition()
-                            .entity(SketchCopies.originalId(controller.definition(), r.entityId())))
-                    .filter(e -> e.kind() == Kind.TEXT)
-                    .findFirst()
-                    .orElseThrow(() ->
-                            new IllegalArgumentException(translations.translate("gui.select_a_text_entity_first")));
             var dialog = new Dialog<TextEdit>();
             dialog.initOwner(getScene().getWindow());
             dialog.setTitle(translations.translate("gui.edit_sketch_text"));
@@ -1100,9 +1110,10 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                     .addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
                         try {
                             var geometry = controller.definition();
-                            var position = new Vec(chosen.value(0), chosen.value(1));
+                            var current = geometry.entity(chosen.id());
+                            var position = new Vec(current.value(0), current.value(1));
                             if (!chosen.text().pathId().equals(path.getValue())) {
-                                var anchor = SketchText.anchor(geometry, chosen);
+                                var anchor = SketchText.anchor(geometry, current);
                                 position = path.getValue().isEmpty()
                                         ? anchor
                                         : new Vec(SketchTools.pathOffset(geometry.entity(path.getValue()), anchor), 0);
@@ -3126,6 +3137,13 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
     }
 
     private void selectGeometry(MouseEvent e, Hit hit) {
+        if (hit != null && e.getClickCount() == 2 && activeConstraint == null) {
+            var text = editableText(hit.ref());
+            if (text.isPresent()) {
+                editText(text.get());
+                return;
+            }
+        }
         if (!e.isShiftDown() && !e.isControlDown() && activeConstraint == null) selection.clear();
         constraints.getSelectionModel().clearSelection();
         if (hit != null) {

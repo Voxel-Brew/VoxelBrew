@@ -3412,6 +3412,7 @@ class WorkbenchUiTest {
         text("sketch-text-angle", "0");
         text("sketch-text-height", "10");
         sketchNumericPoint(10, 18);
+        key(KeyCode.ESCAPE);
         click("sketch-fit");
         fx(() -> {
             var warning = (Label) node("#sketch-profile-warning");
@@ -7284,8 +7285,6 @@ class WorkbenchUiTest {
                 .orElseThrow();
         assertThat(textEntity.text().content()).isEqualTo("Width: 5");
         assertThat(textEntity.value(2)).isCloseTo(5, org.assertj.core.data.Offset.offset(.00001));
-        sketchReference(textEntity.id());
-        click("sketch-edit-text");
         assertThat(fx(() -> ((TextField) node("#sketch-edit-text-content")).getText()))
                 .isEqualTo("=\"Width: \" + 5");
         text("sketch-edit-text-content", "=\"Width: \" + $missing");
@@ -7736,6 +7735,9 @@ class WorkbenchUiTest {
         checkTextAngleBounds("sketch-text-angle");
         text("sketch-text-height", "8");
         sketchNumericPoint(40, 10);
+        assertThat(fx(() -> ((TextField) node("#sketch-edit-text-content")).getText()))
+                .isEqualTo("OB");
+        key(KeyCode.ESCAPE);
         String textId = sketchGeometry().entities().stream()
                 .filter(e -> e.kind() == SketchGeometry.Kind.TEXT)
                 .findFirst()
@@ -7766,8 +7768,15 @@ class WorkbenchUiTest {
         click("sketch-undo");
         sketchReady();
         assertThat(sketchGeometry()).isEqualTo(beforeRotation);
-        sketchReference(textId);
-        click("sketch-edit-text");
+        fx(() -> {
+            var editor = (SketchEditor) node("#sketch-editor");
+            var geometry = editor.controller().definition();
+            var outline = geometry.curves(geometry.entity(textId)).getLast();
+            robot.mouseMove(editor.modelToScreen(outline.at(.5)));
+            robot.mouseClick(MouseButton.PRIMARY);
+            robot.mouseClick(MouseButton.PRIMARY);
+            return null;
+        });
         text("sketch-edit-text-content", "OC");
         checkTextAngleBounds("sketch-edit-text-angle");
         text("sketch-edit-text-angle", "181");
@@ -7866,6 +7875,9 @@ class WorkbenchUiTest {
         text("sketch-text-height", "4");
         sketchClick(50, 20, false);
         sketchReady();
+        assertThat(fx(() -> ((ComboBox<?>) node("#sketch-edit-text-path")).getValue()))
+                .isEqualTo(arc);
+        key(KeyCode.ESCAPE);
         var text = sketchGeometry().entities().stream()
                 .filter(e -> e.kind() == SketchGeometry.Kind.TEXT)
                 .findFirst()

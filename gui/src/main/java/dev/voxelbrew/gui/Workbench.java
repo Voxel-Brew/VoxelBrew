@@ -144,6 +144,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private final Map<String, TextField> fields = new LinkedHashMap<>();
 
+    private final Map<String, Boolean> validSketchProfiles = new HashMap<>();
+
     private final List<QuickMenu> quickMenus = new ArrayList<>();
 
     private final UpdateDialog.Factory updates;
@@ -1071,6 +1073,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     || lastRebuilding != controller.rebuilding()
                     || lastIoBusy != controller.ioBusy();
             boolean changed = featuresChanged(document, effective);
+            if (changed) validSketchProfiles.clear();
             refreshBodies(document, changed);
             var styles = new LinkedHashMap<String, BodyStyle>();
             controller.build().bodies().forEach(b -> styles.put(b.id(), document.bodyStyle(b.id())));
@@ -1089,7 +1092,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             refreshCommands(document, snapshot);
             boolean atEnd = document.cursor() == document.features().size() && !controller.ioBusy();
             refreshSolidCommands(atEnd);
-            refreshCut(atEnd);
+            refreshSketchCommands(atEnd);
             refreshStatus();
         } finally {
             refreshing = false;
@@ -1220,7 +1223,17 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                         .subList(0, controller.snapshot().document().cursor()),
                 id);
         inspect();
-        refresh();
+        var snapshot = controller.snapshot();
+        var document = snapshot.document();
+        boolean wasRefreshing = refreshing;
+        refreshing = true;
+        try {
+            synchronizeTreeSelection();
+            refreshCommands(document, snapshot);
+            refreshSketchCommands(document.cursor() == document.features().size() && !controller.ioBusy());
+        } finally {
+            refreshing = wasRefreshing;
+        }
     }
 
     private void selectBody(String id, int face) {
@@ -3242,20 +3255,20 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         printing.documentChanged();
         customFeature.setDisable(!atEnd || tool != Tool.NONE || controller.rebuilding());
         constrainedSketch.setDisable(!atEnd || tool != Tool.NONE || controller.rebuilding());
-        extrude.setDisable(!atEnd
-                || tool != Tool.NONE
-                || !(selected() instanceof Feature.Sketch s
-                        && (!(s.profile() instanceof Feature.Constrained c)
-                                || dev.voxelbrew.engine.sketch.SketchProfiles.hasProfile(c.geometry()))));
     }
 
-    private void refreshCut(boolean atEnd) {
-        cut.setDisable(!atEnd
-                || tool != Tool.NONE
-                || !(selected() instanceof Feature.Sketch s
-                        && (s.profile() instanceof Feature.Circle
-                                || s.profile() instanceof Feature.Constrained c
-                                        && dev.voxelbrew.engine.sketch.SketchProfiles.hasProfile(c.geometry())))
+    private void refreshSketchCommands(boolean atEnd) {
+        if (!atEnd || tool != Tool.NONE || !(selected() instanceof Feature.Sketch sketch)) {
+            extrude.setDisable(true);
+            cut.setDisable(true);
+            return;
+        }
+        boolean available = !(sketch.profile() instanceof Feature.Constrained c)
+                || validSketchProfiles.computeIfAbsent(
+                        sketch.id(), id -> dev.voxelbrew.engine.sketch.SketchProfiles.hasProfile(c.geometry()));
+        extrude.setDisable(!available);
+        cut.setDisable(!available
+                || sketch.profile() instanceof Feature.Rectangle
                 || controller.rebuilding()
                 || controller.build().bodies().isEmpty());
     }

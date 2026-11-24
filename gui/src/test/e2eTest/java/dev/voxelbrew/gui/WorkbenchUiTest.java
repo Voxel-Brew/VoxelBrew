@@ -2947,12 +2947,13 @@ class WorkbenchUiTest {
         var sketch =
                 new Feature.Sketch("plate", "profile", Feature.Plane.origin("XY"), new Feature.Constrained(geometry));
         var file = directory.resolve("plate-with-holes.vxb");
-        DocumentWriter.save(new CadDocument("plate", List.of(sketch), 1), file, false);
+        var other = new Feature.Sketch("other", "circle", sketch.plane(), new Feature.Circle(-25, -25, 5));
+        DocumentWriter.save(new CadDocument("plate", List.of(sketch, other), 2), file, false);
         open(file);
         standardView(1);
         click("menu-fit");
         click("history-0");
-        fx(() -> {
+        var originalHighlight = fx(() -> {
             var root = ((SubScene) workbench.viewport().getChildren().getFirst()).getRoot();
             var highlight = (javafx.scene.shape.Path) root.lookup(".sketch-profile-highlight");
             assertThat(highlight.contains(30, 20)).isTrue();
@@ -2962,6 +2963,15 @@ class WorkbenchUiTest {
             Screenshot.save(
                     stage.getScene(),
                     Path.of(System.getProperty("voxelbrew.ui.artifacts"), "selected-sketch-profile.png"));
+            return highlight;
+        });
+        click("history-1");
+        fx(() -> {
+            var root = ((SubScene) workbench.viewport().getChildren().getFirst()).getRoot();
+            assertThat(root.lookup(".sketch-profile-highlight")).isNull();
+            var tree = (TreeView<?>) node("#model-tree");
+            tree.getSelectionModel().selectPrevious();
+            assertThat(root.lookup(".sketch-profile-highlight")).isSameAs(originalHighlight);
             return null;
         });
     }

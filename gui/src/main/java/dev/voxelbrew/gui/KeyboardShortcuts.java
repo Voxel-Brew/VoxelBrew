@@ -142,6 +142,7 @@ final class KeyboardShortcuts {
     }
 
     static String match(Scope scope, KeyEvent event, Node focus) {
+        if (focus instanceof FormulaField && event.getCode() == javafx.scene.input.KeyCode.F1) return null;
         // Leave popup navigation, type-ahead and editable combo boxes to their own controls.
         boolean editing = focus instanceof TextInputControl
                 || (!event.isShortcutDown()

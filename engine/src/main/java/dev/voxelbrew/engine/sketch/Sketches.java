@@ -114,7 +114,7 @@ public final class Sketches {
                 .filter(c -> c.id().equals(id))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Missing driving dimension: " + id));
-        if (!constraint.type().dimension()) {
+        if (!SketchConstraints.drivingDimension(constraint)) {
             throw new IllegalArgumentException("Constraint is not a driving dimension: " + id);
         }
         return SketchSolver.solve(g.withConstraints(g.constraints().stream()

@@ -3154,6 +3154,43 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void dimensionToolMeasuresFixedEndpointsWhileOtherGeometryCanMove() throws Exception {
+        ready();
+        click("constrained-sketch");
+        click("choose-plane-xy");
+        sketchReady();
+        var line = dev.voxelbrew.engine.sketch.Sketches.entity("edge", SketchGeometry.Kind.LINE, false, 10, 10, 10, 40);
+        var point = dev.voxelbrew.engine.sketch.Sketches.entity("free", SketchGeometry.Kind.POINT, true, 35, 25);
+        var geometry = new SketchGeometry(List.of(line, point), List.of(), List.of(line.id()));
+        fx(() -> {
+            ((SketchEditor) node("#sketch-editor"))
+                    .controller()
+                    .edit(geometry.add(dev.voxelbrew.engine.sketch.SketchConstraints.create(
+                            geometry, "fixed", SketchGeometry.Type.FIX, List.of(line.ref()), 0)));
+            return null;
+        });
+        sketchReady();
+        click("sketch-dimension");
+        sketchReference("edge.start");
+        sketchReference("edge.end");
+        sketchReady();
+        var reference = sketchGeometry().constraints().getLast();
+        assertThat(dev.voxelbrew.engine.sketch.SketchConstraints.referenceDimension(reference))
+                .isTrue();
+        assertThat(dev.voxelbrew.engine.sketch.SketchConstraints.measuredValue(sketchGeometry(), reference))
+                .isEqualTo(30);
+        assertThat(fx(() -> stage.getScene().lookup("#sketch-inline-dimension")))
+                .isNull();
+        key(KeyCode.ESCAPE);
+        click("sketch-dimension");
+        sketchReference("edge.start");
+        sketchReference("free.point");
+        assertThat(fx(() -> node("#sketch-inline-dimension").isDisabled())).isFalse();
+        key(KeyCode.ESCAPE);
+        click("constraint-cancel");
+    }
+
+    @Test
     void dimensionLabelsAndLinesDragWithoutChangingGeometryAndEscapeRestoresPlacement() throws Exception {
         ready();
         rectangleDraft(60, 40, 0);
@@ -7937,20 +7974,31 @@ class WorkbenchUiTest {
         sketchClick(0, 20, false);
         sketchDimension(0, "40");
         assertThat(fx(() -> ((Label) node("#sketch-solve-status")).getText())).isEqualTo("Fully constrained");
-        // Select the edge away from its midpoint label to add a conflicting dimension.
+        // A second measurement on the fixed edge is a live, read-only annotation.
         sketchClick(12, 0, false);
-        sketchDimension(0, "80");
-        assertThat(fx(() -> node("#constraint-finish").isDisabled())).isTrue();
-        assertThat(fx(() -> ((Label) node("#sketch-error")).getText().contains("cannot satisfy")))
+        assertThat(fx(() -> node("#sketch-dimension-value").isDisabled())).isTrue();
+        click("sketch-apply-dimension");
+        sketchReady();
+        var reference = sketchGeometry().constraints().getLast();
+        assertThat(dev.voxelbrew.engine.sketch.SketchConstraints.referenceDimension(reference))
                 .isTrue();
+        assertThat(dev.voxelbrew.engine.sketch.SketchConstraints.measuredValue(sketchGeometry(), reference))
+                .isCloseTo(60, within(1e-6));
+        assertThat(fx(() -> node("#sketch-dimension-value").isDisabled())).isTrue();
+        assertThat(fx(() -> node("#sketch-apply-dimension").isDisabled())).isTrue();
+        assertThat(fx(() -> node("#constraint-finish").isDisabled())).isFalse();
+        fx(() -> {
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "sketch-reference-dimension.png"));
+            return null;
+        });
         click("sketch-undo");
         sketchReady();
-        assertThat(fx(() -> node("#constraint-finish").isDisabled())).isFalse();
+        assertThat(sketchGeometry().constraints()).doesNotContain(reference);
         click("sketch-redo");
         sketchReady();
-        assertThat(fx(() -> node("#constraint-finish").isDisabled())).isTrue();
-        click("sketch-undo");
-        sketchReady();
+        assertThat(sketchGeometry().constraints()).contains(reference);
         sketchType(SketchTools.Tool.CIRCLE_CENTER);
         sketchNumericPoint(10, 10);
         sketchNumericPoint(12, 10);
@@ -7966,8 +8014,8 @@ class WorkbenchUiTest {
         click("sketch-clear-selection");
         sketchReference(circleId + ".center");
         sketchReference("origin.point");
-        sketchDimension(2, "-10");
-        sketchDimension(3, "-10");
+        sketchDimension(2, "10");
+        sketchDimension(3, "10");
         assertThat(fx(() -> ((Label) node("#sketch-solve-status")).getText())).isEqualTo("Fully constrained");
         assertThat(document().features().size())
                 .as("Sketch editing stays transient until Finish")

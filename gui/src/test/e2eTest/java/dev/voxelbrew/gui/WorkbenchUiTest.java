@@ -5300,7 +5300,18 @@ class WorkbenchUiTest {
                     .filter(menu -> menu.getOwnerNode() == field)
                     .findFirst()
                     .orElseThrow());
+            var instructionRow = fx(() -> {
+                var instructions = (CustomMenuItem) popup.getItems().get(1);
+                assertThat(instructions.isDisable()).isTrue();
+                var row = (javafx.scene.layout.Region) instructions.getStyleableNode();
+                var bounds = row.localToScreen(row.getBoundsInLocal());
+                robot.mouseMove(bounds.getCenterX(), bounds.getCenterY());
+                return row;
+            });
             fx(() -> {
+                assertThat(instructionRow.getOpacity()).isEqualTo(1);
+                assertThat(instructionRow.getBackground().getFills())
+                        .allMatch(fill -> javafx.scene.paint.Color.TRANSPARENT.equals(fill.getFill()));
                 Screenshot.save(
                         popup.getScene(),
                         Path.of(System.getProperty("voxelbrew.ui.artifacts"), "formula-help-" + theme + ".png"));

@@ -30,6 +30,8 @@ public final class Evaluator {
         private final Map<String, List<Entity>> projections = new LinkedHashMap<>();
         private final Map<Feature.BodyRef, Evaluation.Body> outputs = new LinkedHashMap<>();
         private final Map<String, Evaluation.Body> active = new LinkedHashMap<>();
+        private final Map<String, Evaluation.PatternCopy> patternCopies = new LinkedHashMap<>();
+        private final Map<String, Integer> copyCounts = new LinkedHashMap<>();
         private final Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction =
                 new LinkedHashMap<>();
 
@@ -215,7 +217,10 @@ public final class Evaluator {
                     copies.add(new Evaluation.Body(id + "." + name, new Feature.BodyRef(id, name), solid));
                 }
             }
+            int sourceNumber = new ArrayList<>(active.keySet()).indexOf(source.id()) + 1;
             for (var body : copies) {
+                int index = 1 + copyCounts.merge(source.id(), 1, Integer::sum);
+                patternCopies.put(body.id(), new Evaluation.PatternCopy(source.id(), sourceNumber, index));
                 outputs.put(body.output(), body);
                 active.put(body.id(), body);
             }
@@ -423,6 +428,7 @@ public final class Evaluator {
             result.construction(geometry.construction);
             result.projections(geometry.projections);
             result.indexBodyOutputs(geometry.outputs);
+            result.patternCopies(geometry.patternCopies);
             return result;
         } catch (Throwable failure) {
             geometry.owned.forEach(Solid::close);

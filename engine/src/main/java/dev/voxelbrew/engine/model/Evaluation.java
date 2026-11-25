@@ -26,6 +26,10 @@ public final class Evaluation implements AutoCloseable {
     @lombok.experimental.Accessors(fluent = true)
     private Map<Feature.BodyRef, String> bodyIds = Map.of();
 
+    @lombok.Getter
+    @lombok.experimental.Accessors(fluent = true)
+    private Map<String, PatternCopy> patternCopies = Map.of();
+
     private boolean closed;
     private java.util.Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction =
             java.util.Map.of();
@@ -40,6 +44,8 @@ public final class Evaluation implements AutoCloseable {
     public record Diagnostic(String featureId, State state, String message) {}
 
     public record Body(String id, Feature.BodyRef output, Solid solid) {}
+
+    public record PatternCopy(String sourceId, int sourceNumber, int index) {}
 
     Evaluation(CadDocument document, List<Diagnostic> diagnostics, List<Body> bodies, List<Solid> owned) {
         this(document, diagnostics, bodies, owned, document.features());
@@ -69,6 +75,10 @@ public final class Evaluation implements AutoCloseable {
     void indexBodyOutputs(Map<Feature.BodyRef, Body> outputs) {
         bodyIds = outputs.values().stream()
                 .collect(java.util.stream.Collectors.toUnmodifiableMap(Body::output, Body::id));
+    }
+
+    void patternCopies(Map<String, PatternCopy> copies) {
+        patternCopies = Map.copyOf(copies);
     }
 
     public java.util.Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction() {

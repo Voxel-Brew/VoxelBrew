@@ -2675,14 +2675,9 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     }
 
     private String bodyName(String id) {
-        int index = 1;
-        for (var body : document.build().bodies()) {
-            if (body.id().equals(id)) {
-                return document.snapshot().document().bodyName(id, translations.translate("feature.body", index));
-            }
-            index++;
-        }
-        return id;
+        return document.build()
+                .labels()
+                .label(id, document.snapshot().document(), i -> translations.translate("feature.body", i));
     }
 
     private String instanceName(String id) {

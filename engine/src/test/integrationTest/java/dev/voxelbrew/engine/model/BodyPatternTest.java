@@ -30,6 +30,10 @@ class BodyPatternTest {
         try (var evaluated = reopened.evaluate()) {
             var bodies = evaluated.requireCompleteDocument();
             assertThat(bodies).hasSize(8);
+            assertThat(evaluated.patternCopies())
+                    .containsEntry("grid.copy-1-1", new Evaluation.PatternCopy("base.body", 1, 4))
+                    .containsEntry("ring.copy-3-0", new Evaluation.PatternCopy("base.body", 1, 7))
+                    .containsEntry("mirror.copy-1-0", new Evaluation.PatternCopy("grid.copy-1-1", 4, 2));
             for (var body : bodies) assertThat(body.solid().volume()).isCloseTo(48, within(1e-6));
             assertThat(bodies.get(0).solid().contains(3, 6, 3)).isTrue();
             assertThat(bodies.get(3).solid().contains(13, 6, -9)).isTrue();

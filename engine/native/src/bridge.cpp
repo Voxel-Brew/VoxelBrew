@@ -35,6 +35,13 @@
 #include <gp_Torus.hxx>
 #include <gp_Trsf.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include <BRepMesh_Context.hxx>
+#include <BRepMesh_FaceDiscret.hxx>
+#include <BRepMesh_MeshAlgoFactory.hxx>
+#include <BRepMesh_DelaunayBaseMeshAlgo.hxx>
+#include <BRepMesh_DelaunayDeflectionControlMeshAlgo.hxx>
+#include <BRepMesh_DefaultRangeSplitter.hxx>
+#include <OSD_Environment.hxx>
 #include <BRep_Tool.hxx>
 #include <Poly_Triangulation.hxx>
 #include <TopoDS.hxx>
@@ -71,6 +78,19 @@ std::mutex registryMutex;
 std::mutex stepMutex;
 std::unordered_map<jlong, std::shared_ptr<const TopoDS_Shape>> registry;
 jlong nextId = 1;
+
+class PrismMeshFactory final : public BRepMesh_MeshAlgoFactory {
+   public:
+    Handle(IMeshTools_MeshAlgo) GetAlgo(const GeomAbs_SurfaceType type,
+                                        const IMeshTools_Parameters& parameters) const override {
+        // A linear sweep has no curvature along its axis. Start with the sampled
+        // boundary and let OCCT refine triangles against the actual surface.
+        if (type == GeomAbs_SurfaceOfExtrusion)
+            return new BRepMesh_DelaunayDeflectionControlMeshAlgo<BRepMesh_DefaultRangeSplitter,
+                                                                  BRepMesh_DelaunayBaseMeshAlgo>;
+        return BRepMesh_MeshAlgoFactory::GetAlgo(type, parameters);
+    }
+};
 
 void diagnostic(JNIEnv* env, const char* operation, const char* message) {
     if (env->ExceptionCheck()) return;
@@ -839,7 +859,14 @@ JNIEXPORT jobject JNICALL Java_dev_voxelbrew_engine_geometry_NativeKernel_tessel
         // Meshing attaches mutable triangulations to faces. Never mesh registry-owned topology.
         BRepBuilderAPI_Copy copy(*lookup(id), true, false);
         TopoDS_Shape shape = copy.Shape();
-        BRepMesh_IncrementalMesh mesher(shape, chord, false, angle, false);
+        Handle(BRepMesh_Context) context = new BRepMesh_Context;
+        if (OSD_Environment("CSF_MeshAlgo").Value().IsEmpty())
+            context->SetFaceDiscret(new BRepMesh_FaceDiscret(new PrismMeshFactory));
+        BRepMesh_IncrementalMesh mesher;
+        mesher.SetShape(shape);
+        mesher.ChangeParameters().Deflection = chord;
+        mesher.ChangeParameters().Angle = angle;
+        mesher.Perform(context);
         if (!mesher.IsDone() || mesher.GetStatusFlags() != 0)
             throw std::runtime_error("meshing failed");
         std::vector<jdouble> vertices;

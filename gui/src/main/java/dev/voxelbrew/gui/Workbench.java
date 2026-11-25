@@ -1174,6 +1174,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     }
 
     private String defaultFeatureName(Feature feature) {
+        if (CutTargets.through(feature)) return translations.translate("action.cut");
         if (BodyPattern.matches(feature)) {
             return patternName(BodyPattern.from(feature).kind());
         }
@@ -1409,7 +1410,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         } else if (feature instanceof Feature.Shell s) {
             dimension(feature, "thickness", s.thickness());
             referenceEditor(feature, null, s.body());
-        } else if (feature instanceof Feature.ThroughCut c) {
+        } else if (CutTargets.through(feature)) {
+            var c = CutTargets.firstThroughCut(feature);
             referenceEditor(feature, c.profile(), c.body());
         } else if (feature instanceof Feature.SplitBody s) {
             dimension(feature, "offset", s.plane().offset());
@@ -1685,6 +1687,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                             new Label(translations.translate("gui.named_output_body_negative_or_positive")),
                             output);
         }
+        var additional = historicalCutTargets(feature, earlier, bodies, output, operation);
         form.getChildren()
                 .add(button(translations.translate(extrusion ? "gui.apply" : "gui.repair_inputs"), "repair", () -> {
                     boolean useTarget =
@@ -1701,8 +1704,43 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                             profile,
                             sketches.getValue(),
                             target,
-                            extrusion ? operation.getValue() : null);
+                            extrusion ? operation.getValue() : null,
+                            additional == null ? List.of() : additional.selected());
                 }));
+    }
+
+    private AdditionalCutTargets historicalCutTargets(
+            Feature feature,
+            List<Feature> earlier,
+            ComboBox<String> bodies,
+            FormulaField output,
+            ComboBox<BodyExtrusion.Operation> operation) {
+        if (operation == null && !CutTargets.through(feature)) return null;
+        var ids = controller.build().bodyIds();
+        var byFeature = ids.entrySet().stream()
+                .collect(java.util.stream.Collectors.groupingBy(e -> e.getKey().featureId()));
+        var active = new LinkedHashMap<String, Feature.BodyRef>();
+        for (var step : earlier) {
+            if (step instanceof Feature.SplitBody split) active.remove(ids.get(split.body()));
+            byFeature.getOrDefault(step.id(), List.of()).stream()
+                    .sorted(Map.Entry.comparingByKey(Comparator.comparing(Feature.BodyRef::outputName)))
+                    .forEach(e -> active.put(e.getValue(), e.getKey()));
+        }
+        var choices = new LinkedHashMap<Feature.BodyRef, String>();
+        active.forEach((id, ref) -> choices.put(ref, bodyLabel(id)));
+        var selected = operation == null
+                ? CutTargets.throughTargets(feature).bodies().stream().skip(1).toList()
+                : BodyExtrusion.from(feature).additionalTargets();
+        var picker = new AdditionalCutTargets(
+                choices,
+                () -> bodies.getValue() == null ? null : new Feature.BodyRef(bodies.getValue(), output.evaluatedText()),
+                selected,
+                translations);
+        if (operation != null) {
+            picker.visibleProperty().bind(operation.valueProperty().isEqualTo(BodyExtrusion.Operation.CUT));
+        }
+        form.getChildren().add(picker);
+        return picker;
     }
 
     private void replaceInputs(
@@ -1711,7 +1749,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             Feature.ProfileRef original,
             String sketchId,
             Feature.BodyRef target,
-            BodyExtrusion.Operation operation) {
+            BodyExtrusion.Operation operation,
+            List<Feature.BodyRef> additional) {
         if (feature instanceof Feature.EdgeFinish finish) {
             controller.replaceFeature(
                     new Feature.EdgeFinish(finish.id(), target, finish.kind(), finish.size(), finish.edges()));
@@ -1731,7 +1770,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     ? original
                     : new Feature.ProfileRef(sketch.id(), sketch.profileId());
             Feature replacement = operation == null
-                    ? new Feature.ThroughCut(feature.id(), profile, target)
+                    ? new CutTargets(java.util.stream.Stream.concat(
+                                            java.util.stream.Stream.of(target), additional.stream())
+                                    .toList())
+                            .throughFeature(feature.id(), profile)
                     : new BodyExtrusion(
                                     new Feature.Extrude(
                                             feature.id(),
@@ -1740,7 +1782,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                                                     .extrusion()
                                                     .distance()),
                                     operation,
-                                    target)
+                                    target,
+                                    additional)
                             .feature();
             controller.replaceFeature(replacement);
         }
@@ -2145,7 +2188,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     new Feature.Extrude(
                             extrusion.id(), new Feature.ProfileRef(sketch.id(), profileId), extrusion.distance()),
                     definition.operation(),
-                    definition.target());
+                    definition.target(),
+                    definition.additionalTargets());
             controller.replaceFeature(replacement.feature());
             cancelTool();
         }));
@@ -2167,6 +2211,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         var regions = extrusionRegions(sketch, form);
         var operation = extrusionOperation(BodyExtrusion.Operation.NEW_BODY);
         var target = extrusionTarget(sketch);
+        var additional = additionalCutTargets(target);
+        additional.visibleProperty().bind(operation.valueProperty().isEqualTo(BodyExtrusion.Operation.CUT));
         operation.setDisable(target.getItems().isEmpty());
         target.disableProperty().bind(operation.valueProperty().isEqualTo(BodyExtrusion.Operation.NEW_BODY));
         form.getChildren()
@@ -2174,7 +2220,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                         new Label(translations.translate("extrude.operation")),
                         operation,
                         new Label(translations.translate("gui.input_body_feature")),
-                        target);
+                        target,
+                        additional);
         var distance = field("extrude-distance", translations.translate("gui.signed_distance_mm"), 5);
         finish = button(translations.translate("gui.commit"), "commit-extrusion", this::commitExtrusion);
         finish.getStyleClass().add("primary");
@@ -2201,17 +2248,20 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                         operation.getValue(),
                         target.isDisabled() || target.getValue() == null
                                 ? null
-                                : target.getValue().output());
+                                : target.getValue().output(),
+                        operation.getValue() == BodyExtrusion.Operation.CUT ? additional.selected() : List.of());
                 viewport.updateExtrusionDistance(value);
                 error.setText("");
                 finish.setDisable(!controller.canCommitExtrusion());
             } catch (RuntimeException failure) {
+                controller.cancelPreview();
                 finish.setDisable(true);
                 error.setText(failure.getMessage());
             }
         };
         distance.textProperty().addListener((o, a, b) -> updatePreview.run());
         regions.onChange(updatePreview);
+        additional.onChange(updatePreview);
         target.setOnAction(event -> updatePreview.run());
         operation.setOnAction(event -> {
             if (operation.getValue() == BodyExtrusion.Operation.CUT
@@ -2251,6 +2301,12 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         refresh();
     }
 
+    private AdditionalCutTargets additionalCutTargets(ComboBox<DocumentController.Body> first) {
+        var choices = new LinkedHashMap<Feature.BodyRef, String>();
+        first.getItems().forEach(b -> choices.put(b.output(), bodyLabel(b.id())));
+        return new AdditionalCutTargets(choices, () -> first.getValue().output(), List.of(), translations);
+    }
+
     private void beginCut() {
         if (!(selected() instanceof Feature.Sketch sketch)
                 || !(sketch.profile() instanceof Feature.Circle || sketch.profile() instanceof Feature.Constrained)) {
@@ -2262,14 +2318,15 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             throw new IllegalArgumentException(translations.translate("gui.a_target_body_is_required"));
         }
         target.setId("cut-target");
-        form.getChildren().setAll(new Label(translations.translate("gui.choose_the_target_body")), target);
+        var additional = additionalCutTargets(target);
+        form.getChildren().setAll(new Label(translations.translate("gui.choose_the_target_body")), target, additional);
         operationPanel(translations.translate("gui.through_all_cut"), "cut-confirm", () -> {
             String id =
                     "cut-" + controller.snapshot().document().uuidGenerator().next();
-            controller.add(new Feature.ThroughCut(
-                    id,
-                    new Feature.ProfileRef(sketch.id(), sketch.profileId()),
-                    target.getValue().output()));
+            var inputs = new ArrayList<>(List.of(target.getValue().output()));
+            inputs.addAll(additional.selected());
+            controller.add(
+                    new CutTargets(inputs).throughFeature(id, new Feature.ProfileRef(sketch.id(), sketch.profileId())));
             selectedFeature = id;
         });
     }

@@ -465,14 +465,14 @@ public final class VoxelBrew implements Runnable {
         @Option(names = "--sketch", required = true)
         String sketch;
 
-        @Option(names = "--body-feature", required = true, description = "Earlier feature providing the body output")
-        String body;
+        @Option(names = "--body-feature", required = true, description = "Target feature; repeat for each body to cut")
+        java.util.List<String> bodies;
 
         @Option(
                 names = "--body-output",
                 defaultValue = "body",
-                description = "Named body output, including negative/positive split halves")
-        String output;
+                description = "One output name for all targets, or repeat in the same order as --body-feature")
+        java.util.List<String> outputs;
 
         Cut(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
@@ -481,7 +481,14 @@ public final class VoxelBrew implements Runnable {
         @Override
         public Integer call() throws Exception {
             var session = session();
-            session.add(new Feature.ThroughCut(id, profileRef(session, sketch), new Feature.BodyRef(body, output)));
+            if (outputs.size() != 1 && outputs.size() != bodies.size()) {
+                throw new IllegalArgumentException("Provide one output name or one for each target body");
+            }
+            var refs = new java.util.ArrayList<Feature.BodyRef>();
+            for (int i = 0; i < bodies.size(); i++) {
+                refs.add(new Feature.BodyRef(bodies.get(i), outputs.get(outputs.size() == 1 ? 0 : i)));
+            }
+            session.add(new CutTargets(refs).throughFeature(id, profileRef(session, sketch)));
             return save(session);
         }
     }
@@ -586,10 +593,13 @@ public final class VoxelBrew implements Runnable {
                     .orElseThrow(() -> new ModelException(feature, "feature does not exist"));
             if (original instanceof Feature.Extrude e && sketch != null && body == null) {
                 session.replace(new Feature.Extrude(e.id(), profileRef(session, sketch), e.distance()));
-            } else if (original instanceof Feature.ThroughCut c
-                    && (sketch != null || body != null || bodyOutput != null)) {
-                session.replace(new Feature.ThroughCut(
-                        c.id(), sketch == null ? c.profile() : profileRef(session, sketch), repairBody(c.body())));
+            } else if (CutTargets.through(original) && (sketch != null || body != null || bodyOutput != null)) {
+                var c = CutTargets.firstThroughCut(original);
+                var inputs = new java.util.ArrayList<>(
+                        CutTargets.throughTargets(original).bodies());
+                inputs.set(0, repairBody(c.body()));
+                session.replace(new CutTargets(inputs)
+                        .throughFeature(c.id(), sketch == null ? c.profile() : profileRef(session, sketch)));
             } else if (original instanceof Feature.SplitBody s && (body != null || bodyOutput != null)) {
                 session.replace(new Feature.SplitBody(s.id(), repairBody(s.body()), s.plane()));
             } else {

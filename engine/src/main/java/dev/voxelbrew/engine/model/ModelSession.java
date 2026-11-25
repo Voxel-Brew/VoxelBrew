@@ -90,27 +90,41 @@ public final class ModelSession {
         }
     }
 
-    private static Feature.BodyRef modifiedBody(Feature feature) {
+    private static List<Feature.BodyRef> modifiedBodies(Feature feature) {
         if (BodyExtrusion.modifiesBody(feature)) {
-            return BodyExtrusion.from(feature).target();
+            return BodyExtrusion.from(feature).targets();
         }
-        if (feature instanceof Feature.ThroughCut cut) return cut.body();
-        if (feature instanceof Feature.EdgeFinish finish) return finish.body();
-        if (feature instanceof Feature.Shell shell) return shell.body();
-        return null;
+        if (CutTargets.through(feature)) {
+            return CutTargets.throughTargets(feature).bodies();
+        }
+        if (feature instanceof Feature.EdgeFinish finish) return List.of(finish.body());
+        if (feature instanceof Feature.Shell shell) return List.of(shell.body());
+        return List.of();
     }
 
     private static Feature followBody(Feature feature, Feature.BodyRef previous, Feature.BodyRef replacement) {
-        if (feature instanceof Feature.ThroughCut cut && previous.equals(cut.body())) {
-            return new Feature.ThroughCut(cut.id(), cut.profile(), replacement);
+        if (CutTargets.through(feature)) {
+            var inputs = new ArrayList<>(modifiedBodies(feature));
+            if (java.util.Collections.replaceAll(inputs, previous, replacement)) {
+                return new CutTargets(inputs)
+                        .throughFeature(
+                                feature.id(),
+                                CutTargets.firstThroughCut(feature).profile());
+            }
         }
         if (feature instanceof Feature.SplitBody split && previous.equals(split.body())) {
             return new Feature.SplitBody(split.id(), replacement, split.plane());
         }
         if (BodyExtrusion.modifiesBody(feature)) {
             var extrusion = BodyExtrusion.from(feature);
-            if (previous.equals(extrusion.target())) {
-                return new BodyExtrusion(extrusion.extrusion(), extrusion.operation(), replacement).feature();
+            var inputs = new ArrayList<>(extrusion.targets());
+            if (java.util.Collections.replaceAll(inputs, previous, replacement)) {
+                return new BodyExtrusion(
+                                extrusion.extrusion(),
+                                extrusion.operation(),
+                                inputs.getFirst(),
+                                inputs.subList(1, inputs.size()))
+                        .feature();
             }
         }
         if (BodyPattern.matches(feature)) {
@@ -199,9 +213,10 @@ public final class ModelSession {
         var next = new ArrayList<>(features);
         next.add(cursor, feature);
         if (cursor < features.size()) {
-            var input = modifiedBody(feature);
-            if (input != null) {
-                var output = new Feature.BodyRef(feature.id(), "body");
+            var inputs = modifiedBodies(feature);
+            for (int i = 0; i < inputs.size(); i++) {
+                var input = inputs.get(i);
+                var output = new Feature.BodyRef(feature.id(), CutTargets.output(i));
                 next.subList(cursor + 1, next.size()).replaceAll(later -> followBody(later, input, output));
             }
         }

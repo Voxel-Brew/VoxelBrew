@@ -679,7 +679,7 @@ public final class DocumentController implements AutoCloseable {
     }
 
     public void previewExtrusion(Feature.Sketch sketch, String profileId, double distance) {
-        previewExtrusion(sketch, profileId, distance, BodyExtrusion.Operation.NEW_BODY, null);
+        previewExtrusion(sketch, profileId, distance, BodyExtrusion.Operation.NEW_BODY, null, List.of());
     }
 
     private void previewExtrusion(
@@ -687,7 +687,8 @@ public final class DocumentController implements AutoCloseable {
             String profileId,
             double distance,
             BodyExtrusion.Operation operation,
-            Feature.BodyRef target) {
+            Feature.BodyRef target,
+            List<Feature.BodyRef> additionalTargets) {
         previewExpression = "";
         String id = preview == null
                 ? "extrude-" + session.document().uuidGenerator().next()
@@ -695,7 +696,8 @@ public final class DocumentController implements AutoCloseable {
         var candidate = new BodyExtrusion(
                         new Feature.Extrude(id, new Feature.ProfileRef(sketch.id(), profileId), distance),
                         operation,
-                        target)
+                        target,
+                        additionalTargets)
                 .feature();
         var temporary = new ModelSession(session.document());
         temporary.add(candidate);
@@ -708,7 +710,7 @@ public final class DocumentController implements AutoCloseable {
     }
 
     public void previewExtrusion(Feature.Sketch sketch, String profileId, String expression) {
-        previewExtrusion(sketch, profileId, expression, BodyExtrusion.Operation.NEW_BODY, null);
+        previewExtrusion(sketch, profileId, expression, BodyExtrusion.Operation.NEW_BODY, null, List.of());
     }
 
     void previewExtrusion(
@@ -716,10 +718,11 @@ public final class DocumentController implements AutoCloseable {
             String profileId,
             String expression,
             BodyExtrusion.Operation operation,
-            Feature.BodyRef target) {
+            Feature.BodyRef target,
+            List<Feature.BodyRef> additionalTargets) {
         double value =
                 session.document().parameters().value(expression, dev.voxelbrew.api.model.parameters.ParameterUnit.MM);
-        previewExtrusion(sketch, profileId, value, operation, target);
+        previewExtrusion(sketch, profileId, value, operation, target, additionalTargets);
         if (!expression.matches("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?")) {
             previewExpression = expression;
         }

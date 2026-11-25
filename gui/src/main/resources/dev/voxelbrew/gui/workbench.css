@@ -785,6 +785,19 @@
   -fx-padding: 0 1;
   -fx-background-color: derive(-fx-base, -15%);
 }
+#project-window-current {
+  -fx-background-color: #0067b8;
+  -fx-text-fill: white;
+}
+#project-window-current:hover {
+  -fx-background-color: #005da6;
+}
+#project-window-current:armed {
+  -fx-background-color: #004f8c;
+}
+#project-window-current:focused {
+  -fx-border-color: white;
+}
 .dialog-overlay {
   -fx-padding: 20;
   -fx-background-color: -fx-control-inner-background;

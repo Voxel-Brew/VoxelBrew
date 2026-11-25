@@ -6283,9 +6283,14 @@ class WorkbenchUiTest {
         assertThat(fx(() -> {
                     var button = (Button) node("#project-window-current");
                     button.applyCss();
+                    assertThat(button.getTextFill()).isEqualTo(javafx.scene.paint.Color.WHITE);
+                    assertThat(button.getFont().getStyle()).containsIgnoringCase("bold");
+                    Screenshot.save(
+                            stage.getScene(),
+                            Path.of(System.getProperty("voxelbrew.ui.artifacts"), "default-project-window.png"));
                     return button.getBackground().getFills().getLast().getFill();
                 }))
-                .isIn(javafx.scene.paint.Color.web("#0067b8"), javafx.scene.paint.Color.web("#005da6"));
+                .isIn(javafx.scene.paint.Color.web("#6555ce"), javafx.scene.paint.Color.web("#7866de"));
         key(KeyCode.ENTER);
         ready();
         assertThat(document()).isEqualTo(savedDocument);

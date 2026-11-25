@@ -121,7 +121,7 @@ public final class WorkbenchApplication extends Application {
                     var prompt = new Alert(Alert.AlertType.INFORMATION, result.message(), download, ButtonType.CANCEL);
                     prompt.setTitle(translations.translate("update.title"));
                     prompt.setHeaderText(translations.translate("update.heading"));
-                    if (prompt.showAndWait().filter(download::equals).isPresent() && stage.isShowing()) {
+                    if (Dialogs.showStandalone(prompt).filter(download::equals).isPresent() && stage.isShowing()) {
                         workbench.openUpdates();
                     }
                 });

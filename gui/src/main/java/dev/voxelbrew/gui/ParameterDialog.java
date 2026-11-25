@@ -101,7 +101,7 @@ final class ParameterDialog {
         dialog.getDialogPane().getButtonTypes().setAll(ButtonType.APPLY, ButtonType.CANCEL);
         var apply = dialog.getDialogPane().lookupButton(ButtonType.APPLY);
         apply.setId("parameters-apply");
-        apply.getStyleClass().add("parameter-primary-action");
+        apply.getStyleClass().add("primary");
         dialog.getDialogPane().lookupButton(ButtonType.CANCEL).setId("parameters-cancel");
         apply.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
             try {
@@ -302,7 +302,7 @@ final class ParameterDialog {
                 new Label(translations.translate("gui.comment")),
                 comment);
         var save = button(translations.translate("gui.add"), "parameter-save", this::addParameter);
-        save.getStyleClass().add("parameter-primary-action");
+        save.getStyleClass().add("primary");
         var parameterButtons = new FlowPane(
                 6, 6, save, button("↺ " + translations.translate("gui.clear"), "parameter-new", this::clearFields));
         var parameterPane = new VBox(

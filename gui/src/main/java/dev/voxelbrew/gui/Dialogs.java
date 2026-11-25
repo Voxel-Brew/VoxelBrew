@@ -35,6 +35,13 @@ final class Dialogs {
             ButtonType.NO,
             "dialog.no");
 
+    static Optional<ButtonType> showStandalone(Alert alert) {
+        alert.getDialogPane()
+                .getStylesheets()
+                .add(Dialogs.class.getResource("workbench.css").toExternalForm());
+        return alert.showAndWait();
+    }
+
     /** Give the action its full translated label width; the editable path takes the remainder. */
     static HBox pathRow(TextField path, Button browse) {
         path.setMinWidth(0);

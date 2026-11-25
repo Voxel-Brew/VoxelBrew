@@ -529,7 +529,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         var actions = new HBox(12, progress, jobStatus, cancel, export3mfButton, sliceAll, slice);
         actions.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
         actions.getStyleClass().add("slicer-status-bar");
-        slice.getStyleClass().add("slicer-primary-action");
+        slice.getStyleClass().addAll("primary", "slicer-primary-action");
         slice.setText(translations.translate("print.slicePlate"));
         setBottom(new VBox(8, previewControls, actions));
         BorderPane.setMargin(tabs, new Insets(0, 0, 0, 8));
@@ -2729,7 +2729,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
             alert.initOwner(getScene().getWindow());
             alert.setTitle(translations.translate("print.exportPrinters"));
             alert.setHeaderText(null);
-            alert.showAndWait();
+            Dialogs.showStandalone(alert);
         } catch (java.io.IOException ex) {
             throw new IllegalStateException(ex);
         }

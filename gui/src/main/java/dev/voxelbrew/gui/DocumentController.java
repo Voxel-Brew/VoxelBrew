@@ -129,11 +129,12 @@ public final class DocumentController implements AutoCloseable {
                     return new Build(List.of(), evaluation.diagnostics(), false, evaluation.resolvedFeatures());
                 }
                 var active = evaluation.resolvedFeatures().subList(0, document.cursor());
-                var reusable = unchangedProducers(document.id(), active);
+                var reusable = UnchangedGeometry.between(
+                        document.id().equals(documentId) ? previousFeatures : List.of(), active);
                 var bodies = dev.voxelbrew.util.concurrent.ParallelWork.map(evaluation.bodies(), b -> {
                     var cached = previousBodies.get(b.output());
                     if (cached != null
-                            && reusable.contains(b.output().featureId())
+                            && reusable.test(b.output())
                             && cached.id().equals(b.id())) {
                         return cached;
                     }
@@ -153,22 +154,6 @@ public final class DocumentController implements AutoCloseable {
                         bodies.stream().collect(java.util.stream.Collectors.toMap(Body::output, Function.identity()));
                 return result;
             }
-        }
-
-        private Set<String> unchangedProducers(String id, List<Feature> active) {
-            if (!id.equals(documentId)) return Set.of();
-            var producers = new HashSet<String>();
-            for (int i = 0; i < Math.min(previousFeatures.size(), active.size()); i++) {
-                var feature = active.get(i);
-                if (!feature.equals(previousFeatures.get(i))) break;
-                // External feature providers can depend on state outside the document.
-                if (feature instanceof Feature.Custom
-                        && !BodyExtrusion.modifiesBody(feature)
-                        && !BodyPattern.matches(feature)
-                        && !CutTargets.through(feature)) break;
-                producers.add(feature.id());
-            }
-            return producers;
         }
     }
 

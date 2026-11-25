@@ -3123,6 +3123,72 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void editsTheRegionAndTargetsOfAHistoricalThroughCut() throws Exception {
+        var plane = Feature.Plane.origin("XY");
+        var base = new Feature.Sketch("base", "outline", plane, new Feature.Rectangle(0, 0, 40, 20));
+        var plate = new Feature.Extrude("plate", new Feature.ProfileRef("base", "outline"), 5);
+        var copy = new BodyPattern(
+                        BodyPattern.Kind.RECTANGULAR,
+                        new Feature.BodyRef("plate", "body"),
+                        BodyPattern.Axis.Y,
+                        1,
+                        2,
+                        0,
+                        10)
+                .feature("copies");
+        var holes = new SketchGeometry(
+                List.of(
+                        Sketches.entity("small", SketchGeometry.Kind.CIRCLE, false, 8, 10, 2),
+                        Sketches.entity("large", SketchGeometry.Kind.CIRCLE, false, 28, 10, 4)),
+                List.of(),
+                List.of("small", "large"));
+        var sketch = new Feature.Sketch("holes", "profile", plane, new Feature.Constrained(holes));
+        var targets = List.of(new Feature.BodyRef("copies", "copy-0-1"), new Feature.BodyRef("plate", "body"));
+        var cut = new CutTargets(targets).throughFeature("cut", new Feature.ProfileRef("holes", "profile"));
+        var later = new BodyPattern(
+                        BodyPattern.Kind.MIRROR, new Feature.BodyRef("cut", "body"), BodyPattern.Axis.X, 2, 1, 0, 0)
+                .feature("later");
+        var path = directory.resolve("edit-through-cut.vxb");
+        var history = List.of(base, plate, copy, sketch, cut, later);
+        DocumentWriter.save(new CadDocument("history", history, 6), path, false);
+        open(path);
+        click("history-4");
+        doubleClick("history-4");
+        assertThat(fx(() -> ((ComboBox<?>) node("#cut-target")).getValue())).isEqualTo(targets.getFirst());
+        assertThat(fx(() -> ((ComboBox<?>) node("#cut-target-2")).getValue())).isEqualTo(targets.getLast());
+        click("remove-cut-target");
+        modelClick(28, 10, 0);
+        fx(() -> {
+            Screenshot.save(
+                    stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "edit-through-cut.png"));
+            return null;
+        });
+        click("apply-cut-profile");
+        ready();
+        var edited = document();
+        var region = dev.voxelbrew.engine.sketch.SketchProfiles.regionAt(holes, new SketchGeometry.Vec(28, 10))
+                .orElseThrow();
+        assertThat(edited.features().get(4))
+                .isEqualTo(new Feature.ThroughCut(
+                        "cut", new Feature.ProfileRef("holes", "profile/region/" + region), targets.getFirst()));
+        assertThat(edited.features().getLast()).isEqualTo(later);
+        assertThat(fx(() -> workbench.controller().build().bodies().stream()
+                        .map(DocumentController.Body::volume)
+                        .toList()))
+                .satisfiesExactly(
+                        v -> assertThat(v).isCloseTo(4000, within(.001)),
+                        v -> assertThat(v).isCloseTo(4000 - 80 * Math.PI, within(.001)),
+                        v -> assertThat(v).isCloseTo(4000 - 80 * Math.PI, within(.001)));
+        click("history-4");
+        click("edit-cut-profile");
+        assertThat(fx(() -> ((CheckBox) node("#extrude-whole")).isSelected())).isFalse();
+        click("cancel-tool");
+        click("undo");
+        ready();
+        assertThat(document().features()).isEqualTo(history);
+    }
+
+    @Test
     void editsAnEarlierExtrusionProfileAndRebuildsItsDependents() throws Exception {
         var entities = List.of(
                 Sketches.entity("small", SketchGeometry.Kind.CIRCLE, false, 0, 0, 2),

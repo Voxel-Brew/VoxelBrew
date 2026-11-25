@@ -590,6 +590,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         return projectPath == null ? saveFolder.resolve("Untitled.vxb") : projectPath;
     }
 
+    private static boolean canCut(Feature.Sketch sketch) {
+        return sketch.profile() instanceof Feature.Circle || sketch.profile() instanceof Feature.Constrained;
+    }
+
     Workbench(
             Stage stage,
             Path pluginDirectory,
@@ -1662,14 +1666,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         boolean extrusion = feature instanceof Feature.Extrude || BodyExtrusion.modifiesBody(feature);
         var operation =
                 extrusion ? extrusionOperation(BodyExtrusion.from(feature).operation()) : null;
-        if (extrusion) {
-            form.getChildren()
-                    .add(button(
-                            translations.translate("extrude.editProfile"),
-                            "edit-extrusion-profile",
-                            () -> beginProfileEdit(feature, sketches.getValue())));
-            form.getChildren().addAll(new Label(translations.translate("extrude.operation")), operation);
-        }
+        if (profile != null) profileEditorControls(feature, sketches, operation);
         if (body != null || extrusion) {
             earlier.stream()
                     .filter(f -> !(f instanceof Feature.Sketch || f instanceof ConstructionFeature))
@@ -1709,6 +1706,17 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 }));
     }
 
+    private void profileEditorControls(
+            Feature feature, ComboBox<String> sketches, ComboBox<BodyExtrusion.Operation> operation) {
+        boolean extrusion = operation != null;
+        form.getChildren()
+                .add(button(
+                        translations.translate(extrusion ? "extrude.editProfile" : "parameter.edit"),
+                        extrusion ? "edit-extrusion-profile" : "edit-cut-profile",
+                        () -> beginProfileEdit(feature, sketches.getValue())));
+        if (extrusion) form.getChildren().addAll(new Label(translations.translate("extrude.operation")), operation);
+    }
+
     private AdditionalCutTargets historicalCutTargets(
             Feature feature,
             List<Feature> earlier,
@@ -1716,18 +1724,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             FormulaField output,
             ComboBox<BodyExtrusion.Operation> operation) {
         if (operation == null && !CutTargets.through(feature)) return null;
-        var ids = controller.build().bodyIds();
-        var byFeature = ids.entrySet().stream()
-                .collect(java.util.stream.Collectors.groupingBy(e -> e.getKey().featureId()));
-        var active = new LinkedHashMap<String, Feature.BodyRef>();
-        for (var step : earlier) {
-            if (step instanceof Feature.SplitBody split) active.remove(ids.get(split.body()));
-            byFeature.getOrDefault(step.id(), List.of()).stream()
-                    .sorted(Map.Entry.comparingByKey(Comparator.comparing(Feature.BodyRef::outputName)))
-                    .forEach(e -> active.put(e.getValue(), e.getKey()));
-        }
-        var choices = new LinkedHashMap<Feature.BodyRef, String>();
-        active.forEach((id, ref) -> choices.put(ref, bodyLabel(id)));
+        var choices = historicalBodies(earlier);
         var selected = operation == null
                 ? CutTargets.throughTargets(feature).bodies().stream().skip(1).toList()
                 : BodyExtrusion.from(feature).additionalTargets();
@@ -1741,6 +1738,22 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         }
         form.getChildren().add(picker);
         return picker;
+    }
+
+    private Map<Feature.BodyRef, String> historicalBodies(List<Feature> earlier) {
+        var ids = controller.build().bodyIds();
+        var byFeature = ids.entrySet().stream()
+                .collect(java.util.stream.Collectors.groupingBy(e -> e.getKey().featureId()));
+        var active = new LinkedHashMap<String, Feature.BodyRef>();
+        for (var step : earlier) {
+            if (step instanceof Feature.SplitBody split) active.remove(ids.get(split.body()));
+            byFeature.getOrDefault(step.id(), List.of()).stream()
+                    .sorted(Map.Entry.comparingByKey(Comparator.comparing(Feature.BodyRef::outputName)))
+                    .forEach(e -> active.put(e.getValue(), e.getKey()));
+        }
+        var choices = new LinkedHashMap<Feature.BodyRef, String>();
+        active.forEach((id, ref) -> choices.put(ref, bodyLabel(id)));
+        return choices;
     }
 
     private void replaceInputs(
@@ -1815,7 +1828,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     private void editSelectedFeature() {
         var feature = selected();
         if (feature instanceof Feature.Sketch sketch) attempt(() -> editSketch(sketch));
-        else if (feature instanceof Feature.Extrude || BodyExtrusion.modifiesBody(feature)) {
+        else if (CutTargets.through(feature)) {
+            attempt(() -> beginProfileEdit(
+                    feature, CutTargets.firstThroughCut(feature).profile().sketchId()));
+        } else if (feature instanceof Feature.Extrude || BodyExtrusion.modifiesBody(feature)) {
             attempt(() -> beginProfileEdit(
                     feature, BodyExtrusion.from(feature).extrusion().profile().sketchId()));
         }
@@ -2119,9 +2135,12 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         var document = controller.snapshot().document();
         var definition = document.features().stream()
                 .filter(f -> f.id().equals(feature.id()))
-                .map(BodyExtrusion::from)
                 .findFirst()
                 .orElseThrow();
+        boolean cut = CutTargets.through(definition);
+        var original = cut
+                ? CutTargets.firstThroughCut(definition).profile()
+                : BodyExtrusion.from(definition).extrusion().profile();
         var earlier = controller.effectiveFeatures().stream()
                 .takeWhile(f -> !f.id().equals(feature.id()))
                 .toList();
@@ -2130,13 +2149,19 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         draftGeneration = controller.generation();
         form.getChildren().clear();
         fields.clear();
-        selectionLabel.setText(translations.translate("extrude.editProfile"));
-        var sketches = sketchInput(earlier, definition.extrusion().profile());
-        sketches.setValue(initialSketch);
+        selectionLabel.setText(translations.translate(cut ? "gui.through_all_cut" : "extrude.editProfile"));
+        var sketchCandidates = cut
+                ? earlier.stream()
+                        .filter(f -> f instanceof Feature.Sketch s && canCut(s))
+                        .toList()
+                : earlier;
+        var sketches = sketchInput(sketchCandidates, original);
+        sketches.setValue(sketches.getItems().contains(initialSketch) ? initialSketch : original.sketchId());
+        var replaceProfile = profileReplacement(definition, earlier);
         var choices = new VBox(5);
         form.getChildren().add(choices);
         var apply = new Button(translations.translate("gui.apply"));
-        apply.setId("apply-extrusion-profile");
+        apply.setId(cut ? "apply-cut-profile" : "apply-extrusion-profile");
         apply.getStyleClass().add("primary");
         toolActions
                 .getChildren()
@@ -2147,7 +2172,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             viewport.clearHandle();
             apply.setDisable(true);
             error.setText("");
-            var sketch = earlier.stream()
+            var sketch = sketchCandidates.stream()
                     .filter(Feature.Sketch.class::isInstance)
                     .map(Feature.Sketch.class::cast)
                     .filter(s -> s.id().equals(sketches.getValue()))
@@ -2155,7 +2180,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             viewport.showSketches(sketch.stream().map(Feature.class::cast).toList(), null);
             sketch.ifPresent(s -> attempt(() -> {
                 viewport.frameProfile(s);
-                editProfileRegions(definition, s, choices, apply);
+                editProfileRegions(original, s, choices, apply, replaceProfile);
             }));
         };
         sketches.setOnAction(event -> update.run());
@@ -2163,9 +2188,44 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         refresh();
     }
 
-    private void editProfileRegions(BodyExtrusion definition, Feature.Sketch sketch, VBox choices, Button apply) {
+    private java.util.function.Consumer<Feature.ProfileRef> profileReplacement(
+            Feature definition, List<Feature> earlier) {
+        if (CutTargets.through(definition)) {
+            var saved = CutTargets.throughTargets(definition).bodies();
+            var choices = historicalBodies(earlier);
+            var first = new ComboBox<Feature.BodyRef>();
+            first.setId("cut-target");
+            saved.forEach(ref -> choices.putIfAbsent(ref, ref.featureId() + "." + ref.outputName()));
+            first.getItems().setAll(choices.keySet());
+            UiText.choices(first, choices::get);
+            first.setValue(saved.getFirst());
+            var additional =
+                    new AdditionalCutTargets(choices, first::getValue, saved.subList(1, saved.size()), translations);
+            form.getChildren()
+                    .addAll(new Label(translations.translate("gui.choose_the_target_body")), first, additional);
+            return profile -> {
+                var targets = new ArrayList<>(List.of(first.getValue()));
+                targets.addAll(additional.selected());
+                controller.replaceFeature(new CutTargets(targets).throughFeature(definition.id(), profile));
+            };
+        }
+        var extrusion = BodyExtrusion.from(definition);
+        return profile -> controller.replaceFeature(new BodyExtrusion(
+                        new Feature.Extrude(
+                                definition.id(), profile, extrusion.extrusion().distance()),
+                        extrusion.operation(),
+                        extrusion.target(),
+                        extrusion.additionalTargets())
+                .feature());
+    }
+
+    private void editProfileRegions(
+            Feature.ProfileRef original,
+            Feature.Sketch sketch,
+            VBox choices,
+            Button apply,
+            java.util.function.Consumer<Feature.ProfileRef> replaceProfile) {
         var selection = extrusionRegions(sketch, choices);
-        var original = definition.extrusion().profile();
         boolean all =
                 !original.sketchId().equals(sketch.id()) || original.profileId().equals(sketch.profileId());
         selection.whole().setSelected(all);
@@ -2183,14 +2243,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         apply.setDisable(!all && (selection.selectedIds().isEmpty() || !saved.equals(selection.profileId(sketch))));
         apply.setOnAction(event -> attempt(() -> {
             String profileId = selection.profileId(sketch);
-            var extrusion = definition.extrusion();
-            var replacement = new BodyExtrusion(
-                    new Feature.Extrude(
-                            extrusion.id(), new Feature.ProfileRef(sketch.id(), profileId), extrusion.distance()),
-                    definition.operation(),
-                    definition.target(),
-                    definition.additionalTargets());
-            controller.replaceFeature(replacement.feature());
+            replaceProfile.accept(new Feature.ProfileRef(sketch.id(), profileId));
             cancelTool();
         }));
     }
@@ -2308,8 +2361,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     }
 
     private void beginCut() {
-        if (!(selected() instanceof Feature.Sketch sketch)
-                || !(sketch.profile() instanceof Feature.Circle || sketch.profile() instanceof Feature.Constrained)) {
+        if (!(selected() instanceof Feature.Sketch sketch) || !canCut(sketch)) {
             throw new IllegalArgumentException(translations.translate("gui.select_a_closed_sketch_profile"));
         }
         cancelTool();

@@ -33,8 +33,8 @@ jobs:
   native:
     name: ${{ inputs.suite }} (${{ inputs.os }})
     runs-on: ${{ inputs.os }}
-    # macOS package checks also build and upload both app archives.
-    timeout-minutes: ${{ inputs.release-candidate && 90 || inputs.suite == 'headlessPackageCheck' && 30 || 20 }}
+    # Ubuntu platform shards and jobs that archive packages need extra runner time.
+    timeout-minutes: ${{ inputs.release-candidate && 90 || (inputs.archive || (inputs.os == 'ubuntu-24.04' && inputs.suite == ':gui:e2eTest')) && 30 || 20 }}
     env:
       ORG_GRADLE_PROJECT_uiTestShard: ${{ inputs.ui-shard }}
       ORG_GRADLE_PROJECT_uiTestShardCount: ${{ inputs.ui-shard-count }}
@@ -59,6 +59,7 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: gradle/actions/setup-gradle@v4
+      - uses: ./.github/actions/cache-protoc
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -136,6 +137,9 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./scripts/bootstrap-slicer.ps1
+      - name: Prepare pinned slicer downloads for integration tests
+        if: inputs.suite == 'integrationTest' && runner.os == 'Linux'
+        run: python3 scripts/bundle-slicers.py test-downloads linux .tools/bundled-slicers
       - name: Integration tests (headless Ubuntu)
         if: inputs.suite == 'integrationTest'
         run: ./gradlew --build-cache integrationTest
@@ -155,23 +159,40 @@ jobs:
         env:
           GRADLE_SUITE: ${{ inputs.suite }}
         run: ./gradlew --build-cache "$GRADLE_SUITE"
+      - uses: ./.github/actions/cache-protoc
+        with:
+          save: "true"
       - name: Archive app images
         if: inputs.archive
         shell: bash
         run: ./gradlew ${{ inputs.release-candidate && runner.os == 'macOS' && ':cli:packageZip' || ':cli:packageZip :gui:packageZip' }} ${{ runner.os == 'Windows' && '''-PvsGenerator=Visual Studio 17 2022''' || '' }}
       - name: Install Inno Setup 6
-        if: inputs.release-candidate && runner.os == 'Windows'
+        if: inputs.archive && runner.os == 'Windows'
         shell: pwsh
         run: choco install innosetup --no-progress -y
       - name: Build GUI installer
-        if: inputs.release-candidate && (runner.os == 'Windows' || (runner.os == 'macOS' && steps.candidate.outputs.mac_gui_installer == 'true'))
+        if: (inputs.archive && runner.os == 'Windows') || (inputs.release-candidate && ((runner.os == 'Linux' && steps.candidate.outputs.linux_gui_installer == 'true') || (runner.os == 'macOS' && steps.candidate.outputs.mac_gui_installer == 'true')))
         shell: bash
         run: ./gradlew :gui:packageInstaller ${{ runner.os == 'Windows' && '''-PvsGenerator=Visual Studio 17 2022''' || '' }}
-      - name: Verify installed Windows GUI and uninstall
-        if: inputs.release-candidate && runner.os == 'Windows'
+      - name: Verify installed Linux desktop and CLI
+        if: inputs.release-candidate && runner.os == 'Linux' && steps.candidate.outputs.linux_gui_installer == 'true'
+        env:
+          _JAVA_OPTIONS: -Dprism.order=es2 -Dprism.forceGPU=true
+        run: |
+          sudo apt-get install -y ./gui/build/distributions/VoxelBrew-*-linux-x64.deb
+          VoxelBrewCLI designer native-demo
+          bash scripts/with-virtual-desktop.sh bash scripts/check-associated-design.sh
+          bash scripts/with-virtual-desktop.sh VoxelBrew --smoke-test --smoke-output "$RUNNER_TEMP/installed-gui.png"
+          test -s "$RUNNER_TEMP/installed-gui.png"
+          sudo apt-get remove -y voxelbrew
+          test ! -e /usr/bin/VoxelBrewCLI
+          test ! -e /usr/share/mime/packages/dev.voxelbrew.gui.xml
+          test ! -e /usr/share/applications/dev.voxelbrew.gui.desktop
+      - name: Verify installed Windows desktop and CLI and uninstall
+        if: inputs.archive && runner.os == 'Windows'
         shell: pwsh
         run: ./scripts/check-windows-installer.ps1 (Get-Item gui/build/distributions/VoxelBrew-*-windows-x64-Setup.exe).FullName
-      - name: Verify installed macOS GUI
+      - name: Verify installed macOS desktop and CLI
         if: inputs.release-candidate && runner.os == 'macOS' && steps.candidate.outputs.mac_gui_installer == 'true'
         run: bash scripts/check-macos-installer.sh gui/build/distributions/VoxelBrew-*-macos-x64.dmg
       - name: Collect qualified release archives and provenance

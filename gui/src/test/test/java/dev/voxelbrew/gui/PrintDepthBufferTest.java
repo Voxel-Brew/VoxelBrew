@@ -10,6 +10,19 @@ class PrintDepthBufferTest {
     }
 
     @Test
+    void reusedFrameClearsFacesEdgesAndPickingDepth() {
+        var raster = new PrintDepthBuffer(20, 20);
+        raster.triangle(point(0, 0, 1), point(20, 0, 1), point(0, 20, 1), 0xff112233, 7);
+        raster.edge(point(2, 4.5, 1), point(12, 4.5, 1), 0xff000000);
+        raster.clear();
+        assertThat(raster.owner(4, 4)).isEqualTo(-1);
+        assertThat(raster.pixels()).containsOnly(0);
+        raster.triangle(point(0, 0, 10), point(20, 0, 10), point(0, 20, 10), 0xffabcdef, 8);
+        assertThat(raster.owner(4, 4)).isEqualTo(8);
+        assertThat(raster.pixels()[4 * 20 + 4]).isEqualTo(0xffabcdef);
+    }
+
+    @Test
     void nearestSurfaceAndPickingDoNotDependOnInsertionOrder() {
         var first = new PrintDepthBuffer(20, 20);
         var second = new PrintDepthBuffer(20, 20);

@@ -17,6 +17,15 @@ final class SketchDimensions {
                 .toList();
     }
 
+    static List<Ref> drivingReferences(SketchGeometry g, List<Ref> selected, Type type) {
+        var refs = references(g, selected);
+        if (refs.size() == 2 && (type == Type.DISTANCE_X || type == Type.DISTANCE_Y)) {
+            var delta = g.point(refs.getLast()).minus(g.point(refs.getFirst()));
+            if ((type == Type.DISTANCE_X ? delta.x() : delta.y()) < 0) return refs.reversed();
+        }
+        return refs;
+    }
+
     static Measurement measure(SketchGeometry g, List<Ref> refs, Vec position) {
         refs = references(g, refs);
         var pointLine = dev.voxelbrew.engine.sketch.SketchConstraints.pointLineDistance(g, refs);
@@ -72,8 +81,8 @@ final class SketchDimensions {
         }
         boolean vertical = position.x() < Math.min(a.x(), b.x()) || position.x() > Math.max(a.x(), b.x());
         return vertical
-                ? new Measurement(Type.DISTANCE_Y, b.y() - a.y())
-                : new Measurement(Type.DISTANCE_X, b.x() - a.x());
+                ? new Measurement(Type.DISTANCE_Y, Math.abs(b.y() - a.y()))
+                : new Measurement(Type.DISTANCE_X, Math.abs(b.x() - a.x()));
     }
 
     private SketchDimensions() {}

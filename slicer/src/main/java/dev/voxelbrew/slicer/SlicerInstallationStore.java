@@ -82,8 +82,18 @@ public final class SlicerInstallationStore {
                 settings);
     }
 
+    public void install(
+            String provider,
+            dev.voxelbrew.api.model.printing.Cancellation cancellation,
+            java.util.function.IntConsumer progress)
+            throws IOException, dev.voxelbrew.api.slicer.SlicerException {
+        var download = dev.voxelbrew.slicer.internal.SlicerDownload.find(provider)
+                .orElseThrow(() -> new IllegalArgumentException("No download for " + provider + " on this platform"));
+        download.install(directory, cancellation, progress);
+    }
+
     public List<SlicerInstallation> load() throws IOException {
-        var installations = new ArrayList<>(BundledSlicers.installations());
+        var installations = new ArrayList<>(BundledSlicers.installations(directory));
         if (Files.exists(directory)) {
             try (var paths = Files.list(directory)) {
                 for (var path : paths.filter(Files::isRegularFile).toList()) {
@@ -110,10 +120,11 @@ public final class SlicerInstallationStore {
     public SlicerInstallation require(String id) {
         var key = UUID.fromString(id);
         if (BundledSlicers.reserved(key)) {
-            return BundledSlicers.installations().stream()
+            return BundledSlicers.installations(directory).stream()
                     .filter(installation -> installation.id().equals(key))
                     .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("Bundled slicer installation is unavailable"));
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Install the selected slicer in Configure slicers or with slicer install"));
         }
         var path = path(key);
         if (!Files.isRegularFile(path)) throw new IllegalArgumentException("Saved slicer installation is unavailable");

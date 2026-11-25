@@ -100,6 +100,7 @@ final class WorkspaceEdits {
         registerSketchPlane(root);
         registerJobList(root);
         registerGeometryQueries(root);
+        registerBodyPatterns(root);
         registerArrangement(root);
         registerPlateSettings(root);
         registerPlates(root);
@@ -236,6 +237,19 @@ final class WorkspaceEdits {
     }
 
     private void registerGeometryQueries(CommandLine root) {
+        edit(root, "designer sketch catalog", s -> {
+            var doc = session(s).document();
+            for (var feature : doc.features()) {
+                if (feature instanceof Feature.Sketch sketch) {
+                    s.commandLine()
+                            .getOut()
+                            .printf(
+                                    "%s\t%s\t%s%n",
+                                    sketch.id(), sketch.profileId(), doc.featureName(sketch.id(), sketch.id()));
+                }
+            }
+            return 0;
+        });
         var topology = edit(root, "designer body topology", s -> {
             var session = session(s);
             try (var evaluation = session.evaluate(value(s, "--plugin-dir"))) {
@@ -264,10 +278,28 @@ final class WorkspaceEdits {
         var regions = edit(root, "designer sketch regions", s -> {
             var doc = session(s).document();
             String id = value(s, "--sketch");
-            var sketch = (Feature.Sketch) doc.features().stream()
-                    .filter(f -> f.id().equals(id))
+            var sketch = doc.features().stream()
+                    .filter(f -> f instanceof Feature.Sketch && f.id().equals(id))
+                    .map(f -> SketchCommands.resolvedSketch(doc, (Feature.Sketch) f))
                     .findFirst()
-                    .orElseThrow();
+                    .orElseThrow(() -> new IllegalArgumentException("Unknown sketch " + id));
+            String point = value(s, "--at");
+            if (point != null) {
+                String[] xy = point.split(",", -1);
+                if (xy.length != 2 || !(sketch.profile() instanceof Feature.Constrained constrained)) {
+                    throw new IllegalArgumentException("--at requires x,y in a constrained sketch");
+                }
+                var selected = dev.voxelbrew.engine.sketch.SketchProfiles.regionAt(
+                                constrained.geometry(),
+                                new dev.voxelbrew.api.model.sketch.SketchGeometry.Vec(
+                                        Double.parseDouble(xy[0]), Double.parseDouble(xy[1])))
+                        .orElseThrow(() -> new IllegalArgumentException("No closed region at " + point));
+                s.commandLine()
+                        .getOut()
+                        .println(dev.voxelbrew.engine.sketch.SketchProfiles.selectedProfileId(
+                                sketch.profileId(), List.of(selected)));
+                return 0;
+            }
             s.commandLine().getOut().println(sketch.profileId());
             if (sketch.profile() instanceof Feature.Constrained profile) {
                 dev.voxelbrew.engine.sketch.SketchProfiles.selectableRegions(profile.geometry())
@@ -279,6 +311,7 @@ final class WorkspaceEdits {
             return 0;
         });
         option(regions, "--sketch", String.class, true, null, "Sketch feature ID");
+        option(regions, "--at", String.class, false, null, "Pick the innermost region at sketch coordinates x,y in mm");
     }
 
     private void registerArrangement(CommandLine root) {
@@ -418,6 +451,71 @@ final class WorkspaceEdits {
             session.invalidateGcode();
             return save(s, session);
         });
+    }
+
+    private void registerBodyPatterns(CommandLine root) {
+        for (var kind : BodyPattern.Kind.values()) {
+            var spec =
+                    edit(root, "designer solid pattern " + kind.name().toLowerCase(Locale.ROOT), s -> pattern(s, kind));
+            option(spec, "--id", String.class, true, null, "Stable pattern feature ID");
+            option(spec, "--replace", boolean.class, false, "false", "Edit an existing pattern of this kind");
+            option(spec, "--body-feature", String.class, true, null, "Source feature ID");
+            option(spec, "--body-output", String.class, false, "body", "Source output name");
+            option(spec, "--axis", BodyPattern.Axis.class, false, "Z", "Rotation axis or pattern plane normal");
+            if (kind != BodyPattern.Kind.MIRROR) {
+                option(
+                        spec,
+                        "--count",
+                        String.class,
+                        false,
+                        kind == BodyPattern.Kind.CIRCULAR ? "4" : "2",
+                        "Instances including the source");
+            }
+            option(
+                    spec,
+                    "--step",
+                    String.class,
+                    false,
+                    switch (kind) {
+                        case RECTANGULAR -> "20";
+                        case CIRCULAR -> "360";
+                        case MIRROR -> "0";
+                    },
+                    "First spacing (mm), circular sweep (degrees), or mirror plane offset (mm)");
+            if (kind == BodyPattern.Kind.RECTANGULAR) {
+                option(spec, "--rows", String.class, false, "1", "Instances along the second direction");
+                option(spec, "--spacing", String.class, false, "20", "Second direction spacing (mm)");
+            }
+        }
+    }
+
+    private int pattern(CommandSpec spec, BodyPattern.Kind kind) throws Exception {
+        var session = session(spec);
+        String id = value(spec, "--id");
+        var source = new Feature.BodyRef(value(spec, "--body-feature"), value(spec, "--body-output"));
+        var template = new BodyPattern(kind, source, value(spec, "--axis"), 2, 1, 1, 0).feature(id);
+        var parameters = session.document().parameters();
+        var values = new LinkedHashMap<String, Double>();
+        for (var dimension : dev.voxelbrew.engine.parameters.FeatureDimensions.list(template)) {
+            String field = dimension.target().field();
+            String expression = value(spec, "--" + field);
+            values.put(field, parameters.value(expression, dimension.unit()));
+            parameters = parameters.bind(
+                    dimension.target(),
+                    dev.voxelbrew.api.model.parameters.Expressions.isNumber(expression) ? "" : expression);
+        }
+        var feature = dev.voxelbrew.engine.parameters.FeatureDimensions.apply(template, values);
+        if ((boolean) value(spec, "--replace")) {
+            var original = session.document().features().stream()
+                    .filter(f -> f.id().equals(id))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Unknown pattern " + id));
+            if (BodyPattern.from(original).kind() != kind) throw new IllegalArgumentException("Pattern kind differs");
+            session.replace(feature, parameters);
+        } else {
+            session.add(feature, parameters);
+        }
+        return save(spec, session);
     }
 
     private void registerFeatureEdits(CommandLine root) {
@@ -616,13 +714,13 @@ final class WorkspaceEdits {
     }
 
     private int save(CommandSpec s, ModelSession session) throws Exception {
-        writer.save(session.document(), file(s), true);
         try (var evaluation = session.evaluate(value(s, "--plugin-dir"))) {
             if (!evaluation.valid()) {
                 evaluation.diagnostics().forEach(s.commandLine().getErr()::println);
                 return 1;
             }
         }
+        writer.save(session.document(), file(s), true);
         return 0;
     }
 }

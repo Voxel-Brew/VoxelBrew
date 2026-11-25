@@ -7,6 +7,7 @@ import dev.voxelbrew.api.model.*;
 import dev.voxelbrew.api.model.parameters.*;
 import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.api.model.sketch.SketchGeometry;
+import dev.voxelbrew.api.model.sketch.SketchText;
 import dev.voxelbrew.api.printer.Printer;
 import dev.voxelbrew.api.printer.driver.*;
 import dev.voxelbrew.engine.model.*;
@@ -189,6 +190,24 @@ class WorkbenchUiTest {
         click("constraint-finish");
         ready();
         assertThat(document().features().size()).isEqualTo(1);
+    }
+
+    @Test
+    void returnsToDesignerWithABodyOnThePrintPlate() throws Exception {
+        openPrepared("plate-5mm.vxb");
+        click("workspace-print");
+        click("print-tab-placement");
+        click("print-add");
+        ready();
+        click("workspace-design");
+        ready();
+        assertThat(selectedWorkspace()).isEqualTo("workspace-design");
+        click("history-0");
+        click("workspace-print");
+        ready();
+        click("print-tab-placement");
+        assertThat(fx(() -> ((ComboBox<?>) node("#print-instance")).getItems().size()))
+                .isPositive();
     }
 
     @Test
@@ -1026,6 +1045,41 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void dimensionFieldAdoptsCompatibleLiteralUnitsAndPersistsTheirScale() throws Exception {
+        openPrepared("plate-5mm.vxb");
+        click("history-1");
+        text("dimension-distance", "250 deg");
+        key(KeyCode.TAB);
+        var field = fx(() -> (FormulaField) node("#dimension-distance"));
+        assertThat(fx(() -> ((Label) field.lookup(".formula-unit")).getText())).isEqualTo("mm");
+        assertThat(fx(() -> field.getPseudoClassStates()
+                        .contains(javafx.css.PseudoClass.getPseudoClass("formula-invalid"))))
+                .isTrue();
+        text("dimension-distance", "250 cm");
+        key(KeyCode.TAB);
+        assertThat(fx(() -> field.getText())).isEqualTo("250");
+        assertThat(fx(() -> ((Label) field.lookup(".formula-unit")).getText())).isEqualTo("cm");
+        assertThat(fx(field::value)).isEqualTo(2500);
+        click("apply-distance");
+        ready();
+        var extrusion = (Feature.Extrude) document().features().get(1);
+        assertThat(document().parameters().binding(new ParameterSet.Target(extrusion.id(), "distance")))
+                .isEqualTo("250 cm");
+        click("history-0");
+        click("history-1");
+        assertThat(fx(() -> ((FormulaField) node("#dimension-distance")).value()))
+                .isEqualTo(2500);
+        assertThat(fx(() -> ((TextField) node("#dimension-distance")).getText()))
+                .isEqualTo("250");
+        fx(() -> {
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "dimension-display-unit.png"));
+            return null;
+        });
+    }
+
+    @Test
     void formulaUnitSuffixesFollowDeclaredUnitsWithoutChangingInput() throws Exception {
         fx(() -> {
             var selected = new javafx.beans.property.SimpleObjectProperty<>(ParameterUnit.MM);
@@ -1038,6 +1092,16 @@ class WorkbenchUiTest {
             field.setSkin(field.createDefaultSkin());
             field.refreshFormula();
             var label = (Label) field.lookup(".formula-unit");
+            selected.set(ParameterUnit.DEG);
+            field.setExpression("1 rad");
+            assertThat(label.getText()).isEqualTo("rad");
+            assertThat(field.value()).isCloseTo(Math.toDegrees(1), within(1e-9));
+            field.setExpression("5 cm");
+            assertThatThrownBy(field::value).isInstanceOf(IllegalArgumentException.class);
+            selected.set(ParameterUnit.NUMBER);
+            field.setExpression("5 rad");
+            assertThatThrownBy(field::value).isInstanceOf(IllegalArgumentException.class);
+            field.setExpression("5");
             for (var unit : ParameterUnit.values()) {
                 selected.set(unit);
                 assertThat(field.dragStep())
@@ -1130,6 +1194,10 @@ class WorkbenchUiTest {
         fx(() -> workbench.controller().open(input)).get(20, TimeUnit.SECONDS);
         ready();
         click("workspace-print");
+        click("print-copy-errors");
+        assertThat(fx(() -> javafx.scene.input.Clipboard.getSystemClipboard().getString()))
+                .isNotBlank()
+                .isEqualTo(fx(() -> ((Label) node("#print-validation")).getText()));
         click("print-add");
         ready();
         click("print-tab-process");
@@ -1170,6 +1238,10 @@ class WorkbenchUiTest {
             assertThat(linkStart.getY()).isCloseTo(messageEnd.getY(), within(1.0));
             return null;
         });
+        click("print-copy-errors");
+        assertThat(fx(() -> javafx.scene.input.Clipboard.getSystemClipboard().getString()))
+                .isEqualTo(jobs.failureDiagnostic())
+                .contains("Slicer exited with 1\nNo first-layer extrusions");
         click("print-job-details");
         assertThat(fx(() -> ((TabPane) node("#print-controls"))
                         .getSelectionModel()
@@ -1193,6 +1265,7 @@ class WorkbenchUiTest {
             assertThat(details.getSelectedText()).isEqualTo(text);
             jobs.clear();
             assertThat(details.getText()).isEmpty();
+            assertThat(workbench.lookup("#print-copy-errors").isVisible()).isFalse();
             return null;
         });
     }
@@ -1359,13 +1432,13 @@ class WorkbenchUiTest {
         });
         ready();
         click("print-view-3d");
-        var before = fx(() -> node("#print-canvas").snapshot(null, null));
+        var before = fx(() -> placementMesh().snapshot(null, null));
         fx(() -> {
             workbench.controller().printSetup(document().printSetup().withInstances(List.of(rear, front)));
             return null;
         });
         ready();
-        var after = fx(() -> node("#print-canvas").snapshot(null, null));
+        var after = fx(() -> placementMesh().snapshot(null, null));
         assertThat(after.getWidth()).isEqualTo(before.getWidth());
         assertThat(after.getHeight()).isEqualTo(before.getHeight());
         for (int y = 0; y < (int) before.getHeight(); y++) {
@@ -2042,7 +2115,7 @@ class WorkbenchUiTest {
             assertThat(slicerHasRing("#57ad74")).isEqualTo(view.equals("print-view-3d"));
             var start = fx(() -> {
                 var canvas = (javafx.scene.canvas.Canvas) node("#print-canvas");
-                var image = canvas.snapshot(null, null);
+                var image = canvas.getParent().snapshot(null, null);
                 Point2D best = null;
                 for (int y = 0; y < image.getHeight(); y++) {
                     for (int x = 0; x < image.getWidth(); x++) {
@@ -2121,9 +2194,9 @@ class WorkbenchUiTest {
         click("print-place");
         ready();
         var tilted = document().printSetup();
-        long worldFrame = slicerCameraFrame();
+        long worldFrame = slicerFrame("#print-placement-overlay");
         choice("print-rotation-space", 1);
-        assertThat(slicerCameraFrame())
+        assertThat(slicerFrame("#print-placement-overlay"))
                 .as("Local rings follow object orientation")
                 .isNotEqualTo(worldFrame);
         assertThat(document().printSetup()).as("Coordinate mode is transient").isEqualTo(tilted);
@@ -2132,7 +2205,7 @@ class WorkbenchUiTest {
         click("print-gizmo-local");
         assertThat(fx(() -> ((ComboBox<?>) node("#print-rotation-space")).getValue()))
                 .isEqualTo(PrintRotationGizmo.Space.WORLD);
-        assertThat(slicerCameraFrame())
+        assertThat(slicerFrame("#print-placement-overlay"))
                 .as("World rings keep their plate alignment")
                 .isEqualTo(worldFrame);
         click("print-gizmo-local");
@@ -2212,7 +2285,7 @@ class WorkbenchUiTest {
     private boolean slicerHasRing(String hex) throws Exception {
         return fx(() -> {
             var expected = javafx.scene.paint.Color.web(hex);
-            var image = node("#print-canvas").snapshot(null, null);
+            var image = node("#print-canvas").getParent().snapshot(null, null);
             for (int y = 0; y < image.getHeight(); y++) {
                 for (int x = 0; x < image.getWidth(); x++) {
                     var color = image.getPixelReader().getColor(x, y);
@@ -2228,7 +2301,12 @@ class WorkbenchUiTest {
     }
 
     private void doubleClickPlate(String id) throws Exception {
-        var point = centerOf("print-plate-" + id);
+        doubleClick("print-plate-" + id);
+        assertThat(fx(() -> node("#print-plate-name"))).isNotNull();
+    }
+
+    private void doubleClick(String id) throws Exception {
+        var point = centerOf(id);
         fx(() -> {
             robot.mouseMove(point);
             robot.mouseClick(MouseButton.PRIMARY);
@@ -2240,7 +2318,6 @@ class WorkbenchUiTest {
             return null;
         });
         Thread.sleep(180);
-        assertThat(fx(() -> node("#print-plate-name"))).isNotNull();
     }
 
     @Test
@@ -2296,15 +2373,17 @@ class WorkbenchUiTest {
         for (String view : List.of("print-view-2d", "print-view-3d")) {
             click(view);
             for (var button : List.of(MouseButton.SECONDARY, MouseButton.MIDDLE, MouseButton.PRIMARY)) {
-                long before = slicerCameraFrame();
+                long before = slicerFrame("#print-canvas");
                 slicerCameraGesture(button, false);
-                assertThat(slicerCameraFrame()).as(view + " / " + button).isNotEqualTo(before);
+                assertThat(slicerFrame("#print-canvas"))
+                        .as(view + " / " + button)
+                        .isNotEqualTo(before);
                 assertThat(document()).as("Camera changes are transient").isEqualTo(initial);
             }
-            long before = slicerCameraFrame();
+            long before = slicerFrame("#print-canvas");
             slicerCameraGesture(MouseButton.MIDDLE, true);
-            assertThat(slicerCameraFrame()).as("Shift+middle pans").isNotEqualTo(before);
-            before = slicerCameraFrame();
+            assertThat(slicerFrame("#print-canvas")).as("Shift+middle pans").isNotEqualTo(before);
+            before = slicerFrame("#print-canvas");
             var center = centerOf("print-canvas");
             fx(() -> {
                 robot.mouseMove(center);
@@ -2312,12 +2391,12 @@ class WorkbenchUiTest {
                 return null;
             });
             Thread.sleep(150);
-            assertThat(slicerCameraFrame()).as("Wheel zooms").isNotEqualTo(before);
+            assertThat(slicerFrame("#print-canvas")).as("Wheel zooms").isNotEqualTo(before);
             assertThat(document()).isEqualTo(initial);
             click("print-fit-view");
             var part = fx(() -> {
                 var canvas = (javafx.scene.canvas.Canvas) node("#print-canvas");
-                var image = canvas.snapshot(null, null);
+                var image = canvas.getParent().snapshot(null, null);
                 double x = 0, y = 0;
                 int count = 0;
                 for (int row = 0; row < image.getHeight(); row++) {
@@ -2368,26 +2447,27 @@ class WorkbenchUiTest {
     }
 
     @Test
-    void slicerNavigationMeshCoversTheSamePartAsTheDetailedPlacementView() throws Exception {
+    void slicerKeepsTheSameSharpMeshAfterNavigationStops() throws Exception {
         ready();
         openPrepared("plate-5mm.vxb");
         click("workspace-print");
+        click("print-tab-placement");
         click("print-add");
         click("print-view-3d");
         ready();
         var rendered = new CompletableFuture<javafx.scene.image.Image>();
-        var detailed = fx(() -> {
+        var idle = new CompletableFuture<Boolean>();
+        fx(() -> {
             var canvas = node("#print-canvas");
-            var image = canvas.snapshot(null, null);
-            var moving = canvas.getParent().getChildrenUnmodifiable().stream()
-                    .filter(PrintNavigationView.class::isInstance)
-                    .findFirst()
-                    .orElseThrow();
-            moving.visibleProperty().addListener((o, before, visible) -> {
-                if (visible && !rendered.isDone()) {
-                    var parameters = new SnapshotParameters();
-                    parameters.setFill(javafx.scene.paint.Color.TRANSPARENT);
-                    rendered.complete(moving.snapshot(parameters, null));
+            var mesh = placementMesh();
+            var overlay = node("#print-placement-overlay");
+            assertThat(mesh.isVisible()).isTrue();
+            assertThat(overlay.isVisible()).isTrue();
+            overlay.visibleProperty().addListener((o, before, visible) -> {
+                if (!visible && !rendered.isDone()) {
+                    Platform.runLater(() -> rendered.complete(mesh.snapshot(null, null)));
+                } else if (visible && rendered.isDone()) {
+                    idle.complete(true);
                 }
             });
             // Trigger a navigation frame at the same zoom for a pixel-for-pixel projection comparison.
@@ -2413,67 +2493,38 @@ class WorkbenchUiTest {
                     0,
                     0,
                     null));
-            return image;
+            return null;
         });
         var moving = rendered.get(10, TimeUnit.SECONDS);
-        int interior = 0, matchingColor = 0;
-        // Edge antialiasing differs between the two renderers. Compare face colors inside the strokes.
-        var pixels = detailed.getPixelReader();
-        for (int y = 1; y + 1 < detailed.getHeight(); y++) {
-            for (int x = 1; x + 1 < detailed.getWidth(); x++) {
-                if (insideSelectedFace(pixels, x, y)) {
-                    interior++;
-                    if (moving.getPixelReader().getArgb(x, y) == 0xff4299c7) matchingColor++;
-                }
-            }
-        }
-        assertThat(interior).as("Selected part pixels in the detailed view").isGreaterThan(10);
-        assertThat((double) matchingColor / interior)
-                .as("Interior pixels retain their placement color during navigation")
-                .isGreaterThan(0.98);
-        var stationaryEdges = darkModelPixels(detailed, moving, .35);
-        var movingEdges = darkModelPixels(moving, moving, .35);
-        assertThat(stationaryEdges).isNotEmpty();
-        assertThat(movingEdges).isNotEmpty();
-        assertThat(edgeOverlap(stationaryEdges, darkModelPixels(moving, moving, .65)))
-                .as("Visible CAD boundaries survive navigation")
-                .isGreaterThan(.9);
-        assertThat(edgeOverlap(movingEdges, darkModelPixels(detailed, moving, .65)))
-                .as("Hidden edges and tessellation diagonals stay hidden")
-                .isGreaterThan(.9);
+        idle.get(10, TimeUnit.SECONDS);
+        var stationary = fx(() -> {
+            assertThat(placementMesh().isVisible()).isTrue();
+            return placementMesh().snapshot(null, null);
+        });
+        var pixels = placementPixels(stationary);
+        assertThat(pixels).containsExactly(placementPixels(moving));
+        assertThat(Arrays.stream(pixels).filter(color -> color == 0xff4299c7).count())
+                .as("Selected body face pixels")
+                .isGreaterThan(10);
+        assertThat(Arrays.stream(pixels).distinct().count())
+                .as("Antialiased shades between faces, outlines and background")
+                .isGreaterThan(3);
     }
 
-    private boolean insideSelectedFace(javafx.scene.image.PixelReader pixels, int x, int y) {
-        for (int dy = -1; dy <= 1; dy++) {
-            for (int dx = -1; dx <= 1; dx++) {
-                if (pixels.getArgb(x + dx, y + dy) != 0xff4299c7) return false;
-            }
-        }
-        return true;
+    private int[] placementPixels(javafx.scene.image.Image image) {
+        int width = (int) image.getWidth();
+        int height = (int) image.getHeight();
+        var pixels = new int[width * height];
+        image.getPixelReader()
+                .getPixels(0, 0, width, height, javafx.scene.image.PixelFormat.getIntArgbInstance(), pixels, 0, width);
+        return pixels;
     }
 
-    private Set<Point2D> darkModelPixels(
-            javafx.scene.image.Image image, javafx.scene.image.Image part, double brightness) {
-        var points = new HashSet<Point2D>();
-        for (int y = 0; y < image.getHeight(); y++) {
-            for (int x = 0; x < image.getWidth(); x++) {
-                var color = image.getPixelReader().getColor(x, y);
-                if (part.getPixelReader().getColor(x, y).getOpacity() > .45 && color.getBrightness() < brightness) {
-                    points.add(new Point2D(x, y));
-                }
-            }
-        }
-        return points;
-    }
-
-    private double edgeOverlap(Set<Point2D> edges, Set<Point2D> reference) {
-        var nearby = new HashSet<Point2D>();
-        for (var point : reference) {
-            for (int dy = -1; dy <= 1; dy++) {
-                for (int dx = -1; dx <= 1; dx++) nearby.add(point.add(dx, dy));
-            }
-        }
-        return (double) edges.stream().filter(nearby::contains).count() / edges.size();
+    private PrintNavigationView placementMesh() {
+        return (PrintNavigationView) node("#print-canvas").getParent().getChildrenUnmodifiable().stream()
+                .filter(PrintNavigationView.class::isInstance)
+                .findFirst()
+                .orElseThrow();
     }
 
     private void slicerCameraGesture(MouseButton button, boolean shift) throws Exception {
@@ -2498,9 +2549,9 @@ class WorkbenchUiTest {
         Thread.sleep(100);
     }
 
-    private long slicerCameraFrame() throws Exception {
+    private long slicerFrame(String selector) throws Exception {
         return fx(() -> {
-            var image = node("#print-canvas").snapshot(null, null);
+            var image = node(selector).snapshot(null, null);
             long hash = 1;
             for (int y = 0; y < image.getHeight(); y += 2) {
                 for (int x = 0; x < image.getWidth(); x += 2) {
@@ -2676,6 +2727,18 @@ class WorkbenchUiTest {
                     .isTrue();
             assertThat(fx(() -> ((Label) node("#slicer-installation-status")).getText()))
                     .contains("Bundled and read-only");
+        }
+        if (dev.voxelbrew.slicer.internal.SlicerDownload.find("prusa-slicer").isPresent() && bundled.isEmpty()) {
+            chooseSlicerProvider("prusa-slicer");
+            fx(() -> {
+                var install = (Button) node("#slicer-installation-download");
+                assertThat(install.isVisible()).isTrue();
+                assertThat(install.getText()).contains("MiB");
+                assertThat(install.getWidth()).isGreaterThanOrEqualTo(Math.floor(install.prefWidth(-1)));
+                Screenshot.save(
+                        stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "slicer-download.png"));
+                return null;
+            });
         }
         openPrusaInstallation("Prusa first");
         assertSlicerInstallationRejected("export-check", "Choose a slicer executable");
@@ -2931,12 +2994,13 @@ class WorkbenchUiTest {
         var sketch =
                 new Feature.Sketch("plate", "profile", Feature.Plane.origin("XY"), new Feature.Constrained(geometry));
         var file = directory.resolve("plate-with-holes.vxb");
-        DocumentWriter.save(new CadDocument("plate", List.of(sketch), 1), file, false);
+        var other = new Feature.Sketch("other", "circle", sketch.plane(), new Feature.Circle(-25, -25, 5));
+        DocumentWriter.save(new CadDocument("plate", List.of(sketch, other), 2), file, false);
         open(file);
         standardView(1);
         click("menu-fit");
         click("history-0");
-        fx(() -> {
+        var originalHighlight = fx(() -> {
             var root = ((SubScene) workbench.viewport().getChildren().getFirst()).getRoot();
             var highlight = (javafx.scene.shape.Path) root.lookup(".sketch-profile-highlight");
             assertThat(highlight.contains(30, 20)).isTrue();
@@ -2946,6 +3010,48 @@ class WorkbenchUiTest {
             Screenshot.save(
                     stage.getScene(),
                     Path.of(System.getProperty("voxelbrew.ui.artifacts"), "selected-sketch-profile.png"));
+            return highlight;
+        });
+        click("history-1");
+        fx(() -> {
+            var root = ((SubScene) workbench.viewport().getChildren().getFirst()).getRoot();
+            assertThat(root.lookup(".sketch-profile-highlight")).isNull();
+            var tree = (TreeView<?>) node("#model-tree");
+            tree.getSelectionModel().selectPrevious();
+            assertThat(root.lookup(".sketch-profile-highlight")).isSameAs(originalHighlight);
+            return null;
+        });
+    }
+
+    @Test
+    void largeExtrusionRegionListScrollsIndependently() throws Exception {
+        var entities = new ArrayList<SketchGeometry.Entity>();
+        for (int i = 0; i < 12; i++) {
+            entities.add(
+                    Sketches.entity("circle-" + i, SketchGeometry.Kind.CIRCLE, false, (i % 4) * 8, (i / 4) * 8, 3));
+        }
+        var geometry = new SketchGeometry(
+                entities,
+                List.of(),
+                entities.stream().map(SketchGeometry.Entity::id).toList());
+        var sketch =
+                new Feature.Sketch("circles", "profile", Feature.Plane.origin("XY"), new Feature.Constrained(geometry));
+        var file = directory.resolve("many-regions.vxb");
+        DocumentWriter.save(new CadDocument("regions", List.of(sketch), 1), file, false);
+        open(file);
+        click("history-0");
+        click("extrude");
+        ready();
+        modelClick(24, 16, 0);
+        ready();
+        assertThat(volume()).isCloseTo(45 * Math.PI, org.assertj.core.data.Offset.offset(.001));
+        fx(() -> {
+            var list = (javafx.scene.control.ScrollPane) node("#extrude-region-list");
+            assertThat(list.getViewportBounds().getHeight())
+                    .isLessThan(list.getContent().getLayoutBounds().getHeight());
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "extrusion-profile-list.png"));
             return null;
         });
     }
@@ -2969,10 +3075,12 @@ class WorkbenchUiTest {
         click("extrude");
         ready();
         assertThat(volume()).isCloseTo(1500, org.assertj.core.data.Offset.offset(.001));
-        click("extrude-region-1");
+        assertExtrusionBodyVisible(
+                fx(() -> workbench.controller().build().bodies().getFirst().id()));
+        modelClick(4, 4, 0);
         ready();
         assertThat(volume()).isCloseTo(1000, org.assertj.core.data.Offset.offset(.001));
-        click("extrude-region-2");
+        modelClick(10, 15, 0);
         ready();
         assertThat(volume()).isCloseTo(1500, org.assertj.core.data.Offset.offset(.001));
         click("extrude-region-1");
@@ -2988,6 +3096,186 @@ class WorkbenchUiTest {
         click("undo");
         ready();
         assertThat(document().features()).isEqualTo(List.of(sketch));
+    }
+
+    @Test
+    void insertsExtrusionAtTheTimelineMarkerAndReplaysLaterSteps() throws Exception {
+        var plane = Feature.Plane.origin("XY");
+        var base = new Feature.Sketch("base", "profile", plane, new Feature.Rectangle(0, 0, 20, 10));
+        var later = new Feature.Sketch("later", "circle", plane, new Feature.Circle(30, 30, 6));
+        var file = directory.resolve("insert-extrusion.vxb");
+        DocumentWriter.save(new CadDocument("insert", List.of(base, later), 2), file, false);
+        open(file);
+        click("timeline-previous");
+        ready();
+        click("history-0");
+        click("extrude");
+        ready();
+        click("commit-extrusion");
+        ready();
+        var operations = document().features();
+        assertThat(operations).hasSize(3);
+        assertThat(operations.get(1)).isInstanceOf(Feature.Extrude.class);
+        assertThat(operations.getLast()).isEqualTo(later);
+        assertThat(document().cursor()).isEqualTo(2);
+        assertThat(fx(() -> node("#history-1").getStyleClass().contains("history-selected")))
+                .isTrue();
+        click("timeline-last");
+        ready();
+        assertThat(document().cursor()).isEqualTo(3);
+        assertThat(volume()).isCloseTo(1000, within(.001));
+    }
+
+    @Test
+    void editsTheRegionAndTargetsOfAHistoricalThroughCut() throws Exception {
+        var plane = Feature.Plane.origin("XY");
+        var base = new Feature.Sketch("base", "outline", plane, new Feature.Rectangle(0, 0, 40, 20));
+        var plate = new Feature.Extrude("plate", new Feature.ProfileRef("base", "outline"), 5);
+        var copy = new BodyPattern(
+                        BodyPattern.Kind.RECTANGULAR,
+                        new Feature.BodyRef("plate", "body"),
+                        BodyPattern.Axis.Y,
+                        1,
+                        2,
+                        0,
+                        10)
+                .feature("copies");
+        var holes = new SketchGeometry(
+                List.of(
+                        Sketches.entity("small", SketchGeometry.Kind.CIRCLE, false, 8, 10, 2),
+                        Sketches.entity("large", SketchGeometry.Kind.CIRCLE, false, 28, 10, 4)),
+                List.of(),
+                List.of("small", "large"));
+        var sketch = new Feature.Sketch("holes", "profile", plane, new Feature.Constrained(holes));
+        var targets = List.of(new Feature.BodyRef("copies", "copy-0-1"), new Feature.BodyRef("plate", "body"));
+        var cut = new CutTargets(targets).throughFeature("cut", new Feature.ProfileRef("holes", "profile"));
+        var later = new BodyPattern(
+                        BodyPattern.Kind.MIRROR, new Feature.BodyRef("cut", "body"), BodyPattern.Axis.X, 2, 1, 0, 0)
+                .feature("later");
+        var path = directory.resolve("edit-through-cut.vxb");
+        var history = List.of(base, plate, copy, sketch, cut, later);
+        var session = new ModelSession(new CadDocument("history", history, 6));
+        session.renameBody("plate.body", "Panel");
+        DocumentWriter.save(session.document(), path, false);
+        open(path);
+        click("history-4");
+        fx(() -> {
+            var list = (javafx.scene.layout.VBox) node("#cut-target-list");
+            assertThat(list.getChildren().stream()
+                            .map(n -> ((Label) n).getText())
+                            .toList())
+                    .containsExactly("Panel 2", "Panel");
+            assertThat(workbench.lookup("#add-cut-target")).isNull();
+            assertThat(workbench.lookup("#remove-cut-target")).isNull();
+            assertThat(workbench.lookup("#repair-body")).isNull();
+            Screenshot.save(
+                    stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "through-cut-preview.png"));
+            return null;
+        });
+        doubleClick("history-4");
+        assertThat(fx(() -> ((ComboBox<?>) node("#cut-target")).getValue())).isEqualTo(targets.getFirst());
+        assertThat(fx(() -> ((ComboBox<?>) node("#cut-target-2")).getValue())).isEqualTo(targets.getLast());
+        click("remove-cut-target");
+        modelClick(28, 10, 0);
+        fx(() -> {
+            Screenshot.save(
+                    stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "edit-through-cut.png"));
+            return null;
+        });
+        click("apply-cut-profile");
+        ready();
+        var edited = document();
+        var region = dev.voxelbrew.engine.sketch.SketchProfiles.regionAt(holes, new SketchGeometry.Vec(28, 10))
+                .orElseThrow();
+        assertThat(edited.features().get(4))
+                .isEqualTo(new Feature.ThroughCut(
+                        "cut", new Feature.ProfileRef("holes", "profile/region/" + region), targets.getFirst()));
+        assertThat(edited.features().getLast()).isEqualTo(later);
+        assertThat(fx(() -> workbench.controller().build().bodies().stream()
+                        .map(DocumentController.Body::volume)
+                        .toList()))
+                .satisfiesExactly(
+                        v -> assertThat(v).isCloseTo(4000, within(.001)),
+                        v -> assertThat(v).isCloseTo(4000 - 80 * Math.PI, within(.001)),
+                        v -> assertThat(v).isCloseTo(4000 - 80 * Math.PI, within(.001)));
+        click("history-4");
+        click("edit-cut-profile");
+        assertThat(fx(() -> ((CheckBox) node("#extrude-whole")).isSelected())).isFalse();
+        click("cancel-tool");
+        click("undo");
+        ready();
+        assertThat(document().features()).isEqualTo(history);
+    }
+
+    @Test
+    void editsAnEarlierExtrusionProfileAndRebuildsItsDependents() throws Exception {
+        var entities = List.of(
+                Sketches.entity("small", SketchGeometry.Kind.CIRCLE, false, 0, 0, 2),
+                Sketches.entity("large", SketchGeometry.Kind.CIRCLE, false, 15, 0, 4),
+                Sketches.entity("center", SketchGeometry.Kind.CIRCLE, false, 15, 0, 1));
+        var geometry = new SketchGeometry(entities, List.of(), List.of("small", "large", "center"));
+        var sketch =
+                new Feature.Sketch("base", "profile", Feature.Plane.origin("XY"), new Feature.Constrained(geometry));
+        var small = dev.voxelbrew.engine.sketch.SketchProfiles.regionAt(geometry, new SketchGeometry.Vec(0, 0))
+                .orElseThrow();
+        var extrude = new Feature.Extrude("first", new Feature.ProfileRef("base", "profile/region/" + small), 8);
+        var mirror = new BodyPattern(
+                        BodyPattern.Kind.MIRROR, new Feature.BodyRef("first", "body"), BodyPattern.Axis.Z, 2, 1, 0, 0)
+                .feature("later");
+        var file = directory.resolve("earlier-extrusion.vxb");
+        DocumentWriter.save(new CadDocument("history", List.of(sketch, extrude, mirror), 3), file, false);
+        open(file);
+        renderStyle("technical");
+        click("history-1");
+        assertThat(fx(() -> ((SubScene) node("#viewport-scene"))
+                        .getRoot()
+                        .lookupAll(".sketch-curves")
+                        .size()))
+                .isEqualTo(3);
+        fx(() -> {
+            workbench.viewport().standardView("Front");
+            return null;
+        });
+        doubleClick("history-1");
+        assertThat(fx(() -> workbench.viewport().orientationProperty().get())).isEqualTo(ViewOrientation.named("Top"));
+        assertExtrusionBodyVisible(
+                fx(() -> workbench.controller().build().bodyIds().get(new Feature.BodyRef("first", "body"))));
+        assertThat(fx(() -> ((CheckBox) node("#extrude-whole")).isSelected())).isFalse();
+        modelClick(0, 0, 0);
+        assertThat(fx(() -> node("#apply-extrusion-profile").isDisabled())).isTrue();
+        modelClick(18, 0, 0);
+        click("extrude-include-enclosed");
+        fx(() -> {
+            var view = workbench.viewport();
+            var p = view.screenToLocal(view.modelToScreen(new Point3D(2, 0, 0)));
+            var pixels = view.snapshot(null, null).getPixelReader();
+            boolean outlineVisible = false;
+            for (int dx = -2; dx <= 2; dx++) {
+                var pixel = pixels.getColor((int) p.getX() + dx, (int) p.getY());
+                outlineVisible |= pixel.getBlue() - pixel.getRed() > .2;
+            }
+            assertThat(outlineVisible)
+                    .as("The unselected source circle has a visible outline")
+                    .isTrue();
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "historical-extrusion-profile.png"));
+            return null;
+        });
+        click("apply-extrusion-profile");
+        ready();
+        assertThat(document().features().getLast()).isEqualTo(mirror);
+        assertThat(fx(() -> workbench.viewport().orientationProperty().get()))
+                .isEqualTo(ViewOrientation.named("Front"));
+        assertThat(document().cursor()).isEqualTo(3);
+        assertThat(fx(() -> workbench.controller().build().bodies().stream()
+                        .map(DocumentController.Body::volume)
+                        .toList()))
+                .hasSize(2)
+                .allSatisfy(v -> assertThat(v).isCloseTo(128 * Math.PI, within(.001)));
+        click("undo");
+        ready();
+        assertThat(document().features()).containsExactly(sketch, extrude, mirror);
     }
 
     @Test
@@ -3102,8 +3390,7 @@ class WorkbenchUiTest {
         DocumentWriter.save(session.document(), file, false);
         open(file);
         choice("appearance", 1);
-        click("history-0");
-        click("edit-sketch-constraints");
+        doubleClick("history-0");
         sketchReady();
         assertThat(fx(() -> ((SketchEditor) node("#sketch-editor"))
                                 .controller()
@@ -3111,16 +3398,18 @@ class WorkbenchUiTest {
                                 .degreesOfFreedom()
                         > 0))
                 .isTrue();
-        assertSketchGeometryColor(20, 10, true);
+        click("sketch-fit");
+        // Probe the strokes away from midpoint dimension labels.
+        assertSketchGeometryColor(26, 10, true);
         assertSketchGeometryColor(10, 10, true);
-        assertSketchGeometryColor(20, 30, false);
+        assertSketchGeometryColor(26, 30, false);
         assertSketchGeometryColor(40, 10, true);
         assertSketchGeometryColor(50, 10, false);
         sketchReference("fixed");
         assertThat(fx(() -> ((Label) node("#sketch-selection")).getText().isBlank()))
                 .isFalse();
         click("sketch-clear-selection");
-        assertSketchGeometryColor(20, 10, true);
+        assertSketchGeometryColor(26, 10, true);
         fx(() -> {
             Screenshot.save(
                     stage.getScene(),
@@ -3154,6 +3443,43 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void dimensionToolMeasuresFixedEndpointsWhileOtherGeometryCanMove() throws Exception {
+        ready();
+        click("constrained-sketch");
+        click("choose-plane-xy");
+        sketchReady();
+        var line = dev.voxelbrew.engine.sketch.Sketches.entity("edge", SketchGeometry.Kind.LINE, false, 10, 10, 10, 40);
+        var point = dev.voxelbrew.engine.sketch.Sketches.entity("free", SketchGeometry.Kind.POINT, true, 35, 25);
+        var geometry = new SketchGeometry(List.of(line, point), List.of(), List.of(line.id()));
+        fx(() -> {
+            ((SketchEditor) node("#sketch-editor"))
+                    .controller()
+                    .edit(geometry.add(dev.voxelbrew.engine.sketch.SketchConstraints.create(
+                            geometry, "fixed", SketchGeometry.Type.FIX, List.of(line.ref()), 0)));
+            return null;
+        });
+        sketchReady();
+        click("sketch-dimension");
+        sketchReference("edge.start");
+        sketchReference("edge.end");
+        sketchReady();
+        var reference = sketchGeometry().constraints().getLast();
+        assertThat(dev.voxelbrew.engine.sketch.SketchConstraints.referenceDimension(reference))
+                .isTrue();
+        assertThat(dev.voxelbrew.engine.sketch.SketchConstraints.measuredValue(sketchGeometry(), reference))
+                .isEqualTo(30);
+        assertThat(fx(() -> stage.getScene().lookup("#sketch-inline-dimension")))
+                .isNull();
+        key(KeyCode.ESCAPE);
+        click("sketch-dimension");
+        sketchReference("edge.start");
+        sketchReference("free.point");
+        assertThat(fx(() -> node("#sketch-inline-dimension").isDisabled())).isFalse();
+        key(KeyCode.ESCAPE);
+        click("constraint-cancel");
+    }
+
+    @Test
     void dimensionLabelsAndLinesDragWithoutChangingGeometryAndEscapeRestoresPlacement() throws Exception {
         ready();
         rectangleDraft(60, 40, 0);
@@ -3175,13 +3501,19 @@ class WorkbenchUiTest {
         sketchDrag(x, 20, x + 10, 25, false);
         assertDimensionLineInk(x + 10, 8, true);
         assertDimensionLineInk(x, 8, false);
-        assertThat(sketchGeometry()).isEqualTo(before);
+        assertThat(sketchGeometry().entities()).isEqualTo(before.entities());
         sketchDrag(x + 10, 8, x + 20, 8, false);
         assertDimensionLineInk(x + 20, 8, true);
         assertDimensionLineInk(x + 10, 8, false);
         sketchDrag(x + 20, 8, x + 30, 8, true);
         assertDimensionLineInk(x + 20, 8, true);
         assertDimensionLineInk(x + 30, 8, false);
+        assertThat(sketchGeometry().entities()).isEqualTo(before.entities());
+        click("sketch-undo");
+        sketchReady();
+        assertDimensionLineInk(x + 10, 8, true);
+        click("sketch-undo");
+        sketchReady();
         assertThat(sketchGeometry()).isEqualTo(before);
         click("sketch-undo");
         sketchReady();
@@ -3270,7 +3602,14 @@ class WorkbenchUiTest {
         });
         key(KeyCode.TAB);
         double preview = fx(() -> Double.parseDouble(((TextField) node("#sketch-size-length")).getText()));
-        assertThat(preview).isCloseTo(30, within(.5));
+        // Both the start click and the pointer move are quantized to screen pixels.
+        double pointerTolerance = fx(() -> {
+            var editor = (SketchEditor) node("#sketch-editor");
+            return 2
+                    / editor.modelToScreen(new SketchGeometry.Vec(0, 0))
+                            .distance(editor.modelToScreen(new SketchGeometry.Vec(1, 0)));
+        });
+        assertThat(preview).isCloseTo(30, within(pointerTolerance));
         key(KeyCode.DIGIT2);
         key(KeyCode.DIGIT5);
         key(KeyCode.TAB);
@@ -3283,6 +3622,9 @@ class WorkbenchUiTest {
         key(KeyCode.TAB);
         key(KeyCode.ENTER);
         sketchReady();
+        assertThat(sketchGeometry().constraints())
+                .extracting(SketchGeometry.Constraint::type)
+                .contains(SketchGeometry.Type.LENGTH, SketchGeometry.Type.ANGLE);
         var line = sketchGeometry().entities().getFirst();
         assertThat(line.at(0).distance(line.at(1))).isCloseTo(25, within(1e-6));
         var delta = line.at(1).minus(line.at(0));
@@ -3290,7 +3632,7 @@ class WorkbenchUiTest {
         moveSketchPointer(line.at(1).x(), line.at(1).y() + 20);
         key(KeyCode.TAB);
         double next = fx(() -> Double.parseDouble(((TextField) node("#sketch-size-length")).getText()));
-        assertThat(next).isCloseTo(20, within(.5));
+        assertThat(next).isCloseTo(20, within(pointerTolerance));
         key(KeyCode.ESCAPE);
         click("constraint-cancel");
     }
@@ -3333,6 +3675,10 @@ class WorkbenchUiTest {
         assertThat(bottom.at(1).x() - bottom.at(0).x()).isCloseTo(24, within(1e-6));
         assertThat(lines.get(1).at(1).y() - bottom.at(0).y()).isCloseTo(12, within(1e-6));
         assertThat(bottom.at(0).x()).isLessThan(25);
+        assertThat(sketchGeometry().constraints().stream()
+                        .filter(c -> c.type().dimension())
+                        .map(c -> c.values().getFirst()))
+                .containsExactlyInAnyOrder(7., 24., 12.);
         click("sketch-tool-circle");
         sketchClick(45, 15, false);
         key(KeyCode.TAB);
@@ -3342,6 +3688,71 @@ class WorkbenchUiTest {
         assertThat(fx(() -> node("#sketch-size-radius").getStyleClass())).contains("invalid");
         key(KeyCode.ESCAPE);
         assertThat(sketchGeometry().entities()).hasSize(5);
+        click("constraint-cancel");
+    }
+
+    @Test
+    void axisConstraintButtonsAlignTheLineWithTheirScreenIcons() throws Exception {
+        ready();
+        click("constrained-sketch");
+        click("choose-plane-xy");
+        sketchReady();
+        click("sketch-tool-line");
+        sketchClick(10, 10, false);
+        sketchClick(35, 30, false);
+        key(KeyCode.ESCAPE);
+        sketchReady();
+        String id = sketchGeometry().entities().getFirst().id();
+        for (boolean horizontal : List.of(true, false)) {
+            String button = horizontal ? "constraint-horizontal" : "constraint-vertical";
+            sketchReference(id);
+            click(button);
+            sketchReady();
+            fx(() -> {
+                var editor = (SketchEditor) node("#sketch-editor");
+                var line = editor.controller().definition().entity(id);
+                var delta = editor.modelToScreen(line.at(1)).subtract(editor.modelToScreen(line.at(0)));
+                assertThat(horizontal ? delta.getY() : delta.getX()).isCloseTo(0, within(1e-4));
+                assertThat(Math.abs(horizontal ? delta.getX() : delta.getY())).isGreaterThan(1);
+                String icon = ((Button) node("#" + button)).getText();
+                assertThat(icon).isEqualTo(horizontal ? "—" : "│");
+                var list = (ListView<?>) node("#sketch-constraints");
+                assertThat(list.lookupAll(".list-cell").stream()
+                                .map(cell -> ((ListCell<?>) cell).getText())
+                                .filter(java.util.Objects::nonNull))
+                        .anyMatch(label -> label.startsWith(icon + (horizontal ? " Horizontal" : " Vertical")));
+                return null;
+            });
+            click("sketch-undo");
+            sketchReady();
+        }
+        click("constraint-cancel");
+    }
+
+    @Test
+    void sketchShowsWhichTextCrossesTheExtrusionBoundary() throws Exception {
+        ready();
+        rectangleDraft(60, 20, 0);
+        sketchType(SketchTools.Tool.TEXT);
+        text("sketch-text-content", "Door");
+        text("sketch-text-angle", "0");
+        text("sketch-text-height", "10");
+        sketchNumericPoint(10, 18);
+        key(KeyCode.ESCAPE);
+        click("sketch-fit");
+        fx(() -> {
+            var warning = (Label) node("#sketch-profile-warning");
+            assertThat(warning.isVisible()).isTrue();
+            assertThat(warning.getText()).contains("Door", "-top");
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "sketch-profile-warning.png"));
+            return null;
+        });
+        click("sketch-undo");
+        sketchReady();
+        assertThat(fx(() -> stage.getScene().lookup("#sketch-profile-warning").isVisible()))
+                .isFalse();
         click("constraint-cancel");
     }
 
@@ -3418,7 +3829,9 @@ class WorkbenchUiTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(dimension.refs().getFirst().part()).isEqualTo(SketchGeometry.Part.CENTER);
-        assertThat(dimension.values()).containsExactly(15.);
+        assertThat(dimension.values().getFirst()).isEqualTo(15.);
+        assertThat(dev.voxelbrew.engine.sketch.SketchConstraints.labelPosition(dimension))
+                .isPresent();
         key(KeyCode.ESCAPE);
         fx(() -> {
             Screenshot.save(
@@ -3610,14 +4023,35 @@ class WorkbenchUiTest {
                 .filter(c -> c.type() == SketchGeometry.Type.DISTANCE_Y)
                 .findFirst()
                 .orElseThrow();
-        // The point-pair dimension label is offset along the sketch's positive X axis.
+        var origin = new SketchGeometry.Vec(0, 0);
+        var point = new SketchGeometry.Vec(0, 20);
+        var initial = fx(() -> ((SketchEditor) node("#sketch-editor")).modelToScreen(point));
+        click("sketch-view-clockwise");
+        fx(() -> {
+            var editor = (SketchEditor) node("#sketch-editor");
+            var delta = editor.modelToScreen(point).subtract(editor.modelToScreen(origin));
+            assertThat(delta.getX()).isCloseTo(0, within(.01));
+            assertThat(delta.getY()).isPositive();
+            return null;
+        });
+        click("sketch-view-anticlockwise");
+        assertThat(fx(() -> ((SketchEditor) node("#sketch-editor"))
+                        .modelToScreen(point)
+                        .distance(initial)))
+                .isLessThan(.01);
+        click("sketch-view-clockwise");
+        assertThat(sketchGeometry()).isEqualTo(before);
+        // Pick near the end of the now vertical dimension label.
         fx(() -> {
             var editor = (SketchEditor) node("#sketch-editor");
             var midpoint = editor.modelToScreen(new SketchGeometry.Vec(0, 20));
             var axis = editor.modelToScreen(new SketchGeometry.Vec(1, 20))
                     .subtract(midpoint)
                     .normalize();
-            robot.mouseMove(midpoint.add(axis.multiply(20)));
+            robot.mouseMove(midpoint.add(axis.multiply(20)).add(0, 15));
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "rotated-sketch-dimension.png"));
             robot.mouseClick(MouseButton.PRIMARY);
             return null;
         });
@@ -3827,11 +4261,11 @@ class WorkbenchUiTest {
     void shadedDesignerDrawsFaceBoundariesWithoutTriangulationLines() throws Exception {
         var mesh = new dev.voxelbrew.api.model.mesh.MeshData(
                 new double[] {0, 0, 0, 30, 0, 0, 30, 20, 0, 0, 20, 0}, new int[] {0, 1, 2, 0, 2, 3}, new int[] {1, 1});
+        var plate = new DocumentController.Body("plate", new Feature.BodyRef("plate", "body"), mesh, 0);
         fx(() -> {
             var view = workbench.viewport();
             view.setRendering(Rendering.Style.SHADED);
-            view.showBodies(
-                    List.of(new DocumentController.Body("plate", new Feature.BodyRef("plate", "body"), mesh, 0)));
+            view.showBodies(List.of(plate));
             view.fit(Map.of("plate", mesh));
             return null;
         });
@@ -3840,6 +4274,11 @@ class WorkbenchUiTest {
             assertThat(outline.getParent().isVisible()).isTrue();
             var ribbons = (javafx.scene.shape.TriangleMesh) outline.getMesh();
             assertThat(ribbons.getFaces().size() / ribbons.getFaceElementSize()).isEqualTo(8);
+            var surface = findBodyView(workbench.viewport(), "body-plate");
+            var second = new DocumentController.Body("second", new Feature.BodyRef("second", "body"), mesh, 0);
+            workbench.viewport().showBodies(List.of(second, plate));
+            assertThat(findBodyView(workbench.viewport(), "body-plate")).isSameAs(surface);
+            assertThat(findBodyView(workbench.viewport(), "outline-plate")).isSameAs(outline);
             return null;
         });
     }
@@ -4017,6 +4456,69 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void cutsTwoSelectedBodiesInOneHistoryStep() throws Exception {
+        var session = new ModelSession(CadDocument.empty());
+        var plane = Feature.Plane.origin("XY");
+        for (int i = 0; i < 3; i++) {
+            String id = "plate" + i;
+            session.add(new Feature.Sketch(id, "profile", plane, new Feature.Rectangle((i - 1) * 10, 0, 10, 10)));
+            session.add(new Feature.Extrude("solid" + i, new Feature.ProfileRef(id, "profile"), 5));
+        }
+        session.add(new Feature.Sketch("hole", "circle", plane, new Feature.Circle(0, 5, 4)));
+        var path = directory.resolve("cut-targets.vxb");
+        DocumentWriter.save(session.document(), path, false);
+        open(path);
+        for (boolean through : List.of(true, false)) {
+            click("history-6");
+            click(through ? "cut" : "extrude");
+            if (!through) {
+                choice("extrude-operation", BodyExtrusion.Operation.CUT.ordinal());
+                text("extrude-distance", "2");
+            }
+            click("add-cut-target");
+            if (through) {
+                fx(() -> {
+                    Screenshot.save(
+                            stage.getScene(),
+                            Path.of(System.getProperty("voxelbrew.ui.artifacts"), "multi-body-cut.png"));
+                    return null;
+                });
+            }
+            ready();
+            click(through ? "cut-confirm" : "commit-extrusion");
+            ready();
+            var saved = document();
+            assertThat(saved.features()).hasSize(8);
+            DocumentWriter.save(saved, path, true);
+            try (var evaluation = new ModelSession(DocumentReader.load(path)).evaluate()) {
+                var bodies = evaluation.requireCompleteDocument();
+                assertThat(bodies).hasSize(3);
+                for (int i = 0; i < 2; i++) {
+                    assertThat(bodies.get(i).solid().volume())
+                            .isCloseTo(500 - 2 * Math.PI * (through ? 5 : 2), within(.001));
+                    assertThat(bodies.get(i).output())
+                            .isEqualTo(new Feature.BodyRef(
+                                    saved.features().getLast().id(), CutTargets.output(i)));
+                }
+                assertThat(bodies.get(2).solid().volume()).isCloseTo(500, within(.001));
+            }
+            click("history-7");
+            if (through) click("edit-cut-profile");
+            else click("operation-references");
+            click("remove-cut-target");
+            click(through ? "apply-cut-profile" : "repair");
+            ready();
+            assertThat(fx(() -> workbench.controller().build().bodies().get(1).volume()))
+                    .isCloseTo(500, within(.001));
+            click("undo");
+            ready();
+            assertThat(document().features()).isEqualTo(saved.features());
+            click("undo");
+            ready();
+        }
+    }
+
+    @Test
     void compactHistorySupportsPickingDraggingPlaybackAndIndependentUndo() throws Exception {
         openPrepared("rectangle-0.vxb");
         click("extrude");
@@ -4054,7 +4556,7 @@ class WorkbenchUiTest {
         click("timeline-first");
         ready();
         assertThat(document().cursor()).isEqualTo(0);
-        assertThat(fx(() -> node("#constrained-sketch").isDisabled())).isTrue();
+        assertThat(fx(() -> node("#constrained-sketch").isDisabled())).isFalse();
         assertThat(fx(() -> node("#history-0").getStyleClass().contains("history-future")))
                 .isTrue();
         click("timeline-next");
@@ -4650,16 +5152,44 @@ class WorkbenchUiTest {
         click("window-close");
         assertThat(fx(stage::isShowing)).isTrue();
         assertThat(fx(() -> workbench.controller().dirty())).isTrue();
-        click("window-close");
+        assertThat(fx(() -> command(workbench, "exit").getAccelerator()))
+                .isEqualTo(KeyCombination.keyCombination("Shortcut+Q"));
+        shortcut(KeyCode.Q, false);
         click("unsaved-cancel");
         assertThat(document()).isEqualTo(original);
-        click("window-close");
+        click("exit");
         click("unsaved-save");
         Path file = directory.resolve("Saved by integrated Close.vxb");
         text("file-path", file.toString());
         click("file-confirm");
         awaitWindowClosed();
         assertThat(DocumentReader.load(file)).isEqualTo(original);
+    }
+
+    @Test
+    void fileExitVisitsOtherDesignsAndStopsWhenCancelled() throws Exception {
+        rectangle(0);
+        var original = document();
+        var secondStage = fx(() -> {
+            var second = new Stage();
+            var other = Workbench.create(
+                    second,
+                    directory.resolve("plugins with spaces"),
+                    new dev.voxelbrew.util.di.ApplicationModule(
+                            configuration, updates::service, startupTranslations(configuration, CONFIG_FILE_NAME)),
+                    new FileIoModule());
+            second.setScene(other.createScene(964, 648));
+            second.show();
+            Platform.runLater(() -> command(other, "exit").fire());
+            return second;
+        });
+        click("unsaved-cancel");
+        assertThat(fx(secondStage::isShowing)).isFalse();
+        assertThat(fx(stage::isShowing)).isTrue();
+        assertThat(document()).isEqualTo(original);
+        click("exit");
+        click("unsaved-discard");
+        awaitWindowClosed();
     }
 
     @Test
@@ -4726,6 +5256,37 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void sketchesListTracksNamesAndSelectsTheSourceSketch() throws Exception {
+        createRenameBodies();
+        bodyTreeClick("named-sketch1", MouseButton.PRIMARY, 1);
+        fx(() -> {
+            var tree = (TreeView<?>) node("#model-tree");
+            var row = tree.getSelectionModel().getSelectedItem();
+            assertThat(row.getParent().getValue().toString()).isEqualTo("Sketches");
+            assertThat(row.getParent().getChildren().stream()
+                            .map(item -> item.getValue().toString()))
+                    .containsExactly("named-sketch0", "named-sketch1");
+            assertThat(node("#history-2").getStyleClass()).contains("history-selected");
+            workbench.controller().renameFeature("named-sketch1", "Lid");
+            return null;
+        });
+        ready();
+        fx(() -> {
+            var tree = (TreeView<?>) node("#model-tree");
+            var row = tree.getSelectionModel().getSelectedItem();
+            assertThat(row.getValue().toString()).isEqualTo("Lid");
+            assertThat(row.getParent().getValue().toString()).isEqualTo("Sketches");
+            Screenshot.save(
+                    tree.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "model-sketches-list.png"));
+            return null;
+        });
+        bodyTreeClick("Lid", MouseButton.PRIMARY, 2);
+        sketchReady();
+        click("constraint-cancel");
+        ready();
+    }
+
+    @Test
     void bodyContextRenameAndInlineEditingPersistWithoutChangingGeometry() throws Exception {
         createRenameBodies();
         var original = document();
@@ -4782,6 +5343,28 @@ class WorkbenchUiTest {
         key(KeyCode.ESCAPE);
         assertThat(fx(() -> workbench.controller().snapshot().revision())).isEqualTo(renamed);
         assertThat(document().bodyNames().get("named0.body")).isEqualTo("Mounting plate");
+        fx(() -> {
+            var tree = (TreeView<?>) node("#model-tree");
+            var rows = tree.lookupAll(".tree-cell").stream()
+                    .map(node -> (TreeCell<?>) node)
+                    .filter(cell -> !cell.isEmpty())
+                    .toList();
+            for (int i = 0; i < tree.getExpandedItemCount(); i++) {
+                assertThat(tree.getTreeItem(i).getGraphic())
+                        .as("Icon for tree row %d", i)
+                        .isNotNull();
+            }
+            assertThat(rows).isNotEmpty();
+            for (var row : rows) {
+                assertThat(row.getGraphic())
+                        .as(row.getText())
+                        .isNotNull()
+                        .isSameAs(row.getTreeItem().getGraphic());
+            }
+            Screenshot.save(
+                    tree.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "model-tree-icons.png"));
+            return null;
+        });
         bodyTreeClick("Mounting plate", MouseButton.PRIMARY, 2);
         text("body-rename-field", "Uncommitted");
         click("body-material-name");
@@ -4853,6 +5436,65 @@ class WorkbenchUiTest {
                         .get(document().features().getFirst().id()))
                 .isEqualTo("Base profile");
         assertThat(document().bodyNames().get("named0.body")).isEqualTo("Mounting plate");
+    }
+
+    @Test
+    void facePlaneLabelFollowsBodyRenameInSketchAndExtrusion() throws Exception {
+        openPrepared("plate-5mm.vxb");
+        var body = fx(() -> workbench.controller().build().bodies().getFirst());
+        var face = body.planarFaces().stream()
+                .filter(f -> f.nz() > .99)
+                .findFirst()
+                .orElseThrow();
+        var plane = dev.voxelbrew.api.model.FaceSupport.attach(body.output(), body.planarFaces(), face.faceIndex());
+        fx(() -> {
+            workbench.controller().add(new Feature.Sketch("boss", "profile", plane, new Feature.Circle(0, 0, 4)));
+            return null;
+        });
+        ready();
+        click("history-2");
+        fx(() -> {
+            workbench.controller().renameBody(body.id(), "Housing");
+            return null;
+        });
+        ready();
+        assertThat(fx(() -> ((Label) node("#sketch-plane-name")).getText())).isEqualTo("Plane: Housing");
+        click("extrude");
+        ready();
+        assertThat(fx(() -> ((Label) node("#sketch-plane-name")).getText())).isEqualTo("Plane: Housing");
+        click("commit-extrusion");
+        ready();
+        fx(() -> {
+            workbench.controller().renameBody(body.id(), "Main casing");
+            return null;
+        });
+        ready();
+        click("history-3");
+        assertThat(fx(() -> node(".inspector-details").lookupAll(".label").stream()
+                        .map(n -> ((Label) n).getText())
+                        .toList()))
+                .contains("Main casing");
+        assertThat(((Feature.Sketch) document().features().get(2)).plane()).isEqualTo(plane);
+    }
+
+    @Test
+    void renamedSketchIdentifiesNewAndExistingExtrusions() throws Exception {
+        createRenameBodies();
+        click("history-0");
+        text("sketch-name", "Base profile");
+        key(KeyCode.ENTER);
+        ready();
+        assertThat(fx(() -> ((Button) node("#history-0")).getText())).isEqualTo("Base profile");
+        click("extrude");
+        assertThat(fx(() -> ((Label) node(".selection-title")).getText())).contains("Base profile");
+        click("cancel-tool");
+        click("history-1");
+        assertThat(fx(() -> node(".inspector-details").lookupAll(".label").stream()
+                        .map(n -> ((Label) n).getText())
+                        .toList()))
+                .contains("Base profile");
+        assertThat(((Feature.Extrude) document().features().get(1)).profile().sketchId())
+                .isEqualTo("named-sketch0");
     }
 
     @Test
@@ -5397,6 +6039,48 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void polishSketchInspectorFitsLongActionsAtMinimumWidth() throws Exception {
+        rectangleDraft(60, 40, 0);
+        click("sketch-tool-select");
+        sketchReference(sketchGeometry().entities().getFirst().id());
+        fx(() -> {
+            var inspector = (ScrollPane) node(".sketch-inspector");
+            inspector.setPrefWidth(inspector.getMinWidth());
+            inspector.setVvalue(0);
+            return null;
+        });
+        fx(() -> {
+            var inspector = (ScrollPane) node(".sketch-inspector");
+            stage.getScene().getRoot().applyCss();
+            stage.getScene().getRoot().layout();
+            var action = (Button) node("#sketch-all-profile");
+            assertThat(action.isWrapText()).isTrue();
+            var viewport = inspector.lookup(".viewport");
+            double right = viewport.localToScene(viewport.getLayoutBounds()).getMaxX();
+            for (var id : List.of(
+                    "sketch-clear-selection", "sketch-select-ref", "sketch-dimension-value", "sketch-all-profile")) {
+                var control = node("#" + id);
+                assertThat(control.localToScene(control.getLayoutBounds()).getMaxX())
+                        .as(id)
+                        .isLessThanOrEqualTo(right);
+            }
+            assertThat(((javafx.scene.text.Text) action.lookup(".text")).getText())
+                    .isEqualTo(action.getText());
+            Screenshot.save(
+                    stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "sketch-inspector-pl.png"));
+            inspector.setVvalue(inspector.getVmax());
+            return null;
+        });
+        fx(() -> {
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "sketch-geometry-actions-pl.png"));
+            return null;
+        });
+        click("constraint-cancel");
+    }
+
+    @Test
     void polishWorkbenchDialogsSketchPrintingAndLanguagePreferenceUseRealControls() throws Exception {
         ready();
         // One translated dialog wiring check; message/resource matrices live in UiTextTest.
@@ -5629,18 +6313,30 @@ class WorkbenchUiTest {
         Path saved = directory.resolve("recent design.vxb");
         save(saved);
         var savedDocument = document();
-        shortcut(KeyCode.N, false);
-        ready();
-        assertThat(document().features().isEmpty()).isTrue();
         click("menu-file");
         fx(() -> {
             var recent = (Menu) command(workbench, "menu-open-recent");
             recent.show();
             assertThat(recent.getItems().getFirst().getText()).isEqualTo(saved.toString());
-            recent.getItems().getFirst().fire();
+            var first = recent.getItems().getFirst();
             recent.hide();
+            Platform.runLater(first::fire);
             return null;
         });
+        assertThat(fx(() -> ((Button) node("#project-window-current")).isDefaultButton()))
+                .isTrue();
+        assertThat(fx(() -> {
+                    var button = (Button) node("#project-window-current");
+                    button.applyCss();
+                    assertThat(button.getTextFill()).isEqualTo(javafx.scene.paint.Color.WHITE);
+                    assertThat(button.getFont().getStyle()).containsIgnoringCase("bold");
+                    Screenshot.save(
+                            stage.getScene(),
+                            Path.of(System.getProperty("voxelbrew.ui.artifacts"), "default-project-window.png"));
+                    return button.getBackground().getFills().getLast().getFill();
+                }))
+                .isIn(javafx.scene.paint.Color.web("#6555ce"), javafx.scene.paint.Color.web("#7866de"));
+        key(KeyCode.ENTER);
         ready();
         assertThat(document()).isEqualTo(savedDocument);
         assertThat(fx(() -> workbench.controller().path())).isEqualTo(saved);
@@ -5650,6 +6346,7 @@ class WorkbenchUiTest {
         save(third);
         shortcut(KeyCode.N, false);
         ready();
+        assertThat(document().features()).isEmpty();
         click("open");
         assertThat(fx(() -> ((Hyperlink) node("#file-recent-0")).getText())).isEqualTo(third.toString());
         assertThat(fx(() -> ((Hyperlink) node("#file-recent-1")).getText())).isEqualTo(second.toString());
@@ -5837,8 +6534,16 @@ class WorkbenchUiTest {
             return;
         }
         String menu = switch (id) {
-            case "extrude", "cut", "fillet", "chamfer", "shell", "split-body" -> "operations-menu";
-            case "new", "open", "import", "save", "save-as", "export" -> "menu-file";
+            case "extrude",
+                    "cut",
+                    "fillet",
+                    "chamfer",
+                    "shell",
+                    "split-body",
+                    "body-rectangular",
+                    "body-circular",
+                    "body-mirror" -> "operations-menu";
+            case "new", "open", "import", "save", "save-as", "export", "exit" -> "menu-file";
             case "language", "updates", "about", "keyboard-shortcuts" -> "menu-settings";
             case "appearance", "menu-fit" -> "menu-view";
             default -> null;
@@ -5971,15 +6676,20 @@ class WorkbenchUiTest {
                 for (var parent = target.getParent(); parent != null; parent = parent.getParent()) {
                     if (!(parent instanceof ScrollPane scroll)) continue;
                     var viewport = scroll.lookup(".viewport");
-                    var visible = viewport.localToScreen(viewport.getBoundsInLocal());
-                    if (bounds.getCenterY() >= visible.getMinY() && bounds.getCenterY() <= visible.getMaxY()) continue;
+                    var visible = viewport.localToScreen(viewport.getLayoutBounds());
+                    if (bounds.getMinY() >= visible.getMinY() && bounds.getMaxY() <= visible.getMaxY()) continue;
+                    if (bounds.getHeight() > visible.getHeight()
+                            && bounds.getCenterY() >= visible.getMinY()
+                            && bounds.getCenterY() <= visible.getMaxY()) continue;
                     double overflow = scroll.getContent().getLayoutBounds().getHeight() - visible.getHeight();
                     if (overflow <= 0) continue;
                     double delta = (bounds.getCenterY() - visible.getCenterY()) / overflow;
-                    scroll.setVvalue(Math.clamp(
+                    double next = Math.clamp(
                             scroll.getVvalue() + delta * (scroll.getVmax() - scroll.getVmin()),
                             scroll.getVmin(),
-                            scroll.getVmax()));
+                            scroll.getVmax());
+                    if (next == scroll.getVvalue()) continue;
+                    scroll.setVvalue(next);
                     return false;
                 }
                 return true;
@@ -6763,6 +7473,21 @@ class WorkbenchUiTest {
         ready();
     }
 
+    private void assertExtrusionBodyVisible(String id) throws Exception {
+        fx(() -> {
+            var root = ((SubScene) node("#viewport-scene")).getRoot();
+            var mesh = root.lookupAll("MeshView").stream()
+                    .filter(n -> ("body-" + id).equals(n.getId()))
+                    .map(javafx.scene.shape.MeshView.class::cast)
+                    .findFirst();
+            assertThat(mesh).as("Visible mesh for body %s", id).isPresent();
+            assertThat(treeVisible(mesh.get())).isTrue();
+            assertThat(((javafx.scene.paint.PhongMaterial) mesh.get().getMaterial()).getDiffuseColor())
+                    .isEqualTo(javafx.scene.paint.Color.web("#efb865"));
+            return null;
+        });
+    }
+
     private void checkTextAngleBounds(String fieldId) throws Exception {
         fx(() -> {
             var angle = (FormulaField) node("#" + fieldId);
@@ -7200,8 +7925,6 @@ class WorkbenchUiTest {
                 .orElseThrow();
         assertThat(textEntity.text().content()).isEqualTo("Width: 5");
         assertThat(textEntity.value(2)).isCloseTo(5, org.assertj.core.data.Offset.offset(.00001));
-        sketchReference(textEntity.id());
-        click("sketch-edit-text");
         assertThat(fx(() -> ((TextField) node("#sketch-edit-text-content")).getText()))
                 .isEqualTo("=\"Width: \" + 5");
         text("sketch-edit-text-content", "=\"Width: \" + $missing");
@@ -7490,14 +8213,22 @@ class WorkbenchUiTest {
         click("parameters-cancel");
         assertThat(fx(() -> workbench.controller().snapshot())).isEqualTo(before);
         click("parameters");
-        fx(() -> {
+        var parameterNameCenter = fx(() -> {
             var cell = node("#parameter-table").lookupAll(".table-cell").stream()
                     .filter(n -> n instanceof TableCell<?, ?> c && "width".equals(c.getText()))
                     .findFirst()
                     .orElseThrow();
             var bounds = cell.localToScreen(cell.getBoundsInLocal());
-            robot.mouseMove(bounds.getCenterX(), bounds.getCenterY());
+            return new Point2D(bounds.getCenterX(), bounds.getCenterY());
+        });
+        fx(() -> {
+            robot.mouseMove(parameterNameCenter);
             robot.mouseClick(MouseButton.PRIMARY);
+            return null;
+        });
+        // Give GTK time to deliver the first native click before sending the second.
+        Thread.sleep(90);
+        fx(() -> {
             robot.mouseClick(MouseButton.PRIMARY);
             return null;
         });
@@ -7636,6 +8367,7 @@ class WorkbenchUiTest {
         sketchNumericPoint(30, 35);
         click("sketch-complete-curve");
         sketchReady();
+        click("sketch-fit");
         var before = sketchGeometry();
         sketchDrag(0, 35, 2, 37, false);
         var control = sketchGeometry().entities().stream()
@@ -7652,6 +8384,9 @@ class WorkbenchUiTest {
         checkTextAngleBounds("sketch-text-angle");
         text("sketch-text-height", "8");
         sketchNumericPoint(40, 10);
+        assertThat(fx(() -> ((TextField) node("#sketch-edit-text-content")).getText()))
+                .isEqualTo("OB");
+        key(KeyCode.ESCAPE);
         String textId = sketchGeometry().entities().stream()
                 .filter(e -> e.kind() == SketchGeometry.Kind.TEXT)
                 .findFirst()
@@ -7682,8 +8417,15 @@ class WorkbenchUiTest {
         click("sketch-undo");
         sketchReady();
         assertThat(sketchGeometry()).isEqualTo(beforeRotation);
-        sketchReference(textId);
-        click("sketch-edit-text");
+        fx(() -> {
+            var editor = (SketchEditor) node("#sketch-editor");
+            var geometry = editor.controller().definition();
+            var outline = geometry.curves(geometry.entity(textId)).getLast();
+            robot.mouseMove(editor.modelToScreen(outline.at(.5)));
+            robot.mouseClick(MouseButton.PRIMARY);
+            robot.mouseClick(MouseButton.PRIMARY);
+            return null;
+        });
         text("sketch-edit-text-content", "OC");
         checkTextAngleBounds("sketch-edit-text-angle");
         text("sketch-edit-text-angle", "181");
@@ -7782,6 +8524,9 @@ class WorkbenchUiTest {
         text("sketch-text-height", "4");
         sketchClick(50, 20, false);
         sketchReady();
+        assertThat(fx(() -> ((ComboBox<?>) node("#sketch-edit-text-path")).getValue()))
+                .isEqualTo(arc);
+        key(KeyCode.ESCAPE);
         var text = sketchGeometry().entities().stream()
                 .filter(e -> e.kind() == SketchGeometry.Kind.TEXT)
                 .findFirst()
@@ -7791,6 +8536,17 @@ class WorkbenchUiTest {
         sketchDrag(30, 20, 35, 20, false);
         assertThat(before.distance(sketchGeometry().curves(text).getFirst().at(0)) > 4)
                 .isTrue();
+        var geometry = sketchGeometry();
+        var anchor = SketchText.anchor(geometry, geometry.entity(text.id()));
+        var guide = geometry.entity(arc);
+        var slideTo = guide.at(.25);
+        var pointer = slideTo.plus(guide.derivative(.25).unit().normal().times(3));
+        sketchDrag(anchor.x(), anchor.y(), pointer.x(), pointer.y(), false);
+        sketchReady();
+        var moved = sketchGeometry();
+        assertThat(moved.entity(text.id()).value(1)).isCloseTo(0, within(.01));
+        assertThat(SketchText.anchor(moved, moved.entity(text.id())).distance(slideTo))
+                .isLessThan(.6);
         Path artifacts = Path.of(System.getProperty("voxelbrew.ui.artifacts"));
         fx(() -> {
             Screenshot.save(stage.getScene(), artifacts.resolve("sketch-types-tangent-and-path-text.png"));
@@ -7802,6 +8558,26 @@ class WorkbenchUiTest {
         key(KeyCode.ENTER);
         sketchReady();
         assertThat(sketchGeometry().entity(text.id()).text().pathId()).isEqualTo("");
+        sketchReference(text.id());
+        click("sketch-edit-text");
+        text("sketch-edit-text-content", "CAM");
+        click("sketch-pick-text-path");
+        key(KeyCode.ESCAPE);
+        assertThat(fx(() -> ((ComboBox<?>) node("#sketch-edit-text-path")).getValue()))
+                .isEqualTo("");
+        click("sketch-pick-text-path");
+        var pick = moved.entity(arc).at(.55);
+        sketchClick(pick.x(), pick.y(), false);
+        assertThat(fx(() -> ((TextField) node("#sketch-edit-text-content")).getText()))
+                .isEqualTo("CAM");
+        assertThat(fx(() -> ((ComboBox<?>) node("#sketch-edit-text-path")).getValue()))
+                .isEqualTo(arc);
+        key(KeyCode.ENTER);
+        sketchReady();
+        assertThat(sketchGeometry().entity(text.id()).text().pathId()).isEqualTo(arc);
+        click("sketch-undo");
+        sketchReady();
+        assertThat(sketchGeometry().entity(text.id()).text().pathId()).isEmpty();
         click("sketch-undo");
         sketchReady();
         assertThat(sketchGeometry().entity(text.id()).text().pathId()).isEqualTo(arc);
@@ -7841,20 +8617,31 @@ class WorkbenchUiTest {
         sketchClick(0, 20, false);
         sketchDimension(0, "40");
         assertThat(fx(() -> ((Label) node("#sketch-solve-status")).getText())).isEqualTo("Fully constrained");
-        // Select the edge away from its midpoint label to add a conflicting dimension.
+        // A second measurement on the fixed edge is a live, read-only annotation.
         sketchClick(12, 0, false);
-        sketchDimension(0, "80");
-        assertThat(fx(() -> node("#constraint-finish").isDisabled())).isTrue();
-        assertThat(fx(() -> ((Label) node("#sketch-error")).getText().contains("cannot satisfy")))
+        assertThat(fx(() -> node("#sketch-dimension-value").isDisabled())).isTrue();
+        click("sketch-apply-dimension");
+        sketchReady();
+        var reference = sketchGeometry().constraints().getLast();
+        assertThat(dev.voxelbrew.engine.sketch.SketchConstraints.referenceDimension(reference))
                 .isTrue();
+        assertThat(dev.voxelbrew.engine.sketch.SketchConstraints.measuredValue(sketchGeometry(), reference))
+                .isCloseTo(60, within(1e-6));
+        assertThat(fx(() -> node("#sketch-dimension-value").isDisabled())).isTrue();
+        assertThat(fx(() -> node("#sketch-apply-dimension").isDisabled())).isTrue();
+        assertThat(fx(() -> node("#constraint-finish").isDisabled())).isFalse();
+        fx(() -> {
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "sketch-reference-dimension.png"));
+            return null;
+        });
         click("sketch-undo");
         sketchReady();
-        assertThat(fx(() -> node("#constraint-finish").isDisabled())).isFalse();
+        assertThat(sketchGeometry().constraints()).doesNotContain(reference);
         click("sketch-redo");
         sketchReady();
-        assertThat(fx(() -> node("#constraint-finish").isDisabled())).isTrue();
-        click("sketch-undo");
-        sketchReady();
+        assertThat(sketchGeometry().constraints()).contains(reference);
         sketchType(SketchTools.Tool.CIRCLE_CENTER);
         sketchNumericPoint(10, 10);
         sketchNumericPoint(12, 10);
@@ -7870,8 +8657,8 @@ class WorkbenchUiTest {
         click("sketch-clear-selection");
         sketchReference(circleId + ".center");
         sketchReference("origin.point");
-        sketchDimension(2, "-10");
-        sketchDimension(3, "-10");
+        sketchDimension(2, "10");
+        sketchDimension(3, "10");
         assertThat(fx(() -> ((Label) node("#sketch-solve-status")).getText())).isEqualTo("Fully constrained");
         assertThat(document().features().size())
                 .as("Sketch editing stays transient until Finish")
@@ -7978,6 +8765,50 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void inwardFaceExtrusionCutsItsSupportUnlessManuallyOverridden() throws Exception {
+        openPrepared("plate-5mm.vxb");
+        double original = volume();
+        var body = fx(() -> workbench.controller().build().bodies().getFirst());
+        var face = body.planarFaces().stream()
+                .filter(f -> f.nz() > .99)
+                .findFirst()
+                .orElseThrow();
+        var plane = FaceSupport.attach(body.output(), body.planarFaces(), face.faceIndex());
+        fx(() -> {
+            workbench.controller().add(new Feature.Sketch("pocket", "profile", plane, new Feature.Circle(10, 10, 4)));
+            return null;
+        });
+        ready();
+        click("history-2");
+        click("extrude");
+        text("extrude-distance", "-2");
+        ready();
+        assertThat(volume()).isCloseTo(original - 8 * Math.PI, within(.001));
+        fx(() -> {
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "inward-face-extrusion.png"));
+            return null;
+        });
+        click("extrude-cut-inward");
+        choice("extrude-operation", BodyExtrusion.Operation.NEW_BODY.ordinal());
+        ready();
+        assertThat(volume()).isCloseTo(original + 8 * Math.PI, within(.001));
+        click("extrude-cut-inward");
+        text("extrude-distance", "2");
+        ready();
+        assertThat(volume()).isCloseTo(original + 8 * Math.PI, within(.001));
+        text("extrude-distance", "-2");
+        ready();
+        click("commit-extrusion");
+        ready();
+        var cut = BodyExtrusion.from(document().features().getLast());
+        assertThat(cut.operation()).isEqualTo(BodyExtrusion.Operation.CUT);
+        assertThat(cut.target()).isEqualTo(body.output());
+        assertThat(volume()).isCloseTo(original - 8 * Math.PI, within(.001));
+    }
+
+    @Test
     void extrudeCanJoinAndThenEditTheSameFeatureIntoABlindCut() throws Exception {
         openPrepared("plate-5mm.vxb");
         double original = volume();
@@ -7991,6 +8822,29 @@ class WorkbenchUiTest {
         ready();
         click("history-2");
         click("extrude");
+        fx(() -> {
+            var operations = (ComboBox<?>) node("#extrude-operation");
+            assertThat(operations.getButtonCell().getGraphic()).isNotNull();
+            operations.show();
+            return null;
+        });
+        fx(() -> {
+            var operations = (ComboBox<?>) node("#extrude-operation");
+            var skin = (javafx.scene.control.skin.ComboBoxListViewSkin<?>) operations.getSkin();
+            var rows = skin.getPopupContent().lookupAll(".list-cell").stream()
+                    .map(row -> (javafx.scene.control.ListCell<?>) row)
+                    .filter(cell -> !cell.isEmpty())
+                    .toList();
+            assertThat(rows).hasSize(3).allSatisfy(cell -> {
+                assertThat(cell.getText()).isNotBlank();
+                assertThat(cell.getGraphic()).isNotNull();
+            });
+            Screenshot.save(
+                    skin.getPopupContent().getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "extrusion-operation-icons.png"));
+            operations.hide();
+            return null;
+        });
         choice("extrude-operation", 1);
         text("extrude-distance", "2");
         ready();
@@ -7998,7 +8852,11 @@ class WorkbenchUiTest {
         ready();
         assertThat(volume()).isCloseTo(original + 8 * Math.PI, within(.001));
         click("history-3");
+        click("operation-references");
         choice("extrude-operation", 2);
+        assertThat(fx(() -> ((FormulaField) workbench.lookup("#repair-output")).expressionType()))
+                .isEqualTo(FormulaField.ExpressionType.STRING);
+        text("repair-output", "=\"bo\"+\"dy\"");
         click("repair");
         ready();
         text("dimension-distance", "-2");
@@ -8187,8 +9045,14 @@ class WorkbenchUiTest {
         sketchDrag(30, 10, 35, 15, false);
         var moved =
                 fx(() -> ((SketchEditor) node("#sketch-editor")).controller().definition());
-        assertThat(moved.entities().getFirst().at(1).x()).isCloseTo(35, org.assertj.core.data.Offset.offset(0.3));
-        assertThat(moved.entities().getFirst().at(1).y()).isCloseTo(15, org.assertj.core.data.Offset.offset(0.3));
+        var screenError = fx(() -> {
+            var editor = (SketchEditor) node("#sketch-editor");
+            var end = editor.modelToScreen(moved.entities().getFirst().at(1));
+            return end.distance(editor.modelToScreen(new SketchGeometry.Vec(35, 15)));
+        });
+        assertThat(screenError)
+                .as("Dragged endpoint distance from the pointer in pixels")
+                .isLessThan(1.5);
         assertThat(moved.entities().getFirst().at(1).y())
                 .isCloseTo(moved.entities().getFirst().at(0).y(), org.assertj.core.data.Offset.offset(1e-6));
         click("sketch-undo");
@@ -8961,6 +9825,105 @@ class WorkbenchUiTest {
         assertThat(sketchGeometry().entities().size()).isEqualTo(4);
         click("constraint-cancel");
         ready();
+    }
+
+    @Test
+    void operationsMenuBuildsAndEditsSolidPatterns() throws Exception {
+        openPrepared("plate-5mm.vxb");
+        int count = fx(() -> workbench.controller().build().bodies().size());
+        click("body-rectangular");
+        assertThat(fx(() -> workbench.lookup("#pattern-rows"))).isInstanceOf(FormulaField.class);
+        text("pattern-rows", "=1+1");
+        fx(() -> {
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "body-pattern-inspector.png"));
+            return null;
+        });
+        click("pattern-apply");
+        ready();
+        assertThat(fx(() -> workbench.controller().build().bodies().size())).isEqualTo(count + 3);
+        click("body-circular");
+        click("pattern-apply");
+        ready();
+        assertThat(fx(() -> workbench.controller().build().bodies().size())).isEqualTo(count + 6);
+        click("body-mirror");
+        text("pattern-step", "5+5");
+        click("pattern-apply");
+        ready();
+        assertThat(fx(() -> workbench.controller().build().bodies().size())).isEqualTo(count + 7);
+        fx(() -> {
+            var source = workbench.controller().build().bodies().getFirst();
+            workbench.controller().renameBody(source.id(), "Boazeria");
+            return null;
+        });
+        ready();
+        assertThat(fx(() -> {
+                    var tree = (TreeView<?>) node("#model-tree");
+                    return java.util.stream.IntStream.range(0, tree.getExpandedItemCount())
+                            .mapToObj(i -> tree.getTreeItem(i).getValue().toString())
+                            .filter(name -> name.startsWith("Boazeria"))
+                            .toList();
+                }))
+                .containsExactly(
+                        "Boazeria",
+                        "Boazeria 2",
+                        "Boazeria 3",
+                        "Boazeria 4",
+                        "Boazeria 5",
+                        "Boazeria 6",
+                        "Boazeria 7",
+                        "Boazeria 8");
+        fx(() -> {
+            Screenshot.save(
+                    stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "pattern-body-names.png"));
+            return null;
+        });
+        click("history-" + (document().features().size() - 1));
+        assertThat(fx(() -> ((InspectorDetails) node(".inspector-details")).getRowCount()))
+                .isEqualTo(3);
+        click("edit-body-pattern");
+        assertThat(fx(() -> ((FormulaField) workbench.lookup("#pattern-step")).getText()))
+                .isEqualTo("5+5");
+        text("pattern-step", "15");
+        click("pattern-apply");
+        ready();
+        assertThat(BodyPattern.from(document().features().getLast()).firstStep())
+                .isEqualTo(15);
+        assertThat(document()
+                        .parameters()
+                        .binding(new ParameterSet.Target(
+                                document().features().getLast().id(), "step")))
+                .isEmpty();
+        click("operations-menu");
+        fx(() -> {
+            Screenshot.save(
+                    node("#body-circular").getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "body-pattern-menu.png"));
+            return null;
+        });
+        key(KeyCode.ESCAPE);
+    }
+
+    @Test
+    void escapeClearsDesignerBodySelection() throws Exception {
+        openPrepared("plate-5mm.vxb");
+        var snapshot = fx(() -> workbench.controller().snapshot());
+        var body = fx(() -> findBodyView(
+                workbench.viewport(),
+                "body-" + workbench.controller().build().bodies().getFirst().id()));
+        var normal = fx(() -> ((javafx.scene.paint.PhongMaterial) body.getMaterial()).getDiffuseColor());
+        bodyTreeClick("Body 1", MouseButton.PRIMARY, 1);
+        assertThat(fx(() -> ((javafx.scene.paint.PhongMaterial) body.getMaterial()).getDiffuseColor()))
+                .isNotEqualTo(normal);
+        key(KeyCode.ESCAPE);
+        assertThat(fx(() ->
+                        ((TreeView<?>) node("#model-tree")).getSelectionModel().getSelectedIndex()))
+                .isEqualTo(-1);
+        assertThat(fx(() -> ((javafx.scene.paint.PhongMaterial) body.getMaterial()).getDiffuseColor()))
+                .isEqualTo(normal);
+        assertThat(fx(() -> workbench.lookup("#body-material-name"))).isNull();
+        assertThat(fx(() -> workbench.controller().snapshot())).isEqualTo(snapshot);
     }
 
     @Test

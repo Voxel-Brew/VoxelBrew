@@ -22,6 +22,28 @@ class SketchControllerTest {
     }
 
     @Test
+    void extrusionWarningNamesTheCrossingTextAndClearsAfterRepair() throws Exception {
+        var box = Sketches.rectangle("frame", 0, 0, 100, 20, false);
+        var label = SketchText.create("label", "O", "SansSerif", 0, 10, 18, 10, 0, 0, "", false);
+        var geometry = box.add(label)
+                .withBoundary(
+                        java.util.stream.Stream.concat(box.boundary().stream(), java.util.stream.Stream.of(label.id()))
+                                .toList());
+        var queue = new ConcurrentLinkedQueue<Runnable>();
+        try (var controller = new SketchController(geometry, queue::add)) {
+            await(controller, queue);
+            assertThat(controller.extrusionIssue()).contains("O", "label", "frame-top");
+            assertThat(controller.canFinish()).isTrue();
+            controller.edit(geometry.withBoundary(box.boundary()));
+            await(controller, queue);
+            assertThat(controller.extrusionIssue()).isEmpty();
+            controller.undo();
+            await(controller, queue);
+            assertThat(controller.extrusionIssue()).contains("frame-top");
+        }
+    }
+
+    @Test
     void textFormulaDraftsRebuildAndKeepBindingsInUndoHistory() throws Exception {
         var queue = new ConcurrentLinkedQueue<Runnable>();
         var text = SketchText.create("text", "Width: 5", "SansSerif", 0, 0, 0, 5, 0, 0, "", false);

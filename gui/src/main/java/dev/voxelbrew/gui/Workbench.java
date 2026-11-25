@@ -79,12 +79,15 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     private final TabPane workspaces;
 
     private final TreeView<Entry> tree = new TreeView<>();
+    private final TreeItem<Entry> operationRows = new TreeItem<>();
+    private final TreeItem<Entry> sketchRows = new TreeItem<>();
+    private final TreeItem<Entry> bodyRows = new TreeItem<>();
 
     private final VBox inspector = new VBox(12), form = new VBox(9);
 
     private final VBox featureDiagnostics = new VBox(6);
 
-    private final HBox toolActions = new HBox(8);
+    private final FlowPane toolActions = new FlowPane(8, 5);
 
     private final Label status, error, selectionLabel;
 
@@ -144,6 +147,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private final Map<String, TextField> fields = new LinkedHashMap<>();
 
+    private final Map<String, Boolean> validSketchProfiles = new HashMap<>();
+
     private final List<QuickMenu> quickMenus = new ArrayList<>();
 
     private final UpdateDialog.Factory updates;
@@ -198,6 +203,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     private Feature.Sketch extrusionSketch;
 
     private ModelSession.Snapshot planeSnapshot;
+    private long draftRevision;
+    private long draftGeneration;
 
     private Feature.Sketch planeRepair;
 
@@ -232,8 +239,37 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         NONE,
         PLANE,
         EXTRUDE,
+        EDIT_PROFILE,
         MODIFY,
+        OPERATION,
         CONSTRUCTION
+    }
+
+    private record ProfileChoices(CheckBox whole, Map<CheckBox, String> regions) {
+        List<String> selectedIds() {
+            return regions.entrySet().stream()
+                    .filter(e -> e.getKey().isSelected())
+                    .map(Map.Entry::getValue)
+                    .toList();
+        }
+
+        String profileId(Feature.Sketch sketch) {
+            return whole.isSelected()
+                    ? sketch.profileId()
+                    : SketchProfiles.selectedProfileId(sketch.profileId(), selectedIds());
+        }
+
+        void onChange(Runnable update) {
+            whole.setOnAction(event -> {
+                if (whole.isSelected()) regions.keySet().forEach(box -> box.setSelected(false));
+                update.run();
+            });
+            regions.keySet()
+                    .forEach(box -> box.setOnAction(event -> {
+                        whole.setSelected(false);
+                        update.run();
+                    }));
+        }
     }
 
     private final class BodyTreeCell extends TreeCell<Entry> {
@@ -301,12 +337,15 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                         || controller.rebuilding()
                         || !controller.build().valid());
             });
-            setOnMouseClicked(event -> {
-                if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2 && canRename()) {
-                    requestRename();
-                    event.consume();
-                }
-            });
+            setOnMouseClicked(this::activateRow);
+        }
+
+        private void activateRow(MouseEvent event) {
+            if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2 && canRename()) {
+                if (getTreeItem().getParent() == sketchRows) editSelectedFeature();
+                else requestRename();
+                event.consume();
+            }
         }
 
         private boolean canRename() {
@@ -339,7 +378,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             super.updateItem(entry, empty);
             if (!isEditing()) {
                 setText(empty || entry == null ? null : entry.label());
-                setGraphic(null);
+                setGraphic(
+                        empty || entry == null || getTreeItem() == null
+                                ? null
+                                : getTreeItem().getGraphic());
             }
             if (empty || entry == null || entry.id() == null) setContextMenu(null);
             else setContextMenu(entry.body() ? menu : featureMenu);
@@ -454,7 +496,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             editingEntry = null;
             editingSnapshot = null;
             setText(getItem() == null ? null : getItem().label());
-            setGraphic(null);
+            setGraphic(getTreeItem() == null ? null : getTreeItem().getGraphic());
         }
     }
 
@@ -527,6 +569,12 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         return String.format(Locale.ROOT, "%.3f", value);
     }
 
+    private static String numericText(double value) {
+        var format = java.text.NumberFormat.getNumberInstance();
+        format.setMaximumFractionDigits(15);
+        return format.format(value);
+    }
+
     static int parseNotificationDuration(String value) {
         int millis = Integer.parseInt(value.strip());
         if (millis <= 0) throw new IllegalArgumentException("Notification duration must be positive");
@@ -546,6 +594,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     static Path exportSuggestion(Path saveFolder, Path projectPath) {
         return projectPath == null ? saveFolder.resolve("Untitled.vxb") : projectPath;
+    }
+
+    private static boolean canCut(Feature.Sketch sketch) {
+        return sketch.profile() instanceof Feature.Circle || sketch.profile() instanceof Feature.Constrained;
     }
 
     Workbench(
@@ -674,7 +726,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                         saveItem,
                         saveAsItem,
                         new SeparatorMenuItem(),
-                        export);
+                        export,
+                        new SeparatorMenuItem(),
+                        menuItem(translations.translate("action.exit"), "exit", true, this::exitApplication));
         var editMenu = menu("menu-edit");
         editMenu.getItems()
                 .addAll(mirror(undo, true), mirror(redo, true), new SeparatorMenuItem(), mirror(parameters, true));
@@ -822,22 +876,26 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         toolbar.getStyleClass().add("command-strip");
         constrainedSketch.getStyleClass().add("primary");
         var left = modelPanel();
-        inspector.getStyleClass().add("side-panel");
+        inspector.getStyleClass().addAll("side-panel", "properties-panel");
         inspector.setPrefWidth(270);
         inspector.setMinWidth(240);
         error.setWrapText(true);
         error.setId("tool-error");
         error.getStyleClass().add("error");
         selectionLabel.getStyleClass().add("selection-title");
+        selectionLabel.setWrapText(true);
+        var header = new VBox(5, heading(translations.translate("gui.properties")), selectionLabel);
+        header.getStyleClass().add("inspector-header");
+        form.getStyleClass().add("inspector-form");
+        toolActions.getStyleClass().add("inspector-actions");
+        toolActions.managedProperty().bind(javafx.beans.binding.Bindings.isNotEmpty(toolActions.getChildren()));
         var scroll = new ScrollPane(form);
         scroll.setFitToWidth(true);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         VBox.setVgrow(scroll, Priority.ALWAYS);
         error.managedProperty().bind(error.textProperty().isNotEmpty());
         error.visibleProperty().bind(error.managedProperty());
-        inspector
-                .getChildren()
-                .addAll(heading(translations.translate("gui.properties")), selectionLabel, scroll, error, toolActions);
+        inspector.getChildren().addAll(header, scroll, error, toolActions);
         var center = new BorderPane(viewport);
         center.getStyleClass().add("viewport-panel");
         var split = new SplitPane(left, center, inspector);
@@ -865,6 +923,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 translations,
                 position -> attempt(() -> controller.cursor(position)),
                 this::selectFeature,
+                this::editSelectedFeature,
                 this::shortName,
                 (from, to) -> attempt(() -> controller.deleteFeatures(from, to)));
         progress.setPrefSize(16, 16);
@@ -890,17 +949,34 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         installShortcuts(menuBar, newItem, openItem, importItem, saveItem, saveAsItem, constructionMenu, solidCommands);
         stage.setOnCloseRequest(e -> {
             e.consume();
-            requestChange(() -> {
-                close();
-                stage.hide();
-            });
+            requestChange(this::closeWindow);
         });
+        stage.getProperties().put(Workbench.class, this);
         applyAppearance();
         refresh();
     }
 
     private Stage stage() {
         return stage;
+    }
+
+    private void closeWindow() {
+        close();
+        stage.hide();
+    }
+
+    private void exitApplication() {
+        stage.toFront();
+        if (isDisabled()) return;
+        requestChange(() -> {
+            closeWindow();
+            javafx.stage.Window.getWindows().stream()
+                    .map(open -> open.getProperties().get(Workbench.class))
+                    .filter(Workbench.class::isInstance)
+                    .map(Workbench.class::cast)
+                    .findFirst()
+                    .ifPresent(Workbench::exitApplication);
+        });
     }
 
     javafx.scene.Scene createScene(double width, double height) {
@@ -1064,18 +1140,33 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         try {
             var snapshot = controller.snapshot();
             var document = snapshot.document();
-            refreshWorkspaceTabs(document);
+            refreshWorkspaceTabs(document, snapshot.revision());
             var effective = controller.effectiveFeatures();
             boolean buildStateChanged = lastBuild != controller.build()
                     || lastRebuilding != controller.rebuilding()
                     || lastIoBusy != controller.ioBusy();
             boolean changed = featuresChanged(document, effective);
+            if (changed) validSketchProfiles.clear();
             refreshBodies(document, changed);
             var styles = new LinkedHashMap<String, BodyStyle>();
             controller.build().bodies().forEach(b -> styles.put(b.id(), document.bodyStyle(b.id())));
             viewport.setBodyStyles(styles);
+            String extrusionId = tool == Tool.EDIT_PROFILE ? selectedFeature : controller.extrusionPreviewId();
+            viewport.highlightExtrusionBodies(
+                    extrusionId == null
+                            ? java.util.Set.of()
+                            : controller.build().bodyIds().entrySet().stream()
+                                    .filter(entry -> entry.getKey().featureId().equals(extrusionId))
+                                    .map(Map.Entry::getValue)
+                                    .collect(java.util.stream.Collectors.toSet()));
             synchronizeTreeSelection();
-            viewport.showSketches(effective.subList(0, document.cursor()), selectedFeature);
+            if (tool != Tool.EDIT_PROFILE) {
+                viewport.showSketches(effective.subList(0, document.cursor()), selectedFeature);
+            }
+            if (tool != Tool.NONE) {
+                selectionLabel.setGraphic(null);
+                selectionLabel.setTooltip(null);
+            }
             if (tool == Tool.NONE && (changed || selectedBody != null && buildStateChanged)) inspect();
             lastRebuilding = controller.rebuilding();
             lastIoBusy = controller.ioBusy();
@@ -1086,9 +1177,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             lastParameters = document.parameters();
             lastDocument = document.id();
             refreshCommands(document, snapshot);
-            boolean atEnd = document.cursor() == document.features().size() && !controller.ioBusy();
-            refreshSolidCommands(atEnd);
-            refreshCut(atEnd);
+            refreshSolidCommands();
+            refreshSketchCommands(document);
             refreshStatus();
         } finally {
             refreshing = false;
@@ -1110,6 +1200,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     }
 
     private String defaultFeatureName(Feature feature) {
+        if (CutTargets.through(feature)) return translations.translate("action.cut");
+        if (BodyPattern.matches(feature)) {
+            return patternName(BodyPattern.from(feature).kind());
+        }
         if (BodyExtrusion.modifiesBody(feature)) {
             return translations.translate("gui.extrude") + " · "
                     + translations.translate(
@@ -1142,45 +1236,68 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private void rebuildTree(CadDocument document) {
         tree.edit(null);
-        var root = new TreeItem<>(new Entry(null, translations.translate("gui.document"), false));
-        var features = new TreeItem<>(new Entry(null, translations.translate("gui.features"), false));
-        features.setExpanded(true);
+        var selectedRow = tree.getSelectionModel().getSelectedItem();
+        boolean keepSketchRow = selectedRow != null && selectedRow.getParent() == sketchRows;
+        var operations = new ArrayList<TreeItem<Entry>>();
+        var sketches = new ArrayList<TreeItem<Entry>>();
+        var bodies = new ArrayList<TreeItem<Entry>>();
+        var diagnostics = new HashMap<String, String>();
+        for (var result : controller.build().diagnostics()) {
+            if (result.state() != Evaluation.State.OK) {
+                diagnostics.putIfAbsent(result.featureId(), "  [" + result.state() + "]");
+            }
+        }
         for (int i = 0; i < document.features().size(); i++) {
             var feature = document.features().get(i);
-            String diagnostic = controller.build().diagnostics().stream()
-                    .filter(d -> d.featureId().equals(feature.id()) && d.state() != Evaluation.State.OK)
-                    .map(d -> "  [" + d.state() + "]")
-                    .findFirst()
-                    .orElse("");
-            var item = new TreeItem<>(new Entry(feature.id(), (i + 1) + "  " + shortName(feature) + diagnostic, false));
-            features.getChildren().add(item);
-        }
-        var bodies = new TreeItem<>(new Entry(null, translations.translate("gui.bodies"), true));
-        bodies.setExpanded(true);
-        int index = 1;
-        for (var body : controller.build().bodies()) {
-            bodies.getChildren()
-                    .add(new TreeItem<>(new Entry(
-                            body.id(),
-                            document.bodyName(body.id(), translations.translate("feature.body", index++)),
-                            true)));
-        }
-        root.getChildren().add(features);
-        root.getChildren().add(bodies);
-        tree.setRoot(root);
-        for (var item : features.getChildren()) {
-            if (item.getValue().id().equals(selectedFeature)) {
-                tree.getSelectionModel().select(item);
+            String diagnostic = diagnostics.getOrDefault(feature.id(), "");
+            String label = document.featureName(feature.id(), defaultFeatureName(feature));
+            var item = new TreeItem<>(new Entry(feature.id(), (i + 1) + "  " + label + diagnostic, false));
+            item.setGraphic(FeatureTimeline.featureIcon(feature));
+            operations.add(item);
+            if (feature instanceof Feature.Sketch) {
+                var sketchRow = new TreeItem<>(
+                        new Entry(feature.id(), document.featureName(feature.id(), feature.id()) + diagnostic, false),
+                        FeatureTimeline.featureIcon(feature));
+                sketches.add(sketchRow);
             }
+        }
+        for (var body : controller.build().bodies()) {
+            bodies.add(new TreeItem<>(
+                    new Entry(
+                            body.id(),
+                            controller
+                                    .build()
+                                    .labels()
+                                    .label(body.id(), document, i -> translations.translate("feature.body", i)),
+                            true),
+                    OperationIcons.icon("new-body")));
+        }
+        operationRows.getChildren().setAll(operations);
+        sketchRows.getChildren().setAll(sketches);
+        bodyRows.getChildren().setAll(bodies);
+        if (keepSketchRow && sketchRows.isExpanded()) {
+            sketches.stream()
+                    .filter(row -> row.getValue().id().equals(selectedFeature))
+                    .findFirst()
+                    .ifPresent(tree.getSelectionModel()::select);
         }
     }
 
     private void synchronizeTreeSelection() {
         if (tree.getRoot() == null) return;
         String id = selectedBody == null ? selectedFeature : selectedBody;
+        var current = tree.getSelectionModel().getSelectedItem();
+        if (id != null
+                && current != null
+                && current.getValue().body() == (selectedBody != null)
+                && id.equals(current.getValue().id())) {
+            return;
+        }
         for (var group : tree.getRoot().getChildren()) {
+            if (!group.isExpanded()) continue;
             for (var item : group.getChildren()) {
-                if (item.getValue().id().equals(id)) {
+                if (item.getValue().body() == (selectedBody != null)
+                        && item.getValue().id().equals(id)) {
                     tree.getSelectionModel().select(item);
                     return;
                 }
@@ -1190,14 +1307,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     }
 
     private String bodyLabel(String id) {
-        int index = 1;
-        for (var body : controller.build().bodies()) {
-            if (body.id().equals(id)) {
-                return controller.snapshot().document().bodyName(id, translations.translate("feature.body", index));
-            }
-            index++;
-        }
-        return id;
+        return controller
+                .build()
+                .labels()
+                .label(id, controller.snapshot().document(), i -> translations.translate("feature.body", i));
     }
 
     private Feature selected() {
@@ -1219,7 +1332,17 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                         .subList(0, controller.snapshot().document().cursor()),
                 id);
         inspect();
-        refresh();
+        var snapshot = controller.snapshot();
+        var document = snapshot.document();
+        boolean wasRefreshing = refreshing;
+        refreshing = true;
+        try {
+            synchronizeTreeSelection();
+            refreshCommands(document, snapshot);
+            refreshSketchCommands(document);
+        } finally {
+            refreshing = wasRefreshing;
+        }
     }
 
     private void selectBody(String id, int face) {
@@ -1246,6 +1369,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         fields.clear();
         error.setText("");
         var feature = selected();
+        selectionLabel.setGraphic(feature == null ? null : FeatureTimeline.featureIcon(feature));
+        selectionLabel.setTooltip(feature == null ? null : new Tooltip(feature.id()));
         if (feature == null) {
             selectionLabel.setText(translations.translate("gui.start_a_design"));
             var hint = new Label(
@@ -1256,54 +1381,62 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             return;
         }
         selectionLabel.setText(selectedBody == null ? shortName(feature) : bodyLabel(selectedBody));
-        var identity = new Label(feature.id());
-        identity.setWrapText(true);
-        identity.getStyleClass().add("muted");
-        form.getChildren().add(identity);
         if (selectedBody != null) bodyStyleEditor(selectedBody);
         inspectFeature(feature);
     }
 
+    private void inspectSketch(Feature.Sketch s) {
+        sketchNameEditor(s);
+        if (s.profile() instanceof Feature.Rectangle r) {
+            dimension(s, "x", r.x());
+            dimension(s, "y", r.y());
+            dimension(s, "width", r.width());
+            dimension(s, "height", r.height());
+        } else if (s.profile() instanceof Feature.Circle c) {
+            dimension(s, "centerX", c.centerX());
+            dimension(s, "centerY", c.centerY());
+            dimension(s, "diameter", c.diameter());
+        } else if (s.profile() instanceof Feature.Constrained c) {
+            var info = new Label(translations.translate(
+                    "feature.sketchSummary",
+                    c.geometry().entities().size(),
+                    c.geometry().constraints().size()));
+            info.setWrapText(true);
+            form.getChildren().add(info);
+            var hint = new Label(translations.translate(
+                    "gui.edit_sketch_to_change_driving_dimensions_constraints_or_the_profile_boundary"));
+            hint.setWrapText(true);
+            form.getChildren().add(hint);
+        }
+        form.getChildren()
+                .add(button(
+                        translations.translate("gui.edit_sketch_constraints"),
+                        "edit-sketch-constraints",
+                        () -> editSketch(s)));
+
+        var plane = sketchPlaneLabel(s);
+        var changePlane =
+                button(translations.translate("plane.change"), "change-sketch-plane", () -> beginPlaneSelection(s));
+        form.getChildren().add(new FlowPane(6, 4, plane, changePlane));
+    }
+
     private void inspectFeature(Feature feature) {
         if (feature instanceof ConstructionFeature construction) {
+            var details = new InspectorDetails();
+            for (var input : construction.inputs()) {
+                details.row(
+                        translations.translate("construction.input"),
+                        ConstructionEditor.inputLabel(input, controller, translations));
+            }
+            var valueKey = ConstructionEditor.valueKey(construction.tool());
+            if (valueKey != null) details.row(translations.translate(valueKey), numericText(construction.value()));
+            form.getChildren().add(details);
             var edit = new Button(translations.translate("construction.edit"));
             edit.setId("construction-edit");
             edit.setOnAction(event -> beginConstruction(construction.tool(), construction));
             form.getChildren().add(edit);
         } else if (feature instanceof Feature.Sketch s) {
-            if (s.profile() instanceof Feature.Rectangle r) {
-                dimension(feature, "x", r.x());
-                dimension(feature, "y", r.y());
-                dimension(feature, "width", r.width());
-                dimension(feature, "height", r.height());
-            } else if (s.profile() instanceof Feature.Circle c) {
-                dimension(feature, "centerX", c.centerX());
-                dimension(feature, "centerY", c.centerY());
-                dimension(feature, "diameter", c.diameter());
-            } else if (s.profile() instanceof Feature.Constrained c) {
-                var info = new Label(translations.translate(
-                        "feature.sketchSummary",
-                        c.geometry().entities().size(),
-                        c.geometry().constraints().size()));
-                info.setWrapText(true);
-                form.getChildren().add(info);
-                var hint = new Label(translations.translate(
-                        "gui.edit_sketch_to_change_driving_dimensions_constraints_or_the_profile_boundary"));
-                hint.setWrapText(true);
-                form.getChildren().add(hint);
-            }
-            form.getChildren()
-                    .add(button(
-                            translations.translate("gui.edit_sketch_constraints"),
-                            "edit-sketch-constraints",
-                            () -> editSketch(s)));
-
-            var plane =
-                    new Label(translations.translate("feature.plane", s.plane().id()));
-            plane.setWrapText(true);
-            var changePlane =
-                    button(translations.translate("plane.change"), "change-sketch-plane", () -> beginPlaneSelection(s));
-            form.getChildren().add(new FlowPane(6, 4, plane, changePlane));
+            inspectSketch(s);
         } else if (feature instanceof Feature.Extrude || BodyExtrusion.modifiesBody(feature)) {
             var definition = BodyExtrusion.from(feature);
             dimension(feature, "distance", definition.extrusion().distance());
@@ -1314,40 +1447,61 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         } else if (feature instanceof Feature.Shell s) {
             dimension(feature, "thickness", s.thickness());
             referenceEditor(feature, null, s.body());
-        } else if (feature instanceof Feature.ThroughCut c) {
-            referenceEditor(feature, c.profile(), c.body());
+        } else if (CutTargets.through(feature)) {
+            inspectThroughCut(feature);
         } else if (feature instanceof Feature.SplitBody s) {
             dimension(feature, "offset", s.plane().offset());
             referenceEditor(feature, null, s.body());
-        } else if (feature instanceof Feature.Custom custom) {
-            var metadata =
-                    new Label(custom.providerId() + "/" + custom.type() + " · payload v" + custom.payloadVersion());
-            metadata.setWrapText(true);
-            form.getChildren().add(metadata);
-            try (var features = featureProviders.open(pluginDirectory)) {
-                var values = features.parameters(custom);
-                for (var parameter : features.descriptor(custom).parameters()) {
-                    editableDimension(
-                            parameter.key(),
-                            parameter.label(),
-                            values.get(parameter.key()),
-                            FormulaField.unit(parameter.unit()),
-                            input -> controller.edit(custom.id(), parameter.key(), input.declaredValue()));
-                }
-            } catch (IOException | RuntimeException failure) {
-                var message = new Label(failure.getMessage());
-                message.setWrapText(true);
-                message.getStyleClass().add("error");
-                form.getChildren().add(message);
+        } else if (BodyPattern.matches(feature)) {
+            var pattern = BodyPattern.from(feature);
+            var details = new InspectorDetails();
+            details.row(translations.translate("gui.input_body"), targetLabel(pattern.source()));
+            boolean circular = pattern.kind() == BodyPattern.Kind.CIRCULAR;
+            details.row(
+                    translations.translate(circular ? "pattern.axis" : "pattern.plane"),
+                    BodyPatternEditor.axisName(pattern.axis(), circular));
+            for (var dim : FeatureDimensions.list(feature)) {
+                var caption =
+                        BodyPatternEditor.caption(dim.target().field(), pattern.kind(), pattern.axis(), translations);
+                details.row(caption, numericText(dim.value()));
             }
+            form.getChildren().add(details);
             form.getChildren()
-                    .add(button(translations.translate("gui.reload_plugin_and_rebuild"), "custom-rebuild", () -> {
-                        inspect();
-                        controller.rebuild();
-                    }));
+                    .add(button(
+                            translations.translate("parameter.edit"),
+                            "edit-body-pattern",
+                            () -> editBodyPattern(pattern.kind(), feature)));
+        } else if (feature instanceof Feature.Custom custom) {
+            inspectPlugin(custom);
         }
         form.getChildren().add(featureDiagnostics);
         updateFeatureDiagnostics();
+    }
+
+    private void inspectPlugin(Feature.Custom custom) {
+        var metadata = new Label(custom.providerId() + "/" + custom.type() + " · payload v" + custom.payloadVersion());
+        metadata.setWrapText(true);
+        form.getChildren().add(metadata);
+        try (var features = featureProviders.open(pluginDirectory)) {
+            var values = features.parameters(custom);
+            for (var parameter : features.descriptor(custom).parameters()) {
+                editableDimension(
+                        parameter.key(),
+                        parameter.label(),
+                        values.get(parameter.key()),
+                        FormulaField.unit(parameter.unit()),
+                        input -> controller.edit(custom.id(), parameter.key(), input.declaredValue()));
+            }
+        } catch (IOException | RuntimeException failure) {
+            var message = new Label(failure.getMessage());
+            message.setWrapText(true);
+            message.getStyleClass().add("error");
+            form.getChildren().add(message);
+        }
+        form.getChildren().add(button(translations.translate("gui.reload_plugin_and_rebuild"), "custom-rebuild", () -> {
+            inspect();
+            controller.rebuild();
+        }));
     }
 
     private void bodyStyleEditor(String bodyId) {
@@ -1385,7 +1539,12 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         var hint = new Label(translations.translate("body.cadHint"));
         hint.setWrapText(true);
         hint.getStyleClass().add("muted");
-        var content = new VBox(6, materialLabel, material, colorLabel, color, new HBox(6, apply, reset), hint);
+        var content = new VBox(
+                9,
+                InspectorDetails.field(materialLabel, material),
+                InspectorDetails.field(colorLabel, color),
+                new HBox(6, apply, reset),
+                hint);
         // Properties remain readable while rebuilding; editing requires a current body.
         content.setDisable(
                 !controller.canExport() || controller.build().bodies().stream().noneMatch(b -> b.id().equals(bodyId)));
@@ -1414,14 +1573,14 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 .binding(new dev.voxelbrew.api.model.parameters.ParameterSet.Target(feature.id(), name));
         var field = editableDimension(
                 name, translations.tryTranslate("dimension." + name).orElse(name), value, ParameterUnit.MM, input -> {
-                    String text = input.getText().strip();
+                    String text = input.expression().strip();
                     if (text.matches("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?")) {
                         controller.edit(feature.id(), name, number(input, name));
                     } else {
                         controller.expression(feature.id(), name, text);
                     }
                 });
-        if (!expression.isEmpty()) field.setText(expression);
+        if (!expression.isEmpty()) field.setExpression(expression);
     }
 
     private FormulaField editableDimension(
@@ -1440,21 +1599,24 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         label.setLabelFor(input);
         var row = new HBox(6, input, apply);
         row.setAlignment(Pos.CENTER_LEFT);
-        form.getChildren().addAll(label, row);
+        form.getChildren().add(InspectorDetails.field(label, row));
         return input;
     }
 
     private void customFeature() {
         cancelTool();
         try {
-            FeatureDialog.show(stage, pluginDirectory, featureProviders, formulaParameters(), translations)
-                    .ifPresent(feature -> {
-                        controller.add(feature);
-                        selectedFeature = feature.id();
-                        selectedBody = feature.id() + ".body";
-                        fitNext = true;
-                        inspect();
-                    });
+            var editor = new CustomFeatureEditor(pluginDirectory, featureProviders, formulaParameters(), translations);
+            form.getChildren().setAll(editor);
+            var apply = operationPanel(translations.translate("gui.add_feature"), "custom-add", () -> {
+                var feature = editor.feature();
+                controller.add(feature);
+                selectedFeature = feature.id();
+                selectedBody = feature.id() + ".body";
+                fitNext = true;
+            });
+            apply.setDisable(!editor.available());
+            toolActions.getChildren().getLast().setId("custom-cancel");
         } catch (IOException failure) {
             error.setText(failure.getMessage());
         }
@@ -1470,45 +1632,186 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 .ifPresent(controller::parameters);
     }
 
-    private void referenceEditor(Feature feature, Feature.ProfileRef profile, Feature.BodyRef body) {
-        var earlier = controller.snapshot().document().features().stream()
-                .takeWhile(f -> !f.id().equals(feature.id()))
-                .toList();
+    private String sketchReferenceName(String id) {
+        return controller.snapshot().document().featureName(id, id);
+    }
+
+    private String planeName(Feature.Plane plane) {
+        var document = controller.snapshot().document();
+        if (!plane.constructionSupport().isEmpty()) {
+            String id = plane.constructionSupport();
+            return document.featureName(id, featureBaseName(id));
+        }
+        if (plane.support() != null) {
+            var source = plane.support().body();
+            String bodyId =
+                    controller.build().bodyIds().getOrDefault(source, source.featureId() + "." + source.outputName());
+            String featureName = document.featureNames().get(source.featureId());
+            if (controller.build().labels().isCopy(bodyId)) return bodyLabel(bodyId);
+            return document.bodyName(bodyId, featureName == null ? bodyLabel(bodyId) : featureName);
+        }
+        return plane.isOrigin() ? plane.id().substring("origin-".length()).toUpperCase(Locale.ROOT) : plane.id();
+    }
+
+    private Label sketchPlaneLabel(Feature.Sketch sketch) {
+        var label = new Label(translations.translate("feature.plane", planeName(sketch.plane())));
+        label.setId("sketch-plane-name");
+        label.setWrapText(true);
+        return label;
+    }
+
+    private void sketchNameEditor(Feature.Sketch sketch) {
+        var name = new TextField(sketchReferenceName(sketch.id()));
+        name.setId("sketch-name");
+        var label = new Label(translations.translate("gui.name"));
+        label.setLabelFor(name);
+        var rename = button(translations.translate("body.rename"), "rename-sketch", () -> {
+            if (!name.getText().strip().equals(sketchReferenceName(sketch.id()))) {
+                controller.renameFeature(sketch.id(), name.getText());
+            }
+        });
+        name.setOnAction(event -> rename.fire());
+        HBox.setHgrow(name, Priority.ALWAYS);
+        form.getChildren().add(InspectorDetails.field(label, new HBox(6, name, rename)));
+    }
+
+    private ComboBox<String> sketchInput(List<Feature> earlier, Feature.ProfileRef profile, VBox container) {
         var sketches = new ComboBox<String>();
         sketches.setId("repair-sketch");
+        UiText.choices(sketches, this::sketchReferenceName);
         earlier.stream()
                 .filter(f -> f instanceof Feature.Sketch)
                 .forEach(f -> sketches.getItems().add(f.id()));
         if (profile != null) {
+            container
+                    .getChildren()
+                    .add(InspectorDetails.field(new Label(translations.translate("gui.input_sketch")), sketches));
+            var plane = new Label();
+            plane.setId("sketch-plane-name");
+            plane.setWrapText(true);
+            sketches.valueProperty().addListener((o, previous, id) -> {
+                plane.setText(earlier.stream()
+                        .filter(Feature.Sketch.class::isInstance)
+                        .map(Feature.Sketch.class::cast)
+                        .filter(s -> s.id().equals(id))
+                        .map(s -> translations.translate("feature.plane", planeName(s.plane())))
+                        .findFirst()
+                        .orElse(""));
+            });
             sketches.setValue(profile.sketchId());
-            form.getChildren().addAll(new Label(translations.translate("gui.input_sketch")), sketches);
+            container.getChildren().add(plane);
         }
+        return sketches;
+    }
+
+    private void inspectThroughCut(Feature feature) {
+        var sketch = CutTargets.firstThroughCut(feature).profile().sketchId();
+        var details = new InspectorDetails();
+        details.row(translations.translate("gui.input_sketch"), sketchReferenceName(sketch));
+        var targets = new VBox(4);
+        targets.setId("cut-target-list");
+        for (var target : CutTargets.throughTargets(feature).bodies()) {
+            var name = new Label(targetLabel(target));
+            name.setWrapText(true);
+            targets.getChildren().add(name);
+        }
+        details.row(translations.translate("gui.bodies"), targets);
+        form.getChildren()
+                .addAll(
+                        details,
+                        button(
+                                translations.translate("parameter.edit"),
+                                "edit-cut-profile",
+                                () -> beginProfileEdit(feature, sketch)));
+    }
+
+    private String targetLabel(Feature.BodyRef target) {
+        return bodyLabel(
+                controller.build().bodyIds().getOrDefault(target, target.featureId() + "." + target.outputName()));
+    }
+
+    private void referenceEditor(Feature feature, Feature.ProfileRef profile, Feature.BodyRef body) {
+        var earlier = controller.snapshot().document().features().stream()
+                .takeWhile(f -> !f.id().equals(feature.id()))
+                .toList();
+        referenceSummary(feature, profile, body, earlier);
+        var inputs = new VBox(9);
+        var sketches = sketchInput(earlier, profile, inputs);
+        referenceControls(feature, profile, body, earlier, inputs, sketches);
+    }
+
+    private void referenceSummary(
+            Feature feature, Feature.ProfileRef profile, Feature.BodyRef body, List<Feature> earlier) {
+        var details = new InspectorDetails();
+        if (profile != null) {
+            details.row(translations.translate("gui.input_sketch"), sketchReferenceName(profile.sketchId()));
+            earlier.stream()
+                    .filter(f -> f instanceof Feature.Sketch && f.id().equals(profile.sketchId()))
+                    .map(Feature.Sketch.class::cast)
+                    .findFirst()
+                    .ifPresent(s -> details.row(translations.translate("pattern.plane"), planeName(s.plane())));
+        }
+        if (body != null) {
+            var targets = BodyExtrusion.modifiesBody(feature)
+                    ? BodyExtrusion.from(feature).targets()
+                    : List.of(body);
+            details.row(
+                    translations.translate("gui.bodies"),
+                    targets.stream().map(this::targetLabel).collect(java.util.stream.Collectors.joining("\n")));
+        }
+        form.getChildren().add(details);
+    }
+
+    private void referenceControls(
+            Feature feature,
+            Feature.ProfileRef profile,
+            Feature.BodyRef body,
+            List<Feature> earlier,
+            VBox inputs,
+            ComboBox<String> sketches) {
         var bodies = new ComboBox<String>();
         bodies.setId("repair-body");
-        var output = new TextField(body == null ? "body" : body.outputName());
+        var output =
+                FormulaField.text(body == null ? "body" : body.outputName(), this::formulaParameters, translations);
         output.setId("repair-output");
         boolean extrusion = feature instanceof Feature.Extrude || BodyExtrusion.modifiesBody(feature);
         var operation =
                 extrusion ? extrusionOperation(BodyExtrusion.from(feature).operation()) : null;
-        if (extrusion) form.getChildren().addAll(new Label(translations.translate("extrude.operation")), operation);
-        if (body != null || extrusion) {
-            earlier.stream()
-                    .filter(f -> !(f instanceof Feature.Sketch || f instanceof ConstructionFeature))
-                    .forEach(f -> bodies.getItems().add(f.id()));
-            if (body != null) bodies.setValue(body.featureId());
-            else bodies.getSelectionModel().selectLast();
-            if (extrusion) {
-                bodies.disableProperty().bind(operation.valueProperty().isEqualTo(BodyExtrusion.Operation.NEW_BODY));
-                output.disableProperty().bind(bodies.disableProperty());
-            }
+        if (extrusion) {
             form.getChildren()
-                    .addAll(
-                            new Label(translations.translate("gui.input_body_feature")),
-                            bodies,
-                            new Label(translations.translate("gui.named_output_body_negative_or_positive")),
-                            output);
+                    .add(button(
+                            translations.translate("extrude.editProfile"),
+                            "edit-extrusion-profile",
+                            () -> beginProfileEdit(feature, sketches.getValue())));
+            inputs.getChildren()
+                    .add(InspectorDetails.field(new Label(translations.translate("extrude.operation")), operation));
         }
-        form.getChildren()
+        earlier.stream()
+                .filter(f -> !(f instanceof Feature.Sketch || f instanceof ConstructionFeature))
+                .forEach(f -> bodies.getItems().add(f.id()));
+        if (body != null) bodies.setValue(body.featureId());
+        else bodies.getSelectionModel().selectLast();
+        if (extrusion) {
+            bodies.disableProperty().bind(operation.valueProperty().isEqualTo(BodyExtrusion.Operation.NEW_BODY));
+            output.disableProperty().bind(bodies.disableProperty());
+        }
+        var targetFields = new VBox(
+                8,
+                InspectorDetails.field(new Label(translations.translate("gui.input_body_feature")), bodies),
+                InspectorDetails.field(new Label(translations.translate("inspector.output")), output));
+        if (extrusion) {
+            targetFields.visibleProperty().bind(bodies.disableProperty().not());
+            targetFields.managedProperty().bind(targetFields.visibleProperty());
+        }
+        inputs.getChildren().add(targetFields);
+        var additional = historicalCutTargets(feature, earlier, bodies, output, operation);
+        if (additional != null) inputs.getChildren().add(additional);
+        var disclosure = new TitledPane(translations.translate("inspector.editInputs"), inputs);
+        disclosure.setId("operation-references");
+        disclosure.setAnimated(false);
+        disclosure.setExpanded(!controller.build().valid());
+        form.getChildren().add(disclosure);
+        inputs.getChildren()
                 .add(button(translations.translate(extrusion ? "gui.apply" : "gui.repair_inputs"), "repair", () -> {
                     boolean useTarget =
                             extrusion ? operation.getValue() != BodyExtrusion.Operation.NEW_BODY : body != null;
@@ -1516,7 +1819,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                             ? new Feature.BodyRef(
                                     Objects.requireNonNull(
                                             bodies.getValue(), translations.translate("gui.choose_an_earlier_body")),
-                                    output.getText())
+                                    output.evaluatedText())
                             : null;
                     replaceInputs(
                             feature,
@@ -1524,8 +1827,43 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                             profile,
                             sketches.getValue(),
                             target,
-                            extrusion ? operation.getValue() : null);
+                            extrusion ? operation.getValue() : null,
+                            additional == null ? List.of() : additional.selected());
                 }));
+    }
+
+    private AdditionalCutTargets historicalCutTargets(
+            Feature feature,
+            List<Feature> earlier,
+            ComboBox<String> bodies,
+            FormulaField output,
+            ComboBox<BodyExtrusion.Operation> operation) {
+        if (operation == null) return null;
+        var choices = historicalBodies(earlier);
+        var selected = BodyExtrusion.from(feature).additionalTargets();
+        var picker = new AdditionalCutTargets(
+                choices,
+                () -> bodies.getValue() == null ? null : new Feature.BodyRef(bodies.getValue(), output.evaluatedText()),
+                selected,
+                translations);
+        picker.visibleProperty().bind(operation.valueProperty().isEqualTo(BodyExtrusion.Operation.CUT));
+        return picker;
+    }
+
+    private Map<Feature.BodyRef, String> historicalBodies(List<Feature> earlier) {
+        var ids = controller.build().bodyIds();
+        var byFeature = ids.entrySet().stream()
+                .collect(java.util.stream.Collectors.groupingBy(e -> e.getKey().featureId()));
+        var active = new LinkedHashMap<String, Feature.BodyRef>();
+        for (var step : earlier) {
+            if (step instanceof Feature.SplitBody split) active.remove(ids.get(split.body()));
+            byFeature.getOrDefault(step.id(), List.of()).stream()
+                    .sorted(Map.Entry.comparingByKey(Comparator.comparing(Feature.BodyRef::outputName)))
+                    .forEach(e -> active.put(e.getValue(), e.getKey()));
+        }
+        var choices = new LinkedHashMap<Feature.BodyRef, String>();
+        active.forEach((id, ref) -> choices.put(ref, bodyLabel(id)));
+        return choices;
     }
 
     private void replaceInputs(
@@ -1534,7 +1872,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             Feature.ProfileRef original,
             String sketchId,
             Feature.BodyRef target,
-            BodyExtrusion.Operation operation) {
+            BodyExtrusion.Operation operation,
+            List<Feature.BodyRef> additional) {
         if (feature instanceof Feature.EdgeFinish finish) {
             controller.replaceFeature(
                     new Feature.EdgeFinish(finish.id(), target, finish.kind(), finish.size(), finish.edges()));
@@ -1553,18 +1892,15 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             var profile = original.sketchId().equals(sketch.id())
                     ? original
                     : new Feature.ProfileRef(sketch.id(), sketch.profileId());
-            Feature replacement = operation == null
-                    ? new Feature.ThroughCut(feature.id(), profile, target)
-                    : new BodyExtrusion(
-                                    new Feature.Extrude(
-                                            feature.id(),
-                                            profile,
-                                            BodyExtrusion.from(feature)
-                                                    .extrusion()
-                                                    .distance()),
-                                    operation,
-                                    target)
-                            .feature();
+            Feature replacement = new BodyExtrusion(
+                            new Feature.Extrude(
+                                    feature.id(),
+                                    profile,
+                                    BodyExtrusion.from(feature).extrusion().distance()),
+                            operation,
+                            target,
+                            additional)
+                    .feature();
             controller.replaceFeature(replacement);
         }
     }
@@ -1577,7 +1913,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         var input = numericField(id, initial, ParameterUnit.MM);
         var caption = new Label(label);
         caption.setLabelFor(input);
-        form.getChildren().addAll(caption, input);
+        form.getChildren().add(InspectorDetails.field(caption, input));
         return input;
     }
 
@@ -1590,6 +1926,18 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private double value(String key) {
         return number(fields.get(key), key);
+    }
+
+    private void editSelectedFeature() {
+        var feature = selected();
+        if (feature instanceof Feature.Sketch sketch) attempt(() -> editSketch(sketch));
+        else if (CutTargets.through(feature)) {
+            attempt(() -> beginProfileEdit(
+                    feature, CutTargets.firstThroughCut(feature).profile().sketchId()));
+        } else if (feature instanceof Feature.Extrude || BodyExtrusion.modifiesBody(feature)) {
+            attempt(() -> beginProfileEdit(
+                    feature, BodyExtrusion.from(feature).extrusion().profile().sketchId()));
+        }
     }
 
     private void editSketch(Feature.Sketch sketch) {
@@ -1779,8 +2127,26 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         choice.setId("extrude-operation");
         choice.getItems().setAll(BodyExtrusion.Operation.values());
         UiText.enums(choice, translations, "extrude.");
+        choice.setCellFactory(list -> extrusionOperationCell(choice));
+        choice.setButtonCell(extrusionOperationCell(choice));
         choice.setValue(initial);
         return choice;
+    }
+
+    private ListCell<BodyExtrusion.Operation> extrusionOperationCell(ComboBox<BodyExtrusion.Operation> choice) {
+        return new ListCell<>() {
+            @Override
+            protected void updateItem(BodyExtrusion.Operation operation, boolean empty) {
+                super.updateItem(operation, empty);
+                if (empty || operation == null) {
+                    setText(null);
+                    setGraphic(null);
+                    return;
+                }
+                setText(choice.getConverter().toString(operation));
+                setGraphic(OperationIcons.extrusion(operation));
+            }
+        };
     }
 
     private ComboBox<DocumentController.Body> extrusionTarget(Feature.Sketch sketch) {
@@ -1788,10 +2154,12 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         target.setId("extrude-target");
         target.getItems().setAll(controller.build().bodies());
         UiText.choices(target, b -> bodyLabel(b.id()));
+        var support = sketch.plane().support();
+        String preferredId = support == null
+                ? selectedBody
+                : controller.build().bodyIds().getOrDefault(support.body(), selectedBody);
         var preferred = target.getItems().stream()
-                .filter(b -> b.id().equals(selectedBody)
-                        || sketch.plane().support() != null
-                                && b.output().equals(sketch.plane().support().body()))
+                .filter(b -> b.id().equals(preferredId))
                 .findFirst();
         target.getSelectionModel()
                 .select(preferred.orElse(
@@ -1799,22 +2167,214 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         return target;
     }
 
-    private Map<CheckBox, String> extrusionRegions(Feature.Sketch sketch, CheckBox whole) {
+    private ProfileChoices extrusionRegions(Feature.Sketch sketch, VBox container) {
+        var whole = new CheckBox(translations.translate("gui.extrude_all_regions"));
+        whole.setId("extrude-whole");
+        whole.setSelected(true);
         var regions = new LinkedHashMap<CheckBox, String>();
         if (sketch.profile() instanceof Feature.Constrained constrained) {
-            var faces = SketchProfiles.selectableRegions(constrained.geometry());
-            if (faces.size() > 1) {
-                form.getChildren().add(whole);
+            boolean editing = tool == Tool.EDIT_PROFILE;
+            var contours = editing
+                    ? SketchProfiles.regionContours(constrained.geometry())
+                    : Map.<String, List<List<dev.voxelbrew.api.model.sketch.SketchGeometry.Vec>>>of();
+            var faces = editing
+                    ? List.copyOf(contours.keySet())
+                    : SketchProfiles.selectableRegions(constrained.geometry()).stream()
+                            .map(SketchProfiles.Region::id)
+                            .toList();
+            if (faces.size() > 1 || tool == Tool.EDIT_PROFILE) {
+                container.getChildren().add(whole);
+                var choices = new VBox(5);
                 for (var face : faces) {
                     int number = regions.size() + 1;
                     var box = new CheckBox(translations.translate("gui.extrude_region") + " " + number);
                     box.setId("extrude-region-" + number);
-                    regions.put(box, face.id());
-                    form.getChildren().add(box);
+                    regions.put(box, face);
+                    if (editing) {
+                        var highlight = viewport.editingHighlight(sketch.plane(), contours.get(face));
+                        highlight.visibleProperty().bind(box.selectedProperty());
+                    }
+                    choices.getChildren().add(box);
                 }
+                if (faces.size() > 4) {
+                    var scroll = new ScrollPane(choices);
+                    scroll.setId("extrude-region-list");
+                    scroll.setFitToWidth(true);
+                    scroll.setPrefViewportHeight(96);
+                    container.getChildren().add(scroll);
+                } else {
+                    container.getChildren().add(choices);
+                }
+                var include = new Button(translations.translate("extrude.includeEnclosed"));
+                include.setId("extrude-include-enclosed");
+                include.disableProperty().bind(whole.selectedProperty());
+                include.setOnAction(event -> {
+                    var selection = new ProfileChoices(whole, regions);
+                    var filled =
+                            SketchProfiles.includingEnclosedRegions(constrained.geometry(), selection.selectedIds());
+                    var additional = regions.entrySet().stream()
+                            .filter(e -> !e.getKey().isSelected() && filled.contains(e.getValue()))
+                            .map(Map.Entry::getKey)
+                            .toList();
+                    if (additional.isEmpty()) return;
+                    additional.subList(1, additional.size()).forEach(box -> box.setSelected(true));
+                    additional.getFirst().fire();
+                });
+                container.getChildren().add(include);
+                viewport.pickExtrusionRegion(
+                        sketch.plane(),
+                        point -> SketchProfiles.regionAt(
+                                        constrained.geometry(),
+                                        new dev.voxelbrew.api.model.sketch.SketchGeometry.Vec(
+                                                point.getX(), point.getY()))
+                                .ifPresent(id -> regions.forEach((box, region) -> {
+                                    if (region.equals(id)) box.fire();
+                                })));
+                if (editing) viewport.editingWholeHighlight(sketch, constrained.geometry(), whole.selectedProperty());
             }
         }
-        return regions;
+        return new ProfileChoices(whole, regions);
+    }
+
+    private void beginProfileEdit(Feature feature, String initialSketch) {
+        var document = controller.snapshot().document();
+        var definition = document.features().stream()
+                .filter(f -> f.id().equals(feature.id()))
+                .findFirst()
+                .orElseThrow();
+        boolean cut = CutTargets.through(definition);
+        var original = cut
+                ? CutTargets.firstThroughCut(definition).profile()
+                : BodyExtrusion.from(definition).extrusion().profile();
+        var earlier = controller.effectiveFeatures().stream()
+                .takeWhile(f -> !f.id().equals(feature.id()))
+                .toList();
+        tool = Tool.EDIT_PROFILE;
+        draftRevision = controller.snapshot().revision();
+        draftGeneration = controller.generation();
+        form.getChildren().clear();
+        fields.clear();
+        selectionLabel.setText(translations.translate(cut ? "gui.through_all_cut" : "extrude.editProfile"));
+        var sketchCandidates = cut
+                ? earlier.stream()
+                        .filter(f -> f instanceof Feature.Sketch s && canCut(s))
+                        .toList()
+                : earlier;
+        var sketches = sketchInput(sketchCandidates, original, form);
+        sketches.setValue(sketches.getItems().contains(initialSketch) ? initialSketch : original.sketchId());
+        var replaceProfile = profileReplacement(definition, earlier);
+        var choices = new VBox(5);
+        form.getChildren().add(choices);
+        var apply = new Button(translations.translate("gui.apply"));
+        apply.setId(cut ? "apply-cut-profile" : "apply-extrusion-profile");
+        apply.getStyleClass().add("primary");
+        toolActions
+                .getChildren()
+                .setAll(apply, button(translations.translate("action.cancel"), "cancel-tool", this::cancelTool));
+        viewport.isolateProfile(true);
+        Runnable update = () -> {
+            choices.getChildren().clear();
+            viewport.clearHandle();
+            apply.setDisable(true);
+            error.setText("");
+            var sketch = sketchCandidates.stream()
+                    .filter(Feature.Sketch.class::isInstance)
+                    .map(Feature.Sketch.class::cast)
+                    .filter(s -> s.id().equals(sketches.getValue()))
+                    .findFirst();
+            viewport.showSketches(sketch.stream().map(Feature.class::cast).toList(), null);
+            sketch.ifPresent(s -> attempt(() -> {
+                viewport.frameProfile(s);
+                editProfileRegions(original, s, choices, apply, replaceProfile);
+            }));
+        };
+        sketches.setOnAction(event -> update.run());
+        update.run();
+        refresh();
+    }
+
+    private java.util.function.Consumer<Feature.ProfileRef> profileReplacement(
+            Feature definition, List<Feature> earlier) {
+        if (CutTargets.through(definition)) {
+            var saved = CutTargets.throughTargets(definition).bodies();
+            var choices = historicalBodies(earlier);
+            saved.forEach(ref -> choices.putIfAbsent(ref, ref.featureId() + "." + ref.outputName()));
+            form.getChildren().add(new Label(translations.translate("gui.choose_the_target_body")));
+            var first = primaryCutTarget(earlier, choices, saved.getFirst());
+            var additional = new AdditionalCutTargets(choices, first, saved.subList(1, saved.size()), translations);
+            form.getChildren().add(additional);
+            return profile -> {
+                var targets = new ArrayList<>(List.of(first.get()));
+                targets.addAll(additional.selected());
+                controller.replaceFeature(new CutTargets(targets).throughFeature(definition.id(), profile));
+            };
+        }
+        var extrusion = BodyExtrusion.from(definition);
+        return profile -> controller.replaceFeature(new BodyExtrusion(
+                        new Feature.Extrude(
+                                definition.id(), profile, extrusion.extrusion().distance()),
+                        extrusion.operation(),
+                        extrusion.target(),
+                        extrusion.additionalTargets())
+                .feature());
+    }
+
+    private java.util.function.Supplier<Feature.BodyRef> primaryCutTarget(
+            List<Feature> earlier, Map<Feature.BodyRef, String> choices, Feature.BodyRef saved) {
+        if (!controller.build().valid()
+                || earlier.size() > controller.snapshot().document().cursor()) {
+            // A failed or rolled-back build may have no index of the earlier outputs.
+            var sources = new ComboBox<String>();
+            sources.setId("repair-body");
+            earlier.stream()
+                    .filter(f -> !(f instanceof Feature.Sketch || f instanceof ConstructionFeature))
+                    .forEach(f -> sources.getItems().add(f.id()));
+            sources.setValue(saved.featureId());
+            var output = FormulaField.text(saved.outputName(), this::formulaParameters, translations);
+            output.setId("repair-output");
+            form.getChildren()
+                    .addAll(
+                            sources,
+                            new Label(translations.translate("gui.named_output_body_negative_or_positive")),
+                            output);
+            return () -> new Feature.BodyRef(sources.getValue(), output.evaluatedText());
+        }
+        var first = new ComboBox<Feature.BodyRef>();
+        first.setId("cut-target");
+        first.getItems().setAll(choices.keySet());
+        UiText.choices(first, choices::get);
+        first.setValue(saved);
+        form.getChildren().add(first);
+        return first::getValue;
+    }
+
+    private void editProfileRegions(
+            Feature.ProfileRef original,
+            Feature.Sketch sketch,
+            VBox choices,
+            Button apply,
+            java.util.function.Consumer<Feature.ProfileRef> replaceProfile) {
+        var selection = extrusionRegions(sketch, choices);
+        boolean all =
+                !original.sketchId().equals(sketch.id()) || original.profileId().equals(sketch.profileId());
+        selection.whole().setSelected(all);
+        var saved = original.profileId();
+        String prefix = sketch.profileId() + "/regions/";
+        var ids = saved.startsWith(prefix)
+                ? Arrays.asList(saved.substring(prefix.length()).split("\\."))
+                : List.<String>of();
+        selection
+                .regions()
+                .forEach((box, id) -> box.setSelected(
+                        !all && (saved.equals(sketch.profileId() + "/region/" + id) || ids.contains(id))));
+        selection.onChange(() -> apply.setDisable(
+                !selection.whole().isSelected() && selection.selectedIds().isEmpty()));
+        apply.setDisable(!all && (selection.selectedIds().isEmpty() || !saved.equals(selection.profileId(sketch))));
+        apply.setOnAction(event -> attempt(() -> {
+            String profileId = selection.profileId(sketch);
+            replaceProfile.accept(new Feature.ProfileRef(sketch.id(), profileId));
+            cancelTool();
+        }));
     }
 
     private void beginExtrusion() {
@@ -1825,23 +2385,42 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         cancelTool();
         extrusionSketch = sketch;
         tool = Tool.EXTRUDE;
-        selectionLabel.setText(translations.translate("gui.extrude_profile"));
+        selectionLabel.setText(
+                translations.translate("gui.extrude_profile") + " · " + sketchReferenceName(sketch.id()));
         form.getChildren().clear();
         fields.clear();
-        var whole = new CheckBox(translations.translate("gui.extrude_all_regions"));
-        whole.setId("extrude-whole");
-        whole.setSelected(true);
-        var regions = extrusionRegions(sketch, whole);
+        form.getChildren().add(sketchPlaneLabel(sketch));
+        var regions = extrusionRegions(sketch, form);
         var operation = extrusionOperation(BodyExtrusion.Operation.NEW_BODY);
         var target = extrusionTarget(sketch);
-        operation.setDisable(target.getItems().isEmpty());
-        target.disableProperty().bind(operation.valueProperty().isEqualTo(BodyExtrusion.Operation.NEW_BODY));
+        var host = target.getValue();
+        var automatic = new CheckBox(translations.translate("extrude.cutInward"));
+        automatic.setId("extrude-cut-inward");
+        automatic.setWrapText(true);
+        automatic.setMinWidth(0);
+        var support = sketch.plane().support();
+        if (support != null
+                && sketch.plane().offsetZ() == 0
+                && host != null
+                && host.id().equals(controller.build().bodyIds().get(support.body()))) {
+            automatic.setSelected(true);
+            form.getChildren().add(automatic);
+        }
+        var additional = additionalCutTargets(target);
+        additional.visibleProperty().bind(operation.valueProperty().isEqualTo(BodyExtrusion.Operation.CUT));
+        operation
+                .disableProperty()
+                .bind(automatic.selectedProperty().or(javafx.beans.binding.Bindings.isEmpty(target.getItems())));
+        var newBody = operation.valueProperty().isEqualTo(BodyExtrusion.Operation.NEW_BODY);
+        target.disableProperty().bind(newBody.or(automatic.selectedProperty()));
+        var targetField = InspectorDetails.field(new Label(translations.translate("gui.input_body")), target);
+        targetField.visibleProperty().bind(newBody.not());
+        targetField.managedProperty().bind(targetField.visibleProperty());
         form.getChildren()
                 .addAll(
-                        new Label(translations.translate("extrude.operation")),
-                        operation,
-                        new Label(translations.translate("gui.input_body_feature")),
-                        target);
+                        InspectorDetails.field(new Label(translations.translate("extrude.operation")), operation),
+                        targetField,
+                        additional);
         var distance = field("extrude-distance", translations.translate("gui.signed_distance_mm"), 5);
         finish = button(translations.translate("gui.commit"), "commit-extrusion", this::commitExtrusion);
         finish.getStyleClass().add("primary");
@@ -1852,57 +2431,22 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 translations.translate("gui.drag_the_gold_handle_or_type_a_distance_enter_commits_escape_cancels"));
         hint.setWrapText(true);
         form.getChildren().add(hint);
-        Runnable updatePreview = () -> {
-            try {
-                double value = controller
-                        .snapshot()
-                        .document()
-                        .parameters()
-                        .value(distance.getText(), dev.voxelbrew.api.model.parameters.ParameterUnit.MM);
-                var ids = regions.entrySet().stream()
-                        .filter(entry -> entry.getKey().isSelected())
-                        .map(Map.Entry::getValue)
-                        .toList();
-                if (!whole.isSelected() && ids.isEmpty()) {
-                    controller.cancelPreview();
-                    finish.setDisable(true);
-                    error.setText(translations.translate("gui.select_a_closed_sketch_profile"));
-                    return;
-                }
-                controller.previewExtrusion(
-                        sketch,
-                        whole.isSelected()
-                                ? sketch.profileId()
-                                : SketchProfiles.selectedProfileId(sketch.profileId(), ids),
-                        distance.getText().strip(),
-                        operation.getValue(),
-                        target.isDisabled() || target.getValue() == null
-                                ? null
-                                : target.getValue().output());
-                viewport.updateExtrusionDistance(value);
-                error.setText("");
-                finish.setDisable(!controller.canCommitExtrusion());
-            } catch (RuntimeException failure) {
-                finish.setDisable(true);
-                error.setText(failure.getMessage());
-            }
-        };
+        Runnable updatePreview = () -> updateExtrusionPreview(
+                sketch, regions, operation, target, additional, distance, automatic.isSelected());
         distance.textProperty().addListener((o, a, b) -> updatePreview.run());
-        whole.setOnAction(event -> {
-            if (whole.isSelected()) regions.keySet().forEach(box -> box.setSelected(false));
+        regions.onChange(updatePreview);
+        additional.onChange(updatePreview);
+        target.setOnAction(event -> updatePreview.run());
+        automatic.setOnAction(event -> {
+            if (automatic.isSelected()) target.setValue(host);
             updatePreview.run();
         });
-        regions.keySet()
-                .forEach(box -> box.setOnAction(event -> {
-                    whole.setSelected(false);
-                    updatePreview.run();
-                }));
-        target.setOnAction(event -> updatePreview.run());
         operation.setOnAction(event -> {
+            if (automatic.isSelected()) return;
             if (operation.getValue() == BodyExtrusion.Operation.CUT
                     && sketch.plane().support() != null
-                    && distance.getText().equals("5.0")) {
-                distance.setText("-5");
+                    && distance.expression().equals("5.0")) {
+                distance.setExpression("-5");
             } else {
                 updatePreview.run();
             }
@@ -1914,12 +2458,50 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 configuration, name -> name.equals("Default") ? translations.translate("configuration.default") : name);
         viewport.standardView("Isometric");
         controller.previewExtrusion(sketch, 5);
-        viewport.extrusionHandle(sketch, 5, v -> distance.setText(format(v)), () -> {
+        viewport.extrusionHandle(sketch, 5, v -> distance.setExpression(format(v)), () -> {
             if (!finish.isDisabled()) commitExtrusion();
         });
         distance.requestFocus();
         distance.selectAll();
         refresh();
+    }
+
+    private void updateExtrusionPreview(
+            Feature.Sketch sketch,
+            ProfileChoices regions,
+            ComboBox<BodyExtrusion.Operation> operation,
+            ComboBox<DocumentController.Body> target,
+            AdditionalCutTargets additional,
+            FormulaField distance,
+            boolean automatic) {
+        try {
+            double value = distance.value();
+            if (automatic) {
+                operation.setValue(value < 0 ? BodyExtrusion.Operation.CUT : BodyExtrusion.Operation.NEW_BODY);
+            }
+            if (!regions.whole().isSelected() && regions.selectedIds().isEmpty()) {
+                controller.cancelPreview();
+                finish.setDisable(true);
+                error.setText(translations.translate("gui.select_a_closed_sketch_profile"));
+                return;
+            }
+            controller.previewExtrusion(
+                    sketch,
+                    regions.profileId(sketch),
+                    distance.expression().strip(),
+                    operation.getValue(),
+                    operation.getValue() == BodyExtrusion.Operation.NEW_BODY || target.getValue() == null
+                            ? null
+                            : target.getValue().output(),
+                    operation.getValue() == BodyExtrusion.Operation.CUT ? additional.selected() : List.of());
+            viewport.updateExtrusionDistance(value);
+            error.setText("");
+            finish.setDisable(!controller.canCommitExtrusion());
+        } catch (RuntimeException failure) {
+            controller.cancelPreview();
+            finish.setDisable(true);
+            error.setText(failure.getMessage());
+        }
     }
 
     private void commitExtrusion() {
@@ -1930,40 +2512,59 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         planeRepair = null;
         viewport.stopPlaneSelection();
         viewport.clearHandle();
-        var features = controller.snapshot().document().features();
-        selectedFeature = features.getLast().id();
+        var document = controller.snapshot().document();
+        selectedFeature = document.features().get(document.cursor() - 1).id();
         inspect();
         refresh();
     }
 
+    private AdditionalCutTargets additionalCutTargets(ComboBox<DocumentController.Body> first) {
+        var choices = new LinkedHashMap<Feature.BodyRef, String>();
+        first.getItems().forEach(b -> choices.put(b.output(), bodyLabel(b.id())));
+        return new AdditionalCutTargets(choices, () -> first.getValue().output(), List.of(), translations);
+    }
+
     private void beginCut() {
-        if (!(selected() instanceof Feature.Sketch sketch)
-                || !(sketch.profile() instanceof Feature.Circle || sketch.profile() instanceof Feature.Constrained)) {
+        if (!(selected() instanceof Feature.Sketch sketch) || !canCut(sketch)) {
             throw new IllegalArgumentException(translations.translate("gui.select_a_closed_sketch_profile"));
         }
-        var choices = controller.build().bodies();
-        if (choices.isEmpty()) {
+        cancelTool();
+        var target = extrusionTarget(sketch);
+        if (target.getValue() == null) {
             throw new IllegalArgumentException(translations.translate("gui.a_target_body_is_required"));
         }
-        var dialog = new ChoiceDialog<>(
-                choices.getFirst().id(),
-                choices.stream().map(DocumentController.Body::id).toList());
-        dialog.setTitle(translations.translate("gui.through_all_cut"));
-        dialog.setHeaderText(translations.translate("gui.choose_the_target_body"));
-        dialog.getDialogPane().lookupButton(ButtonType.OK).setId("cut-confirm");
-        Dialogs.show(dialog, stage, translations).ifPresent(id -> {
-            var target =
-                    choices.stream().filter(b -> b.id().equals(id)).findFirst().orElseThrow();
-            controller.add(new Feature.ThroughCut(
-                    "cut-" + controller.snapshot().document().uuidGenerator().next(),
-                    new Feature.ProfileRef(sketch.id(), sketch.profileId()),
-                    target.output()));
-            tool = Tool.NONE;
-            selectedFeature =
-                    controller.snapshot().document().features().getLast().id();
-            inspect();
-            refresh();
+        target.setId("cut-target");
+        var additional = additionalCutTargets(target);
+        form.getChildren()
+                .setAll(
+                        InspectorDetails.field(new Label(translations.translate("gui.input_body")), target),
+                        additional);
+        operationPanel(translations.translate("gui.through_all_cut"), "cut-confirm", () -> {
+            String id =
+                    "cut-" + controller.snapshot().document().uuidGenerator().next();
+            var inputs = new ArrayList<>(List.of(target.getValue().output()));
+            inputs.addAll(additional.selected());
+            controller.add(
+                    new CutTargets(inputs).throughFeature(id, new Feature.ProfileRef(sketch.id(), sketch.profileId())));
+            selectedFeature = id;
         });
+    }
+
+    private Button operationPanel(String title, String applyId, Runnable commit) {
+        tool = Tool.OPERATION;
+        draftGeneration = controller.generation();
+        draftRevision = controller.snapshot().revision();
+        selectionLabel.setText(title);
+        var apply = button(translations.translate("gui.apply"), applyId, () -> {
+            commit.run();
+            cancelTool();
+        });
+        apply.getStyleClass().add("primary");
+        toolActions
+                .getChildren()
+                .setAll(apply, button(translations.translate("action.cancel"), "cancel-tool", this::cancelTool));
+        refresh();
+        return apply;
     }
 
     private void beginFinish(boolean rounded) {
@@ -2035,7 +2636,12 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                             amount,
                             java.util.List.copyOf(edges));
                 }
-                controller.add(feature);
+                var parameters = formulaParameters();
+                if (!Expressions.isNumber(size.expression())) {
+                    String key = feature instanceof Feature.Shell ? "thickness" : "size";
+                    parameters = parameters.bind(new ParameterSet.Target(id, key), size.expression());
+                }
+                controller.add(feature, parameters);
                 selectedFeature = id;
                 tool = Tool.NONE;
                 modificationFaces.clear();
@@ -2094,24 +2700,60 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 translations.translate("gui.selected_geometry", modificationEdges.size(), modificationFaces.size()));
     }
 
+    private String patternName(BodyPattern.Kind kind) {
+        return translations.translate("sketch.copy." + kind.name().toLowerCase(Locale.ROOT));
+    }
+
+    private void editBodyPattern(BodyPattern.Kind kind, Feature existing) {
+        var sources = new LinkedHashMap<Feature.BodyRef, String>();
+        BodyPattern initial;
+        if (existing == null) {
+            cancelTool();
+            var bodies = controller.build().bodies();
+            if (bodies.isEmpty()) return;
+            for (var body : bodies) sources.put(body.output(), bodyLabel(body.id()));
+            var source = bodies.stream()
+                    .filter(b -> b.id().equals(selectedBody))
+                    .findFirst()
+                    .orElse(bodies.getFirst())
+                    .output();
+            initial = new BodyPattern(
+                    kind,
+                    source,
+                    BodyPattern.Axis.Z,
+                    kind == BodyPattern.Kind.CIRCULAR ? 4 : 2,
+                    1,
+                    switch (kind) {
+                        case RECTANGULAR -> 20;
+                        case CIRCULAR -> 360;
+                        case MIRROR -> 0;
+                    },
+                    kind == BodyPattern.Kind.RECTANGULAR ? 20 : 0);
+        } else {
+            initial = BodyPattern.from(existing);
+            var ref = initial.source();
+            var bodyId = controller.build().bodyIds().get(ref);
+            sources.put(ref, bodyId == null ? ref.featureId() + "." + ref.outputName() : bodyLabel(bodyId));
+        }
+        String id = existing == null
+                ? "pattern-" + controller.snapshot().document().uuidGenerator().next()
+                : existing.id();
+        var editor = new BodyPatternEditor(id, initial, sources, formulaParameters(), translations);
+        form.getChildren().setAll(editor);
+        operationPanel(patternName(kind), "pattern-apply", () -> {
+            if (existing == null) controller.add(editor.feature(), editor.bindings());
+            else controller.replaceFeature(editor.feature(), editor.bindings());
+            selectedFeature = id;
+            selectedBody = null;
+        });
+    }
+
     private void beginSplit() {
         cancelTool();
-        var dialog = new Dialog<Void>();
-        dialog.setTitle(translations.translate("action.split"));
         var body = new ComboBox<DocumentController.Body>();
         body.setId("split-input");
         body.getItems().setAll(controller.build().bodies());
-        body.setConverter(new javafx.util.StringConverter<>() {
-            @Override
-            public String toString(DocumentController.Body value) {
-                return value == null ? "" : value.id();
-            }
-
-            @Override
-            public DocumentController.Body fromString(String value) {
-                throw new UnsupportedOperationException();
-            }
-        });
+        UiText.choices(body, b -> bodyLabel(b.id()));
         body.setValue(body.getItems().stream()
                 .filter(b -> b.id().equals(selectedBody))
                 .findFirst()
@@ -2122,48 +2764,30 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         axis.setValue("X");
         var offset = FormulaField.number("30", this::formulaParameters, ParameterUnit.MM, translations);
         offset.setId("split-offset");
-        var error = new Label();
-        error.setWrapText(true);
-        error.setId("split-error");
-        dialog.getDialogPane()
-                .setContent(new VBox(
-                        8,
-                        new Label(translations.translate("gui.input_body")),
-                        body,
-                        new Label(translations.translate("gui.plane_normal")),
-                        axis,
-                        new Label(translations.translate("gui.offset_mm")),
-                        offset,
-                        error));
-        var commit = new ButtonType(translations.translate("gui.split"), ButtonBar.ButtonData.OK_DONE);
-        dialog.getDialogPane().getButtonTypes().addAll(commit, ButtonType.CANCEL);
-        var button = dialog.getDialogPane().lookupButton(commit);
-        button.setId("split-confirm");
-        button.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
-            try {
-                String id = "split-"
-                        + controller.snapshot().document().uuidGenerator().next();
-                var feature = new Feature.SplitBody(
-                        id,
-                        Objects.requireNonNull(body.getValue(), translations.translate("gui.choose_a_body"))
-                                .output(),
-                        new Feature.SplitPlane(
-                                axis.getValue().equals("X") ? 1 : 0,
-                                axis.getValue().equals("Y") ? 1 : 0,
-                                axis.getValue().equals("Z") ? 1 : 0,
-                                number(offset, "offset")));
-                var parameters = formulaParameters();
-                if (!Expressions.isNumber(offset.getText())) {
-                    parameters = parameters.bind(new ParameterSet.Target(id, "offset"), offset.getText());
-                }
-                controller.add(feature, parameters);
-                selectedFeature = id;
-            } catch (RuntimeException failure) {
-                error.setText(failure.getMessage());
-                event.consume();
+        form.getChildren()
+                .setAll(
+                        InspectorDetails.field(new Label(translations.translate("gui.input_body")), body),
+                        InspectorDetails.field(new Label(translations.translate("gui.plane_normal")), axis),
+                        InspectorDetails.field(new Label(translations.translate("gui.offset_mm")), offset));
+        operationPanel(translations.translate("action.split"), "split-confirm", () -> {
+            String id =
+                    "split-" + controller.snapshot().document().uuidGenerator().next();
+            var feature = new Feature.SplitBody(
+                    id,
+                    Objects.requireNonNull(body.getValue(), translations.translate("gui.choose_a_body"))
+                            .output(),
+                    new Feature.SplitPlane(
+                            axis.getValue().equals("X") ? 1 : 0,
+                            axis.getValue().equals("Y") ? 1 : 0,
+                            axis.getValue().equals("Z") ? 1 : 0,
+                            number(offset, "offset")));
+            var parameters = formulaParameters();
+            if (!Expressions.isNumber(offset.expression())) {
+                parameters = parameters.bind(new ParameterSet.Target(id, "offset"), offset.expression());
             }
+            controller.add(feature, parameters);
+            selectedFeature = id;
         });
-        Dialogs.show(dialog, stage, translations);
     }
 
     private void beginConstruction(
@@ -2173,20 +2797,18 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 || (original == null && !controller.build().valid())) {
             return;
         }
-        var document = controller.snapshot().document();
-        if (document.cursor() != document.features().size()) {
-            throw new IllegalStateException(translations.translate("construction.end"));
-        }
         cancelTool();
         tool = Tool.CONSTRUCTION;
+        selectionLabel.setText(translations.translate("construction." + command.name()));
         viewport.pickEdges(true);
-        constructionEditor =
-                new ConstructionEditor(command, original, controller, viewport, translations, this::cancelTool);
+        constructionEditor = new ConstructionEditor(
+                command, original, controller, viewport, translations, toolActions, this::cancelTool);
         form.getChildren().setAll(constructionEditor);
         refresh();
     }
 
     private void cancelTool() {
+        if (tool == Tool.EDIT_PROFILE) viewport.isolateProfile(false);
         if (constructionEditor != null) {
             constructionEditor.close();
             constructionEditor = null;
@@ -2237,7 +2859,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             requestChange(currentWindow);
             return;
         }
-        var current = new ButtonType(translations.translate("projectWindow.current"));
+        var current = new ButtonType(translations.translate("projectWindow.current"), ButtonBar.ButtonData.OK_DONE);
         var separate = new ButtonType(translations.translate("projectWindow.new"));
         var dialog = new Alert(
                 Alert.AlertType.CONFIRMATION,
@@ -2246,7 +2868,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 separate,
                 ButtonType.CANCEL);
         dialog.setHeaderText(translations.translate("projectWindow.title"));
-        dialog.getDialogPane().lookupButton(current).setId("project-window-current");
+        var currentButton = dialog.getDialogPane().lookupButton(current);
+        currentButton.setId("project-window-current");
         dialog.getDialogPane().lookupButton(separate).setId("project-window-new");
         Dialogs.show(dialog, stage, translations).ifPresent(choice -> {
             if (choice == current) requestChange(currentWindow);
@@ -2666,6 +3289,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     public void close() {
         if (closed) return;
         closed = true;
+        stage.getProperties().remove(Workbench.class);
         backupTimer.stop();
         if (exportNotification != null) exportNotification.hide();
         quickMenus.forEach(QuickMenu::close);
@@ -2801,6 +3425,13 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             item.disableProperty().bind(disabledProperty().or(command.disabledProperty()));
             solidCommands.getItems().add(item);
         }
+        for (var kind : BodyPattern.Kind.values()) {
+            var key = kind.name().toLowerCase(Locale.ROOT);
+            var item = menuItem(patternName(kind), "body-" + key, false, () -> editBodyPattern(kind, null));
+            item.setGraphic(OperationIcons.icon(key));
+            item.disableProperty().bind(disabledProperty().or(splitBody.disabledProperty()));
+            solidCommands.getItems().add(item);
+        }
     }
 
     private MenuButton constructionMenu() {
@@ -2830,6 +3461,18 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private VBox modelPanel() {
         tree.setId("model-tree");
+        var root = new TreeItem<>(new Entry(null, translations.translate("gui.document"), false));
+        operationRows.setValue(new Entry(null, translations.translate("gui.features"), false));
+        operationRows.setGraphic(OperationIcons.icon("features"));
+        sketchRows.setValue(new Entry(null, translations.translate("gui.sketches"), false));
+        sketchRows.setGraphic(OperationIcons.icon("constrained-sketch"));
+        bodyRows.setValue(new Entry(null, translations.translate("gui.bodies"), true));
+        bodyRows.setGraphic(OperationIcons.icon("bodies"));
+        for (var group : List.of(operationRows, bodyRows, sketchRows)) {
+            group.setExpanded(true);
+            root.getChildren().add(group);
+        }
+        tree.setRoot(root);
         tree.setShowRoot(false);
         tree.setEditable(true);
         tree.setCellFactory(view -> new BodyTreeCell());
@@ -2884,6 +3527,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         }
         workspaces.setId("workspaces");
         workspaces.getSelectionModel().selectedItemProperty().addListener((o, a, b) -> {
+            printing.setWorkspaceActive(b == printTab);
             quickMenus.forEach(QuickMenu::hide);
             if (b == printTab && printTab.isDisable()) {
                 workspaces.getSelectionModel().select(designTab);
@@ -2903,7 +3547,6 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 return;
             }
             cancelTool();
-            printing.documentChanged();
         });
     }
 
@@ -2936,6 +3579,17 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         });
     }
 
+    private void escape() {
+        if (printing.cancelPlateRename() || printing.cancelDrag()) return;
+        if (tree.getEditingItem() != null) {
+            tree.edit(null);
+        } else if (designTab.isSelected() && tool == Tool.NONE && selectedBody != null) {
+            selectFeature(null);
+        } else {
+            cancelTool();
+        }
+    }
+
     private void installShortcuts(
             MenuBar menuBar,
             MenuItem newItem,
@@ -2950,16 +3604,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             var focus = getScene().getFocusOwner();
             if (KeyboardShortcuts.textUndo(e, focus)) return;
             if (e.getCode() == KeyCode.ESCAPE) {
-                if (printing.cancelPlateRename() || printing.cancelDrag()) {
-                    e.consume();
-                    return;
-                }
-                if (tree.getEditingItem() != null) {
-                    tree.edit(null);
-                    e.consume();
-                    return;
-                }
-                cancelTool();
+                escape();
                 e.consume();
                 return;
             }
@@ -2975,6 +3620,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     case "save" -> fire(saveItem);
                     case "save-as" -> fire(saveAsItem);
                     case "export" -> fire(export);
+                    case "exit" -> exitApplication();
                     case "undo" -> undo.fire();
                     case "redo" -> redo.fire();
                     case "parameters" -> parameters.fire();
@@ -3040,7 +3686,14 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         Dialogs.show(help, stage, translations);
     }
 
-    private void refreshWorkspaceTabs(CadDocument document) {
+    private void refreshWorkspaceTabs(CadDocument document, long revision) {
+        if ((tool == Tool.EDIT_PROFILE || tool == Tool.OPERATION)
+                && (revision != draftRevision || controller.generation() != draftGeneration)) {
+            tool = Tool.NONE;
+            viewport.clearHandle();
+            viewport.isolateProfile(false);
+            inspect();
+        }
         printTab.setDisable(controller.build().bodies().isEmpty());
         if (printTab.isDisable() && printTab.isSelected()) {
             workspaces.getSelectionModel().select(designTab);
@@ -3119,34 +3772,36 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         fileBusy.set(controller.ioBusy());
     }
 
-    private void refreshSolidCommands(boolean atEnd) {
+    private void refreshSolidCommands() {
         if (tool == Tool.EXTRUDE && finish != null) {
             finish.setDisable(
                     !controller.canCommitExtrusion() || !error.getText().isEmpty());
         }
-        splitBody.setDisable(tool != Tool.NONE
-                || !controller.canExport()
-                || controller.build().bodies().isEmpty());
+        splitBody.setDisable(tool != Tool.NONE || !controller.hasEditableBodies());
         fillet.setDisable(splitBody.isDisabled());
         chamfer.setDisable(splitBody.isDisabled());
         shell.setDisable(splitBody.isDisabled());
         printing.documentChanged();
-        customFeature.setDisable(!atEnd || tool != Tool.NONE || controller.rebuilding());
-        constrainedSketch.setDisable(!atEnd || tool != Tool.NONE || controller.rebuilding());
-        extrude.setDisable(!atEnd
-                || tool != Tool.NONE
-                || !(selected() instanceof Feature.Sketch s
-                        && (!(s.profile() instanceof Feature.Constrained c)
-                                || dev.voxelbrew.engine.sketch.SketchProfiles.hasProfile(c.geometry()))));
+        customFeature.setDisable(controller.ioBusy() || tool != Tool.NONE || controller.rebuilding());
+        constrainedSketch.setDisable(customFeature.isDisabled());
     }
 
-    private void refreshCut(boolean atEnd) {
-        cut.setDisable(!atEnd
+    private void refreshSketchCommands(CadDocument document) {
+        if (controller.ioBusy()
                 || tool != Tool.NONE
-                || !(selected() instanceof Feature.Sketch s
-                        && (s.profile() instanceof Feature.Circle
-                                || s.profile() instanceof Feature.Constrained c
-                                        && dev.voxelbrew.engine.sketch.SketchProfiles.hasProfile(c.geometry())))
+                || !(selected() instanceof Feature.Sketch sketch)
+                || document.features().subList(0, document.cursor()).stream()
+                        .noneMatch(f -> f.id().equals(sketch.id()))) {
+            extrude.setDisable(true);
+            cut.setDisable(true);
+            return;
+        }
+        boolean available = !(sketch.profile() instanceof Feature.Constrained c)
+                || validSketchProfiles.computeIfAbsent(
+                        sketch.id(), id -> dev.voxelbrew.engine.sketch.SketchProfiles.hasProfile(c.geometry()));
+        extrude.setDisable(!available);
+        cut.setDisable(!available
+                || sketch.profile() instanceof Feature.Rectangle
                 || controller.rebuilding()
                 || controller.build().bodies().isEmpty());
     }

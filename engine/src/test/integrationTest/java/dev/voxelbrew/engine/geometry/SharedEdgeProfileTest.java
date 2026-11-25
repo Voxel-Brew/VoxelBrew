@@ -25,6 +25,29 @@ class SharedEdgeProfileTest {
     }
 
     @Test
+    void adjacentStripStartingOnSharedEdgeIsNotAHole() {
+        var g = geometry(List.of(
+                Sketches.entity("strip-bottom", Kind.LINE, false, -1e-15, 1e-15, 5, 0),
+                Sketches.entity("panel-bottom", Kind.LINE, false, 0, 0, -50, 0),
+                Sketches.entity("divider", Kind.LINE, false, 0, 0, 0, 46),
+                Sketches.entity("panel-left", Kind.LINE, false, -50, 0, -50, 7),
+                Sketches.entity("panel-top", Kind.LINE, false, -50, 7, 0, 7),
+                Sketches.entity("strip-right", Kind.LINE, false, 5, 0, 5, 46),
+                Sketches.entity("strip-top", Kind.LINE, false, 5, 46, 0, 46)));
+        var panel = SketchProfiles.regionAt(g, new Vec(-25, 3)).orElseThrow();
+        assertThat(SketchProfiles.regionContours(g).get(panel)).hasSize(1);
+        var region = SketchProfiles.selectableRegions(g).stream()
+                .filter(r -> r.id().equals(panel))
+                .findFirst()
+                .orElseThrow();
+        try (var solid = Solid.profilePrism(region.profile(), 0, 5)) {
+            assertThat(solid.volume()).isCloseTo(1750, within(1e-6));
+            assertThat(solid.contains(-25, 3, 2)).isTrue();
+            assertThat(solid.contains(2, 3, 2)).isFalse();
+        }
+    }
+
+    @Test
     void individualFacesKeepSharedEdgeAndStableReferences() throws Exception {
         var original = SketchProfiles.selectableRegions(geometry(house()));
         assertThat(original.size()).isEqualTo(2);
@@ -153,6 +176,27 @@ class SharedEdgeProfileTest {
             assertThat(solid.volume()).isCloseTo(1000 - 40 * Math.PI, within(1e-6));
             assertThat(solid.contains(5, 5, 2)).isFalse();
             assertThat(solid.contains(15, 5, 2)).isFalse();
+        }
+    }
+
+    @Test
+    void dividerMeetingUnsplitWallsProducesTwoExtrudableFaces() {
+        var entities = new ArrayList<>(house().subList(0, 4));
+        entities.add(Sketches.entity("partition", Kind.LINE, false, 0, 3, 20, 3));
+        var g = geometry(entities);
+        var regions = SketchProfiles.selectableRegions(g);
+        assertThat(regions).hasSize(2);
+        var volumes = new ArrayList<Double>();
+        for (var region : regions) {
+            try (var solid = Solid.profilePrism(region.profile(), 0, 5)) {
+                volumes.add(solid.volume());
+            }
+        }
+        assertThat(volumes)
+                .usingElementComparator(new org.assertj.core.util.DoubleComparator(1e-6))
+                .containsExactlyInAnyOrder(300., 700.);
+        try (var solid = Solid.profilePrism(SketchProfiles.profile(g), 0, 5)) {
+            assertThat(solid.volume()).isCloseTo(1000, within(1e-6));
         }
     }
 

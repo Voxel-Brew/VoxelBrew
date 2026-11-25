@@ -11,6 +11,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.IntFunction;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NonNull;
@@ -114,6 +115,48 @@ public final class DocumentController implements AutoCloseable {
     private java.util.function.Supplier<java.util.Map<String, String>> printWorkspace =
             () -> session.document().printSetup().workspaceSettings();
 
+    @RequiredArgsConstructor
+    static final class DisplayEvaluator implements Function<CadDocument, Build> {
+        private final Path pluginDirectory;
+        private String documentId;
+        private List<Feature> previousFeatures = List.of();
+        private Map<Feature.BodyRef, Body> previousBodies = Map.of();
+
+        @Override
+        public Build apply(CadDocument document) {
+            try (var evaluation = Evaluator.evaluate(document, pluginDirectory)) {
+                if (!evaluation.valid()) {
+                    return new Build(List.of(), evaluation.diagnostics(), false, evaluation.resolvedFeatures());
+                }
+                var active = evaluation.resolvedFeatures().subList(0, document.cursor());
+                var reusable = UnchangedGeometry.between(
+                        document.id().equals(documentId) ? previousFeatures : List.of(), active);
+                var bodies = dev.voxelbrew.util.concurrent.ParallelWork.map(evaluation.bodies(), b -> {
+                    var cached = previousBodies.get(b.output());
+                    if (cached != null
+                            && reusable.test(b.output())
+                            && cached.id().equals(b.id())) {
+                        return cached;
+                    }
+                    return new Body(
+                            b.id(),
+                            b.output(),
+                            b.solid().tessellate(MeshOptions.DEFAULT),
+                            b.solid().volume(),
+                            b.solid().planarFaces(),
+                            b.solid().faceEdges(),
+                            b.solid().edgeSamples());
+                });
+                var result = build(evaluation, bodies);
+                documentId = document.id();
+                previousFeatures = List.copyOf(active);
+                previousBodies =
+                        bodies.stream().collect(java.util.stream.Collectors.toMap(Body::output, Function.identity()));
+                return result;
+            }
+        }
+    }
+
     public record Body(
             String id,
             Feature.BodyRef output,
@@ -174,6 +217,40 @@ public final class DocumentController implements AutoCloseable {
         }
     }
 
+    public static final class BodyLabels {
+        private final Map<String, Integer> numbers = new HashMap<>();
+        private final Map<String, Evaluation.PatternCopy> copies;
+
+        BodyLabels(List<Body> bodies, Map<String, Evaluation.PatternCopy> copies) {
+            this.copies = Map.copyOf(copies);
+            for (int i = 0; i < bodies.size(); i++) numbers.put(bodies.get(i).id(), i + 1);
+        }
+
+        boolean isCopy(String id) {
+            return copies.containsKey(id);
+        }
+
+        String label(String id, CadDocument document, IntFunction<String> defaultName) {
+            var suffixes = new ArrayDeque<Integer>();
+            var source = id;
+            Integer sourceNumber = null;
+            while (!document.bodyNames().containsKey(source) && copies.containsKey(source)) {
+                var copy = copies.get(source);
+                suffixes.addFirst(copy.index());
+                source = copy.sourceId();
+                sourceNumber = copy.sourceNumber();
+            }
+            var name = document.bodyNames().get(source);
+            if (name == null) {
+                var number = numbers.getOrDefault(source, sourceNumber);
+                name = number == null ? source : defaultName.apply(number);
+            }
+            var label = new StringBuilder(name);
+            for (int index : suffixes) label.append(' ').append(index);
+            return label.toString();
+        }
+    }
+
     public record Build(
             List<Body> bodies,
             List<Evaluation.Diagnostic> diagnostics,
@@ -181,7 +258,41 @@ public final class DocumentController implements AutoCloseable {
             List<Feature> features,
             Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction,
             List<ConstructionFeature.Input> constructionInputs,
-            Map<String, List<Entity>> projections) {
+            Map<String, List<Entity>> projections,
+            Map<Feature.BodyRef, String> bodyIds,
+            BodyLabels labels) {
+        public Build(
+                List<Body> bodies,
+                List<Evaluation.Diagnostic> diagnostics,
+                boolean valid,
+                List<Feature> features,
+                Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction,
+                List<ConstructionFeature.Input> constructionInputs,
+                Map<String, List<Entity>> projections,
+                Map<Feature.BodyRef, String> bodyIds) {
+            this(
+                    bodies,
+                    diagnostics,
+                    valid,
+                    features,
+                    construction,
+                    constructionInputs,
+                    projections,
+                    bodyIds,
+                    new BodyLabels(bodies, Map.of()));
+        }
+
+        public Build(
+                List<Body> bodies,
+                List<Evaluation.Diagnostic> diagnostics,
+                boolean valid,
+                List<Feature> features,
+                Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction,
+                List<ConstructionFeature.Input> constructionInputs,
+                Map<String, List<Entity>> projections) {
+            this(bodies, diagnostics, valid, features, construction, constructionInputs, projections, Map.of());
+        }
+
         public Build(
                 List<Body> bodies,
                 List<Evaluation.Diagnostic> diagnostics,
@@ -208,6 +319,7 @@ public final class DocumentController implements AutoCloseable {
             construction = Map.copyOf(construction);
             constructionInputs = List.copyOf(constructionInputs);
             projections = Map.copyOf(projections);
+            bodyIds = Map.copyOf(bodyIds);
         }
     }
 
@@ -228,49 +340,36 @@ public final class DocumentController implements AutoCloseable {
     }
 
     static Build evaluate(CadDocument document, Path pluginDirectory) {
-        try (var evaluation = Evaluator.evaluate(document, pluginDirectory)) {
-            if (!evaluation.valid()) {
-                return new Build(List.of(), evaluation.diagnostics(), false, evaluation.resolvedFeatures());
-            }
-            var bodies = dev.voxelbrew.util.concurrent.ParallelWork.map(
-                    evaluation.bodies(),
-                    b -> new Body(
-                            b.id(),
-                            b.output(),
-                            b.solid().tessellate(MeshOptions.DEFAULT),
-                            b.solid().volume(),
-                            b.solid().planarFaces(),
-                            b.solid().faceEdges(),
-                            b.solid().edgeSamples()));
-            var inputs = new ArrayList<ConstructionFeature.Input>();
-            var zero = new dev.voxelbrew.api.model.construction.ConstructionGeometry.Vector(0, 0, 0);
-            for (var body : evaluation.bodies()) {
-                for (int kind = 0; kind < 3; kind++) {
-                    int count = (int) body.solid().constructionInput(kind, -1, .5)[0];
-                    var selection = switch (kind) {
-                        case 0 -> ConstructionFeature.Selection.FACE;
-                        case 1 -> ConstructionFeature.Selection.EDGE;
-                        default -> ConstructionFeature.Selection.VERTEX;
-                    };
-                    for (int index = 0; index < count; index++) {
-                        inputs.add(new ConstructionFeature.Input(
-                                selection,
-                                body.output().featureId(),
-                                body.output().outputName(),
-                                index,
-                                zero));
-                    }
+        return new DisplayEvaluator(pluginDirectory).apply(document);
+    }
+
+    private static Build build(Evaluation evaluation, List<Body> bodies) {
+        var inputs = new ArrayList<ConstructionFeature.Input>();
+        var zero = new dev.voxelbrew.api.model.construction.ConstructionGeometry.Vector(0, 0, 0);
+        for (var body : evaluation.bodies()) {
+            for (int kind = 0; kind < 3; kind++) {
+                int count = (int) body.solid().constructionInput(kind, -1, .5)[0];
+                var selection = switch (kind) {
+                    case 0 -> ConstructionFeature.Selection.FACE;
+                    case 1 -> ConstructionFeature.Selection.EDGE;
+                    default -> ConstructionFeature.Selection.VERTEX;
+                };
+                for (int index = 0; index < count; index++) {
+                    inputs.add(new ConstructionFeature.Input(
+                            selection, body.output().featureId(), body.output().outputName(), index, zero));
                 }
             }
-            return new Build(
-                    bodies,
-                    evaluation.diagnostics(),
-                    true,
-                    evaluation.resolvedFeatures(),
-                    evaluation.construction(),
-                    inputs,
-                    evaluation.projections());
         }
+        return new Build(
+                bodies,
+                evaluation.diagnostics(),
+                true,
+                evaluation.resolvedFeatures(),
+                evaluation.construction(),
+                inputs,
+                evaluation.projections(),
+                evaluation.bodyIds(),
+                new BodyLabels(bodies, evaluation.patternCopies()));
     }
 
     public DocumentController(Consumer<Runnable> dispatch) {
@@ -278,7 +377,7 @@ public final class DocumentController implements AutoCloseable {
     }
 
     public DocumentController(Consumer<Runnable> dispatch, Path pluginDirectory) {
-        this(dispatch, document -> evaluate(document, pluginDirectory), pluginDirectory);
+        this(dispatch, new DisplayEvaluator(pluginDirectory), pluginDirectory);
     }
 
     DocumentController(Consumer<Runnable> dispatch, Function<CadDocument, Build> evaluator) {
@@ -304,14 +403,7 @@ public final class DocumentController implements AutoCloseable {
             ExecutorService io,
             dev.voxelbrew.importer.DocumentSource documents,
             DocumentSave documentWriter) {
-        this(
-                dispatch,
-                document -> evaluate(document, pluginDirectory),
-                pluginDirectory,
-                worker,
-                io,
-                documents,
-                documentWriter);
+        this(dispatch, new DisplayEvaluator(pluginDirectory), pluginDirectory, worker, io, documents, documentWriter);
     }
 
     public ModelSession.Snapshot snapshot() {
@@ -425,21 +517,28 @@ public final class DocumentController implements AutoCloseable {
         return preview != null;
     }
 
+    String extrusionPreviewId() {
+        return preview != null && displayedPreview ? preview.id() : null;
+    }
+
     boolean canCommitExtrusion() {
         return preview != null
                 && (!BodyExtrusion.modifiesBody(preview) || !rebuilding && displayedPreview && build.valid());
     }
 
-    public boolean canExport() {
-        var d = session.document();
+    boolean hasEditableBodies() {
         return !closed
                 && !rebuilding
                 && !ioBusy
                 && !hasPreview()
                 && !displayedPreview
                 && build.valid()
-                && !build.bodies().isEmpty()
-                && d.cursor() == d.features().size();
+                && !build.bodies().isEmpty();
+    }
+
+    public boolean canExport() {
+        var d = session.document();
+        return hasEditableBodies() && d.cursor() == d.features().size();
     }
 
     public void newDocument() {
@@ -488,7 +587,11 @@ public final class DocumentController implements AutoCloseable {
     }
 
     public void replaceFeature(Feature feature) {
-        session.replace(feature);
+        replaceFeature(feature, session.document().parameters());
+    }
+
+    void replaceFeature(Feature feature, dev.voxelbrew.api.model.parameters.ParameterSet parameters) {
+        session.replace(feature, parameters);
         preview = null;
         schedule(session.document(), false);
     }
@@ -600,7 +703,7 @@ public final class DocumentController implements AutoCloseable {
     }
 
     public void previewExtrusion(Feature.Sketch sketch, String profileId, double distance) {
-        previewExtrusion(sketch, profileId, distance, BodyExtrusion.Operation.NEW_BODY, null);
+        previewExtrusion(sketch, profileId, distance, BodyExtrusion.Operation.NEW_BODY, null, List.of());
     }
 
     private void previewExtrusion(
@@ -608,7 +711,8 @@ public final class DocumentController implements AutoCloseable {
             String profileId,
             double distance,
             BodyExtrusion.Operation operation,
-            Feature.BodyRef target) {
+            Feature.BodyRef target,
+            List<Feature.BodyRef> additionalTargets) {
         previewExpression = "";
         String id = preview == null
                 ? "extrude-" + session.document().uuidGenerator().next()
@@ -616,7 +720,8 @@ public final class DocumentController implements AutoCloseable {
         var candidate = new BodyExtrusion(
                         new Feature.Extrude(id, new Feature.ProfileRef(sketch.id(), profileId), distance),
                         operation,
-                        target)
+                        target,
+                        additionalTargets)
                 .feature();
         var temporary = new ModelSession(session.document());
         temporary.add(candidate);
@@ -629,7 +734,7 @@ public final class DocumentController implements AutoCloseable {
     }
 
     public void previewExtrusion(Feature.Sketch sketch, String profileId, String expression) {
-        previewExtrusion(sketch, profileId, expression, BodyExtrusion.Operation.NEW_BODY, null);
+        previewExtrusion(sketch, profileId, expression, BodyExtrusion.Operation.NEW_BODY, null, List.of());
     }
 
     void previewExtrusion(
@@ -637,10 +742,11 @@ public final class DocumentController implements AutoCloseable {
             String profileId,
             String expression,
             BodyExtrusion.Operation operation,
-            Feature.BodyRef target) {
+            Feature.BodyRef target,
+            List<Feature.BodyRef> additionalTargets) {
         double value =
                 session.document().parameters().value(expression, dev.voxelbrew.api.model.parameters.ParameterUnit.MM);
-        previewExtrusion(sketch, profileId, value, operation, target);
+        previewExtrusion(sketch, profileId, value, operation, target, additionalTargets);
         if (!expression.matches("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?")) {
             previewExpression = expression;
         }

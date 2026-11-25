@@ -157,7 +157,7 @@ class SketchCurveTypesIntegrationTest {
         var selections = List.of(
                 strokes.stream().map(SketchProfiles.Region::id).toList(),
                 cutout,
-                faces.stream().map(SketchProfiles.Region::id).toList());
+                List.copyOf(SketchProfiles.includingEnclosedRegions(combined, List.of(frame))));
         var volumes = List.of(textVolume, 4800 - textVolume, 4800.0);
         var bodies = List.of(2, 4, 1);
         for (int i = 0; i < selections.size(); i++) {

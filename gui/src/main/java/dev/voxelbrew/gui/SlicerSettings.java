@@ -97,7 +97,7 @@ final class SlicerSettings {
                 version.setText(subtitle);
                 String status;
                 if (item.bundled()) {
-                    status = "bundled";
+                    status = item.settings().containsKey("executable") ? "ready" : "bundled";
                 } else if (item.operational()) {
                     status = "ready";
                 } else {
@@ -116,7 +116,7 @@ final class SlicerSettings {
         String detail;
         if (selected == null) {
             detail = "";
-        } else if (selected.bundled()) {
+        } else if (selected.bundled() && !selected.settings().containsKey("executable")) {
             detail = text.translate("slicer.installation.bundled");
         } else if (selected.operational()) {
             detail = selected.settings().getOrDefault("executable", selected.version());
@@ -201,7 +201,7 @@ final class SlicerSettings {
         types.getSelectionModel().selectFirst();
         var add = new Button(text.translate("slicer.installation.add"));
         add.setId("slicer-installation-add");
-        add.getStyleClass().addAll("slicer-manager-action", "slicer-manager-primary");
+        add.getStyleClass().addAll("slicer-manager-action", "primary");
         add.setMinWidth(Region.USE_PREF_SIZE);
         add.disableProperty().bind(types.valueProperty().isNull());
         var edit = new Button(text.translate("slicer.installation.edit"));
@@ -243,7 +243,32 @@ final class SlicerSettings {
         var typeLabel = new Label(text.translate("slicer.installation.provider"));
         typeLabel.setLabelFor(types);
         typeLabel.setMinWidth(Region.USE_PREF_SIZE);
-        var creation = new HBox(10, typeLabel, types, add);
+        var install = new Button();
+        install.setId("slicer-installation-download");
+        install.getStyleClass().add("slicer-manager-action");
+        install.setMinWidth(Region.USE_PREF_SIZE);
+        Runnable showDownload = () -> {
+            var provider = types.getValue();
+            var download = provider == null
+                    ? Optional.<dev.voxelbrew.slicer.internal.SlicerDownload>empty()
+                    : dev.voxelbrew.slicer.internal.SlicerDownload.find(provider.id());
+            boolean available = download.isPresent()
+                    && items.stream()
+                            .noneMatch(
+                                    item -> item.bundled() && item.providerId().equals(provider.id()));
+            install.setManaged(available);
+            install.setVisible(available);
+            download.ifPresent(asset -> install.setText(
+                    text.translate("slicer.installation.download", (asset.size() + 1048575) / 1048576)));
+        };
+        types.valueProperty().addListener((obs, old, selected) -> showDownload.run());
+        showDownload.run();
+        install.setOnAction(event -> {
+            install(types.getValue(), owner, text);
+            update.accept(null);
+            showDownload.run();
+        });
+        var creation = new HBox(10, typeLabel, types, add, install);
         creation.setAlignment(Pos.CENTER_LEFT);
         creation.getStyleClass().add("slicer-manager-create");
         var content = new VBox(12, installations, actions, creation);
@@ -267,6 +292,43 @@ final class SlicerSettings {
                     new Alert(
                             Alert.AlertType.ERROR,
                             text.translate("slicer.installation.removeFailed", failure.getMessage())),
+                    owner,
+                    text);
+        }
+    }
+
+    private void install(SlicerDescriptor provider, Window owner, TranslationService text) {
+        var dialog = new Dialog<ButtonType>();
+        dialog.setTitle(provider.name());
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+        var indicator = new ProgressBar(0);
+        indicator.setPrefWidth(300);
+        dialog.getDialogPane().setContent(indicator);
+        var cancellation = new Cancellation();
+        var task = new javafx.concurrent.Task<Void>() {
+            @Override
+            protected Void call() throws Exception {
+                store.install(provider.id(), cancellation, percent -> updateProgress(percent, 100));
+                return null;
+            }
+        };
+        indicator.progressProperty().bind(task.progressProperty());
+        var finish = (ButtonBase) dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
+        task.setOnSucceeded(event -> finish.fire());
+        task.setOnFailed(event -> finish.fire());
+        worker.execute(task);
+        try {
+            Dialogs.show(dialog, owner, text);
+        } finally {
+            cancellation.cancel();
+        }
+        if (task.getException() != null) {
+            Dialogs.show(
+                    new Alert(
+                            Alert.AlertType.ERROR,
+                            text.translate(
+                                    "slicer.settings.failed",
+                                    task.getException().getMessage())),
                     owner,
                     text);
         }

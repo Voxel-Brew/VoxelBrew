@@ -274,16 +274,17 @@ test("1.0.0 ships the Intel Mac CLI and omits the unqualified DMG", () => {
   assert.ok(assetNames("1.0.0").includes("VoxelBrewCLI-1.0.0-macos-x64.zip"));
   assert.ok(!assetNames("1.0.0").some((name) => name.endsWith(".dmg")));
   assert.ok(assetNames("1.0.1").includes("VoxelBrew-1.0.1-macos-x64.dmg"));
+  assert.ok(assetNames("1.0.1").includes("VoxelBrew-1.0.1-linux-x64.deb"));
 });
 
 test("manifest requires every qualified download with matching revision and hashes", (t) => {
   const f = fixture(t),
     m = { version: "1.2.3", release: "a".repeat(40) };
   assets(f.assets, m);
-  assert.equal(manifest(f.assets, m).length, 12);
+  assert.equal(manifest(f.assets, m).length, 13);
   assert.equal(
     fs.readFileSync(path.join(f.assets, "SHA256SUMS"), "utf8").trim().split("\n").length,
-    11,
+    12,
   );
   const file = path.join(f.assets, assetNames(m.version)[0]);
   fs.appendFileSync(file, "changed");

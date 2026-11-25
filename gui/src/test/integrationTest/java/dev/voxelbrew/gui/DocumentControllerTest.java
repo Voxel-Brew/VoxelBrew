@@ -44,6 +44,58 @@ class DocumentControllerTest {
     }
 
     @Test
+    void editingAnExtrusionReusesIndependentMeshesOnEitherSideInHistory() {
+        var first = sketch("first", 0);
+        var second = sketch("second", 10);
+        var a = new Feature.Extrude("a", new Feature.ProfileRef("first", first.profileId()), 2);
+        var b = new Feature.Extrude("b", new Feature.ProfileRef("second", second.profileId()), 3);
+        var session = new ModelSession(new CadDocument("model", List.of(first, a, second, b), 4));
+        var evaluator = new DocumentController.DisplayEvaluator(directory);
+        var before = evaluator.apply(session.document()).bodies();
+        session.replace(new Feature.Extrude(b.id(), b.profile(), 4));
+        var after = evaluator.apply(session.document()).bodies();
+        assertThat(after.getFirst()).isSameAs(before.getFirst());
+        assertThat(after.getLast().volume()).isCloseTo(9600, within(.001));
+        session.replace(new Feature.Extrude(a.id(), a.profile(), 1));
+        var upstream = evaluator.apply(session.document()).bodies();
+        assertThat(upstream.getFirst().volume()).isCloseTo(2400, within(.001));
+        assertThat(upstream.getLast()).isSameAs(after.getLast());
+    }
+
+    @Test
+    void editPropagatesThroughOnlyTheAffectedTargetOfAMultiBodyCut() {
+        var first = sketch("first", 0);
+        var second = sketch("second", 10);
+        var a = new Feature.Extrude("a", new Feature.ProfileRef(first.id(), first.profileId()), 2);
+        var b = new Feature.Extrude("b", new Feature.ProfileRef(second.id(), second.profileId()), 3);
+        var hole = new Feature.Sketch("hole", "circle", first.plane(), new Feature.Circle(10, 10, 4));
+        var cut = new CutTargets(List.of(new Feature.BodyRef("a", "body"), new Feature.BodyRef("b", "body")))
+                .throughFeature("cut", new Feature.ProfileRef(hole.id(), hole.profileId()));
+        var pattern = new BodyPattern(
+                        BodyPattern.Kind.RECTANGULAR,
+                        new Feature.BodyRef("cut", "body-2"),
+                        BodyPattern.Axis.X,
+                        2,
+                        1,
+                        80,
+                        0)
+                .feature("pattern");
+        var session = new ModelSession(new CadDocument("multi", List.of(first, a, second, b, hole, cut, pattern), 7));
+        var evaluator = new DocumentController.DisplayEvaluator(directory);
+        var before = evaluator.apply(session.document()).bodies();
+        session.editDimension("a", "distance", 4);
+        var after = evaluator.apply(session.document()).bodies();
+        assertThat(after).hasSize(3);
+        assertThat(after.getFirst().volume()).isCloseTo(2 * before.getFirst().volume(), within(.001));
+        assertThat(after.get(1)).isSameAs(before.get(1));
+        assertThat(after.get(2)).isSameAs(before.get(2));
+        session.editDimension("b", "distance", 6);
+        var changed = evaluator.apply(session.document()).bodies();
+        assertThat(changed.getFirst()).isSameAs(after.getFirst());
+        assertThat(changed.get(2).volume()).isCloseTo(2 * after.get(2).volume(), within(.001));
+    }
+
+    @Test
     void changingNozzleRebuildsAnExtrusionBoundToThePrintProfile() throws Exception {
         try (var controller = new DocumentController(callbacks::add)) {
             var profile = sketch("base", 0);

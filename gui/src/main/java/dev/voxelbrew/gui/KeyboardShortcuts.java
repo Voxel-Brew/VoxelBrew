@@ -20,6 +20,7 @@ final class KeyboardShortcuts {
             binding(Scope.DOCUMENT, "save", true, "Shortcut+S"),
             binding(Scope.DOCUMENT, "save-as", true, "Shortcut+Shift+S"),
             binding(Scope.DOCUMENT, "export", true, "Shortcut+E"),
+            binding(Scope.DOCUMENT, "exit", true, "Shortcut+Q"),
             binding(Scope.DOCUMENT, "undo", false, "Shortcut+Z"),
             binding(Scope.DOCUMENT, "redo", false, "Shortcut+Shift+Z", "Shortcut+Y"),
             binding(Scope.DOCUMENT, "parameters", true, "Shortcut+Shift+P"),

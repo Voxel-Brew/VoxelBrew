@@ -1194,6 +1194,10 @@ class WorkbenchUiTest {
         fx(() -> workbench.controller().open(input)).get(20, TimeUnit.SECONDS);
         ready();
         click("workspace-print");
+        click("print-copy-errors");
+        assertThat(fx(() -> javafx.scene.input.Clipboard.getSystemClipboard().getString()))
+                .isNotBlank()
+                .isEqualTo(fx(() -> ((Label) node("#print-validation")).getText()));
         click("print-add");
         ready();
         click("print-tab-process");
@@ -1234,6 +1238,10 @@ class WorkbenchUiTest {
             assertThat(linkStart.getY()).isCloseTo(messageEnd.getY(), within(1.0));
             return null;
         });
+        click("print-copy-errors");
+        assertThat(fx(() -> javafx.scene.input.Clipboard.getSystemClipboard().getString()))
+                .isEqualTo(jobs.failureDiagnostic())
+                .contains("Slicer exited with 1\nNo first-layer extrusions");
         click("print-job-details");
         assertThat(fx(() -> ((TabPane) node("#print-controls"))
                         .getSelectionModel()
@@ -1257,6 +1265,7 @@ class WorkbenchUiTest {
             assertThat(details.getSelectedText()).isEqualTo(text);
             jobs.clear();
             assertThat(details.getText()).isEmpty();
+            assertThat(workbench.lookup("#print-copy-errors").isVisible()).isFalse();
             return null;
         });
     }

@@ -47,7 +47,7 @@ final class PrinterExportDialog {
         var exportButton = dialog.getDialogPane().lookupButton(export);
         exportButton.setId("printer-export-confirm");
         exportButton.setDisable(!visibility);
-        exportButton.getStyleClass().add("printer-dialog-primary");
+        exportButton.getStyleClass().addAll("primary", "printer-dialog-primary");
         dialog.getDialogPane().lookupButton(ButtonType.CANCEL).setId("printer-dialog-cancel");
         Set<String> selected = new LinkedHashSet<>(initial);
         long total =

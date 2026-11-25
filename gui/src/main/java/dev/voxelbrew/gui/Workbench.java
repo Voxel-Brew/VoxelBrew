@@ -2827,7 +2827,6 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         dialog.setHeaderText(translations.translate("projectWindow.title"));
         var currentButton = dialog.getDialogPane().lookupButton(current);
         currentButton.setId("project-window-current");
-        currentButton.getStyleClass().add("primary");
         dialog.getDialogPane().lookupButton(separate).setId("project-window-new");
         Dialogs.show(dialog, stage, translations).ifPresent(choice -> {
             if (choice == current) requestChange(currentWindow);

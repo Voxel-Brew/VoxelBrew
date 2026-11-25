@@ -53,7 +53,7 @@ final class SupportDialog {
                 log.warn("Could not open support link {}", address, failure);
                 var alert = new Alert(Alert.AlertType.ERROR, address, ButtonType.CLOSE);
                 alert.setHeaderText("Could not open the link. Copy this address into your browser:");
-                alert.showAndWait();
+                Dialogs.showStandalone(alert);
             }
         });
         return button;

@@ -317,11 +317,6 @@
 .button:hover {
   -fx-background-color: -fx-selection-bar;
 }
-.primary {
-  -fx-background-color: #3574f0;
-  -fx-border-color: transparent;
-  -fx-text-fill: white;
-}
 .view-cube-panel {
   -fx-stroke-width: 1;
 }
@@ -785,19 +780,6 @@
   -fx-padding: 0 1;
   -fx-background-color: derive(-fx-base, -15%);
 }
-#project-window-current {
-  -fx-background-color: #0067b8;
-  -fx-text-fill: white;
-}
-#project-window-current:hover {
-  -fx-background-color: #005da6;
-}
-#project-window-current:armed {
-  -fx-background-color: #004f8c;
-}
-#project-window-current:focused {
-  -fx-border-color: white;
-}
 .dialog-overlay {
   -fx-padding: 20;
   -fx-background-color: -fx-control-inner-background;
@@ -957,15 +939,6 @@
 .command-strip > .menu-button:focused {
   -fx-border-radius: 12;
 }
-.command-strip .primary {
-  -fx-background-color: #6555ce;
-}
-.command-strip .primary:hover {
-  -fx-background-color: #7866de;
-}
-.primary:hover {
-  -fx-background-color: #467ff2;
-}
 .button:focused,
 .menu-button:focused,
 .combo-box:focused {
@@ -1121,22 +1094,8 @@
 .button.parameter-row-action:focused {
   -fx-border-color: -fx-focus-color;
 }
-.parameter-primary-action,
-.slicer-primary-action {
-  -fx-background-color: #6555ce;
-  -fx-background-insets: 0;
-  -fx-border-color: transparent;
-  -fx-background-radius: 9;
-  -fx-border-radius: 9;
-  -fx-text-fill: white;
-  -fx-font-weight: bold;
-}
 .slicer-primary-action {
   -fx-padding: 10 22;
-}
-.parameter-primary-action:hover,
-.slicer-primary-action:hover {
-  -fx-background-color: #7866de;
 }
 .slicer-toolbar .button {
   -fx-background-color: transparent;
@@ -1271,16 +1230,8 @@
   -fx-background-color: -fx-selection-bar;
 }
 .printer-dialog-primary {
-  -fx-background-color: #6555ce;
-  -fx-background-radius: 6;
-  -fx-text-fill: white;
-  -fx-font-weight: bold;
   -fx-padding: 8 16;
 }
-.printer-dialog-primary:hover {
-  -fx-background-color: #7866de;
-}
-
 .slicer-installation-list {
   -fx-background-color: derive(-fx-base, 34%);
   -fx-background-insets: 0;
@@ -1391,24 +1342,10 @@
 .slicer-manager-create > .label {
   -fx-font-weight: bold;
 }
-.slicer-manager-primary {
-  -fx-background-color: #245fc9;
-  -fx-border-color: transparent;
-  -fx-text-fill: white;
-  -fx-font-weight: bold;
-}
-.slicer-manager-primary:hover {
-  -fx-background-color: #1d51b6;
-}
 .slicer-manager-action:focused,
 .slicer-manager-create .combo-box:focused {
   -fx-border-color: -fx-focus-color;
 }
-.slicer-manager-primary:focused {
-  -fx-border-color: white;
-  -fx-border-insets: 2;
-}
-
 #device-config-content {
   -fx-padding: 2 0 4 0;
 }
@@ -1537,17 +1474,6 @@
   -fx-padding: 8 15;
   -fx-background-radius: 6;
 }
-.printer-card .printer-primary {
-  -fx-background-color: #6555ce;
-  -fx-text-fill: white;
-  -fx-font-weight: bold;
-}
-.printer-card .printer-primary:hover {
-  -fx-background-color: #7866de;
-}
-.printer-card .printer-primary:disabled {
-  -fx-background-color: #aaa4cf;
-}
 .printer-card .printer-danger {
   -fx-text-fill: #b03b3b;
 }
@@ -1592,4 +1518,29 @@
 }
 .printer-message {
   -fx-text-fill: #5c4bc5;
+}
+
+/* Shared by keyboard defaults and designated primary actions in every workspace. */
+.root .button:default,
+.root .button.primary {
+  -fx-background-color: #6555ce;
+  -fx-background-insets: 0;
+  -fx-background-radius: 9;
+  -fx-border-radius: 9;
+  -fx-border-color: transparent;
+  -fx-text-fill: white;
+  -fx-font-weight: bold;
+}
+.root .button:default:hover,
+.root .button.primary:hover {
+  -fx-background-color: #7866de;
+}
+.root .button:default:armed,
+.root .button.primary:armed {
+  -fx-background-color: #5445b6;
+}
+.root .button:default:focused,
+.root .button.primary:focused {
+  -fx-border-color: white;
+  -fx-border-insets: 2;
 }

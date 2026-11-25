@@ -201,7 +201,7 @@ final class SlicerSettings {
         types.getSelectionModel().selectFirst();
         var add = new Button(text.translate("slicer.installation.add"));
         add.setId("slicer-installation-add");
-        add.getStyleClass().addAll("slicer-manager-action", "slicer-manager-primary");
+        add.getStyleClass().addAll("slicer-manager-action", "primary");
         add.setMinWidth(Region.USE_PREF_SIZE);
         add.disableProperty().bind(types.valueProperty().isNull());
         var edit = new Button(text.translate("slicer.installation.edit"));

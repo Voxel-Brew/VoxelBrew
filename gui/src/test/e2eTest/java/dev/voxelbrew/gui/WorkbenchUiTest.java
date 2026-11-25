@@ -6280,7 +6280,12 @@ class WorkbenchUiTest {
         });
         assertThat(fx(() -> ((Button) node("#project-window-current")).isDefaultButton()))
                 .isTrue();
-        assertThat(fx(() -> node("#project-window-current").getStyleClass())).contains("primary");
+        assertThat(fx(() -> {
+                    var button = (Button) node("#project-window-current");
+                    button.applyCss();
+                    return button.getBackground().getFills().getLast().getFill();
+                }))
+                .isIn(javafx.scene.paint.Color.web("#0067b8"), javafx.scene.paint.Color.web("#005da6"));
         key(KeyCode.ENTER);
         ready();
         assertThat(document()).isEqualTo(savedDocument);

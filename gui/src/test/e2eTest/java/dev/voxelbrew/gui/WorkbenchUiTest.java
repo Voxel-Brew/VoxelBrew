@@ -4950,7 +4950,9 @@ class WorkbenchUiTest {
         click("window-close");
         assertThat(fx(stage::isShowing)).isTrue();
         assertThat(fx(() -> workbench.controller().dirty())).isTrue();
-        click("exit");
+        assertThat(fx(() -> command(workbench, "exit").getAccelerator()))
+                .isEqualTo(KeyCombination.keyCombination("Shortcut+Q"));
+        shortcut(KeyCode.Q, false);
         click("unsaved-cancel");
         assertThat(document()).isEqualTo(original);
         click("exit");

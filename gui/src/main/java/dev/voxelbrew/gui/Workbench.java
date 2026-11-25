@@ -712,7 +712,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                         new SeparatorMenuItem(),
                         export,
                         new SeparatorMenuItem(),
-                        menuItem(translations.translate("action.exit"), "exit", false, this::exitApplication));
+                        menuItem(translations.translate("action.exit"), "exit", true, this::exitApplication));
         var editMenu = menu("menu-edit");
         editMenu.getItems()
                 .addAll(mirror(undo, true), mirror(redo, true), new SeparatorMenuItem(), mirror(parameters, true));
@@ -3298,6 +3298,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     case "save" -> fire(saveItem);
                     case "save-as" -> fire(saveAsItem);
                     case "export" -> fire(export);
+                    case "exit" -> exitApplication();
                     case "undo" -> undo.fire();
                     case "redo" -> redo.fire();
                     case "parameters" -> parameters.fire();

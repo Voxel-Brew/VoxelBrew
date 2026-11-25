@@ -8457,6 +8457,9 @@ class WorkbenchUiTest {
         assertThat(volume()).isCloseTo(original + 8 * Math.PI, within(.001));
         click("history-3");
         choice("extrude-operation", 2);
+        assertThat(fx(() -> ((FormulaField) workbench.lookup("#repair-output")).expressionType()))
+                .isEqualTo(FormulaField.ExpressionType.STRING);
+        text("repair-output", "=\"bo\"+\"dy\"");
         click("repair");
         ready();
         text("dimension-distance", "-2");
@@ -9432,7 +9435,14 @@ class WorkbenchUiTest {
         openPrepared("plate-5mm.vxb");
         int count = fx(() -> workbench.controller().build().bodies().size());
         click("body-rectangular");
-        text("pattern-rows", "2");
+        assertThat(fx(() -> workbench.lookup("#pattern-rows"))).isInstanceOf(FormulaField.class);
+        text("pattern-rows", "=1+1");
+        fx(() -> {
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "body-pattern-inspector.png"));
+            return null;
+        });
         click("pattern-apply");
         ready();
         assertThat(fx(() -> workbench.controller().build().bodies().size())).isEqualTo(count + 3);
@@ -9441,17 +9451,24 @@ class WorkbenchUiTest {
         ready();
         assertThat(fx(() -> workbench.controller().build().bodies().size())).isEqualTo(count + 6);
         click("body-mirror");
-        text("pattern-step", "10");
+        text("pattern-step", "5+5");
         click("pattern-apply");
         ready();
         assertThat(fx(() -> workbench.controller().build().bodies().size())).isEqualTo(count + 7);
         click("history-" + (document().features().size() - 1));
         click("edit-body-pattern");
+        assertThat(fx(() -> ((FormulaField) workbench.lookup("#pattern-step")).getText()))
+                .isEqualTo("5+5");
         text("pattern-step", "15");
         click("pattern-apply");
         ready();
         assertThat(BodyPattern.from(document().features().getLast()).firstStep())
                 .isEqualTo(15);
+        assertThat(document()
+                        .parameters()
+                        .binding(new ParameterSet.Target(
+                                document().features().getLast().id(), "step")))
+                .isEmpty();
         click("operations-menu");
         fx(() -> {
             Screenshot.save(

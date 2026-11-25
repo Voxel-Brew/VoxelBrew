@@ -82,6 +82,29 @@ public final class FeatureDimensions {
                 default -> ParameterUnit.NUMBER;
             };
             result.add(new Dimension(new ParameterSet.Target(c.id(), "value"), unit, c.value()));
+        } else {
+            solidDimensions(feature, result, length);
+        }
+        return List.copyOf(result);
+    }
+
+    private static void solidDimensions(
+            Feature feature, List<Dimension> result, java.util.function.BiConsumer<String, Double> length) {
+        if (BodyPattern.matches(feature)) {
+            var p = BodyPattern.from(feature);
+            if (p.kind() != BodyPattern.Kind.MIRROR) {
+                result.add(new Dimension(
+                        new ParameterSet.Target(feature.id(), "count"), ParameterUnit.NUMBER, p.firstCount()));
+            }
+            result.add(new Dimension(
+                    new ParameterSet.Target(feature.id(), "step"),
+                    p.kind() == BodyPattern.Kind.CIRCULAR ? ParameterUnit.DEG : ParameterUnit.MM,
+                    p.firstStep()));
+            if (p.kind() == BodyPattern.Kind.RECTANGULAR) {
+                result.add(new Dimension(
+                        new ParameterSet.Target(feature.id(), "rows"), ParameterUnit.NUMBER, p.secondCount()));
+                length.accept("spacing", p.secondStep());
+            }
         } else if (BodyExtrusion.modifiesBody(feature)) {
             length.accept("distance", BodyExtrusion.from(feature).extrusion().distance());
         } else if (feature instanceof Feature.Extrude e) {
@@ -93,7 +116,6 @@ public final class FeatureDimensions {
         } else if (feature instanceof Feature.SplitBody s) {
             length.accept("offset", s.plane().offset());
         }
-        return List.copyOf(result);
     }
 
     public static Dimension dimension(Feature feature, String field) {
@@ -107,6 +129,18 @@ public final class FeatureDimensions {
     public static Feature apply(Feature feature, Map<String, Double> changes) {
         if (changes.isEmpty()) return feature;
         changes.keySet().forEach(k -> dimension(feature, k));
+        if (BodyPattern.matches(feature)) {
+            var p = BodyPattern.from(feature);
+            return new BodyPattern(
+                            p.kind(),
+                            p.source(),
+                            p.axis(),
+                            patternCount(changes.getOrDefault("count", (double) p.firstCount())),
+                            patternCount(changes.getOrDefault("rows", (double) p.secondCount())),
+                            changes.getOrDefault("step", p.firstStep()),
+                            changes.getOrDefault("spacing", p.secondStep()))
+                    .feature(feature.id());
+        }
         if (feature instanceof ConstructionFeature c) {
             return new ConstructionFeature(
                     c.id(), c.tool(), c.inputs(), changes.getOrDefault("value", c.value()), c.alternate());
@@ -160,6 +194,13 @@ public final class FeatureDimensions {
             profile = new Feature.Constrained(SketchSolver.solve(next).requireSolved());
         }
         return new Feature.Sketch(s.id(), s.profileId(), plane, profile);
+    }
+
+    private static int patternCount(double value) {
+        if (value != Math.rint(value) || value < 1 || value > 256) {
+            throw new IllegalArgumentException("Pattern count must be a whole number from 1 to 256");
+        }
+        return (int) value;
     }
 
     public static Feature resolve(

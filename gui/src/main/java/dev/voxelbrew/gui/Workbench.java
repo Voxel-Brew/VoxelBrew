@@ -200,8 +200,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     private Feature.Sketch extrusionSketch;
 
     private ModelSession.Snapshot planeSnapshot;
-    private long profileEditRevision;
-    private long profileEditGeneration;
+    private long draftRevision;
+    private long draftGeneration;
 
     private Feature.Sketch planeRepair;
 
@@ -238,6 +238,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         EXTRUDE,
         EDIT_PROFILE,
         MODIFY,
+        OPERATION,
         CONSTRUCTION
     }
 
@@ -1530,14 +1531,17 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     private void customFeature() {
         cancelTool();
         try {
-            FeatureDialog.show(stage, pluginDirectory, featureProviders, formulaParameters(), translations)
-                    .ifPresent(feature -> {
-                        controller.add(feature);
-                        selectedFeature = feature.id();
-                        selectedBody = feature.id() + ".body";
-                        fitNext = true;
-                        inspect();
-                    });
+            var editor = new CustomFeatureEditor(pluginDirectory, featureProviders, formulaParameters(), translations);
+            form.getChildren().setAll(editor);
+            var apply = operationPanel(translations.translate("gui.add_feature"), "custom-add", () -> {
+                var feature = editor.feature();
+                controller.add(feature);
+                selectedFeature = feature.id();
+                selectedBody = feature.id() + ".body";
+                fitNext = true;
+            });
+            apply.setDisable(!editor.available());
+            toolActions.getChildren().getLast().setId("custom-cancel");
         } catch (IOException failure) {
             error.setText(failure.getMessage());
         }
@@ -1629,7 +1633,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         var sketches = sketchInput(earlier, profile);
         var bodies = new ComboBox<String>();
         bodies.setId("repair-body");
-        var output = new TextField(body == null ? "body" : body.outputName());
+        var output =
+                FormulaField.text(body == null ? "body" : body.outputName(), this::formulaParameters, translations);
         output.setId("repair-output");
         boolean extrusion = feature instanceof Feature.Extrude || BodyExtrusion.modifiesBody(feature);
         var operation =
@@ -1667,7 +1672,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                             ? new Feature.BodyRef(
                                     Objects.requireNonNull(
                                             bodies.getValue(), translations.translate("gui.choose_an_earlier_body")),
-                                    output.getText())
+                                    output.evaluatedText())
                             : null;
                     replaceInputs(
                             feature,
@@ -2041,8 +2046,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 .takeWhile(f -> !f.id().equals(feature.id()))
                 .toList();
         tool = Tool.EDIT_PROFILE;
-        profileEditRevision = controller.snapshot().revision();
-        profileEditGeneration = controller.generation();
+        draftRevision = controller.snapshot().revision();
+        draftGeneration = controller.generation();
         form.getChildren().clear();
         fields.clear();
         selectionLabel.setText(translations.translate("extrude.editProfile"));
@@ -2218,29 +2223,39 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 || !(sketch.profile() instanceof Feature.Circle || sketch.profile() instanceof Feature.Constrained)) {
             throw new IllegalArgumentException(translations.translate("gui.select_a_closed_sketch_profile"));
         }
-        var choices = controller.build().bodies();
-        if (choices.isEmpty()) {
+        cancelTool();
+        var target = extrusionTarget(sketch);
+        if (target.getValue() == null) {
             throw new IllegalArgumentException(translations.translate("gui.a_target_body_is_required"));
         }
-        var dialog = new ChoiceDialog<>(
-                choices.getFirst().id(),
-                choices.stream().map(DocumentController.Body::id).toList());
-        dialog.setTitle(translations.translate("gui.through_all_cut"));
-        dialog.setHeaderText(translations.translate("gui.choose_the_target_body"));
-        dialog.getDialogPane().lookupButton(ButtonType.OK).setId("cut-confirm");
-        Dialogs.show(dialog, stage, translations).ifPresent(id -> {
-            var target =
-                    choices.stream().filter(b -> b.id().equals(id)).findFirst().orElseThrow();
+        target.setId("cut-target");
+        form.getChildren().setAll(new Label(translations.translate("gui.choose_the_target_body")), target);
+        operationPanel(translations.translate("gui.through_all_cut"), "cut-confirm", () -> {
+            String id =
+                    "cut-" + controller.snapshot().document().uuidGenerator().next();
             controller.add(new Feature.ThroughCut(
-                    "cut-" + controller.snapshot().document().uuidGenerator().next(),
+                    id,
                     new Feature.ProfileRef(sketch.id(), sketch.profileId()),
-                    target.output()));
-            tool = Tool.NONE;
-            var document = controller.snapshot().document();
-            selectedFeature = document.features().get(document.cursor() - 1).id();
-            inspect();
-            refresh();
+                    target.getValue().output()));
+            selectedFeature = id;
         });
+    }
+
+    private Button operationPanel(String title, String applyId, Runnable commit) {
+        tool = Tool.OPERATION;
+        draftGeneration = controller.generation();
+        draftRevision = controller.snapshot().revision();
+        selectionLabel.setText(title);
+        var apply = button(translations.translate("gui.apply"), applyId, () -> {
+            commit.run();
+            cancelTool();
+        });
+        apply.getStyleClass().add("primary");
+        toolActions
+                .getChildren()
+                .setAll(apply, button(translations.translate("action.cancel"), "cancel-tool", this::cancelTool));
+        refresh();
+        return apply;
     }
 
     private void beginFinish(boolean rounded) {
@@ -2312,7 +2327,12 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                             amount,
                             java.util.List.copyOf(edges));
                 }
-                controller.add(feature);
+                var parameters = formulaParameters();
+                if (!Expressions.isNumber(size.getText())) {
+                    String key = feature instanceof Feature.Shell ? "thickness" : "size";
+                    parameters = parameters.bind(new ParameterSet.Target(id, key), size.getText());
+                }
+                controller.add(feature, parameters);
                 selectedFeature = id;
                 tool = Tool.NONE;
                 modificationFaces.clear();
@@ -2406,37 +2426,25 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             var bodyId = controller.build().bodyIds().get(ref);
             sources.put(ref, bodyId == null ? ref.featureId() + "." + ref.outputName() : bodyLabel(bodyId));
         }
-        BodyPatternDialog.show(stage, patternName(kind), translations, initial, sources, pattern -> {
-            if (existing == null) {
-                var id = "pattern-"
-                        + controller.snapshot().document().uuidGenerator().next();
-                controller.add(pattern.feature(id));
-                selectedFeature = id;
-                selectedBody = null;
-            } else {
-                controller.replaceFeature(pattern.feature(existing.id()));
-            }
+        String id = existing == null
+                ? "pattern-" + controller.snapshot().document().uuidGenerator().next()
+                : existing.id();
+        var editor = new BodyPatternEditor(id, initial, sources, formulaParameters(), translations);
+        form.getChildren().setAll(editor);
+        operationPanel(patternName(kind), "pattern-apply", () -> {
+            if (existing == null) controller.add(editor.feature(), editor.bindings());
+            else controller.replaceFeature(editor.feature(), editor.bindings());
+            selectedFeature = id;
+            selectedBody = null;
         });
     }
 
     private void beginSplit() {
         cancelTool();
-        var dialog = new Dialog<Void>();
-        dialog.setTitle(translations.translate("action.split"));
         var body = new ComboBox<DocumentController.Body>();
         body.setId("split-input");
         body.getItems().setAll(controller.build().bodies());
-        body.setConverter(new javafx.util.StringConverter<>() {
-            @Override
-            public String toString(DocumentController.Body value) {
-                return value == null ? "" : value.id();
-            }
-
-            @Override
-            public DocumentController.Body fromString(String value) {
-                throw new UnsupportedOperationException();
-            }
-        });
+        UiText.choices(body, b -> bodyLabel(b.id()));
         body.setValue(body.getItems().stream()
                 .filter(b -> b.id().equals(selectedBody))
                 .findFirst()
@@ -2447,48 +2455,33 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         axis.setValue("X");
         var offset = FormulaField.number("30", this::formulaParameters, ParameterUnit.MM, translations);
         offset.setId("split-offset");
-        var error = new Label();
-        error.setWrapText(true);
-        error.setId("split-error");
-        dialog.getDialogPane()
-                .setContent(new VBox(
-                        8,
+        form.getChildren()
+                .setAll(
                         new Label(translations.translate("gui.input_body")),
                         body,
                         new Label(translations.translate("gui.plane_normal")),
                         axis,
                         new Label(translations.translate("gui.offset_mm")),
-                        offset,
-                        error));
-        var commit = new ButtonType(translations.translate("gui.split"), ButtonBar.ButtonData.OK_DONE);
-        dialog.getDialogPane().getButtonTypes().addAll(commit, ButtonType.CANCEL);
-        var button = dialog.getDialogPane().lookupButton(commit);
-        button.setId("split-confirm");
-        button.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
-            try {
-                String id = "split-"
-                        + controller.snapshot().document().uuidGenerator().next();
-                var feature = new Feature.SplitBody(
-                        id,
-                        Objects.requireNonNull(body.getValue(), translations.translate("gui.choose_a_body"))
-                                .output(),
-                        new Feature.SplitPlane(
-                                axis.getValue().equals("X") ? 1 : 0,
-                                axis.getValue().equals("Y") ? 1 : 0,
-                                axis.getValue().equals("Z") ? 1 : 0,
-                                number(offset, "offset")));
-                var parameters = formulaParameters();
-                if (!Expressions.isNumber(offset.getText())) {
-                    parameters = parameters.bind(new ParameterSet.Target(id, "offset"), offset.getText());
-                }
-                controller.add(feature, parameters);
-                selectedFeature = id;
-            } catch (RuntimeException failure) {
-                error.setText(failure.getMessage());
-                event.consume();
+                        offset);
+        operationPanel(translations.translate("action.split"), "split-confirm", () -> {
+            String id =
+                    "split-" + controller.snapshot().document().uuidGenerator().next();
+            var feature = new Feature.SplitBody(
+                    id,
+                    Objects.requireNonNull(body.getValue(), translations.translate("gui.choose_a_body"))
+                            .output(),
+                    new Feature.SplitPlane(
+                            axis.getValue().equals("X") ? 1 : 0,
+                            axis.getValue().equals("Y") ? 1 : 0,
+                            axis.getValue().equals("Z") ? 1 : 0,
+                            number(offset, "offset")));
+            var parameters = formulaParameters();
+            if (!Expressions.isNumber(offset.getText())) {
+                parameters = parameters.bind(new ParameterSet.Target(id, "offset"), offset.getText());
             }
+            controller.add(feature, parameters);
+            selectedFeature = id;
         });
-        Dialogs.show(dialog, stage, translations);
     }
 
     private void beginConstruction(
@@ -3371,8 +3364,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     }
 
     private void refreshWorkspaceTabs(CadDocument document, long revision) {
-        if (tool == Tool.EDIT_PROFILE
-                && (revision != profileEditRevision || controller.generation() != profileEditGeneration)) {
+        if ((tool == Tool.EDIT_PROFILE || tool == Tool.OPERATION)
+                && (revision != draftRevision || controller.generation() != draftGeneration)) {
             tool = Tool.NONE;
             viewport.clearHandle();
             viewport.isolateProfile(false);

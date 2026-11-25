@@ -13,6 +13,31 @@ import org.junit.jupiter.api.Test;
 @SuppressWarnings("deprecation")
 class ParametersTest {
     @Test
+    void circularPatternReevaluatesBoundCountsAndAngles() {
+        var feature = new BodyPattern(
+                        BodyPattern.Kind.CIRCULAR,
+                        new Feature.BodyRef("plate", "body"),
+                        BodyPattern.Axis.Z,
+                        2,
+                        1,
+                        360,
+                        0)
+                .feature("pattern");
+        var parameters = ParameterSet.empty()
+                .put("copies", ParameterUnit.NUMBER, "4", "")
+                .bind(new ParameterSet.Target("pattern", "count"), "copies")
+                .bind(new ParameterSet.Target("pattern", "step"), "180 deg");
+        var resolved =
+                BodyPattern.from(FeatureDimensions.resolve(feature, List.of(feature), parameters, parameters.values()));
+        assertThat(resolved.firstCount()).isEqualTo(4);
+        assertThat(resolved.firstStep()).isEqualTo(180);
+        var invalid = parameters.put("copies", ParameterUnit.NUMBER, "2.5", "");
+        assertThatThrownBy(() -> FeatureDimensions.resolve(feature, List.of(feature), invalid, invalid.values()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("whole number");
+    }
+
+    @Test
     void arithmeticUnitsAndFunctionsKeepDimensions() {
         var p = ParameterSet.empty()
                 .put("width", ParameterUnit.MM, "2 in", "")

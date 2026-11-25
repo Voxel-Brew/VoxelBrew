@@ -116,7 +116,11 @@ public class ModelViews {
 
     /** Adapt an already detached snapshot without reevaluating or retessellating it. */
     public static ManufacturingView from(@NonNull ManufacturingModel model) {
-
+        // A saved plate can still refer to a body that was deleted in Designer.
+        var placements = model.instances().stream()
+                .filter(instance -> model.meshes().containsKey(instance.bodyId()))
+                .toList();
+        var placedIds = placements.stream().map(BodyInstance::bodyId).collect(java.util.stream.Collectors.toSet());
         return new ManufacturingView() {
             @Override
             public ManufacturingModel manufacturingModel() {
@@ -126,15 +130,14 @@ public class ModelViews {
             @Override
             public List<Body> bodies() {
                 return model.meshes().keySet().stream()
-                        .filter(id -> model.instances().stream()
-                                .anyMatch(i -> i.bodyId().equals(id)))
+                        .filter(placedIds::contains)
                         .map(id -> new Body(id, id))
                         .toList();
             }
 
             @Override
             public List<BodyInstance> instances() {
-                return model.instances();
+                return List.copyOf(placements);
             }
 
             @Override
@@ -152,8 +155,9 @@ public class ModelViews {
         var instances = new ArrayList<BodyInstance>();
         if (selection == ExportSelection.Contents.ALL) {
             selectedMeshes.putAll(model.meshes());
-            bodies.addAll(from(model).bodies());
-            instances.addAll(model.instances());
+            var placed = from(model);
+            bodies.addAll(placed.bodies());
+            instances.addAll(placed.instances());
         }
         for (var support : model.setup().supports()) {
             if (support.role() == SupportVolume.Role.SOLID_SUPPORT) {
@@ -162,6 +166,7 @@ public class ModelViews {
                         .findFirst()
                         .orElseThrow(() -> new IllegalArgumentException(
                                 "Support " + support.id() + " has missing instance " + support.instanceId()));
+                if (!model.meshes().containsKey(owner.bodyId())) continue;
                 String id = "support." + support.id();
                 selectedMeshes.put(id, MeshGeometry.box(support));
                 bodies.add(new ModelView.Body(id, support.id(), ModelView.Role.SOLID_SUPPORT));

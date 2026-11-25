@@ -83,8 +83,11 @@ class UnifiedExportTest {
     void threeMfPrefersSlicerPlateAndCarriesSettingsWhileObjKeepsDesignSpace() throws Exception {
         var base = ExportTest.reference();
         var setup = dev.voxelbrew.api.model.printing.PrintSetup.empty()
-                .withInstances(List.of(new dev.voxelbrew.api.model.BodyInstance(
-                        "placed", "thickness.body", dev.voxelbrew.api.model.Transform.translation(25, 35, 7))))
+                .withInstances(List.of(
+                        new dev.voxelbrew.api.model.BodyInstance(
+                                "placed", "thickness.body", dev.voxelbrew.api.model.Transform.translation(25, 35, 7)),
+                        new dev.voxelbrew.api.model.BodyInstance(
+                                "obsolete", "deleted.body", dev.voxelbrew.api.model.Transform.IDENTITY)))
                 .withWorkspaceSettings(Map.of("print-output", "custom.gcode"));
         var document = new CadDocument(base.id(), base.features(), base.cursor(), setup);
         Path target = directory.resolve("plate.3mf");
@@ -95,8 +98,12 @@ class UnifiedExportTest {
             var factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
             factory.setNamespaceAware(true);
             var xml = factory.newDocumentBuilder().parse(input);
+            assertThat(xml.getElementsByTagNameNS("*", "item").getLength()).isEqualTo(1);
             var item = (org.w3c.dom.Element)
                     xml.getElementsByTagNameNS("*", "item").item(0);
+            var object = (org.w3c.dom.Element)
+                    xml.getElementsByTagNameNS("*", "object").item(0);
+            assertThat(item.getAttribute("objectid")).isEqualTo(object.getAttribute("id"));
             assertThat(item.getAttribute("transform")).isEqualTo("1.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 1.0 25.0 35.0 7.0");
             var metadata = xml.getElementsByTagNameNS("*", "metadata").item(0).getTextContent();
             var proto = dev.voxelbrew.engine.persistence.proto.DocumentProto.PrintSetup.newBuilder();
@@ -115,6 +122,21 @@ class UnifiedExportTest {
                 .summaryStatistics();
         assertThat(xs.getMin()).isCloseTo(0, org.assertj.core.data.Offset.offset(0.001));
         assertThat(xs.getMax()).isCloseTo(60, org.assertj.core.data.Offset.offset(0.001));
+    }
+
+    @Test
+    void threeMfRejectsAnEntirelyObsoletePlateWithoutPublishingAnEmptyFile() {
+        var base = ExportTest.reference();
+        var setup = base.printSetup()
+                .withInstances(List.of(new dev.voxelbrew.api.model.BodyInstance(
+                        "obsolete", "deleted.body", dev.voxelbrew.api.model.Transform.IDENTITY)));
+        var document = new CadDocument(base.id(), base.features(), base.cursor(), setup);
+        var target = directory.resolve("obsolete.3mf");
+        var exporter = new ThreeMfExporter(directory);
+        assertThatThrownBy(() -> exporter.export(document, window(target, false)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Nothing to export");
+        assertThat(target).doesNotExist();
     }
 
     @Test

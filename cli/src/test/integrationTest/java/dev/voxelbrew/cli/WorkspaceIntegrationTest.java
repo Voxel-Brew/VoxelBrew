@@ -40,6 +40,38 @@ class WorkspaceIntegrationTest {
     }
 
     @Test
+    void cutAcceptsRepeatedBodyTargets() throws Exception {
+        var file = part("cut-pair");
+        var session = new ModelSession(DocumentReader.load(file));
+        session.add(new Feature.Extrude("second", new Feature.ProfileRef("outline", "outline.profile"), -4));
+        session.add(
+                new Feature.Sketch("hole", "hole.profile", Feature.Plane.origin("XY"), new Feature.Circle(10, 10, 2)));
+        DocumentWriter.save(session.document(), file, true);
+        assertThat(run(
+                        "--document",
+                        file.toString(),
+                        "designer",
+                        "solid",
+                        "cut",
+                        "--id",
+                        "holes",
+                        "--sketch",
+                        "hole",
+                        "--body-feature",
+                        "solid",
+                        "--body-feature",
+                        "second"))
+                .as(output)
+                .isZero();
+        try (var result = new ModelSession(DocumentReader.load(file)).evaluate()) {
+            var bodies = result.requireCompleteDocument();
+            assertThat(bodies).hasSize(2);
+            assertThat(bodies.getFirst().solid().contains(10, 10, 4)).isFalse();
+            assertThat(bodies.getLast().solid().contains(10, 10, -2)).isFalse();
+        }
+    }
+
+    @Test
     void finishingCommandsRebuildPersistedSolidsAndKeepTheirExpressions() throws Exception {
         for (String operation : new String[] {"fillet", "chamfer", "shell"}) {
             Path file = part(operation);

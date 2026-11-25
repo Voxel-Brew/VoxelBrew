@@ -4364,6 +4364,67 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void cutsTwoSelectedBodiesInOneHistoryStep() throws Exception {
+        var session = new ModelSession(CadDocument.empty());
+        var plane = Feature.Plane.origin("XY");
+        for (int i = 0; i < 3; i++) {
+            String id = "plate" + i;
+            session.add(new Feature.Sketch(id, "profile", plane, new Feature.Rectangle((i - 1) * 10, 0, 10, 10)));
+            session.add(new Feature.Extrude("solid" + i, new Feature.ProfileRef(id, "profile"), 5));
+        }
+        session.add(new Feature.Sketch("hole", "circle", plane, new Feature.Circle(0, 5, 4)));
+        var path = directory.resolve("cut-targets.vxb");
+        DocumentWriter.save(session.document(), path, false);
+        open(path);
+        for (boolean through : List.of(true, false)) {
+            click("history-6");
+            click(through ? "cut" : "extrude");
+            if (!through) {
+                choice("extrude-operation", BodyExtrusion.Operation.CUT.ordinal());
+                text("extrude-distance", "2");
+            }
+            click("add-cut-target");
+            if (through) {
+                fx(() -> {
+                    Screenshot.save(
+                            stage.getScene(),
+                            Path.of(System.getProperty("voxelbrew.ui.artifacts"), "multi-body-cut.png"));
+                    return null;
+                });
+            }
+            ready();
+            click(through ? "cut-confirm" : "commit-extrusion");
+            ready();
+            var saved = document();
+            assertThat(saved.features()).hasSize(8);
+            DocumentWriter.save(saved, path, true);
+            try (var evaluation = new ModelSession(DocumentReader.load(path)).evaluate()) {
+                var bodies = evaluation.requireCompleteDocument();
+                assertThat(bodies).hasSize(3);
+                for (int i = 0; i < 2; i++) {
+                    assertThat(bodies.get(i).solid().volume())
+                            .isCloseTo(500 - 2 * Math.PI * (through ? 5 : 2), within(.001));
+                    assertThat(bodies.get(i).output())
+                            .isEqualTo(new Feature.BodyRef(
+                                    saved.features().getLast().id(), CutTargets.output(i)));
+                }
+                assertThat(bodies.get(2).solid().volume()).isCloseTo(500, within(.001));
+            }
+            click("history-7");
+            click("remove-cut-target");
+            click("repair");
+            ready();
+            assertThat(fx(() -> workbench.controller().build().bodies().get(1).volume()))
+                    .isCloseTo(500, within(.001));
+            click("undo");
+            ready();
+            assertThat(document().features()).isEqualTo(saved.features());
+            click("undo");
+            ready();
+        }
+    }
+
+    @Test
     void compactHistorySupportsPickingDraggingPlaybackAndIndependentUndo() throws Exception {
         openPrepared("rectangle-0.vxb");
         click("extrude");

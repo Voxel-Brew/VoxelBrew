@@ -243,12 +243,17 @@ message ThroughCut {
   BodyRef body = 2;
   reserved 3 to 7;
 }
+message MultiThroughCut {
+  ThroughCut first = 1;
+  repeated BodyRef additional_targets = 2;
+}
 // Payload for the built-in body extrusion stored in the versioned Custom
 // feature envelope.
 message BodyExtrusion {
   Extrude extrusion = 1;
   BodyRef target = 2;
   bool subtract = 3;
+  repeated BodyRef additional_targets = 4;
 }
 message BodyPattern {
   BodyRef source = 1;

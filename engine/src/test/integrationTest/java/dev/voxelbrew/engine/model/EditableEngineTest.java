@@ -57,6 +57,23 @@ class EditableEngineTest {
     }
 
     @Test
+    void failedSecondCutTargetPublishesNoPartialBody() {
+        var session = new ModelSession(CadDocument.empty());
+        session.add(new Feature.Sketch("plate", "p", XY, new Feature.Rectangle(0, 0, 10, 10)));
+        session.add(new Feature.Extrude("base", new Feature.ProfileRef("plate", "p"), 5));
+        session.add(new Feature.Sketch("hole", "h", XY, new Feature.Circle(5, 5, 2)));
+        var source = new Feature.BodyRef("base", "body");
+        var targets = new CutTargets(List.of(source, new Feature.BodyRef("base", "missing")));
+        session.add(targets.throughFeature("cut", new Feature.ProfileRef("hole", "h")));
+        session.add(new BodyPattern(BodyPattern.Kind.MIRROR, source, BodyPattern.Axis.Z, 2, 1, 0, 0).feature("mirror"));
+        try (var result = session.evaluate()) {
+            assertThat(result.valid()).isFalse();
+            assertThat(result.diagnostics().getLast().state()).isEqualTo(Evaluation.State.OK);
+            assertThat(result.bodyIds()).doesNotContainKey(new Feature.BodyRef("cut", "body"));
+        }
+    }
+
+    @Test
     void solidModificationsSurviveDocumentRoundTrip() throws Exception {
         var session = new ModelSession(CadDocument.empty());
         session.add(new Feature.Sketch(

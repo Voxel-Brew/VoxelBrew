@@ -44,6 +44,7 @@ public final class Evaluator {
                 when BodyExtrusion.modifiesBody(custom) -> rebuildExtrude(BodyExtrusion.from(custom));
                 case Feature.Custom custom
                 when BodyPattern.matches(custom) -> rebuildPattern(custom.id(), BodyPattern.from(custom));
+                case Feature.Custom custom when CutTargets.through(custom) -> rebuildThroughCut(custom);
                 case Feature.Custom custom -> rebuildCustom(custom, customEvaluator);
                 case Feature.Extrude e -> rebuildExtrude(BodyExtrusion.from(e));
                 case Feature.EdgeFinish finish -> rebuildEdgeFinish(finish);
@@ -179,18 +180,13 @@ public final class Evaluator {
             }
             if (!owned.contains(solid)) owned.add(solid);
             if (definition.target() != null) {
-                var input = outputs.get(definition.target());
-                if (input == null || active.get(input.id()) != input) {
-                    throw new ModelException(e.id(), "Extrusion target is missing or has been superseded");
-                }
                 var tools = new ArrayList<Solid>();
                 tools.add(solid);
                 additionalBodies.forEach(body -> tools.add(body.solid()));
-                var result = input.solid().combine(tools, definition.operation() == BodyExtrusion.Operation.CUT);
-                owned.add(result);
-                var body = new Evaluation.Body(input.id(), new Feature.BodyRef(e.id(), "body"), result);
-                outputs.put(body.output(), body);
-                active.put(body.id(), body);
+                modifyTargets(
+                        e.id(),
+                        definition.targets(),
+                        input -> input.combine(tools, definition.operation() == BodyExtrusion.Operation.CUT));
                 return;
             }
             var body = new Evaluation.Body(e.id() + ".body", new Feature.BodyRef(e.id(), "body"), solid);
@@ -279,22 +275,40 @@ public final class Evaluator {
             }
         }
 
-        private void rebuildThroughCut(Feature.ThroughCut cut) {
+        private void modifyTargets(String id, List<Feature.BodyRef> targets, Function<Solid, Solid> operation) {
+            var results = new ArrayList<Evaluation.Body>();
+            for (var target : targets) {
+                var input = outputs.get(target);
+                if (input == null) throw new ModelException(id, "missing body output " + target);
+                if (active.get(input.id()) != input) {
+                    throw new ModelException(id, "body input has been superseded: " + target);
+                }
+                var solid = operation.apply(input.solid());
+                if (!owned.contains(solid)) owned.add(solid);
+                var output = new Feature.BodyRef(id, CutTargets.output(results.size()));
+                results.add(new Evaluation.Body(input.id(), output, solid));
+            }
+            for (var result : results) {
+                outputs.put(result.output(), result);
+                active.put(result.id(), result);
+            }
+        }
+
+        private void rebuildThroughCut(Feature feature) {
+            var cut = CutTargets.firstThroughCut(feature);
             Feature.Sketch sketch = profile(cut.id(), cut.profile(), sketches);
             if (!(sketch.profile() instanceof Feature.Circle) && !(sketch.profile() instanceof Feature.Constrained)) {
                 throw new ModelException(cut.id(), "through-all cut requires a circle profile");
             }
-            Evaluation.Body input = outputs.get(cut.body());
-            if (input == null) {
-                throw new ModelException(cut.id(), "missing body output " + cut.body());
-            }
-            if (active.get(input.id()) != input) {
-                throw new ModelException(cut.id(), "body input has been superseded by a later feature");
-            }
+            modifyTargets(
+                    cut.id(), CutTargets.throughTargets(feature).bodies(), input -> throughSolid(sketch, cut, input));
+        }
+
+        private Solid throughSolid(Feature.Sketch sketch, Feature.ThroughCut cut, Solid input) {
             // Evaluate through-all in sketch coordinates, then restore model
             // coordinates.
             var frame = sketch.plane().frame();
-            Solid local = input.solid();
+            Solid local = input;
             if (!frame.equals(Transform.IDENTITY)) {
                 local = local.transformed(frame.inverse());
                 owned.add(local);
@@ -310,14 +324,11 @@ public final class Evaluator {
                     owned.add(solid);
                 }
             }
-            if (!owned.contains(solid)) owned.add(solid);
             if (!frame.equals(Transform.IDENTITY)) {
+                if (!owned.contains(solid)) owned.add(solid);
                 solid = solid.transformed(frame);
-                owned.add(solid);
             }
-            var body = new Evaluation.Body(input.id(), new Feature.BodyRef(cut.id(), "body"), solid);
-            outputs.put(body.output(), body);
-            active.put(body.id(), body);
+            return solid;
         }
     }
 
@@ -336,8 +347,10 @@ public final class Evaluator {
     /** The registry lives only on the evaluating thread; results contain engine-owned solids. */
     public static Evaluation evaluate(CadDocument document, Path pluginDirectory) {
         if (document.features().stream()
-                .noneMatch(f ->
-                        f instanceof Feature.Custom && !BodyExtrusion.modifiesBody(f) && !BodyPattern.matches(f))) {
+                .noneMatch(f -> f instanceof Feature.Custom
+                        && !BodyExtrusion.modifiesBody(f)
+                        && !BodyPattern.matches(f)
+                        && !CutTargets.through(f))) {
             return replay(document, custom -> {
                 throw new AssertionError("No custom features");
             });
@@ -455,6 +468,14 @@ public final class Evaluator {
         }
     }
 
+    private static List<String> cutReferences(Feature.ProfileRef profile, List<Feature.BodyRef> targets) {
+        return java.util.stream.Stream.concat(
+                        java.util.stream.Stream.of(profile.sketchId()),
+                        targets.stream().map(Feature.BodyRef::featureId))
+                .distinct()
+                .toList();
+    }
+
     private static List<String> references(Feature feature) {
         if (feature instanceof ConstructionFeature construction) return construction.dependencies();
         if (feature instanceof Feature.Sketch s
@@ -469,12 +490,12 @@ public final class Evaluator {
         }
         if (BodyExtrusion.modifiesBody(feature)) {
             var definition = BodyExtrusion.from(feature);
-            return List.of(
-                    definition.extrusion().profile().sketchId(),
-                    definition.target().featureId());
+            return cutReferences(definition.extrusion().profile(), definition.targets());
         }
-        if (feature instanceof Feature.ThroughCut c) {
-            return List.of(c.profile().sketchId(), c.body().featureId());
+        if (CutTargets.through(feature)) {
+            return cutReferences(
+                    CutTargets.firstThroughCut(feature).profile(),
+                    CutTargets.throughTargets(feature).bodies());
         }
         if (BodyPattern.matches(feature)) {
             return List.of(BodyPattern.from(feature).source().featureId());

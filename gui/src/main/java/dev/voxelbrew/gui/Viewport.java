@@ -721,7 +721,8 @@ public final class Viewport extends StackPane {
         for (var feature : features) {
             if (feature instanceof Feature.Extrude || BodyExtrusion.modifiesBody(feature)) {
                 consumed.add(BodyExtrusion.from(feature).extrusion().profile().sketchId());
-            } else if (feature instanceof Feature.ThroughCut cut) {
+            } else if (dev.voxelbrew.engine.model.CutTargets.through(feature)) {
+                var cut = dev.voxelbrew.engine.model.CutTargets.firstThroughCut(feature);
                 consumed.add(cut.profile().sketchId());
             }
         }

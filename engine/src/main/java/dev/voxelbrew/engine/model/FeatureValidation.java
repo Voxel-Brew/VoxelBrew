@@ -13,18 +13,15 @@ final class FeatureValidation {
             validate(BodyExtrusion.from(feature).extrusion());
         } else if (BodyPattern.matches(feature)) {
             BodyPattern.from(feature);
+        } else if (CutTargets.through(feature)) {
+            CutTargets.throughTargets(feature);
         } else if (feature instanceof Feature.Extrude extrusion) {
             finite(feature.id(), "distance", extrusion.distance());
             if (Math.abs(extrusion.distance()) < 1e-6) {
                 throw new ModelException(feature.id(), "distance must have magnitude >= 0.000001 mm");
             }
         } else if (feature instanceof Feature.EdgeFinish finish) {
-            positive(feature.id(), "size", finish.size());
-            if (finish.kind() == null) throw new ModelException(feature.id(), "edge finish kind is missing");
-            if (finish.edges().isEmpty()) throw new ModelException(feature.id(), "select at least one edge");
-            if (finish.edges().stream().anyMatch(index -> index == null || index < 1)) {
-                throw new ModelException(feature.id(), "edge indices must be positive");
-            }
+            validateFinish(finish);
         } else if (feature instanceof Feature.Shell shell) {
             positive(feature.id(), "thickness", shell.thickness());
             if (shell.removedFace() < 0) throw new ModelException(feature.id(), "removed face must be nonnegative");
@@ -37,6 +34,15 @@ final class FeatureValidation {
             if (Math.abs(Math.hypot(Math.hypot(p.normalX(), p.normalY()), p.normalZ()) - 1) > 1e-9) {
                 throw new ModelException(feature.id(), "split plane normal must have unit length");
             }
+        }
+    }
+
+    private static void validateFinish(Feature.EdgeFinish finish) {
+        positive(finish.id(), "size", finish.size());
+        if (finish.kind() == null) throw new ModelException(finish.id(), "edge finish kind is missing");
+        if (finish.edges().isEmpty()) throw new ModelException(finish.id(), "select at least one edge");
+        if (finish.edges().stream().anyMatch(index -> index == null || index < 1)) {
+            throw new ModelException(finish.id(), "edge indices must be positive");
         }
     }
 

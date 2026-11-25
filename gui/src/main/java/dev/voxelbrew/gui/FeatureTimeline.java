@@ -106,7 +106,7 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
                 path("M10 10L18 6V16L10 20Z", "timeline-cube-right"));
         if (feature instanceof Feature.Extrude) {
             cube.getChildren().add(path("M17 5L20 1L23 5H21V14H19V5Z", "timeline-extrude-icon"));
-        } else if (feature instanceof Feature.ThroughCut) {
+        } else if (dev.voxelbrew.engine.model.CutTargets.through(feature)) {
             cube.getChildren().add(path("M8 5L10 4L13 5L13 8L11 9L8 8Z M10 9V16", "timeline-cut-icon"));
         } else if (feature instanceof Feature.SplitBody) {
             cube.getChildren().add(path("M6 1L14 21", "timeline-split-icon"));

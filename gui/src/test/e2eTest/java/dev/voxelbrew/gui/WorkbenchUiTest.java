@@ -3094,12 +3094,35 @@ class WorkbenchUiTest {
         var file = directory.resolve("earlier-extrusion.vxb");
         DocumentWriter.save(new CadDocument("history", List.of(sketch, extrude, mirror), 3), file, false);
         open(file);
+        renderStyle("technical");
+        click("history-1");
+        assertThat(fx(() -> ((SubScene) node("#viewport-scene"))
+                        .getRoot()
+                        .lookupAll(".sketch-curves")
+                        .size()))
+                .isEqualTo(2);
+        fx(() -> {
+            workbench.viewport().standardView("Front");
+            return null;
+        });
         doubleClick("history-1");
+        assertThat(fx(() -> workbench.viewport().orientationProperty().get())).isEqualTo(ViewOrientation.named("Top"));
         assertThat(fx(() -> ((CheckBox) node("#extrude-whole")).isSelected())).isFalse();
         modelClick(0, 0, 0);
         assertThat(fx(() -> node("#apply-extrusion-profile").isDisabled())).isTrue();
         modelClick(15, 0, 0);
         fx(() -> {
+            var view = workbench.viewport();
+            var p = view.screenToLocal(view.modelToScreen(new Point3D(2, 0, 0)));
+            var pixels = view.snapshot(null, null).getPixelReader();
+            boolean outlineVisible = false;
+            for (int dx = -2; dx <= 2; dx++) {
+                var pixel = pixels.getColor((int) p.getX() + dx, (int) p.getY());
+                outlineVisible |= pixel.getBlue() - pixel.getRed() > .2;
+            }
+            assertThat(outlineVisible)
+                    .as("The unselected source circle has a visible outline")
+                    .isTrue();
             Screenshot.save(
                     stage.getScene(),
                     Path.of(System.getProperty("voxelbrew.ui.artifacts"), "historical-extrusion-profile.png"));
@@ -3108,6 +3131,8 @@ class WorkbenchUiTest {
         click("apply-extrusion-profile");
         ready();
         assertThat(document().features().getLast()).isEqualTo(mirror);
+        assertThat(fx(() -> workbench.viewport().orientationProperty().get()))
+                .isEqualTo(ViewOrientation.named("Front"));
         assertThat(document().cursor()).isEqualTo(3);
         assertThat(fx(() -> workbench.controller().build().bodies().stream()
                         .map(DocumentController.Body::volume)

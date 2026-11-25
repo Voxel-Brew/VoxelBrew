@@ -6313,9 +6313,6 @@ class WorkbenchUiTest {
         Path saved = directory.resolve("recent design.vxb");
         save(saved);
         var savedDocument = document();
-        shortcut(KeyCode.N, false);
-        ready();
-        assertThat(document().features().isEmpty()).isTrue();
         click("menu-file");
         fx(() -> {
             var recent = (Menu) command(workbench, "menu-open-recent");
@@ -6349,6 +6346,7 @@ class WorkbenchUiTest {
         save(third);
         shortcut(KeyCode.N, false);
         ready();
+        assertThat(document().features()).isEmpty();
         click("open");
         assertThat(fx(() -> ((Hyperlink) node("#file-recent-0")).getText())).isEqualTo(third.toString());
         assertThat(fx(() -> ((Hyperlink) node("#file-recent-1")).getText())).isEqualTo(second.toString());
@@ -6358,7 +6356,6 @@ class WorkbenchUiTest {
                         .size()))
                 .isEqualTo(4);
         click("file-recent-2");
-        key(KeyCode.ENTER);
         ready();
         assertThat(document()).isEqualTo(savedDocument);
         assertThat(fx(() -> workbench.controller().path())).isEqualTo(saved);

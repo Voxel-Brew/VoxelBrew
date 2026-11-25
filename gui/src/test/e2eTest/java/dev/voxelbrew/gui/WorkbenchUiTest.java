@@ -193,6 +193,24 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void returnsToDesignerWithABodyOnThePrintPlate() throws Exception {
+        openPrepared("plate-5mm.vxb");
+        click("workspace-print");
+        click("print-tab-placement");
+        click("print-add");
+        ready();
+        click("workspace-design");
+        ready();
+        assertThat(selectedWorkspace()).isEqualTo("workspace-design");
+        click("history-0");
+        click("workspace-print");
+        ready();
+        click("print-tab-placement");
+        assertThat(fx(() -> ((ComboBox<?>) node("#print-instance")).getItems().size()))
+                .isPositive();
+    }
+
+    @Test
     void readmeLightWorkspaceScreenshots() throws Exception {
         ready();
         openPrepared("plate-5mm.vxb");

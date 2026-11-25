@@ -13,17 +13,15 @@ import java.util.*;
 public final class SketchProfiles {
     public record Region(String id, PlanarProfile profile) {}
 
-    private record Edge(Entity entity, boolean reversed) {
-        Vec start() {
-            return entity.at(reversed ? 1 : 0);
-        }
+    private record Junction(String id, Vec position) {}
 
-        Vec end() {
-            return entity.at(reversed ? 0 : 1);
+    private record Edge(Entity entity, boolean reversed, Vec start, Vec end) {
+        Edge(Entity entity, boolean reversed) {
+            this(entity, reversed, entity.at(reversed ? 1 : 0), entity.at(reversed ? 0 : 1));
         }
 
         Edge reverse() {
-            return new Edge(entity, !reversed);
+            return new Edge(entity, !reversed, end, start);
         }
     }
 
@@ -37,6 +35,9 @@ public final class SketchProfiles {
     }
 
     private static int[] enclosingLoops(List<List<Edge>> loops, List<List<Vec>> polygons, double[] areas) {
+        var boundaries = loops.stream()
+                .map(loop -> loop.stream().map(Edge::entity).collect(java.util.stream.Collectors.toSet()))
+                .toList();
         int[] parent = new int[loops.size()];
         Arrays.fill(parent, -1);
         for (int i = 0; i < loops.size(); i++) {
@@ -47,6 +48,7 @@ public final class SketchProfiles {
             for (int j = 0; j < loops.size(); j++) {
                 if (Math.abs(areas[j]) > Math.abs(areas[i])
                         && Math.abs(areas[j]) < size
+                        && Collections.disjoint(boundaries.get(i), boundaries.get(j))
                         && inside(loops.get(i).getFirst().start(), polygons.get(j))) {
                     parent[i] = j;
                     size = Math.abs(areas[j]);
@@ -63,6 +65,42 @@ public final class SketchProfiles {
     /** Individual bounded faces, including faces separated by a shared sketch edge. */
     public static List<Region> selectableRegions(SketchGeometry g) {
         return regions(g, true);
+    }
+
+    /** Include all nested faces of the selection, so their shared contours cancel during extrusion. */
+    public static Set<String> includingEnclosedRegions(SketchGeometry geometry, Collection<String> selected) {
+        var loops = profileLoops(geometry, true);
+        var polygons = loops.stream().map(SketchProfiles::samples).toList();
+        var parents = enclosingLoops(
+                loops,
+                polygons,
+                polygons.stream().mapToDouble(SketchProfiles::area).toArray());
+        var ids = loops.stream().map(SketchProfiles::regionId).toList();
+        var result = new HashSet<>(selected);
+        for (int i = 0; i < parents.length; i++) {
+            for (int parent = parents[i]; parent >= 0; parent = parents[parent]) {
+                if (result.contains(ids.get(parent))) {
+                    result.add(ids.get(i));
+                    break;
+                }
+            }
+        }
+        return Set.copyOf(result);
+    }
+
+    /** Pick the innermost bounded face at a point in sketch coordinates. */
+    public static Optional<String> regionAt(SketchGeometry geometry, Vec point) {
+        double smallest = Double.POSITIVE_INFINITY;
+        String picked = null;
+        for (var loop : profileLoops(geometry, true)) {
+            var polygon = samples(loop);
+            double size = Math.abs(area(polygon));
+            if (size < smallest && inside(point, polygon)) {
+                smallest = size;
+                picked = regionId(loop);
+            }
+        }
+        return Optional.ofNullable(picked);
     }
 
     public static String regionProfileId(String profileId, Region region) {
@@ -118,17 +156,150 @@ public final class SketchProfiles {
                 .toList();
     }
 
+    /** Display contours for each selectable face, including its immediate interior holes. */
+    public static Map<String, List<List<Vec>>> regionContours(SketchGeometry geometry) {
+        var loops = profileLoops(geometry, true);
+        var polygons = loops.stream().map(SketchProfiles::samples).toList();
+        var parents = enclosingLoops(
+                loops,
+                polygons,
+                polygons.stream().mapToDouble(SketchProfiles::area).toArray());
+        var faces = new LinkedHashMap<String, List<List<Vec>>>();
+        for (int i = 0; i < loops.size(); i++) {
+            var rings = new ArrayList<List<Vec>>();
+            rings.add(polygons.get(i));
+            for (int j = 0; j < parents.length; j++) {
+                if (parents[j] == i) rings.add(polygons.get(j));
+            }
+            faces.put(regionId(loops.get(i)), List.copyOf(rings));
+        }
+        return faces;
+    }
+
     private static List<List<Edge>> profileLoops(SketchGeometry g, boolean individual) {
         SketchConstraints.requireSatisfied(g);
         if (g.boundary().isEmpty()) {
             throw new IllegalArgumentException("Select closed profile geometry in Edit sketch before extruding");
         }
-        var remaining = new ArrayList<>(g.boundary().stream()
-                .map(g::entity)
-                .flatMap(e -> g.curves(e).stream())
-                .toList());
+        var boundary = g.boundary().stream().map(g::entity).toList();
+        var endpoints = new ArrayList<Junction>();
+        for (var entity : boundary) {
+            if (entity.kind() == Kind.TEXT || entity.loop()) continue;
+            endpoints.add(new Junction(entity.id(), entity.at(0)));
+            endpoints.add(new Junction(entity.id(), entity.at(1)));
+        }
+        var remaining = new ArrayList<Entity>();
+        for (var entity : boundary) {
+            if (entity.kind() == Kind.LINE) remaining.addAll(splitAtJunctions(entity, endpoints));
+            else remaining.addAll(g.curves(entity));
+        }
         if (remaining.isEmpty()) throw new IllegalArgumentException("Profile has no curves");
         return boundaryLoops(remaining, individual);
+    }
+
+    /** Reports profile problems while the sketch can still be edited or saved as an open sketch. */
+    public static String extrusionIssue(SketchGeometry g) {
+        if (g.entities().isEmpty()) return "";
+        try {
+            var loops = profileLoops(g, false);
+            var texts = g.boundary().stream()
+                    .map(g::entity)
+                    .filter(e -> e.kind() == Kind.TEXT)
+                    .toList();
+            if (texts.isEmpty()) return "";
+            // Interior dividers are absent from the whole profile. Only test its actual boundary.
+            var walls = new LinkedHashMap<Entity, String>();
+            for (var loop : loops) {
+                for (var edge : loop) {
+                    var wall = edge.entity();
+                    if (wall.kind() != Kind.LINE) continue;
+                    for (var id : g.boundary()) {
+                        var source = g.entity(id);
+                        if (source.kind() == Kind.LINE
+                                && onSegment(source, wall.at(0))
+                                && onSegment(source, wall.at(1))) {
+                            walls.put(wall, id);
+                            break;
+                        }
+                    }
+                }
+            }
+            for (var text : texts) {
+                for (var curve : g.curves(text)) {
+                    var points = curve.sample();
+                    for (var wall : walls.entrySet()) {
+                        if (crosses(points, wall.getKey())) {
+                            return "Text '" + text.text().content() + "' (" + text.id() + ") crosses profile edge "
+                                    + wall.getValue()
+                                    + ". Move the text clear of the edge or exclude it from the profile.";
+                        }
+                    }
+                }
+            }
+            return "";
+        } catch (IllegalArgumentException invalid) {
+            return invalid.getMessage();
+        }
+    }
+
+    private static boolean onSegment(Entity line, Vec point) {
+        var start = line.at(0);
+        var direction = line.at(1).minus(start);
+        var offset = point.minus(start);
+        var unit = direction.unit();
+        return Math.abs(offset.cross(unit)) <= TOLERANCE
+                && offset.dot(unit) >= -TOLERANCE
+                && offset.dot(unit) <= direction.length() + TOLERANCE;
+    }
+
+    private static boolean crosses(List<Vec> points, Entity line) {
+        var start = line.at(0);
+        var unit = line.at(1).minus(start).unit();
+        var previous = points.getFirst();
+        double side = previous.minus(start).cross(unit);
+        for (int i = 1; i < points.size(); i++) {
+            var point = points.get(i);
+            double next = point.minus(start).cross(unit);
+            if (side * next < 0 && onSegment(line, previous.mix(point, side / (side - next)))) return true;
+            previous = point;
+            side = next;
+        }
+        return false;
+    }
+
+    private static List<Entity> splitAtJunctions(Entity line, List<Junction> endpoints) {
+        var start = line.at(0);
+        var end = line.at(1);
+        var delta = end.minus(start);
+        double length = delta.length();
+        var unit = delta.unit();
+        var cuts = new TreeMap<Double, String>();
+        for (var endpoint : endpoints) {
+            var offset = endpoint.position().minus(start);
+            double along = offset.dot(unit);
+            if (along <= TOLERANCE || along >= length - TOLERANCE || Math.abs(offset.cross(unit)) > TOLERANCE) continue;
+            cuts.merge(along, endpoint.id(), (a, b) -> a.compareTo(b) < 0 ? a : b);
+        }
+        if (cuts.isEmpty()) return List.of(line);
+        // Name each span by its bounding junctions so unrelated cuts do not renumber it.
+        boolean ascending = Math.abs(delta.x()) > Math.abs(delta.y()) ? delta.x() > 0 : delta.y() > 0;
+        var previous = start;
+        String previousKey = ascending ? "@low" : "@high";
+        var spans = new ArrayList<Entity>();
+        cuts.put(length, ascending ? "@high" : "@low");
+        for (var cut : cuts.entrySet()) {
+            var point = cut.getKey() == length ? end : start.plus(unit.times(cut.getKey()));
+            if (point.distance(previous) <= TOLERANCE) continue;
+            String key = cut.getValue();
+            String pair = previousKey.compareTo(key) < 0 ? previousKey + ":" + key : key + ":" + previousKey;
+            String id = UUID.nameUUIDFromBytes(
+                            (line.id() + ":" + pair).getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                    .toString();
+            spans.add(Sketches.entity(id, Kind.LINE, false, previous.x(), previous.y(), point.x(), point.y()));
+            previous = point;
+            previousKey = key;
+        }
+        return spans;
     }
 
     private static List<Region> regions(SketchGeometry g, boolean individual) {
@@ -166,17 +337,16 @@ public final class SketchProfiles {
         for (var entity : entities) {
             if (entity.loop()) loops.add(List.of(new Edge(entity, false)));
             else {
-                directed.add(new Edge(entity, false));
-                directed.add(new Edge(entity, true));
+                var edge = new Edge(entity, false);
+                directed.add(edge);
+                directed.add(edge.reverse());
             }
         }
-        omitIsolatedSegments(directed, loops);
+        var outgoingAt = outgoingEdges(directed);
+        omitIsolatedSegments(directed, loops, outgoingAt);
         var next = new HashMap<Edge, Edge>();
         for (var edge : directed) {
-            var outgoing = directed.stream()
-                    .filter(e -> e.start().distance(edge.end()) <= TOLERANCE)
-                    .sorted(Comparator.comparingDouble(SketchProfiles::angle))
-                    .toList();
+            var outgoing = outgoingAt.get(edge.end());
             if (outgoing.size() < 2) {
                 throw new IllegalArgumentException(
                         "Open profile at " + edge.entity().id() + "; add Coincident constraints to close it");
@@ -214,15 +384,42 @@ public final class SketchProfiles {
         return loops;
     }
 
-    private static void omitIsolatedSegments(List<Edge> directed, List<List<Edge>> loops) {
+    private static Map<Vec, List<Edge>> outgoingEdges(List<Edge> directed) {
+        var byX = new TreeMap<Double, List<Edge>>();
+        var order = new IdentityHashMap<Edge, Integer>();
+        for (var edge : directed) {
+            byX.computeIfAbsent(edge.start().x(), x -> new ArrayList<>()).add(edge);
+            order.put(edge, order.size());
+        }
+        var byEndpoint = new HashMap<Vec, List<Edge>>();
+        var byAngle = Comparator.comparingDouble(SketchProfiles::angle).thenComparingInt(order::get);
+        for (var edge : directed) {
+            byEndpoint.computeIfAbsent(
+                    edge.start(),
+                    point -> byX
+                            .subMap(
+                                    Math.nextDown(point.x() - TOLERANCE),
+                                    true,
+                                    Math.nextUp(point.x() + TOLERANCE),
+                                    true)
+                            .values()
+                            .stream()
+                            .flatMap(List::stream)
+                            .filter(candidate -> candidate.start().distance(point) <= TOLERANCE)
+                            .sorted(byAngle)
+                            .toList());
+        }
+        return byEndpoint;
+    }
+
+    private static void omitIsolatedSegments(
+            List<Edge> directed, List<List<Edge>> loops, Map<Vec, List<Edge>> outgoingAt) {
         // A standalone segment (for example a line joining two hole centers) bounds no face.
         // Keep edges attached to other curves so an incomplete contour is still diagnosed.
         var isolated = directed.stream()
-                .filter(edge -> directed.stream()
-                        .noneMatch(other -> !other.entity().equals(edge.entity())
-                                && (other.start().distance(edge.start()) <= TOLERANCE
-                                        || other.start().distance(edge.end()) <= TOLERANCE)))
-                .toList();
+                .filter(edge -> outgoingAt.get(edge.start()).stream().allMatch(other -> other.entity() == edge.entity())
+                        && outgoingAt.get(edge.end()).stream().allMatch(other -> other.entity() == edge.entity()))
+                .collect(java.util.stream.Collectors.toSet());
         directed.removeAll(isolated);
         if (directed.isEmpty() && loops.isEmpty()) {
             throw new IllegalArgumentException("Open profile; select closed geometry before extruding");

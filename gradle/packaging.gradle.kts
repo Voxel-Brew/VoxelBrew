@@ -1,3 +1,4 @@
+import java.util.Properties
 import org.gradle.jvm.toolchain.JavaToolchainService
 
 // Applied to the two frontends; packages the host architecture only.
@@ -91,18 +92,38 @@ val preparePackage by
         from(installationMetadata)
         from(tasks.named("jar"))
         from(configurations.named("runtimeClasspath"))
-        from(project(":engine").layout.buildDirectory.dir("native/runtime")) { into("native") }
+        from(project(":engine").layout.buildDirectory.dir("native/runtime")) {
+            into("native")
+            if (packagePlatform == "linux") {
+                val nativeVersions =
+                    Properties().apply {
+                        rootProject.file("scripts/native-versions.properties").inputStream().use {
+                            load(it)
+                        }
+                    }
+                val sonameSuffix =
+                    ".so." + nativeVersions.getProperty("occt.version").substringBeforeLast('.')
+                // Copy the ELF SONAME once. Gradle otherwise dereferences all three OCCT aliases.
+                exclude { it.name.startsWith("libTK") && !it.name.endsWith(sonameSuffix) }
+            }
+        }
         from(rootProject.file("LICENSE"))
         from(rootProject.file("THIRD_PARTY_NOTICES.md"))
         from(rootProject.file("third_party")) { into("third_party") }
         into(packageInput)
     }
 
+val cliLauncher = rootProject.file("gui/src/main/packaging/cli-launcher.properties")
+
+val macAssociation = rootProject.file("gui/src/main/packaging/macos-vxb.properties")
+
 val appImage by
     tasks.registering(Exec::class) {
         group = "distribution"
         description = "Build a native launcher with a bundled Java 21 runtime and matching OCCT."
         dependsOn(preparePackage)
+        if (project.name == "gui") inputs.file(cliLauncher)
+        if (packageMac && project.name == "gui") inputs.file(macAssociation)
         inputs.dir(packageInput)
         inputs.file(packageJdk.resolve("release"))
         inputs.file(rootProject.file("gradle/packaging.gradle.kts"))
@@ -129,7 +150,15 @@ val appImage by
                 "--vendor",
                 "voxelbrew.dev",
                 *(if (packageMac && project.name == "gui")
-                    arrayOf("--mac-package-identifier", "dev.voxelbrew.gui")
+                    arrayOf(
+                        "--mac-package-identifier",
+                        "dev.voxelbrew.gui",
+                        "--file-associations",
+                        macAssociation.absolutePath,
+                    )
+                else emptyArray()),
+                *(if (project.name == "gui")
+                    arrayOf("--add-launcher", "VoxelBrewCLI=${cliLauncher.absolutePath}")
                 else emptyArray()),
                 "--input",
                 packageInput.get().asFile.absolutePath,
@@ -142,7 +171,8 @@ val appImage by
                 "--add-modules",
                 "java.se,jdk.unsupported,jdk.crypto.ec,jdk.localedata",
                 "--jlink-options",
-                "--strip-debug --no-man-pages --no-header-files",
+                if (packageMac) "--strip-debug --no-man-pages --no-header-files"
+                else "--strip-debug --no-man-pages --no-header-files --compress=zip-6",
             ) +
                 (applicationIcon?.let { listOf("--icon", it.absolutePath) } ?: emptyList()) +
                 (if (packageWindows && project.name == "cli") listOf("--win-console")
@@ -233,18 +263,22 @@ if (project.name == "gui") {
     val installerOutput = layout.buildDirectory.dir("distributions")
     val installerName =
         "$applicationName-$productVersion-$packagePlatform-$packageArchitecture" +
-            if (packageWindows) "-Setup.exe" else ".dmg"
+            when {
+                packageWindows -> "-Setup.exe"
+                packageMac -> ".dmg"
+                else -> ".deb"
+            }
     val installerFile = installerOutput.map { it.file(installerName) }
     val stageInstaller by
         tasks.registering(Sync::class) {
             dependsOn(appImage)
             from(image) {
-                if (packageWindows) include("VoxelBrew.exe", "app/**", "runtime/**")
-                else include("**")
-                into(if (packageMac) "VoxelBrew.app" else "VoxelBrew")
+                include("VoxelBrew.exe", "VoxelBrewCLI.exe", "app/**", "runtime/**")
+                into("VoxelBrew")
             }
             into(installerStage)
         }
+    val associations = file("src/main/packaging/windows-associations.iss")
     val innoScript = layout.buildDirectory.file("installer/voxelbrew.iss")
     val generateInnoScript by
         tasks.registering {
@@ -257,8 +291,6 @@ if (project.name == "gui") {
                 val source = installerStage.get().dir("VoxelBrew").asFile.absolutePath
                 val output = installerOutput.get().asFile.absolutePath
                 val icon = applicationIcon!!.absolutePath
-                val quotedExe = "\"\"{app}\\VoxelBrew.exe\"\""
-                val quotedFile = "\"\"%1\"\""
                 val script =
                     """
                     [Setup]
@@ -270,22 +302,17 @@ if (project.name == "gui") {
                     DefaultDirName={localappdata}\Programs\VoxelBrew
                     DefaultGroupName=VoxelBrew
                     PrivilegesRequired=lowest
+                    ChangesAssociations=yes
                     OutputDir=$output
                     OutputBaseFilename=${installerName.removeSuffix(".exe")}
                     SetupIconFile=$icon
                     Compression=lzma
                     SolidCompression=yes
 
-                    ChangesAssociations=yes
-
-                    [Registry]
-                    Root: HKCU; Subkey: "Software\Classes\.vxb\OpenWithProgids"; ValueType: none; ValueName: "VoxelBrew.Design"; Flags: uninsdeletevalue
-                    Root: HKCU; Subkey: "Software\Classes\VoxelBrew.Design"; ValueType: string; ValueData: "VoxelBrew design"; Flags: uninsdeletekey
-                    Root: HKCU; Subkey: "Software\Classes\VoxelBrew.Design\DefaultIcon"; ValueType: string; ValueData: "{app}\VoxelBrew.exe,0"
-                    Root: HKCU; Subkey: "Software\Classes\VoxelBrew.Design\shell\open\command"; ValueType: string; ValueData: "${quotedExe} --open ${quotedFile}"
-
                     [Files]
                     Source: "$source\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
+
+                    #include "$associations"
 
                     [Icons]
                     Name: "{group}\VoxelBrew"; Filename: "{app}\VoxelBrew.exe"; WorkingDir: "{app}"
@@ -297,45 +324,42 @@ if (project.name == "gui") {
         }
     tasks.register<Exec>("packageInstaller") {
         group = "distribution"
-        description = "Package the existing GUI app image as a Windows setup or macOS DMG."
-        dependsOn(stageInstaller)
-        if (packageWindows) dependsOn(generateInnoScript)
-        inputs.dir(installerStage)
+        description = "Package the desktop and command-line launchers in the host installer."
+        dependsOn(appImage)
         inputs.file(rootProject.file("gradle/packaging.gradle.kts"))
-        inputs.property("version", productVersion)
-        applicationIcon?.let { inputs.file(it) }
-        if (packageWindows) inputs.file(innoScript)
-        if (packageMac) inputs.file(rootProject.file("scripts/package-macos-dmg.sh"))
         outputs.file(installerFile)
+        if (packageWindows) {
+            dependsOn(generateInnoScript)
+            inputs.dir(installerStage)
+            inputs.file(innoScript)
+            inputs.file(associations)
+            commandLine(
+                providers
+                    .environmentVariable("INNO_SETUP_ISCC")
+                    .orElse("C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe")
+                    .get(),
+                innoScript.get().asFile.absolutePath,
+            )
+        } else {
+            val script =
+                rootProject.file(
+                    if (packageMac) "scripts/package-macos-dmg.sh"
+                    else "scripts/package-linux-deb.sh"
+                )
+            inputs.file(script)
+            inputs.dir(image)
+            commandLine(
+                listOf(
+                    "bash",
+                    script.absolutePath,
+                    image.get().asFile.absolutePath,
+                    installerFile.get().asFile.absolutePath,
+                ) + if (packageMac) emptyList() else listOf(productVersion)
+            )
+        }
         doFirst {
-            check(packageWindows || packageMac) {
-                "Installer packaging is supported on Windows and macOS hosts only."
-            }
-            val tool =
-                if (packageWindows)
-                    providers
-                        .environmentVariable("INNO_SETUP_ISCC")
-                        .orElse("C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe")
-                        .get()
-                else "/usr/bin/hdiutil"
-            check(file(tool).isFile) {
-                if (packageWindows)
-                    "Inno Setup 6 ISCC.exe is required. Install Inno Setup 6 or set INNO_SETUP_ISCC to its full path."
-                else
-                    "hdiutil is required; run packaging on macOS with Xcode command line tools installed."
-            }
             installerOutput.get().asFile.mkdirs()
             delete(installerFile.get().asFile)
-            commandLine(
-                if (packageWindows) listOf(tool, innoScript.get().asFile.absolutePath)
-                else
-                    listOf(
-                        "/bin/bash",
-                        rootProject.file("scripts/package-macos-dmg.sh").absolutePath,
-                        installerStage.get().asFile.absolutePath,
-                        installerFile.get().asFile.absolutePath,
-                    )
-            )
         }
     }
 }

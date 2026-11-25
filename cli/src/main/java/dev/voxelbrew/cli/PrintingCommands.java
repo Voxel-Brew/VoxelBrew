@@ -470,6 +470,34 @@ final class PrintingCommands {
     }
 
     @Command(
+            name = "install",
+            mixinStandardHelpOptions = true,
+            description = "Install a slicer for offline use by the GUI and CLI.")
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+    static final class InstallSlicer implements Callable<Integer> {
+        private final UserConfigService configuration;
+
+        @Parameters(index = "0", description = "prusa-slicer or orca")
+        String provider;
+
+        @Spec
+        CommandLine.Model.CommandSpec spec;
+
+        @Override
+        public Integer call() throws Exception {
+            var download = dev.voxelbrew.slicer.internal.SlicerDownload.find(provider)
+                    .orElseThrow(
+                            () -> new IllegalArgumentException("No download for " + provider + " on this platform"));
+            var err = spec.commandLine().getErr();
+            err.printf("%s download: %.1f MiB%n", provider, download.size() / 1048576.0);
+            new SlicerInstallationStore(configuration)
+                    .install(provider, new Cancellation(), percent -> err.printf("%s %d%%%n", provider, percent));
+            spec.commandLine().getOut().println(provider + " installed");
+            return 0;
+        }
+    }
+
+    @Command(
             name = "slicers",
             mixinStandardHelpOptions = true,
             description = "List installed slicer providers and their implementation versions.")
@@ -597,6 +625,15 @@ final class PrintingCommands {
             var store = new SlicerInstallationStore(configuration);
             dev.voxelbrew.api.slicer.SlicerWindow window;
             if (installationId.isBlank()) {
+                String providerId = provider.descriptor().id();
+                if (options.isEmpty() && store.providerDefaults(providerId).isEmpty()) {
+                    var managed = store.load().stream()
+                            .filter(entry -> entry.providerId().equals(providerId)
+                                    && entry.bundled()
+                                    && entry.settings().containsKey("executable"))
+                            .findFirst();
+                    if (managed.isPresent()) return managed.get().executionWindow(Map.of());
+                }
                 window = new CliSlicerWindow(store, provider.descriptor().id(), options);
             } else {
                 var installation = store.require(installationId);

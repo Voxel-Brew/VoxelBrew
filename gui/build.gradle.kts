@@ -2,6 +2,8 @@ plugins { application }
 
 apply(from = rootProject.file("gradle/packaging.gradle.kts"))
 
+tasks.withType<Checkstyle>().configureEach { maxHeapSize.set("1g") }
+
 val javafxPlatform =
     if (System.getProperty("os.name").startsWith("Windows")) "win"
     else if (System.getProperty("os.name").startsWith("Mac"))
@@ -24,6 +26,7 @@ dependencies {
     testImplementation(project(":exporter-impl"))
     implementation(project(":util"))
     implementation(project(":engine"))
+    runtimeOnly(project(":cli"))
     runtimeOnly("com.twelvemonkeys.imageio:imageio-webp")
     testImplementation("org.apache.commons:commons-compress")
     testImplementation("com.google.protobuf:protobuf-java")

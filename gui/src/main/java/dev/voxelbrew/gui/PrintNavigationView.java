@@ -1,8 +1,10 @@
 package dev.voxelbrew.gui;
 
+import dev.voxelbrew.api.model.BodyInstance;
 import dev.voxelbrew.api.model.mesh.MeshData;
 import dev.voxelbrew.api.model.printing.ManufacturingModel;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import javafx.geometry.Point2D;
@@ -12,7 +14,7 @@ import javafx.scene.paint.PhongMaterial;
 import javafx.scene.shape.*;
 import javafx.scene.transform.Affine;
 
-/** Retains the placed meshes while the user navigates the orthographic print bed. */
+/** Retains the placed meshes on the orthographic print bed during placement and navigation. */
 final class PrintNavigationView extends SubScene {
     private final Group bodies;
     private final Affine projection = new Affine();
@@ -127,7 +129,11 @@ final class PrintNavigationView extends SubScene {
             selectedBody = null;
             int palette = 0;
             extent = 1;
-            for (var instance : model.instances()) {
+            // Coplanar outlines share depth samples. Keep their draw order stable across list edits.
+            var ordered = model.instances().stream()
+                    .sorted(Comparator.comparing(BodyInstance::id))
+                    .toList();
+            for (var instance : ordered) {
                 if (!model.meshes().containsKey(instance.bodyId())) continue;
                 var placed = model.placedMesh(instance);
                 var color = instance.id().equals(selected)

@@ -138,6 +138,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     private final StyleClassedTextArea diagnostics = new StyleClassedTextArea();
 
     private final Hyperlink jobDetails = new Hyperlink();
+    private final Hyperlink copyErrors = new Hyperlink();
 
     private final EnumMap<GcodeJob.Role, CheckBox> roles = new EnumMap<>(GcodeJob.Role.class);
 
@@ -192,6 +193,8 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     private double viewScale, viewOx, viewOy;
 
     private PrintDepthBuffer placementRaster;
+    private javafx.scene.image.WritableImage placementImage;
+    private boolean workspaceActive;
 
     private double placementRasterScale = 1;
 
@@ -216,6 +219,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     private ManufacturingModel model;
 
     private PrintValidation.Result validation;
+    private String placementError = "";
 
     private PrintSetup lastSetup;
 
@@ -419,6 +423,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
             navigationView.heightProperty().bind(center.heightProperty());
             dragOverlay.widthProperty().bind(center.widthProperty());
             dragOverlay.heightProperty().bind(center.heightProperty());
+            dragOverlay.setId("print-placement-overlay");
             dragOverlay.setManaged(false);
             dragOverlay.setMouseTransparent(true);
             dragOverlay.setVisible(false);
@@ -516,7 +521,16 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         preview.setBottom(placementHint);
         setCenter(preview);
         var legend = configurePreviewControls();
-        var statusLine = new HBox(4, status, jobDetails);
+        copyErrors.setId("print-copy-errors");
+        copyErrors.setText(translations.translate("print.copyErrors"));
+        UiHelp.describe(copyErrors, translations.translate("help.print-copy-errors"));
+        copyErrors.managedProperty().bind(copyErrors.visibleProperty());
+        copyErrors.setOnAction(event -> {
+            var content = new javafx.scene.input.ClipboardContent();
+            content.putString(errorText());
+            javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
+        });
+        var statusLine = new HBox(4, status, jobDetails, copyErrors);
         statusLine.setAlignment(javafx.geometry.Pos.BASELINE_LEFT);
         var jobStatus = new VBox(4, statusLine, validationLabel);
         jobStatus.setMinWidth(0);
@@ -529,7 +543,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         var actions = new HBox(12, progress, jobStatus, cancel, export3mfButton, sliceAll, slice);
         actions.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
         actions.getStyleClass().add("slicer-status-bar");
-        slice.getStyleClass().add("slicer-primary-action");
+        slice.getStyleClass().addAll("primary", "slicer-primary-action");
         slice.setText(translations.translate("print.slicePlate"));
         setBottom(new VBox(8, previewControls, actions));
         BorderPane.setMargin(tabs, new Insets(0, 0, 0, 8));
@@ -839,7 +853,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
 
     private void bindWorkspaceSettings(
             ToggleGroup viewMode, RadioButton solidView, RadioButton topView, TitledPane legend) {
-        fields.forEach((key, field) -> workspace.add(key, field::getText, field::setText));
+        fields.forEach((key, field) -> workspace.add(key, field::expression, field::setExpression));
         for (var choice : List.of(bodies, instances, materials, supportIds, supportOwners, targetPlate)) {
             workspace.add(choice.getId(), choice::getValue, value -> choice.setValue(value.isEmpty() ? null : value));
         }
@@ -1004,7 +1018,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         };
         for (int i = 0; i < names.length; i++) {
             fields.get("print-" + names[i])
-                    .setText(java.math.BigDecimal.valueOf(values[i])
+                    .setExpression(java.math.BigDecimal.valueOf(values[i])
                             .setScale(4, java.math.RoundingMode.HALF_UP)
                             .stripTrailingZeros()
                             .toPlainString());
@@ -1020,6 +1034,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     private void validateDocument(dev.voxelbrew.api.model.CadDocument snapshot) {
         String revision = DocumentCodec.fingerprint(snapshot);
         if (!document.canExport()) {
+            placementError = "";
             model = null;
             validation = null;
             validatedRevision = "";
@@ -1027,12 +1042,13 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
             validationLabel.setText(
                     translations.translate("gui.finish_rebuilding_the_complete_document_before_preparing_a_print"));
         } else if (!revision.equals(validatedRevision)) {
+            placementError = "";
             validatedRevision = revision;
             validation = null;
             try {
                 var meshes = new LinkedHashMap<String, MeshData>();
                 document.build().bodies().forEach(b -> meshes.put(b.id(), b.mesh()));
-                model = new ManufacturingModel(snapshot.id(), revision, setup(), PrintProfile.resolve(setup()), meshes);
+                model = ManufacturingModels.fromMeshes(snapshot.id(), revision, setup(), meshes);
                 var captured = model;
                 long ticket = ++validationSequence;
                 if (validationTask != null) validationTask.cancel(false);
@@ -1046,12 +1062,14 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
                                 result.valid()
                                         ? translations.translate("gui.print_setup_valid_millimeters")
                                         : PrintValidationMessages.format(result, translations, this::instanceName));
+                        placementError = result.valid() ? "" : validationLabel.getText();
                         updateJob();
                     });
                 });
             } catch (RuntimeException failure) {
                 model = null;
-                validationLabel.setText(failure.getMessage());
+                placementError = Objects.toString(failure.getMessage(), failure.toString());
+                validationLabel.setText(placementError);
             }
         }
     }
@@ -1904,7 +1922,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         };
         for (int i = 0; i < names.length; i++) {
             fields.get("print-" + names[i])
-                    .setText(java.math.BigDecimal.valueOf(values[i])
+                    .setExpression(java.math.BigDecimal.valueOf(values[i])
                             .setScale(4, java.math.RoundingMode.HALF_UP)
                             .stripTrailingZeros()
                             .toPlainString());
@@ -1972,7 +1990,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
                     double[] values = {s.x(), s.y(), s.z(), s.width(), s.depth(), s.height()};
                     for (int i = 0; i < names.length; i++) {
                         fields.get("print-support-" + names[i])
-                                .setText(java.math.BigDecimal.valueOf(values[i])
+                                .setExpression(java.math.BigDecimal.valueOf(values[i])
                                         .setScale(4, java.math.RoundingMode.HALF_UP)
                                         .stripTrailingZeros()
                                         .toPlainString());
@@ -2067,6 +2085,18 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         updateJob();
     }
 
+    void setWorkspaceActive(boolean active) {
+        workspaceActive = active;
+        if (!active) {
+            navigationFrame.stop();
+            navigationIdle.stop();
+            placementRaster = null;
+            placementImage = null;
+            if (navigationView != null) navigationView.hide(null);
+            dragOverlay.setVisible(false);
+        }
+    }
+
     void documentChanged() {
         if (closed) return;
         var snapshot = document.snapshot().document();
@@ -2154,10 +2184,17 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         boolean failed = jobs.state() == PrintController.State.FAILED;
         status.setText(failed ? translations.translate("print.slicingFailed") : stateLabel + ": " + jobMessage());
         jobDetails.setVisible(failed);
+        copyErrors.setVisible(!errorText().isEmpty());
         status.setTooltip(failed ? null : UiHelp.tooltip(jobs.message()));
         showDiagnostics(jobs.failureDiagnostic(), String.join("\n", jobs.progressDiagnostics()));
         updateJobPreview();
         draw();
+    }
+
+    private String errorText() {
+        String failure = jobs.state() == PrintController.State.FAILED ? jobs.failureDiagnostic() : "";
+        if (placementError.isEmpty()) return failure;
+        return failure.isEmpty() ? placementError : placementError + "\n" + failure;
     }
 
     void setDark(boolean value) {
@@ -2193,12 +2230,12 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
 
     private void drawTranslation() {
         if (model == null) return;
+        placementRaster = null;
         if (!dragOverlay.isVisible()) {
             var bed = canvas.getGraphicsContext2D();
             bed.setFill(dark ? Color.web("#182028") : Color.web("#edf1f4"));
             bed.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
             drawBed(viewOx, viewOy, viewScale);
-            placementRaster = null;
             dragOverlay.setVisible(true);
         }
         var offset = dragOffset();
@@ -2228,22 +2265,26 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         localGizmoAxes.setTranslateX(0);
         localGizmoAxes.setTranslateY(0);
         detailedDragOffset = dragOffset();
-        if (navigationView != null) navigationView.hide(model);
         draw(false);
     }
 
     private void draw(boolean movingCamera) {
+        if (!workspaceActive || closed) return;
+        dragOverlay.setVisible(false);
         if (viewCube != null) viewCube.setOrientation(camera().orientation());
         selectedObjectTooltip.hide();
         selectedObjectName.setVisible(false);
-        placementRaster = null;
         var graphics = canvas.getGraphicsContext2D();
         localGizmoAxes.setVisible(false);
         double w = canvas.getWidth(), h = canvas.getHeight();
         graphics.setFill(dark ? Color.web("#182028") : Color.web("#edf1f4"));
         graphics.fillRect(0, 0, w, h);
         if (rotationDrag == null) rotationRings = List.of();
-        if (w < 1 || h < 1) return;
+        if (w < 1 || h < 1) {
+            if (navigationView != null) navigationView.hide(model);
+            placementRaster = null;
+            return;
+        }
         double extentX = threeDimensional ? Math.hypot(plateWidth, plateDepth) : plateWidth;
         double extentY = threeDimensional ? extentX : plateDepth;
         double scale = Math.max(0.001, Math.min((w - 48) / extentX, (h - 48) / extentY)) * camera().zoom();
@@ -2255,20 +2296,38 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         viewOy = oy;
         drawBed(ox, oy, scale);
         if (toolpathPreview.isSelected() && displayed != null && !previewLayers.isEmpty()) {
+            if (navigationView != null) navigationView.hide(model);
+            placementRaster = null;
             drawToolpath(ox, oy, scale);
         } else {
-            layerLabel.setText(translations.translate("gui.build_placement_slice_to_preview_actual_toolpaths"));
-            if (model == null) return;
-            if (movingCamera && navigationView != null) {
-                navigationView.show(
-                        model, document.build(), instances.getValue(), camera(), ox, oy, scale, Point2D.ZERO);
+            drawPlacedInstances(ox, oy, scale, w, h, movingCamera);
+        }
+    }
+
+    private void drawPlacedInstances(double ox, double oy, double scale, double w, double h, boolean movingCamera) {
+        layerLabel.setText(translations.translate("gui.build_placement_slice_to_preview_actual_toolpaths"));
+        if (model == null || model.instances().isEmpty()) {
+            if (navigationView != null) navigationView.hide(model);
+            placementRaster = null;
+            return;
+        }
+        if (navigationView != null && rotationDrag != null) navigationView.hide(model);
+        boolean meshVisible = navigationView != null && rotationDrag == null;
+        var graphics = canvas.getGraphicsContext2D();
+        if (meshVisible) {
+            navigationView.show(model, document.build(), instances.getValue(), camera(), ox, oy, scale, dragOffset());
+            if (movingCamera) {
+                placementRaster = null;
                 return;
             }
-            renderPlacement(ox, oy, scale, (int) Math.ceil(w), (int) Math.ceil(h), movingCamera);
-            drawSelectedObjectName(ox, oy, scale, w, h);
-            drawSupportOutlines(graphics, ox, oy, scale);
-            drawRotationGizmo();
+            dragOverlay.setVisible(true);
+            graphics = dragOverlay.getGraphicsContext2D();
+            graphics.clearRect(0, 0, w, h);
         }
+        renderPlacement(ox, oy, scale, (int) Math.ceil(w), (int) Math.ceil(h), movingCamera, meshVisible);
+        drawSelectedObjectName(ox, oy, scale, w, h);
+        drawSupportOutlines(graphics, ox, oy, scale);
+        drawRotationGizmo(graphics);
     }
 
     private PrintDepthBuffer.Point projected(double x, double y, double z, double ox, double oy, double scale) {
@@ -2276,15 +2335,20 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
                 ox + projectX(x, y) * scale, oy - projectY(x, y, z) * scale, camera().depth(x, y, z));
     }
 
-    private void renderPlacement(double ox, double oy, double scale, int width, int height, boolean movingCamera) {
+    private void renderPlacement(
+            double ox, double oy, double scale, int width, int height, boolean movingCamera, boolean pickingOnly) {
         // Render at physical-pixel resolution, with supersampling for smooth silhouettes.
         var window = canvas.getScene() == null ? null : canvas.getScene().getWindow();
         double pixelScale =
                 Math.max(2, window == null ? 1 : Math.max(window.getOutputScaleX(), window.getOutputScaleY()));
         if (movingCamera) pixelScale = Math.min(1, Math.sqrt(250_000.0 / width / height));
+        if (pickingOnly) pixelScale = 1;
+        // The depth/edge buffers use 48 bytes per pixel, in addition to the Prism texture.
+        pixelScale = Math.min(
+                pixelScale, Math.min(4096.0 / Math.max(width, height), Math.sqrt(2_000_000.0 / width / height)));
         int imageWidth = (int) Math.ceil(width * pixelScale);
         int imageHeight = (int) Math.ceil(height * pixelScale);
-        var raster = new PrintDepthBuffer(imageWidth, imageHeight, pixelScale);
+        var raster = preparePlacementRaster(imageWidth, imageHeight, pixelScale);
         ox *= pixelScale;
         oy *= pixelScale;
         scale *= pixelScale;
@@ -2316,24 +2380,33 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
                         owner);
             }
         }
-        drawPlacementEdges(raster, ox, oy, scale);
-        var image = new javafx.scene.image.WritableImage(imageWidth, imageHeight);
-        image.getPixelWriter()
-                .setPixels(
-                        0,
-                        0,
-                        imageWidth,
-                        imageHeight,
-                        javafx.scene.image.PixelFormat.getIntArgbInstance(),
-                        raster.pixels(),
-                        0,
-                        imageWidth);
-        canvas.getGraphicsContext2D().drawImage(image, 0, 0, width, height);
         placementRaster = raster;
         placementRasterScale = pixelScale;
+        if (!pickingOnly) {
+            drawPlacementEdges(raster, ox, oy, scale);
+            paintPlacementRaster(imageWidth, imageHeight, width, height);
+        }
     }
 
-    private void drawRotationGizmo() {
+    private void paintPlacementRaster(int imageWidth, int imageHeight, int width, int height) {
+        if (placementImage == null
+                || placementImage.getWidth() != imageWidth
+                || placementImage.getHeight() != imageHeight) {
+            placementImage = new javafx.scene.image.WritableImage(imageWidth, imageHeight);
+        }
+        placementRaster.writeTo(placementImage.getPixelWriter());
+        canvas.getGraphicsContext2D().drawImage(placementImage, 0, 0, width, height);
+    }
+
+    private PrintDepthBuffer preparePlacementRaster(int imageWidth, int imageHeight, double pixelScale) {
+        if (placementRaster == null || !placementRaster.matches(imageWidth, imageHeight, pixelScale)) {
+            return new PrintDepthBuffer(imageWidth, imageHeight, pixelScale);
+        }
+        placementRaster.clear();
+        return placementRaster;
+    }
+
+    private void drawRotationGizmo(GraphicsContext graphics) {
         if (!showRotationGizmos.isSelected() || !document.canExport() || jobs.running()) return;
         var instance = model.instances().stream()
                 .filter(i -> i.id().equals(instances.getValue()))
@@ -2342,7 +2415,6 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         if (rotationDrag == null) {
             projectRotationRings(instance.get());
         }
-        var graphics = canvas.getGraphicsContext2D();
         graphics.save();
         for (var ring : rotationRings) {
             paintRotationRing(graphics, ring);
@@ -2675,14 +2747,9 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     }
 
     private String bodyName(String id) {
-        int index = 1;
-        for (var body : document.build().bodies()) {
-            if (body.id().equals(id)) {
-                return document.snapshot().document().bodyName(id, translations.translate("feature.body", index));
-            }
-            index++;
-        }
-        return id;
+        return document.build()
+                .labels()
+                .label(id, document.snapshot().document(), i -> translations.translate("feature.body", i));
     }
 
     private String instanceName(String id) {
@@ -2734,7 +2801,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
             alert.initOwner(getScene().getWindow());
             alert.setTitle(translations.translate("print.exportPrinters"));
             alert.setHeaderText(null);
-            alert.showAndWait();
+            Dialogs.showStandalone(alert);
         } catch (java.io.IOException ex) {
             throw new IllegalStateException(ex);
         }
@@ -2780,7 +2847,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         printerProfileLabel.setText(translations
                 .tryTranslate(deviceSelected ? "print.deviceProfile" : "print.printerSelector")
                 .orElseThrow());
-        if (!nozzle.isFocused()) nozzle.setText(Double.toString(p.nozzleMm()));
+        if (!nozzle.isFocused()) nozzle.setExpression(Double.toString(p.nozzleMm()));
         var entry = printerCatalog.entries().stream()
                 .filter(e -> e.definition().printer().id().equals(p.id()))
                 .findFirst()

@@ -52,6 +52,7 @@ final class WorkspaceCommands {
                 .forEach(e -> mount(root, routes.get(e.getKey()), e.getValue()));
         WorkspaceEdits.register(root);
         path(root, "settings").addSubcommand("report-bug", ReportBugCommand.class);
+        path(root, "slicer").addSubcommand("install", PrintingCommands.InstallSlicer.class);
         path(root, "slicer job").addSubcommand("export", VoxelBrew.Export.class);
         try {
             root.getFactory().create(DeviceCommands.class).install(root);

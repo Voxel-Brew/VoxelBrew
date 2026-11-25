@@ -317,11 +317,6 @@
 .button:hover {
   -fx-background-color: -fx-selection-bar;
 }
-.primary {
-  -fx-background-color: #3574f0;
-  -fx-border-color: transparent;
-  -fx-text-fill: white;
-}
 .view-cube-panel {
   -fx-stroke-width: 1;
 }
@@ -379,6 +374,130 @@
 .side-panel .tree-view {
   -fx-background-color: transparent;
   -fx-border-width: 0;
+}
+.sketch-inspector {
+  -fx-padding: 0;
+  -sketch-surface: #f5f6fa;
+  -sketch-divider: #dce0e8;
+  -inspector-caption: #535c70;
+}
+.dark .sketch-inspector {
+  -sketch-surface: #282b31;
+  -sketch-divider: #444954;
+  -inspector-caption: #b4bdcd;
+}
+.sketch-inspector > .viewport,
+.sketch-inspector-content {
+  -fx-background-color: -sketch-surface;
+}
+.sketch-inspector-content {
+  -fx-padding: 8;
+}
+.sketch-inspector-section {
+  -fx-padding: 10;
+  -fx-background-color: -fx-control-inner-background;
+  -fx-background-radius: 8;
+  -fx-border-color: -sketch-divider;
+  -fx-border-radius: 8;
+}
+.sketch-section-title {
+  -fx-font-size: 13px;
+  -fx-font-weight: bold;
+}
+.sketch-selected-refs,
+.sketch-selected-refs > .viewport {
+  -fx-background-color: -sketch-surface;
+  -fx-background-radius: 5;
+}
+.sketch-selected-refs {
+  -fx-padding: 5 7;
+}
+.sketch-inspector-section .combo-box-base,
+.sketch-inspector-section .list-view {
+  -fx-background-color: -fx-control-inner-background;
+  -fx-border-color: -sketch-divider;
+  -fx-border-radius: 5;
+  -fx-background-radius: 5;
+}
+.sketch-inspector-section .combo-box-base:focused,
+.sketch-inspector-section .list-view:focused {
+  -fx-border-color: -fx-focus-color;
+}
+.sketch-inspector-section .sketch-clear {
+  -fx-background-color: transparent;
+  -fx-text-fill: -fx-focus-color;
+  -fx-padding: 2 5;
+}
+.properties-panel {
+  -fx-padding: 0;
+  -fx-spacing: 0;
+  -inspector-line: #dce0e8;
+  -inspector-tint: #f6f7fa;
+  -inspector-caption: #535c70;
+}
+.dark .properties-panel {
+  -inspector-line: #404650;
+  -inspector-tint: #2b2f36;
+  -inspector-caption: #b4bdcd;
+}
+.properties-panel .inspector-header {
+  -fx-padding: 13 14 12 14;
+  -fx-border-color: transparent transparent -inspector-line transparent;
+  -fx-border-width: 0 0 1 0;
+}
+.properties-panel .selection-title {
+  -fx-graphic-text-gap: 8;
+  -fx-font-size: 16px;
+}
+.properties-panel > .scroll-pane,
+.properties-panel > .scroll-pane > .viewport {
+  -fx-background-color: -fx-control-inner-background;
+  -fx-padding: 0;
+}
+.inspector-form {
+  -fx-spacing: 10;
+  -fx-padding: 12 14 14 14;
+}
+.inspector-details {
+  -fx-background-color: -inspector-tint;
+  -fx-background-radius: 7;
+  -fx-padding: 10;
+  -fx-vgap: 7;
+}
+.inspector-caption {
+  -fx-text-fill: -inspector-caption;
+  -fx-font-size: 11px;
+  -fx-padding: 1 6 1 0;
+}
+.properties-panel .titled-pane > .title {
+  -fx-background-color: -inspector-tint;
+  -fx-padding: 7 9;
+  -fx-background-radius: 5;
+}
+.properties-panel .titled-pane > .content {
+  -fx-background-color: -fx-control-inner-background;
+  -fx-border-color: -inspector-line;
+  -fx-padding: 8;
+}
+.properties-panel .combo-box-base {
+  -fx-max-width: infinity;
+  -fx-background-color: -fx-control-inner-background;
+  -fx-border-color: -inspector-line;
+  -fx-border-radius: 5;
+  -fx-background-radius: 5;
+  -fx-padding: 1 3;
+}
+.properties-panel .combo-box-base:focused {
+  -fx-border-color: -fx-focus-color;
+}
+.properties-panel .inspector-actions {
+  -fx-padding: 10 14;
+  -fx-alignment: center-right;
+  -fx-border-color: -inspector-line transparent transparent transparent;
+  -fx-border-width: 1 0 0 0;
+}
+.properties-panel > .error {
+  -fx-padding: 4 14;
 }
 .tree-cell {
   -fx-padding: 6 3;
@@ -873,15 +992,6 @@
 .command-strip > .menu-button:focused {
   -fx-border-radius: 12;
 }
-.command-strip .primary {
-  -fx-background-color: #6555ce;
-}
-.command-strip .primary:hover {
-  -fx-background-color: #7866de;
-}
-.primary:hover {
-  -fx-background-color: #467ff2;
-}
 .button:focused,
 .menu-button:focused,
 .combo-box:focused {
@@ -1037,22 +1147,8 @@
 .button.parameter-row-action:focused {
   -fx-border-color: -fx-focus-color;
 }
-.parameter-primary-action,
-.slicer-primary-action {
-  -fx-background-color: #6555ce;
-  -fx-background-insets: 0;
-  -fx-border-color: transparent;
-  -fx-background-radius: 9;
-  -fx-border-radius: 9;
-  -fx-text-fill: white;
-  -fx-font-weight: bold;
-}
 .slicer-primary-action {
   -fx-padding: 10 22;
-}
-.parameter-primary-action:hover,
-.slicer-primary-action:hover {
-  -fx-background-color: #7866de;
 }
 .slicer-toolbar .button {
   -fx-background-color: transparent;
@@ -1187,16 +1283,8 @@
   -fx-background-color: -fx-selection-bar;
 }
 .printer-dialog-primary {
-  -fx-background-color: #6555ce;
-  -fx-background-radius: 6;
-  -fx-text-fill: white;
-  -fx-font-weight: bold;
   -fx-padding: 8 16;
 }
-.printer-dialog-primary:hover {
-  -fx-background-color: #7866de;
-}
-
 .slicer-installation-list {
   -fx-background-color: derive(-fx-base, 34%);
   -fx-background-insets: 0;
@@ -1307,24 +1395,10 @@
 .slicer-manager-create > .label {
   -fx-font-weight: bold;
 }
-.slicer-manager-primary {
-  -fx-background-color: #245fc9;
-  -fx-border-color: transparent;
-  -fx-text-fill: white;
-  -fx-font-weight: bold;
-}
-.slicer-manager-primary:hover {
-  -fx-background-color: #1d51b6;
-}
 .slicer-manager-action:focused,
 .slicer-manager-create .combo-box:focused {
   -fx-border-color: -fx-focus-color;
 }
-.slicer-manager-primary:focused {
-  -fx-border-color: white;
-  -fx-border-insets: 2;
-}
-
 #device-config-content {
   -fx-padding: 2 0 4 0;
 }
@@ -1453,17 +1527,6 @@
   -fx-padding: 8 15;
   -fx-background-radius: 6;
 }
-.printer-card .printer-primary {
-  -fx-background-color: #6555ce;
-  -fx-text-fill: white;
-  -fx-font-weight: bold;
-}
-.printer-card .printer-primary:hover {
-  -fx-background-color: #7866de;
-}
-.printer-card .printer-primary:disabled {
-  -fx-background-color: #aaa4cf;
-}
 .printer-card .printer-danger {
   -fx-text-fill: #b03b3b;
 }
@@ -1508,4 +1571,29 @@
 }
 .printer-message {
   -fx-text-fill: #5c4bc5;
+}
+
+/* Shared by keyboard defaults and designated primary actions in every workspace. */
+.root .button:default,
+.root .button.primary {
+  -fx-background-color: #6555ce;
+  -fx-background-insets: 0;
+  -fx-background-radius: 9;
+  -fx-border-radius: 9;
+  -fx-border-color: transparent;
+  -fx-text-fill: white;
+  -fx-font-weight: bold;
+}
+.root .button:default:hover,
+.root .button.primary:hover {
+  -fx-background-color: #7866de;
+}
+.root .button:default:armed,
+.root .button.primary:armed {
+  -fx-background-color: #5445b6;
+}
+.root .button:default:focused,
+.root .button.primary:focused {
+  -fx-border-color: white;
+  -fx-border-insets: 2;
 }

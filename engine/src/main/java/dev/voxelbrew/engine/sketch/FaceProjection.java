@@ -138,6 +138,50 @@ public class FaceProjection {
         return new Entity("edge", Kind.FIT_SPLINE, values, true, 0, closed, null);
     }
 
+    /** Preserve saved reference names when adding or removing unrelated edges renumbers a family. */
+    public static List<Entity> retainReferenceIds(SketchGeometry geometry, List<Entity> projected) {
+        var byId = new HashMap<String, Entity>();
+        projected.forEach(edge -> byId.put(edge.id(), edge));
+        var references = geometry.entities().stream()
+                .filter(edge -> reference(edge.id()))
+                .toList();
+        var reserved = new HashSet<String>();
+        references.forEach(edge -> reserved.add(edge.id()));
+        var renamed = new HashMap<String, Entity>();
+        for (var saved : references) {
+            if (byId.containsKey(saved.id())) continue;
+            var matches = projected.stream()
+                    .filter(edge -> !reserved.contains(edge.id()) && sameCurve(saved, edge))
+                    .limit(2)
+                    .toList();
+            if (matches.size() != 1) continue;
+            var edge = matches.getFirst();
+            if (renamed.containsKey(edge.id())) {
+                throw new IllegalArgumentException("Ambiguous supporting face edge: " + saved.id());
+            }
+            renamed.put(
+                    edge.id(),
+                    new Entity(
+                            saved.id(), edge.kind(), edge.values(), true, edge.degree(), edge.closed(), edge.text()));
+        }
+        return renamed.isEmpty()
+                ? projected
+                : projected.stream()
+                        .map(edge -> renamed.getOrDefault(edge.id(), edge))
+                        .toList();
+    }
+
+    private static boolean sameCurve(Entity first, Entity second) {
+        if (first.kind() != second.kind()
+                || first.degree() != second.degree()
+                || first.closed() != second.closed()
+                || first.values().size() != second.values().size()) return false;
+        for (int i = 0; i < first.values().size(); i++) {
+            if (Math.abs(first.value(i) - second.value(i)) > TOLERANCE) return false;
+        }
+        return true;
+    }
+
     public static SketchGeometry refresh(SketchGeometry geometry, List<Entity> projected) {
         if (geometry.entities().stream().noneMatch(e -> reference(e.id()))) return geometry;
         var byId = new HashMap<String, Entity>();

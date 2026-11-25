@@ -57,6 +57,25 @@ final class PrintDepthBuffer {
         return pixels.clone();
     }
 
+    void writeTo(javafx.scene.image.PixelWriter writer) {
+        writer.setPixels(0, 0, width, height, javafx.scene.image.PixelFormat.getIntArgbInstance(), pixels, 0, width);
+    }
+
+    boolean matches(int w, int h, double scale) {
+        return width == w && height == h && strokeScale == scale;
+    }
+
+    void clear() {
+        Arrays.fill(pixels, 0);
+        Arrays.fill(owners, -1);
+        Arrays.fill(surfaces, 0);
+        Arrays.fill(edgeColors, 0);
+        Arrays.fill(depths, Double.POSITIVE_INFINITY);
+        Arrays.fill(tolerances, 0);
+        Arrays.fill(edgeDepths, Double.POSITIVE_INFINITY);
+        Arrays.fill(edgeCoverage, 0);
+    }
+
     int owner(double x, double y) {
         return x < 0 || y < 0 || x >= width || y >= height ? -1 : owners[(int) y * width + (int) x];
     }

@@ -40,7 +40,7 @@ public record SlicerInstallation(
     public SlicerWindow executionWindow(Map<String, String> overrides) {
         if (!bundled()) return SlicerInputs.window(settings, overrides);
         if (!overrides.isEmpty()) throw new IllegalArgumentException("Bundled slicer settings are read-only");
-        return BundledSlicers.window(id);
+        return BundledSlicers.window(id, settings.get("executable"));
     }
 
     public PrintSetup select(PrintSetup setup) {

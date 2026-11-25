@@ -175,10 +175,7 @@ final class SessionCommand implements Callable<Integer> {
                     },
                     gcode);
             var parser = CliComponent.factory()
-                    .create(
-                            dev.voxelbrew.util.di.ApplicationModule.system(
-                                    dev.voxelbrew.util.update.ApplicationImage.Component.CLI),
-                            files)
+                    .create(dev.voxelbrew.util.di.ApplicationModule.system(VoxelBrew.installationComponent()), files)
                     .commandLine();
             parser.setOut(spec.commandLine().getOut());
             parser.setErr(spec.commandLine().getErr());

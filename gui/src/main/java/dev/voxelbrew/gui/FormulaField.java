@@ -6,6 +6,7 @@ import dev.voxelbrew.api.model.units.Measurements;
 import dev.voxelbrew.engine.parameters.*;
 import java.util.Objects;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
@@ -19,6 +20,8 @@ import lombok.RequiredArgsConstructor;
 
 /** A normal editable TextField with explicit formula affordance and non-destructive previews. */
 final class FormulaField extends TextField {
+    private static final Pattern QUANTITY =
+            Pattern.compile("([+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?)\\s*([a-zA-Z]+|°)");
     private static final PseudoClass FORMULA = PseudoClass.getPseudoClass("formula");
 
     private static final PseudoClass INVALID = PseudoClass.getPseudoClass("formula-invalid");
@@ -44,6 +47,9 @@ final class FormulaField extends TextField {
     private java.util.function.DoubleConsumer validation = value -> {};
 
     private String displayUnit;
+    private ParameterUnit enteredUnit;
+    private ParameterUnit declaredAtEntry;
+    private java.util.function.Consumer<ParameterUnit> unitSelection;
 
     private Double dragStep;
 
@@ -98,7 +104,10 @@ final class FormulaField extends TextField {
             refreshFormula();
             requestLayout();
         });
-        focusedProperty().addListener((o, a, b) -> refreshFormula());
+        focusedProperty().addListener((o, a, focused) -> {
+            if (!focused) acceptUnit();
+            refreshFormula();
+        });
         sceneProperty().addListener((o, a, b) -> {
             if (b != null) refreshFormula();
         });
@@ -106,12 +115,67 @@ final class FormulaField extends TextField {
         suggestions = new ParameterSuggestions(this, parameters, translations);
         formulaHelp = new FormulaHelp(this, translations);
         addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == javafx.scene.input.KeyCode.ENTER) acceptUnit();
             if (event.getCode() == javafx.scene.input.KeyCode.F1) {
                 event.consume();
                 showHelp();
             }
         });
         if (expressionType == ExpressionType.NUMBER) new NumericFieldDrag(this);
+        acceptUnit();
+    }
+
+    /** Load model input whose bare numbers are in the field's declared unit. */
+    void setExpression(String expression) {
+        if (enteredUnit == null && Objects.equals(getText(), expression)) return;
+        enteredUnit = null;
+        setText(expression);
+        acceptUnit();
+        refreshFormula();
+    }
+
+    private void acceptUnit() {
+        if (unit == null
+                || displayUnit != null
+                || getText() == null
+                || textProperty().isBound()) return;
+        var literal = QUANTITY.matcher(getText().strip());
+        if (!literal.matches()) return;
+        var declared = unit.get();
+        var entered = unit(literal.group(2).equals("°") ? "deg" : literal.group(2));
+        if (declared == null
+                || entered == ParameterUnit.NUMBER
+                || !Measurements.sameKind(declared.unit(), entered.unit())) return;
+        declaredAtEntry = declared;
+        enteredUnit = entered;
+        if (unitSelection != null) unitSelection.accept(entered);
+        setText(literal.group(1));
+    }
+
+    void onUnitSelected(java.util.function.Consumer<ParameterUnit> selection) {
+        unitSelection = selection;
+    }
+
+    /** Expression for model bindings and evaluation, including a literal's chosen unit. */
+    String expression() {
+        if (enteredUnit != null
+                && enteredUnit != unit.get()
+                && declaredAtEntry == unit.get()
+                && Expressions.isNumber(getText())) {
+            return getText().strip() + " " + enteredUnit;
+        }
+        return getText();
+    }
+
+    private ParameterUnit shownUnit() {
+        if (unit == null) return null;
+        var declared = unit.get();
+        if (declared != declaredAtEntry) enteredUnit = null;
+        return enteredUnit != null
+                        && (Expressions.isNumber(getText())
+                                || QUANTITY.matcher(getText().strip()).matches())
+                ? enteredUnit
+                : declared;
     }
 
     ExpressionType expressionType() {
@@ -132,11 +196,11 @@ final class FormulaField extends TextField {
     double value() {
         if (unit == null) throw new IllegalStateException("This is a text field");
         var selected = Objects.requireNonNull(unit.get());
-        double result = parameters.get().value(getText(), selected);
+        double result = parameters.get().value(expression(), selected);
         double displayed = selected.displayValue(Measurements.quantity(result, selected.canonicalUnit()));
         if (!bounds.get().accepts(displayed)) {
-            throw new IllegalArgumentException(translations.translate(
-                    "formula.bounds", bounds.get().minimumHint(), bounds.get().maximumHint()));
+            throw new IllegalArgumentException(
+                    translations.translate("formula.bounds", bounds().minimumHint(), bounds().maximumHint()));
         }
         validation.accept(result);
         return result;
@@ -151,7 +215,19 @@ final class FormulaField extends TextField {
     }
 
     NumericFieldBounds bounds() {
-        return bounds.get();
+        var limits = bounds.get();
+        if (unit == null || limits.equals(NumericFieldBounds.UNBOUNDED)) return limits;
+        var shown = shownUnit();
+        if (shown == unit.get()) return limits;
+        return new NumericFieldBounds(
+                convertLimit(limits.min(), shown),
+                limits.minInclusive(),
+                convertLimit(limits.max(), shown),
+                limits.maxInclusive());
+    }
+
+    private double convertLimit(double limit, ParameterUnit shown) {
+        return Double.isFinite(limit) ? Measurements.convert(limit, unit.get().unit(), shown.unit()) : limit;
     }
 
     /** Change in declared display units per horizontal screen pixel during middle-button dragging. */
@@ -167,7 +243,7 @@ final class FormulaField extends TextField {
     double dragStep() {
         if (dragStep != null) return dragStep;
         if (unit == null) throw new IllegalStateException("This is a text field");
-        return switch (Objects.requireNonNull(unit.get())) {
+        return switch (Objects.requireNonNull(shownUnit())) {
             case DEG -> 1;
             case RAD -> 0.01;
             default -> 0.1;
@@ -215,7 +291,7 @@ final class FormulaField extends TextField {
                 || (unit != null && !getText().isBlank() && !Expressions.isNumber(getText()));
         pseudoClassStateChanged(FORMULA, formula);
         try {
-            var selected = unit == null ? null : unit.get();
+            var selected = shownUnit();
             String label = displayUnit;
             if (label == null) {
                 label = switch (selected) {
@@ -260,9 +336,9 @@ final class FormulaField extends TextField {
                 mark.setManaged(false);
                 mark.setMouseTransparent(true);
                 minimum.textProperty()
-                        .bind(Bindings.createStringBinding(() -> bounds.get().minimumHint(), bounds));
+                        .bind(Bindings.createStringBinding(() -> bounds().minimumHint(), bounds, unitSuffix));
                 maximum.textProperty()
-                        .bind(Bindings.createStringBinding(() -> bounds.get().maximumHint(), bounds));
+                        .bind(Bindings.createStringBinding(() -> bounds().maximumHint(), bounds, unitSuffix));
                 minimum.getStyleClass().add("formula-minimum");
                 maximum.getStyleClass().add("formula-maximum");
                 unitLabel.getStyleClass().add("formula-unit");

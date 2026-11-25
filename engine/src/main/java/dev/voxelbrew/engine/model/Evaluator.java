@@ -30,6 +30,8 @@ public final class Evaluator {
         private final Map<String, List<Entity>> projections = new LinkedHashMap<>();
         private final Map<Feature.BodyRef, Evaluation.Body> outputs = new LinkedHashMap<>();
         private final Map<String, Evaluation.Body> active = new LinkedHashMap<>();
+        private final Map<String, Evaluation.PatternCopy> patternCopies = new LinkedHashMap<>();
+        private final Map<String, Integer> copyCounts = new LinkedHashMap<>();
         private final Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction =
                 new LinkedHashMap<>();
 
@@ -40,6 +42,9 @@ public final class Evaluator {
                 case Feature.Sketch s -> rebuildSketch(s, index, resolved);
                 case Feature.Custom custom
                 when BodyExtrusion.modifiesBody(custom) -> rebuildExtrude(BodyExtrusion.from(custom));
+                case Feature.Custom custom
+                when BodyPattern.matches(custom) -> rebuildPattern(custom.id(), BodyPattern.from(custom));
+                case Feature.Custom custom when CutTargets.through(custom) -> rebuildThroughCut(custom);
                 case Feature.Custom custom -> rebuildCustom(custom, customEvaluator);
                 case Feature.Extrude e -> rebuildExtrude(BodyExtrusion.from(e));
                 case Feature.EdgeFinish finish -> rebuildEdgeFinish(finish);
@@ -90,8 +95,11 @@ public final class Evaluator {
                     support.resolve(faces, s.plane().frame()),
                     support);
             var edges = FaceProjection.edges(plane, faces, solid.faceEdges(), solid.edgeSamples());
-            projections.put(s.id(), edges);
             var profile = s.profile();
+            if (profile instanceof Feature.Constrained c) {
+                edges = FaceProjection.retainReferenceIds(c.geometry(), edges);
+            }
+            projections.put(s.id(), edges);
             if (profile instanceof Feature.Constrained c) {
                 var next = FaceProjection.refresh(c.geometry(), edges);
                 if (next != c.geometry()) profile = new Feature.Constrained(next);
@@ -172,18 +180,13 @@ public final class Evaluator {
             }
             if (!owned.contains(solid)) owned.add(solid);
             if (definition.target() != null) {
-                var input = outputs.get(definition.target());
-                if (input == null || active.get(input.id()) != input) {
-                    throw new ModelException(e.id(), "Extrusion target is missing or has been superseded");
-                }
                 var tools = new ArrayList<Solid>();
                 tools.add(solid);
                 additionalBodies.forEach(body -> tools.add(body.solid()));
-                var result = input.solid().combine(tools, definition.operation() == BodyExtrusion.Operation.CUT);
-                owned.add(result);
-                var body = new Evaluation.Body(input.id(), new Feature.BodyRef(e.id(), "body"), result);
-                outputs.put(body.output(), body);
-                active.put(body.id(), body);
+                modifyTargets(
+                        e.id(),
+                        definition.targets(),
+                        input -> input.combine(tools, definition.operation() == BodyExtrusion.Operation.CUT));
                 return;
             }
             var body = new Evaluation.Body(e.id() + ".body", new Feature.BodyRef(e.id(), "body"), solid);
@@ -192,6 +195,30 @@ public final class Evaluator {
             for (var additional : additionalBodies) {
                 outputs.put(additional.output(), additional);
                 active.put(additional.id(), additional);
+            }
+        }
+
+        private void rebuildPattern(String id, BodyPattern pattern) {
+            var source = outputs.get(pattern.source());
+            if (source == null || active.get(source.id()) != source) {
+                throw new ModelException(id, "Pattern source is missing or superseded");
+            }
+            var copies = new ArrayList<Evaluation.Body>();
+            for (int j = 0; j < pattern.secondCount(); j++) {
+                for (int i = 0; i < pattern.firstCount(); i++) {
+                    if (i == 0 && j == 0) continue;
+                    var solid = pattern.copy(source.solid(), i, j);
+                    owned.add(solid);
+                    var name = "copy-" + i + "-" + j;
+                    copies.add(new Evaluation.Body(id + "." + name, new Feature.BodyRef(id, name), solid));
+                }
+            }
+            int sourceNumber = new ArrayList<>(active.keySet()).indexOf(source.id()) + 1;
+            for (var body : copies) {
+                int index = 1 + copyCounts.merge(source.id(), 1, Integer::sum);
+                patternCopies.put(body.id(), new Evaluation.PatternCopy(source.id(), sourceNumber, index));
+                outputs.put(body.output(), body);
+                active.put(body.id(), body);
             }
         }
 
@@ -248,22 +275,40 @@ public final class Evaluator {
             }
         }
 
-        private void rebuildThroughCut(Feature.ThroughCut cut) {
+        private void modifyTargets(String id, List<Feature.BodyRef> targets, Function<Solid, Solid> operation) {
+            var results = new ArrayList<Evaluation.Body>();
+            for (var target : targets) {
+                var input = outputs.get(target);
+                if (input == null) throw new ModelException(id, "missing body output " + target);
+                if (active.get(input.id()) != input) {
+                    throw new ModelException(id, "body input has been superseded: " + target);
+                }
+                var solid = operation.apply(input.solid());
+                if (!owned.contains(solid)) owned.add(solid);
+                var output = new Feature.BodyRef(id, CutTargets.output(results.size()));
+                results.add(new Evaluation.Body(input.id(), output, solid));
+            }
+            for (var result : results) {
+                outputs.put(result.output(), result);
+                active.put(result.id(), result);
+            }
+        }
+
+        private void rebuildThroughCut(Feature feature) {
+            var cut = CutTargets.firstThroughCut(feature);
             Feature.Sketch sketch = profile(cut.id(), cut.profile(), sketches);
             if (!(sketch.profile() instanceof Feature.Circle) && !(sketch.profile() instanceof Feature.Constrained)) {
                 throw new ModelException(cut.id(), "through-all cut requires a circle profile");
             }
-            Evaluation.Body input = outputs.get(cut.body());
-            if (input == null) {
-                throw new ModelException(cut.id(), "missing body output " + cut.body());
-            }
-            if (active.get(input.id()) != input) {
-                throw new ModelException(cut.id(), "body input has been superseded by a later feature");
-            }
+            modifyTargets(
+                    cut.id(), CutTargets.throughTargets(feature).bodies(), input -> throughSolid(sketch, cut, input));
+        }
+
+        private Solid throughSolid(Feature.Sketch sketch, Feature.ThroughCut cut, Solid input) {
             // Evaluate through-all in sketch coordinates, then restore model
             // coordinates.
             var frame = sketch.plane().frame();
-            Solid local = input.solid();
+            Solid local = input;
             if (!frame.equals(Transform.IDENTITY)) {
                 local = local.transformed(frame.inverse());
                 owned.add(local);
@@ -279,14 +324,11 @@ public final class Evaluator {
                     owned.add(solid);
                 }
             }
-            if (!owned.contains(solid)) owned.add(solid);
             if (!frame.equals(Transform.IDENTITY)) {
+                if (!owned.contains(solid)) owned.add(solid);
                 solid = solid.transformed(frame);
-                owned.add(solid);
             }
-            var body = new Evaluation.Body(input.id(), new Feature.BodyRef(cut.id(), "body"), solid);
-            outputs.put(body.output(), body);
-            active.put(body.id(), body);
+            return solid;
         }
     }
 
@@ -305,7 +347,10 @@ public final class Evaluator {
     /** The registry lives only on the evaluating thread; results contain engine-owned solids. */
     public static Evaluation evaluate(CadDocument document, Path pluginDirectory) {
         if (document.features().stream()
-                .noneMatch(f -> f instanceof Feature.Custom && !BodyExtrusion.modifiesBody(f))) {
+                .noneMatch(f -> f instanceof Feature.Custom
+                        && !BodyExtrusion.modifiesBody(f)
+                        && !BodyPattern.matches(f)
+                        && !CutTargets.through(f))) {
             return replay(document, custom -> {
                 throw new AssertionError("No custom features");
             });
@@ -359,7 +404,8 @@ public final class Evaluator {
                     continue;
                 }
                 try {
-                    for (String input : references(feature)) {
+                    for (var reference : GeometryInputs.of(feature)) {
+                        String input = reference.featureId();
                         if (!states.containsKey(input)) {
                             throw new ModelException(feature.id(), "missing or non-earlier input '" + input + "'");
                         }
@@ -395,6 +441,8 @@ public final class Evaluator {
                     document, diagnostics, new ArrayList<>(geometry.active.values()), geometry.owned, resolved);
             result.construction(geometry.construction);
             result.projections(geometry.projections);
+            result.indexBodyOutputs(geometry.outputs);
+            result.patternCopies(geometry.patternCopies);
             return result;
         } catch (Throwable failure) {
             geometry.owned.forEach(Solid::close);
@@ -419,37 +467,6 @@ public final class Evaluator {
         try (local) {
             return local.transformed(frame);
         }
-    }
-
-    private static List<String> references(Feature feature) {
-        if (feature instanceof ConstructionFeature construction) return construction.dependencies();
-        if (feature instanceof Feature.Sketch s
-                && !s.plane().constructionSupport().isEmpty()) {
-            return List.of(s.plane().constructionSupport());
-        }
-        if (feature instanceof Feature.Sketch s && s.plane().support() != null) {
-            return List.of(s.plane().support().body().featureId());
-        }
-        if (feature instanceof Feature.Extrude e) {
-            return List.of(e.profile().sketchId());
-        }
-        if (BodyExtrusion.modifiesBody(feature)) {
-            var definition = BodyExtrusion.from(feature);
-            return List.of(
-                    definition.extrusion().profile().sketchId(),
-                    definition.target().featureId());
-        }
-        if (feature instanceof Feature.ThroughCut c) {
-            return List.of(c.profile().sketchId(), c.body().featureId());
-        }
-        if (feature instanceof Feature.SplitBody split) {
-            return List.of(split.body().featureId());
-        }
-        if (feature instanceof Feature.EdgeFinish finish) {
-            return List.of(finish.body().featureId());
-        }
-        if (feature instanceof Feature.Shell shell) return List.of(shell.body().featureId());
-        return List.of();
     }
 
     private Evaluator() {}

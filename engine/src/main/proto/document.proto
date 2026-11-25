@@ -175,6 +175,10 @@ message SketchReference {
   Part part = 2;
   uint32 index = 3;
 }
+message SketchLabelPosition {
+  double x = 1;
+  double y = 2;
+}
 message SketchConstraint {
   enum Type {
     TYPE_UNSPECIFIED = 0;
@@ -210,6 +214,8 @@ message SketchConstraint {
   Type type = 2;
   repeated SketchReference refs = 3;
   repeated double values = 4;
+  SketchLabelPosition label_position = 5;
+  bool reference_dimension = 6;
 }
 message ConstrainedSketch {
   repeated SketchEntity entities = 1;
@@ -237,12 +243,26 @@ message ThroughCut {
   BodyRef body = 2;
   reserved 3 to 7;
 }
+message MultiThroughCut {
+  ThroughCut first = 1;
+  repeated BodyRef additional_targets = 2;
+}
 // Payload for the built-in body extrusion stored in the versioned Custom
 // feature envelope.
 message BodyExtrusion {
   Extrude extrusion = 1;
   BodyRef target = 2;
   bool subtract = 3;
+  repeated BodyRef additional_targets = 4;
+}
+message BodyPattern {
+  BodyRef source = 1;
+  string kind = 2;
+  string axis = 3;
+  uint32 first_count = 4;
+  uint32 second_count = 5;
+  double first_step = 6;
+  double second_step = 7;
 }
 message SplitBody {
   BodyRef body = 1;

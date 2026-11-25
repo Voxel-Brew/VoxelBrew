@@ -197,7 +197,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
         });
         exportGcode = button("exportGcode", this::exportGcode);
         print = button("print", this::submit);
-        print.getStyleClass().add("printer-primary");
+        print.getStyleClass().add("primary");
         status.setId("printer-status");
         details.setId("printer-details");
         message.setId("printer-message");

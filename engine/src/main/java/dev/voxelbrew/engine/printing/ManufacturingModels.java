@@ -4,6 +4,7 @@ import dev.voxelbrew.api.model.*;
 import dev.voxelbrew.api.model.mesh.*;
 import dev.voxelbrew.api.model.printing.ManufacturingModel;
 import dev.voxelbrew.api.model.printing.PrintProfile;
+import dev.voxelbrew.api.model.printing.PrintSetup;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.persistence.DocumentCodec;
 import java.util.*;
@@ -27,12 +28,26 @@ public final class ManufacturingModels {
         var detached = dev.voxelbrew.util.concurrent.ParallelWork.map(
                 bodies, body -> body.solid().tessellate(options));
         for (int i = 0; i < bodies.size(); i++) meshes.put(bodies.get(i).id(), detached.get(i));
-        return new ManufacturingModel(
-                document.id(),
-                DocumentCodec.fingerprint(document),
-                document.printSetup(),
-                PrintProfile.resolve(document.printSetup()),
-                meshes);
+        return fromMeshes(document.id(), DocumentCodec.fingerprint(document), document.printSetup(), meshes);
+    }
+
+    /** Prepare the active plate from current geometry, retaining the saved document revision. */
+    public static ManufacturingModel fromMeshes(
+            String documentId, String revision, PrintSetup setup, Map<String, MeshData> meshes) {
+        var removed = new HashSet<String>();
+        for (var instance : setup.instances()) {
+            if (!meshes.containsKey(instance.bodyId())) removed.add(instance.id());
+        }
+        if (!removed.isEmpty()) {
+            var supports = setup.supports().stream()
+                    .filter(support -> !removed.contains(support.instanceId()))
+                    .toList();
+            setup = setup.withSupports(supports)
+                    .withInstances(setup.instances().stream()
+                            .filter(instance -> !removed.contains(instance.id()))
+                            .toList());
+        }
+        return new ManufacturingModel(documentId, revision, setup, PrintProfile.resolve(setup), meshes);
     }
 
     private ManufacturingModels() {}

@@ -9,6 +9,53 @@ import org.junit.jupiter.api.Test;
 
 class SketchDimensionsTest {
     @Test
+    void labelsFollowEachProjectedArrowAndStayReadableAfterEveryQuarterTurn() {
+        for (boolean clockwise : List.of(true, false)) {
+            var view = SketchViewBasis.DEFAULT;
+            for (int turn = 0; turn < 4; turn++) {
+                for (var arrow : List.of(new Vec(1, 0), new Vec(0, 1), new Vec(-3, 4), new Vec(3, -4))) {
+                    var projected = view.project(arrow);
+                    double dx = projected.x(), dy = -projected.y();
+                    var baseline = SketchEditor.dimensionBaseline(dx, dy);
+                    assertThat(baseline.x() * dy - baseline.y() * dx).isCloseTo(0, within(1e-10));
+                    assertThat(Math.hypot(baseline.x(), baseline.y())).isCloseTo(1, within(1e-10));
+                    assertThat(baseline.x() > 0 || (baseline.x() == 0 && baseline.y() < 0))
+                            .isTrue();
+                }
+                view = view.quarterTurn(clockwise);
+            }
+        }
+        assertThat(SketchEditor.dimensionBaseline(0, 0)).isEqualTo(new Vec(1, 0));
+    }
+
+    @Test
+    void keyboardSizesCreateEditableConstraintsOnlyForEnteredFields() {
+        var g = dev.voxelbrew.engine.sketch.Sketches.rectangle("r", 0, 0, 20, 8, false);
+        for (var shape : List.of(SketchSizeEntry.Shape.RECTANGLE, SketchSizeEntry.Shape.CENTER_RECTANGLE)) {
+            var sized = new SketchSizeEntry.Dimensions(shape, 20., 8.).apply(g, "r");
+            assertThat(sized.constraints().stream()
+                            .filter(c -> c.type().dimension())
+                            .map(c -> c.values().getFirst()))
+                    .containsExactly(20., 8.);
+        }
+        var line = new Entity("line", Kind.LINE, List.of(0., 0., -3., 4.), false);
+        var circle = new Entity("circle", Kind.CIRCLE, List.of(1., 2., 6.), false);
+        var curves = new SketchGeometry(List.of(line, circle), List.of(), List.of());
+        var length = new SketchSizeEntry.Dimensions(SketchSizeEntry.Shape.LINE, 5., null).apply(curves, "line");
+        assertThat(length.constraints())
+                .singleElement()
+                .satisfies(c -> assertThat(c.values()).containsExactly(5.));
+        var angle = new SketchSizeEntry.Dimensions(SketchSizeEntry.Shape.LINE, null, 45.).apply(curves, "line");
+        assertThat(angle.constraints())
+                .singleElement()
+                .satisfies(c -> assertThat(c.type()).isEqualTo(Type.ANGLE));
+        var radius = new SketchSizeEntry.Dimensions(SketchSizeEntry.Shape.CIRCLE, 6., null).apply(curves, "circle");
+        assertThat(radius.constraints())
+                .singleElement()
+                .satisfies(c -> assertThat(c.values()).containsExactly(6.));
+    }
+
+    @Test
     void standalonePointsAndEndpointsSupportTruePointToPointDistance() {
         var a = new Entity("a", Kind.POINT, List.of(10., 10.), false);
         var b = new Entity("b", Kind.POINT, List.of(40., 50.), false);
@@ -97,7 +144,7 @@ class SketchDimensionsTest {
     }
 
     @Test
-    void infersLineCircleAndSignedPointMeasurements() {
+    void infersLineCircleAndPositivePointMeasurements() {
         var line = new Entity("line", Kind.LINE, List.of(0., 0., 30., 40.), false);
         var circle = new Entity("circle", Kind.CIRCLE, List.of(10., 10., 3.), false);
         var g = new SketchGeometry(List.of(line, circle), List.of(), List.of());
@@ -107,9 +154,22 @@ class SketchDimensionsTest {
                 .isEqualTo(new SketchDimensions.Measurement(Type.RADIUS, 3));
         var refs = List.of(line.ref(Part.END), line.ref(Part.START));
         assertThat(SketchDimensions.measure(g, refs, new Vec(15, 60)))
-                .isEqualTo(new SketchDimensions.Measurement(Type.DISTANCE_X, -30));
+                .isEqualTo(new SketchDimensions.Measurement(Type.DISTANCE_X, 30));
         assertThat(SketchDimensions.measure(g, refs, new Vec(50, 20)))
-                .isEqualTo(new SketchDimensions.Measurement(Type.DISTANCE_Y, -40));
+                .isEqualTo(new SketchDimensions.Measurement(Type.DISTANCE_Y, 40));
+        for (var order : List.of(refs, refs.reversed())) {
+            for (var position : List.of(new Vec(15, 60), new Vec(50, 20))) {
+                var measurement = SketchDimensions.measure(g, order, position);
+                var constraint = dev.voxelbrew.engine.sketch.SketchConstraints.create(
+                        g,
+                        "dimension",
+                        measurement.type(),
+                        SketchDimensions.drivingReferences(g, order, measurement.type()),
+                        measurement.value());
+                assertThat(dev.voxelbrew.engine.sketch.SketchConstraints.residuals(g, constraint))
+                        .containsExactly(0.0);
+            }
+        }
         assertThatThrownBy(() -> SketchDimensions.measure(g, List.of(), new Vec(0, 0)))
                 .isInstanceOf(IllegalArgumentException.class);
     }

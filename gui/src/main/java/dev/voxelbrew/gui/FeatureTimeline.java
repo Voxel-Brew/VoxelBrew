@@ -35,6 +35,8 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
 
     private final Consumer<String> select;
 
+    private final Runnable editSelectedFeature;
+
     private final java.util.function.BiConsumer<Integer, Integer> delete;
 
     private final Function<Feature, String> name;
@@ -76,7 +78,20 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
         return path;
     }
 
-    private static Node featureIcon(Feature feature) {
+    private static boolean opensEditorOnDoubleClick(Feature feature) {
+        return feature instanceof Feature.Sketch
+                || feature instanceof Feature.Extrude
+                || dev.voxelbrew.engine.model.CutTargets.through(feature)
+                || BodyExtrusion.modifiesBody(feature);
+    }
+
+    static Node featureIcon(Feature feature) {
+        if (dev.voxelbrew.engine.model.BodyPattern.matches(feature)) {
+            return OperationIcons.icon(dev.voxelbrew.engine.model.BodyPattern.from(feature)
+                    .kind()
+                    .name()
+                    .toLowerCase(java.util.Locale.ROOT));
+        }
         if (feature instanceof dev.voxelbrew.api.model.ConstructionFeature construction) {
             return ConstructionIcons.icon(construction.tool());
         }
@@ -85,13 +100,20 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
                     path("M2 4H15V17H2Z", "timeline-sketch-icon"),
                     path("M7 18L8 14L17 5L20 8L11 17Z", "timeline-pencil-icon"));
         }
+        if (BodyExtrusion.modifiesBody(feature)) {
+            return OperationIcons.extrusion(BodyExtrusion.from(feature).operation());
+        }
+        if (feature instanceof Feature.EdgeFinish finish) {
+            return OperationIcons.icon(finish.kind() == Feature.EdgeFinish.Kind.FILLET ? "fillet" : "chamfer");
+        }
+        if (feature instanceof Feature.Shell) return OperationIcons.icon("shell");
         var cube = new Group(
                 path("M2 6L10 2L18 6L10 10Z", "timeline-cube-top"),
                 path("M2 6L10 10V20L2 16Z", "timeline-cube-left"),
                 path("M10 10L18 6V16L10 20Z", "timeline-cube-right"));
-        if (feature instanceof Feature.Extrude || BodyExtrusion.modifiesBody(feature)) {
+        if (feature instanceof Feature.Extrude) {
             cube.getChildren().add(path("M17 5L20 1L23 5H21V14H19V5Z", "timeline-extrude-icon"));
-        } else if (feature instanceof Feature.ThroughCut) {
+        } else if (dev.voxelbrew.engine.model.CutTargets.through(feature)) {
             cube.getChildren().add(path("M8 5L10 4L13 5L13 8L11 9L8 8Z M10 9V16", "timeline-cut-icon"));
         } else if (feature instanceof Feature.SplitBody) {
             cube.getChildren().add(path("M6 1L14 21", "timeline-split-icon"));
@@ -105,11 +127,13 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
             TranslationService translations,
             IntConsumer moveCursor,
             Consumer<String> select,
+            Runnable editSelectedFeature,
             Function<Feature, String> name,
             java.util.function.BiConsumer<Integer, Integer> delete) {
         this.translations = translations;
         this.moveCursor = moveCursor;
         this.select = select;
+        this.editSelectedFeature = editSelectedFeature;
         this.name = name;
         this.delete = delete;
         setId("feature-timeline");
@@ -267,12 +291,19 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
                 e.consume();
             });
             button.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-            button.setAccessibleText((i + 1) + ". " + name.apply(feature));
             button.setOnAction(e -> {
                 stop();
                 select.accept(feature.id());
             });
             button.resizeRelocate(INSET + i * STEP + 3, 10, STEP - 6, 32);
+            if (opensEditorOnDoubleClick(feature)) {
+                button.setOnMouseClicked(event -> {
+                    if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2 && !rebuilding) {
+                        editSelectedFeature.run();
+                        event.consume();
+                    }
+                });
+            }
             button.setMinSize(STEP - 6, 32);
             button.setMaxSize(STEP - 6, 32);
             button.setManaged(false);
@@ -405,6 +436,9 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
         for (int i = 0; i < definitions.size(); i++) {
             var feature = definitions.get(i);
             var button = (Button) features.getChildren().get(i);
+            String displayName = name.apply(feature);
+            button.setText(displayName);
+            button.setAccessibleText((i + 1) + ". " + displayName);
             button.getStyleClass()
                     .setAll("button", "timeline-feature", i < position ? "history-active" : "history-future");
             if (feature.id().equals(selection)) button.getStyleClass().add("history-selected");
@@ -417,7 +451,7 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
             if (broken) button.getStyleClass().add("history-error");
             String description = (i + 1)
                     + " · "
-                    + name.apply(feature)
+                    + displayName
                     + "\n"
                     + translations.translate(i < position ? "timeline.evaluated" : "timeline.rolledBack")
                     + (broken ? "\n" + diagnostic.orElseThrow().message() : "")

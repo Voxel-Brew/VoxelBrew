@@ -90,6 +90,61 @@ public final class ModelSession {
         }
     }
 
+    private static List<Feature.BodyRef> modifiedBodies(Feature feature) {
+        if (BodyExtrusion.modifiesBody(feature)) {
+            return BodyExtrusion.from(feature).targets();
+        }
+        if (CutTargets.through(feature)) {
+            return CutTargets.throughTargets(feature).bodies();
+        }
+        if (feature instanceof Feature.EdgeFinish finish) return List.of(finish.body());
+        if (feature instanceof Feature.Shell shell) return List.of(shell.body());
+        return List.of();
+    }
+
+    private static Feature followBody(Feature feature, Feature.BodyRef previous, Feature.BodyRef replacement) {
+        if (CutTargets.through(feature)) {
+            var inputs = new ArrayList<>(modifiedBodies(feature));
+            if (java.util.Collections.replaceAll(inputs, previous, replacement)) {
+                return new CutTargets(inputs)
+                        .throughFeature(
+                                feature.id(),
+                                CutTargets.firstThroughCut(feature).profile());
+            }
+        }
+        if (feature instanceof Feature.SplitBody split && previous.equals(split.body())) {
+            return new Feature.SplitBody(split.id(), replacement, split.plane());
+        }
+        if (BodyExtrusion.modifiesBody(feature)) {
+            var extrusion = BodyExtrusion.from(feature);
+            var inputs = new ArrayList<>(extrusion.targets());
+            if (java.util.Collections.replaceAll(inputs, previous, replacement)) {
+                return new BodyExtrusion(
+                                extrusion.extrusion(),
+                                extrusion.operation(),
+                                inputs.getFirst(),
+                                inputs.subList(1, inputs.size()))
+                        .feature();
+            }
+        }
+        if (BodyPattern.matches(feature)) {
+            var pattern = BodyPattern.from(feature);
+            if (previous.equals(pattern.source())) {
+                return new BodyPattern(
+                                pattern.kind(),
+                                replacement,
+                                pattern.axis(),
+                                pattern.firstCount(),
+                                pattern.secondCount(),
+                                pattern.firstStep(),
+                                pattern.secondStep())
+                        .feature(feature.id());
+            }
+        }
+        // Edge and face indices belong to their original solid and need explicit reselection.
+        return feature;
+    }
+
     public ModelSession(CadDocument document) {
         id = document.id();
         uuidGenerator = document.uuidGenerator();
@@ -154,15 +209,20 @@ public final class ModelSession {
     }
 
     public synchronized void add(Feature feature, dev.voxelbrew.api.model.parameters.ParameterSet expressions) {
-        if (cursor != features.size()) {
-            throw new ModelException(feature.id(), "return the timeline cursor to the end before adding a feature");
-        }
         FeatureValidation.validate(feature);
         var next = new ArrayList<>(features);
-        next.add(feature);
+        next.add(cursor, feature);
+        if (cursor < features.size()) {
+            var inputs = modifiedBodies(feature);
+            for (int i = 0; i < inputs.size(); i++) {
+                var input = inputs.get(i);
+                var output = new Feature.BodyRef(feature.id(), CutTargets.output(i));
+                next.subList(cursor + 1, next.size()).replaceAll(later -> followBody(later, input, output));
+            }
+        }
         expressions.validate();
         commit(next, printSetup, expressions);
-        cursor = features.size();
+        cursor++;
     }
 
     public synchronized void replace(Feature feature) {
@@ -233,7 +293,9 @@ public final class ModelSession {
     public synchronized void editDimension(
             String featureId, String field, double value, java.nio.file.Path pluginDirectory) {
         Feature feature = features.get(index(featureId));
-        if (feature instanceof Feature.Custom custom && !BodyExtrusion.modifiesBody(feature)) {
+        if (feature instanceof Feature.Custom custom
+                && !BodyExtrusion.modifiesBody(feature)
+                && !BodyPattern.matches(feature)) {
             try (var registry = new dev.voxelbrew.engine.feature.FeatureRegistry(pluginDirectory)) {
                 replace(registry.edit(custom, java.util.Map.of(field, value)));
             } catch (java.io.IOException failure) {
@@ -290,9 +352,9 @@ public final class ModelSession {
         if (undo.isEmpty()) {
             return false;
         }
-        boolean followEnd = cursor == features.size();
         redo.push(new State(features, printSetup, parameters, bodyStyles, bodyNames, featureNames));
         var previous = undo.pop();
+        cursor = restoredCursor(previous.features());
         invalidateGcode();
         log.debug("Undo in document {} from revision {}", id, revision);
         features = previous.features();
@@ -301,7 +363,6 @@ public final class ModelSession {
         bodyStyles = previous.bodyStyles();
         bodyNames = previous.bodyNames();
         featureNames = previous.featureNames();
-        cursor = followEnd ? features.size() : Math.min(cursor, features.size());
         revision++;
         return true;
     }
@@ -310,9 +371,9 @@ public final class ModelSession {
         if (redo.isEmpty()) {
             return false;
         }
-        boolean followEnd = cursor == features.size();
         undo.push(new State(features, printSetup, parameters, bodyStyles, bodyNames, featureNames));
         var next = redo.pop();
+        cursor = restoredCursor(next.features());
         invalidateGcode();
         log.debug("Redo in document {} from revision {}", id, revision);
         features = next.features();
@@ -321,9 +382,17 @@ public final class ModelSession {
         bodyStyles = next.bodyStyles();
         bodyNames = next.bodyNames();
         featureNames = next.featureNames();
-        cursor = followEnd ? features.size() : Math.min(cursor, features.size());
         revision++;
         return true;
+    }
+
+    private int restoredCursor(List<Feature> restored) {
+        if (cursor == features.size()) return restored.size();
+        String firstRolledBack = features.get(cursor).id();
+        for (int i = 0; i < restored.size(); i++) {
+            if (restored.get(i).id().equals(firstRolledBack)) return i;
+        }
+        return Math.min(cursor, restored.size());
     }
 
     public Evaluation evaluate() {

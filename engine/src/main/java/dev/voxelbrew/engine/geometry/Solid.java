@@ -237,6 +237,20 @@ public final class Solid implements AutoCloseable {
         }
     }
 
+    /** Reflect across a plane normal to the given world axis (X=0, Y=1, Z=2). */
+    public Solid mirrored(int axis, double offset) {
+        if (axis < 0 || axis > 2 || !Double.isFinite(offset)) {
+            throw new IllegalArgumentException("Invalid mirror plane");
+        }
+        double[] matrix = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
+        matrix[axis * 5] = -1;
+        matrix[axis * 4 + 3] = 2 * offset;
+        synchronized (lock) {
+            requireOpen();
+            return new Solid(NativeKernel.transform(token, matrix));
+        }
+    }
+
     /** Detached exact planes, using the same face order as tessellation. */
     public java.util.List<PlanarFace> planarFaces() {
         synchronized (lock) {

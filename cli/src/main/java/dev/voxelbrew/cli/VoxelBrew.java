@@ -4,6 +4,7 @@ import dev.voxelbrew.api.i18n.TranslationService;
 import dev.voxelbrew.api.model.*;
 import dev.voxelbrew.engine.geometry.Solid;
 import dev.voxelbrew.engine.model.*;
+import dev.voxelbrew.engine.sketch.SketchProfiles;
 import dev.voxelbrew.importer.DocumentSource;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -243,7 +244,6 @@ public final class VoxelBrew implements Runnable {
         }
 
         int save(ModelSession session) throws java.io.IOException {
-            documentWriter.save(session.document(), file, true);
             try (Evaluation evaluation = session.evaluate(pluginDirectory)) {
                 if (!evaluation.valid()) {
                     evaluation.diagnostics().stream()
@@ -254,16 +254,21 @@ public final class VoxelBrew implements Runnable {
                     return 1;
                 }
             }
+            documentWriter.save(session.document(), file, true);
             return 0;
         }
 
-        Feature.ProfileRef profileRef(ModelSession session, String sketchId) {
+        Feature.Sketch sourceSketch(ModelSession session, String sketchId) {
             return session.document().features().stream()
                     .filter(f -> f.id().equals(sketchId) && f instanceof Feature.Sketch)
                     .map(f -> (Feature.Sketch) f)
-                    .map(s -> new Feature.ProfileRef(s.id(), s.profileId()))
                     .findFirst()
                     .orElseThrow(() -> new ModelException(sketchId, "sketch does not exist"));
+        }
+
+        Feature.ProfileRef profileRef(ModelSession session, String sketchId) {
+            var source = sourceSketch(session, sketchId);
+            return new Feature.ProfileRef(source.id(), source.profileId());
         }
     }
 
@@ -422,20 +427,99 @@ public final class VoxelBrew implements Runnable {
         }
     }
 
-    @Command(
-            name = "extrude",
-            description = "Extrude an earlier profile as a new body; distance is signed mm.",
-            mixinStandardHelpOptions = true)
-    static final class Extrude extends AddFeature {
-
+    abstract static class ProfileOperation extends AddFeature {
         @Option(names = "--sketch", required = true)
         String sketch;
 
+        @Option(names = "--region", description = "Profile ID from designer sketch regions. Repeat to combine regions.")
+        java.util.List<String> regions = java.util.List.of();
+
+        @Option(names = "--include-enclosed", description = "Fill nested faces within the selected regions.")
+        boolean includeEnclosed;
+
+        @Option(names = "--body-feature", description = "Target feature ID. Repeat for each cut target.")
+        java.util.List<String> bodies = java.util.List.of();
+
+        @Option(names = "--body-output", description = "Output name for all targets, or one per target in order.")
+        java.util.List<String> outputs = java.util.List.of();
+
+        @Option(names = "--replace", description = "Replace the existing operation identified by --id in history.")
+        boolean replace;
+
+        ProfileOperation(DocumentSource documents, DocumentSave documentWriter) {
+            super(documents, documentWriter);
+        }
+
+        Feature.ProfileRef selectedProfile(ModelSession session) {
+            var profile = profileRef(session, sketch);
+            if (!includeEnclosed && regions.isEmpty()) return profile;
+            if (!includeEnclosed && regions.size() == 1) return new Feature.ProfileRef(sketch, regions.getFirst());
+            String prefix = profile.profileId() + "/region/";
+            var ids = regions.stream()
+                    .map(region -> {
+                        if (!region.startsWith(prefix)) {
+                            throw new IllegalArgumentException("Choose individual regions from " + sketch);
+                        }
+                        return region.substring(prefix.length());
+                    })
+                    .distinct()
+                    .toList();
+            if (includeEnclosed) {
+                var resolved = SketchCommands.resolvedSketch(session.document(), sourceSketch(session, sketch));
+                if (!(resolved.profile() instanceof Feature.Constrained constrained) || ids.isEmpty()) {
+                    throw new IllegalArgumentException("--include-enclosed requires selected sketch regions");
+                }
+                ids = java.util.List.copyOf(SketchProfiles.includingEnclosedRegions(constrained.geometry(), ids));
+            }
+            return new Feature.ProfileRef(sketch, SketchProfiles.selectedProfileId(profile.profileId(), ids));
+        }
+
+        java.util.List<Feature.BodyRef> targets() {
+            if ((!outputs.isEmpty() && bodies.isEmpty()) || (outputs.size() > 1 && outputs.size() != bodies.size())) {
+                throw new IllegalArgumentException("Provide one output name or one for each target body");
+            }
+            var refs = new java.util.ArrayList<Feature.BodyRef>();
+            var names = outputs.isEmpty() ? java.util.List.of("body") : outputs;
+            for (int i = 0; i < bodies.size(); i++) {
+                refs.add(new Feature.BodyRef(bodies.get(i), names.get(names.size() == 1 ? 0 : i)));
+            }
+            return refs;
+        }
+
+        void apply(ModelSession session, Feature feature) {
+            if (replace) {
+                var original = session.document().features().stream()
+                        .filter(f -> f.id().equals(id))
+                        .findFirst()
+                        .orElseThrow(() -> new ModelException(id, "Specify an existing feature with --id"));
+                if (CutTargets.through(feature)
+                        ? !CutTargets.through(original)
+                        : !(original instanceof Feature.Extrude || BodyExtrusion.modifiesBody(original))) {
+                    throw new ModelException(id, "Existing feature has a different operation type");
+                }
+                session.replace(feature);
+            } else {
+                session.add(feature);
+            }
+        }
+    }
+
+    @Command(
+            name = "extrude",
+            description = "Extrude selected regions by a signed distance.",
+            mixinStandardHelpOptions = true)
+    static final class Extrude extends ProfileOperation {
         @Option(names = "--distance", required = true)
         String distance;
 
-        @Option(names = "--region", description = "Stable region profile ID (default: whole sketch)")
-        String region;
+        @Option(names = "--operation", defaultValue = "NEW_BODY", description = "new_body, join, or cut (blind cut)")
+        BodyExtrusion.Operation operation;
+
+        @Option(
+                names = "--cut-inward",
+                description =
+                        "On a supporting face, infer a blind cut for negative distance and a new body for positive distance.")
+        boolean cutInward;
 
         Extrude(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
@@ -444,13 +528,54 @@ public final class VoxelBrew implements Runnable {
         @Override
         public Integer call() throws Exception {
             var session = session();
-            var profile = profileRef(session, sketch);
-            session.add(new Feature.Extrude(
+            var refs = targets();
+            if (operation == BodyExtrusion.Operation.NEW_BODY && !refs.isEmpty()) {
+                throw new IllegalArgumentException("New body extrusions cannot have targets");
+            }
+            var extrusion = new Feature.Extrude(
                     id,
-                    region == null ? profile : new Feature.ProfileRef(sketch, region),
+                    selectedProfile(session),
                     session.document()
                             .parameters()
-                            .value(distance, dev.voxelbrew.api.model.parameters.ParameterUnit.MM)));
+                            .value(distance, dev.voxelbrew.api.model.parameters.ParameterUnit.MM));
+            var selectedOperation = operation;
+            if (cutInward) {
+                var plane = sourceSketch(session, sketch).plane();
+                if (plane.support() == null
+                        || plane.offsetZ() != 0
+                        || !refs.isEmpty()
+                        || spec.commandLine().getParseResult().hasMatchedOption("--operation")) {
+                    throw new IllegalArgumentException(
+                            "--cut-inward requires a face-supported sketch without offset or explicit operation/targets");
+                }
+                if (extrusion.distance() < 0) {
+                    selectedOperation = BodyExtrusion.Operation.CUT;
+                    var before = new ModelSession(session.document());
+                    if (replace) {
+                        var features = session.document().features();
+                        before.setCursor(java.util.stream.IntStream.range(0, features.size())
+                                .filter(i -> features.get(i).id().equals(id))
+                                .findFirst()
+                                .orElseThrow());
+                    }
+                    try (var evaluation = before.evaluate(pluginDirectory)) {
+                        String host = evaluation.bodyIds().get(plane.support().body());
+                        refs = java.util.List.of(evaluation.bodies().stream()
+                                .filter(body -> body.id().equals(host))
+                                .findFirst()
+                                .orElseThrow(() -> new ModelException(sketch, "Supporting body is unavailable"))
+                                .output());
+                    }
+                }
+            }
+            apply(
+                    session,
+                    new BodyExtrusion(
+                                    extrusion,
+                                    selectedOperation,
+                                    refs.isEmpty() ? null : refs.getFirst(),
+                                    refs.stream().skip(1).toList())
+                            .feature());
             session.bindExpression(id, "distance", distance);
             return save(session);
         }
@@ -458,22 +583,9 @@ public final class VoxelBrew implements Runnable {
 
     @Command(
             name = "cut",
-            description = "Cut a circular profile through the complete current Z extent.",
+            description = "Cut selected sketch regions through one or more target bodies.",
             mixinStandardHelpOptions = true)
-    static final class Cut extends AddFeature {
-
-        @Option(names = "--sketch", required = true)
-        String sketch;
-
-        @Option(names = "--body-feature", required = true, description = "Earlier feature providing the body output")
-        String body;
-
-        @Option(
-                names = "--body-output",
-                defaultValue = "body",
-                description = "Named body output, including negative/positive split halves")
-        String output;
-
+    static final class Cut extends ProfileOperation {
         Cut(DocumentSource documents, DocumentSave documentWriter) {
             super(documents, documentWriter);
         }
@@ -481,7 +593,7 @@ public final class VoxelBrew implements Runnable {
         @Override
         public Integer call() throws Exception {
             var session = session();
-            session.add(new Feature.ThroughCut(id, profileRef(session, sketch), new Feature.BodyRef(body, output)));
+            apply(session, new CutTargets(targets()).throughFeature(id, selectedProfile(session)));
             return save(session);
         }
     }
@@ -586,10 +698,13 @@ public final class VoxelBrew implements Runnable {
                     .orElseThrow(() -> new ModelException(feature, "feature does not exist"));
             if (original instanceof Feature.Extrude e && sketch != null && body == null) {
                 session.replace(new Feature.Extrude(e.id(), profileRef(session, sketch), e.distance()));
-            } else if (original instanceof Feature.ThroughCut c
-                    && (sketch != null || body != null || bodyOutput != null)) {
-                session.replace(new Feature.ThroughCut(
-                        c.id(), sketch == null ? c.profile() : profileRef(session, sketch), repairBody(c.body())));
+            } else if (CutTargets.through(original) && (sketch != null || body != null || bodyOutput != null)) {
+                var c = CutTargets.firstThroughCut(original);
+                var inputs = new java.util.ArrayList<>(
+                        CutTargets.throughTargets(original).bodies());
+                inputs.set(0, repairBody(c.body()));
+                session.replace(new CutTargets(inputs)
+                        .throughFeature(c.id(), sketch == null ? c.profile() : profileRef(session, sketch)));
             } else if (original instanceof Feature.SplitBody s && (body != null || bodyOutput != null)) {
                 session.replace(new Feature.SplitBody(s.id(), repairBody(s.body()), s.plane()));
             } else {
@@ -622,14 +737,27 @@ public final class VoxelBrew implements Runnable {
             try (var evaluation = session.evaluate(pluginDirectory)) {
                 for (int i = 0; i < session.document().features().size(); i++) {
                     var diagnostic = evaluation.diagnostics().get(i);
+                    var feature = session.document().features().get(i);
+                    Object definition = feature;
+                    if (diagnostic.state() == Evaluation.State.OK) {
+                        if (BodyPattern.matches(feature)) {
+                            definition = BodyPattern.from(feature);
+                        } else if (BodyExtrusion.modifiesBody(feature)) {
+                            definition = BodyExtrusion.from(feature);
+                        } else if (feature instanceof Feature.Custom && CutTargets.through(feature)) {
+                            definition = CutTargets.firstThroughCut(feature) + " targets="
+                                    + CutTargets.throughTargets(feature).bodies();
+                        }
+                    }
                     spec.commandLine()
                             .getOut()
                             .printf(
-                                    "%d %s %s %s%n",
+                                    "%d %s %s %s name=%s%n",
                                     i + 1,
                                     diagnostic.state(),
-                                    session.document().features().get(i),
-                                    diagnostic.message());
+                                    feature.id() + " " + definition,
+                                    diagnostic.message(),
+                                    session.document().featureName(diagnostic.featureId(), diagnostic.featureId()));
                 }
                 return evaluation.valid() ? 0 : 1;
             }
@@ -684,6 +812,16 @@ public final class VoxelBrew implements Runnable {
                                     b.maxX(),
                                     b.maxY(),
                                     b.maxZ());
+                    var copy = evaluation.patternCopies().get(body.id());
+                    if (copy != null) {
+                        spec.commandLine().getOut().printf("source=%s copy=%d%n", copy.sourceId(), copy.index());
+                    }
+                    if (session.document().bodyNames().containsKey(body.id())) {
+                        spec.commandLine()
+                                .getOut()
+                                .println(
+                                        "name=" + session.document().bodyNames().get(body.id()));
+                    }
                     if (point != null) {
                         spec.commandLine()
                                 .getOut()
@@ -727,8 +865,7 @@ public final class VoxelBrew implements Runnable {
         dev.voxelbrew.util.logging.Logging.initialize("cli");
         configureInstalledRuntime();
         int result;
-        try (var lease = dev.voxelbrew.util.update.ApplicationImage.running(
-                dev.voxelbrew.util.update.ApplicationImage.Component.CLI)) {
+        try (var lease = dev.voxelbrew.util.update.ApplicationImage.running(installationComponent())) {
             result = commandLine().execute(args);
         } catch (java.io.IOException | RuntimeException | LinkageError failure) {
             log.error("CLI startup or execution failed", failure);
@@ -740,11 +877,16 @@ public final class VoxelBrew implements Runnable {
         System.exit(result);
     }
 
+    static dev.voxelbrew.util.update.ApplicationImage.Component installationComponent() {
+        return Boolean.getBoolean("voxelbrew.cli.desktopInstallation")
+                ? dev.voxelbrew.util.update.ApplicationImage.Component.GUI
+                : dev.voxelbrew.util.update.ApplicationImage.Component.CLI;
+    }
+
     public static CommandLine commandLine() {
         return CliComponent.factory()
                 .create(
-                        dev.voxelbrew.util.di.ApplicationModule.system(
-                                dev.voxelbrew.util.update.ApplicationImage.Component.CLI),
+                        dev.voxelbrew.util.di.ApplicationModule.system(installationComponent()),
                         new dev.voxelbrew.cli.FileIoModule())
                 .commandLine();
     }

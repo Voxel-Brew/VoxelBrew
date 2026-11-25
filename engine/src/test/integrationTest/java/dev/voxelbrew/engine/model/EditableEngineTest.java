@@ -57,6 +57,23 @@ class EditableEngineTest {
     }
 
     @Test
+    void failedSecondCutTargetPublishesNoPartialBody() {
+        var session = new ModelSession(CadDocument.empty());
+        session.add(new Feature.Sketch("plate", "p", XY, new Feature.Rectangle(0, 0, 10, 10)));
+        session.add(new Feature.Extrude("base", new Feature.ProfileRef("plate", "p"), 5));
+        session.add(new Feature.Sketch("hole", "h", XY, new Feature.Circle(5, 5, 2)));
+        var source = new Feature.BodyRef("base", "body");
+        var targets = new CutTargets(List.of(source, new Feature.BodyRef("base", "missing")));
+        session.add(targets.throughFeature("cut", new Feature.ProfileRef("hole", "h")));
+        session.add(new BodyPattern(BodyPattern.Kind.MIRROR, source, BodyPattern.Axis.Z, 2, 1, 0, 0).feature("mirror"));
+        try (var result = session.evaluate()) {
+            assertThat(result.valid()).isFalse();
+            assertThat(result.diagnostics().getLast().state()).isEqualTo(Evaluation.State.OK);
+            assertThat(result.bodyIds()).doesNotContainKey(new Feature.BodyRef("cut", "body"));
+        }
+    }
+
+    @Test
     void solidModificationsSurviveDocumentRoundTrip() throws Exception {
         var session = new ModelSession(CadDocument.empty());
         session.add(new Feature.Sketch(
@@ -385,6 +402,32 @@ class EditableEngineTest {
         try (var files = Files.list(directory)) {
             assertThat(files.count()).isEqualTo(1);
         }
+    }
+
+    @Test
+    void insertsBodyOperationBeforeExistingCutAndRestoresItsInputOnUndo() throws Exception {
+        var session = reference();
+        var original = session.document().features();
+        session.setCursor(3);
+        var joined = new BodyExtrusion(
+                        new Feature.Extrude("extend", new Feature.ProfileRef("plate", "plate.profile"), 8),
+                        BodyExtrusion.Operation.JOIN,
+                        new Feature.BodyRef("thickness", "body"))
+                .feature();
+        session.add(joined);
+        assertThat(session.document().cursor()).isEqualTo(4);
+        assertThat(((Feature.ThroughCut) session.document().features().getLast()).body())
+                .isEqualTo(new Feature.BodyRef("extend", "body"));
+        assertThat(session.undo()).isTrue();
+        assertThat(session.document().features()).isEqualTo(original);
+        assertThat(session.document().cursor()).isEqualTo(3);
+        assertThat(session.redo()).isTrue();
+        assertThat(session.document().cursor()).isEqualTo(4);
+        var file = directory.resolve("inserted.vxb");
+        DocumentWriter.save(session.document(), file, false);
+        var reopened = new ModelSession(DocumentReader.load(file));
+        reopened.setCursor(5);
+        assertReference(reopened, 8, 4);
     }
 
     @Test

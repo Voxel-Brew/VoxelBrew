@@ -35,6 +35,50 @@ final class Dialogs {
             ButtonType.NO,
             "dialog.no");
 
+    record CanvasPick(Button start, Node canvas, java.util.function.Predicate<javafx.geometry.Point2D> choose) {
+        Runnable install(StackPane host, Region shade, VBox panel, Node returnFocus, TranslationService translations) {
+            var back = new Button(translations.translate("action.cancel"));
+            var bar = new HBox(10, new Label(start.getText()), back);
+            bar.setAlignment(Pos.CENTER);
+            bar.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+            bar.getStyleClass().addAll(panel.getStyleClass());
+            bar.getStylesheets().setAll(panel.getStylesheets());
+            StackPane.setAlignment(bar, Pos.TOP_CENTER);
+            Runnable restore = () -> {
+                host.getChildren().remove(bar);
+                shade.setOnMouseClicked(null);
+                shade.setCursor(null);
+                shade.setOpacity(1);
+                panel.setVisible(true);
+                returnFocus.requestFocus();
+            };
+            back.setOnAction(event -> restore.run());
+            start.setOnAction(event -> {
+                panel.setVisible(false);
+                shade.setOpacity(0);
+                shade.setCursor(javafx.scene.Cursor.CROSSHAIR);
+                host.getChildren().add(bar);
+                back.requestFocus();
+                shade.setOnMouseClicked(click -> {
+                    var point = canvas.screenToLocal(click.getScreenX(), click.getScreenY());
+                    if (click.getButton() == javafx.scene.input.MouseButton.PRIMARY
+                            && click.isStillSincePress()
+                            && canvas.contains(point)
+                            && choose.test(point)) restore.run();
+                    click.consume();
+                });
+            });
+            return restore;
+        }
+    }
+
+    static Optional<ButtonType> showStandalone(Alert alert) {
+        alert.getDialogPane()
+                .getStylesheets()
+                .add(Dialogs.class.getResource("workbench.css").toExternalForm());
+        return alert.showAndWait();
+    }
+
     /** Give the action its full translated label width; the editable path takes the remainder. */
     static HBox pathRow(TextField path, Button browse) {
         path.setMinWidth(0);
@@ -46,8 +90,12 @@ final class Dialogs {
         return row;
     }
 
-    @SuppressWarnings("unchecked") // Dialog's default result type is ButtonType, matching Alert.
     static <T> Optional<T> show(Dialog<T> dialog, Window owner, TranslationService translations) {
+        return show(dialog, owner, translations, null);
+    }
+
+    @SuppressWarnings("unchecked") // Dialog's default result type is ButtonType, matching Alert.
+    static <T> Optional<T> show(Dialog<T> dialog, Window owner, TranslationService translations, CanvasPick picker) {
         var scene = owner.getScene();
         var content = WindowFrame.content(scene);
         var previousFocus = scene.getFocusOwner();
@@ -96,12 +144,9 @@ final class Dialogs {
             }
         }
         ButtonBase cancelButton = cancel;
-        EventHandler<KeyEvent> escape = e -> {
-            if (e.getCode() == KeyCode.ESCAPE && cancelButton != null && WindowFrame.content(scene) == host) {
-                e.consume();
-                cancelButton.fire();
-            }
-        };
+        Node initialFocus = focusTarget(initial, cancel, panel);
+        Runnable stopPicking = picker == null ? null : picker.install(host, shade, panel, initialFocus, translations);
+        EventHandler<KeyEvent> escape = modalKeys(host, panel, stopPicking, cancelButton);
         // MenuBarSkin retains a scene-level Escape filter even when its workbench is
         // disabled behind this overlay. Only the topmost modal owns this window filter.
         owner.addEventFilter(KeyEvent.KEY_PRESSED, escape);
@@ -111,7 +156,6 @@ final class Dialogs {
         });
         EventHandler<WindowEvent> hidden = e -> finish.accept(null);
         owner.addEventHandler(WindowEvent.WINDOW_HIDDEN, hidden);
-        Node initialFocus = focusTarget(initial, cancel, panel);
         initialFocus.requestFocus();
         // A newly attached overlay may not yet be focusable until its first scene pulse.
         Platform.runLater(() -> {
@@ -128,6 +172,20 @@ final class Dialogs {
             content.setDisable(disabled);
             if (previousFocus != null) previousFocus.requestFocus();
         }
+    }
+
+    private static EventHandler<KeyEvent> modalKeys(
+            StackPane host, VBox panel, Runnable stopPicking, ButtonBase cancel) {
+        return event -> {
+            if (host.getScene() == null || WindowFrame.content(host.getScene()) != host) return;
+            if (stopPicking != null && !panel.isVisible()) {
+                event.consume();
+                if (event.getCode() == KeyCode.ESCAPE || event.getCode() == KeyCode.ENTER) stopPicking.run();
+            } else if (event.getCode() == KeyCode.ESCAPE && cancel != null) {
+                event.consume();
+                cancel.fire();
+            }
+        };
     }
 
     private static LinkedHashMap<ButtonType, ButtonBase> translatedButtons(

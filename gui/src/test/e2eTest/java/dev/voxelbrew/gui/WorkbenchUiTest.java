@@ -6273,10 +6273,15 @@ class WorkbenchUiTest {
             var recent = (Menu) command(workbench, "menu-open-recent");
             recent.show();
             assertThat(recent.getItems().getFirst().getText()).isEqualTo(saved.toString());
-            recent.getItems().getFirst().fire();
+            var first = recent.getItems().getFirst();
             recent.hide();
+            Platform.runLater(first::fire);
             return null;
         });
+        assertThat(fx(() -> ((Button) node("#project-window-current")).isDefaultButton()))
+                .isTrue();
+        assertThat(fx(() -> node("#project-window-current").getStyleClass())).contains("primary");
+        key(KeyCode.ENTER);
         ready();
         assertThat(document()).isEqualTo(savedDocument);
         assertThat(fx(() -> workbench.controller().path())).isEqualTo(saved);
@@ -6295,6 +6300,7 @@ class WorkbenchUiTest {
                         .size()))
                 .isEqualTo(4);
         click("file-recent-2");
+        key(KeyCode.ENTER);
         ready();
         assertThat(document()).isEqualTo(savedDocument);
         assertThat(fx(() -> workbench.controller().path())).isEqualTo(saved);

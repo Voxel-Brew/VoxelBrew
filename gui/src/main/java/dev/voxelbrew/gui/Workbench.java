@@ -2808,14 +2808,15 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private void chooseProjectWindow(Path path, Runnable currentWindow) {
         var document = controller.snapshot().document();
-        if (!controller.dirty()
+        if (path == null
+                && !controller.dirty()
                 && document.features().isEmpty()
                 && document.gcode().isEmpty()
                 && document.parameters().equals(dev.voxelbrew.api.model.parameters.ParameterSet.empty())) {
             requestChange(currentWindow);
             return;
         }
-        var current = new ButtonType(translations.translate("projectWindow.current"));
+        var current = new ButtonType(translations.translate("projectWindow.current"), ButtonBar.ButtonData.OK_DONE);
         var separate = new ButtonType(translations.translate("projectWindow.new"));
         var dialog = new Alert(
                 Alert.AlertType.CONFIRMATION,
@@ -2824,7 +2825,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 separate,
                 ButtonType.CANCEL);
         dialog.setHeaderText(translations.translate("projectWindow.title"));
-        dialog.getDialogPane().lookupButton(current).setId("project-window-current");
+        var currentButton = dialog.getDialogPane().lookupButton(current);
+        currentButton.setId("project-window-current");
+        currentButton.getStyleClass().add("primary");
         dialog.getDialogPane().lookupButton(separate).setId("project-window-new");
         Dialogs.show(dialog, stage, translations).ifPresent(choice -> {
             if (choice == current) requestChange(currentWindow);

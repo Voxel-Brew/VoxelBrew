@@ -78,6 +78,13 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
         return path;
     }
 
+    private static boolean opensEditorOnDoubleClick(Feature feature) {
+        return feature instanceof Feature.Sketch
+                || feature instanceof Feature.Extrude
+                || dev.voxelbrew.engine.model.CutTargets.through(feature)
+                || BodyExtrusion.modifiesBody(feature);
+    }
+
     static Node featureIcon(Feature feature) {
         if (dev.voxelbrew.engine.model.BodyPattern.matches(feature)) {
             return OperationIcons.icon(dev.voxelbrew.engine.model.BodyPattern.from(feature)
@@ -289,9 +296,7 @@ final class FeatureTimeline extends HBox implements AutoCloseable {
                 select.accept(feature.id());
             });
             button.resizeRelocate(INSET + i * STEP + 3, 10, STEP - 6, 32);
-            if (feature instanceof Feature.Sketch
-                    || feature instanceof Feature.Extrude
-                    || BodyExtrusion.modifiesBody(feature)) {
+            if (opensEditorOnDoubleClick(feature)) {
                 button.setOnMouseClicked(event -> {
                     if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2 && !rebuilding) {
                         editSelectedFeature.run();

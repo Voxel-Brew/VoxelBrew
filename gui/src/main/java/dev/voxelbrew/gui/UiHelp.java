@@ -18,6 +18,7 @@ final class UiHelp {
 
     static String baseDescription(TranslationService translations, String id) {
         String key = id;
+        if (id.equals("edit-cut-profile")) return translations.translate("help.cut");
         if (id.startsWith("print-remove-plate-")) {
             return translations.translate("help.print-remove-plate");
         }

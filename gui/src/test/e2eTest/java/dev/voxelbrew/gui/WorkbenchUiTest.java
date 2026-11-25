@@ -7,6 +7,7 @@ import dev.voxelbrew.api.model.*;
 import dev.voxelbrew.api.model.parameters.*;
 import dev.voxelbrew.api.model.printing.*;
 import dev.voxelbrew.api.model.sketch.SketchGeometry;
+import dev.voxelbrew.api.model.sketch.SketchText;
 import dev.voxelbrew.api.printer.Printer;
 import dev.voxelbrew.api.printer.driver.*;
 import dev.voxelbrew.engine.model.*;
@@ -8531,6 +8532,17 @@ class WorkbenchUiTest {
         sketchDrag(30, 20, 35, 20, false);
         assertThat(before.distance(sketchGeometry().curves(text).getFirst().at(0)) > 4)
                 .isTrue();
+        var geometry = sketchGeometry();
+        var anchor = SketchText.anchor(geometry, geometry.entity(text.id()));
+        var guide = geometry.entity(arc);
+        var slideTo = guide.at(.25);
+        var pointer = slideTo.plus(guide.derivative(.25).unit().normal().times(3));
+        sketchDrag(anchor.x(), anchor.y(), pointer.x(), pointer.y(), false);
+        sketchReady();
+        var moved = sketchGeometry();
+        assertThat(moved.entity(text.id()).value(1)).isCloseTo(0, within(.01));
+        assertThat(SketchText.anchor(moved, moved.entity(text.id())).distance(slideTo))
+                .isLessThan(.6);
         Path artifacts = Path.of(System.getProperty("voxelbrew.ui.artifacts"));
         fx(() -> {
             Screenshot.save(stage.getScene(), artifacts.resolve("sketch-types-tangent-and-path-text.png"));

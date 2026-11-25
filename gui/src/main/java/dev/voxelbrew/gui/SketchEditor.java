@@ -2637,7 +2637,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         var geometry = controller.definition();
         var entity = geometry.entity(dragPoint.entityId());
         if (entity.kind() == Kind.TEXT && !entity.text().pathId().isEmpty()) {
-            return SketchTools.pathCoordinates(geometry.entity(entity.text().pathId()), position);
+            return new Vec(SketchTools.pathOffset(geometry.entity(entity.text().pathId()), position), 0);
         }
         return position;
     }

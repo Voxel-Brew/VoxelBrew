@@ -30,7 +30,7 @@ jobs:
       - name: Check Java member order
         run: ./gradlew --build-cache checkJavaMemberOrder -PbundleSlicers=false
       - name: Check Java sources and analyze application and fixture bytecode
-        run: ./gradlew --build-cache basicChecks checkstyleAll :engine:checkExporterFixture -PbundleSlicers=false -x :checkJavaMemberOrder
+        run: ./gradlew --stacktrace --build-cache basicChecks checkstyleAll :engine:checkExporterFixture -PbundleSlicers=false -x :checkJavaMemberOrder
       - uses: ./.github/actions/cache-protoc
         with:
           save: "true"

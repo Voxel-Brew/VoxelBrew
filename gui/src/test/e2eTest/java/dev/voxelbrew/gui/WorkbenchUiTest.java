@@ -6679,15 +6679,20 @@ class WorkbenchUiTest {
                 for (var parent = target.getParent(); parent != null; parent = parent.getParent()) {
                     if (!(parent instanceof ScrollPane scroll)) continue;
                     var viewport = scroll.lookup(".viewport");
-                    var visible = viewport.localToScreen(viewport.getBoundsInLocal());
-                    if (bounds.getCenterY() >= visible.getMinY() && bounds.getCenterY() <= visible.getMaxY()) continue;
+                    var visible = viewport.localToScreen(viewport.getLayoutBounds());
+                    if (bounds.getMinY() >= visible.getMinY() && bounds.getMaxY() <= visible.getMaxY()) continue;
+                    if (bounds.getHeight() > visible.getHeight()
+                            && bounds.getCenterY() >= visible.getMinY()
+                            && bounds.getCenterY() <= visible.getMaxY()) continue;
                     double overflow = scroll.getContent().getLayoutBounds().getHeight() - visible.getHeight();
                     if (overflow <= 0) continue;
                     double delta = (bounds.getCenterY() - visible.getCenterY()) / overflow;
-                    scroll.setVvalue(Math.clamp(
+                    double next = Math.clamp(
                             scroll.getVvalue() + delta * (scroll.getVmax() - scroll.getVmin()),
                             scroll.getVmin(),
-                            scroll.getVmax()));
+                            scroll.getVmax());
+                    if (next == scroll.getVvalue()) continue;
+                    scroll.setVvalue(next);
                     return false;
                 }
                 return true;
@@ -8365,6 +8370,7 @@ class WorkbenchUiTest {
         sketchNumericPoint(30, 35);
         click("sketch-complete-curve");
         sketchReady();
+        click("sketch-fit");
         var before = sketchGeometry();
         sketchDrag(0, 35, 2, 37, false);
         var control = sketchGeometry().entities().stream()

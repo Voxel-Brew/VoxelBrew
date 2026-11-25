@@ -523,6 +523,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         var legend = configurePreviewControls();
         copyErrors.setId("print-copy-errors");
         copyErrors.setText(translations.translate("print.copyErrors"));
+        UiHelp.describe(copyErrors, translations.translate("help.print-copy-errors"));
         copyErrors.managedProperty().bind(copyErrors.visibleProperty());
         copyErrors.setOnAction(event -> {
             var content = new javafx.scene.input.ClipboardContent();

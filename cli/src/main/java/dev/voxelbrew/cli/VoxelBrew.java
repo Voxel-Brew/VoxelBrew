@@ -465,8 +465,8 @@ public final class VoxelBrew implements Runnable {
                     .distinct()
                     .toList();
             if (includeEnclosed) {
-                if (!(sourceSketch(session, sketch).profile() instanceof Feature.Constrained constrained)
-                        || ids.isEmpty()) {
+                var resolved = SketchCommands.resolvedSketch(session.document(), sourceSketch(session, sketch));
+                if (!(resolved.profile() instanceof Feature.Constrained constrained) || ids.isEmpty()) {
                     throw new IllegalArgumentException("--include-enclosed requires selected sketch regions");
                 }
                 ids = java.util.List.copyOf(SketchProfiles.includingEnclosedRegions(constrained.geometry(), ids));

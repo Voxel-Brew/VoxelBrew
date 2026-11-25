@@ -2,6 +2,8 @@ plugins { application }
 
 apply(from = rootProject.file("gradle/packaging.gradle.kts"))
 
+tasks.withType<Checkstyle>().configureEach { maxHeapSize.set("1g") }
+
 val javafxPlatform =
     if (System.getProperty("os.name").startsWith("Windows")) "win"
     else if (System.getProperty("os.name").startsWith("Mac"))

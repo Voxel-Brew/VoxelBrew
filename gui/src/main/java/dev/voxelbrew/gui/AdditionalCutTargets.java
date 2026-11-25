@@ -25,6 +25,8 @@ final class AdditionalCutTargets extends VBox {
         remove = new Button(tr.translate("gui.remove"));
         add.setId("add-cut-target");
         remove.setId("remove-cut-target");
+        UiHelp.install(add, tr);
+        UiHelp.install(remove, tr);
         add.setOnAction(event -> this.choices.keySet().stream()
                 .filter(ref -> !ref.equals(first.get()) && !selected().contains(ref))
                 .findFirst()

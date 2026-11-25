@@ -79,6 +79,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     private final TabPane workspaces;
 
     private final TreeView<Entry> tree = new TreeView<>();
+    private final TreeItem<Entry> operationRows = new TreeItem<>();
+    private final TreeItem<Entry> sketchRows = new TreeItem<>();
+    private final TreeItem<Entry> bodyRows = new TreeItem<>();
 
     private final VBox inspector = new VBox(12), form = new VBox(9);
 
@@ -334,12 +337,15 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                         || controller.rebuilding()
                         || !controller.build().valid());
             });
-            setOnMouseClicked(event -> {
-                if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2 && canRename()) {
-                    requestRename();
-                    event.consume();
-                }
-            });
+            setOnMouseClicked(this::activateRow);
+        }
+
+        private void activateRow(MouseEvent event) {
+            if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2 && canRename()) {
+                if (getTreeItem().getParent() == sketchRows) editSelectedFeature();
+                else requestRename();
+                event.consume();
+            }
         }
 
         private boolean canRename() {
@@ -1203,50 +1209,66 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private void rebuildTree(CadDocument document) {
         tree.edit(null);
-        var root = new TreeItem<>(new Entry(null, translations.translate("gui.document"), false));
-        var features = new TreeItem<>(
-                new Entry(null, translations.translate("gui.features"), false), OperationIcons.icon("features"));
-        features.setExpanded(true);
+        var selectedRow = tree.getSelectionModel().getSelectedItem();
+        boolean keepSketchRow = selectedRow != null && selectedRow.getParent() == sketchRows;
+        var operations = new ArrayList<TreeItem<Entry>>();
+        var sketches = new ArrayList<TreeItem<Entry>>();
+        var bodies = new ArrayList<TreeItem<Entry>>();
+        var diagnostics = new HashMap<String, String>();
+        for (var result : controller.build().diagnostics()) {
+            if (result.state() != Evaluation.State.OK) {
+                diagnostics.putIfAbsent(result.featureId(), "  [" + result.state() + "]");
+            }
+        }
         for (int i = 0; i < document.features().size(); i++) {
             var feature = document.features().get(i);
-            String diagnostic = controller.build().diagnostics().stream()
-                    .filter(d -> d.featureId().equals(feature.id()) && d.state() != Evaluation.State.OK)
-                    .map(d -> "  [" + d.state() + "]")
-                    .findFirst()
-                    .orElse("");
-            var item = new TreeItem<>(new Entry(feature.id(), (i + 1) + "  " + shortName(feature) + diagnostic, false));
+            String diagnostic = diagnostics.getOrDefault(feature.id(), "");
+            String label = document.featureName(feature.id(), defaultFeatureName(feature));
+            var item = new TreeItem<>(new Entry(feature.id(), (i + 1) + "  " + label + diagnostic, false));
             item.setGraphic(FeatureTimeline.featureIcon(feature));
-            features.getChildren().add(item);
+            operations.add(item);
+            if (feature instanceof Feature.Sketch) {
+                var sketchRow = new TreeItem<>(
+                        new Entry(feature.id(), document.featureName(feature.id(), feature.id()) + diagnostic, false),
+                        FeatureTimeline.featureIcon(feature));
+                sketches.add(sketchRow);
+            }
         }
-        var bodies = new TreeItem<>(
-                new Entry(null, translations.translate("gui.bodies"), true), OperationIcons.icon("bodies"));
-        bodies.setExpanded(true);
         int index = 1;
         for (var body : controller.build().bodies()) {
-            bodies.getChildren()
-                    .add(new TreeItem<>(
-                            new Entry(
-                                    body.id(),
-                                    document.bodyName(body.id(), translations.translate("feature.body", index++)),
-                                    true),
-                            OperationIcons.icon("new-body")));
+            bodies.add(new TreeItem<>(
+                    new Entry(
+                            body.id(),
+                            document.bodyName(body.id(), translations.translate("feature.body", index++)),
+                            true),
+                    OperationIcons.icon("new-body")));
         }
-        root.getChildren().add(features);
-        root.getChildren().add(bodies);
-        tree.setRoot(root);
-        for (var item : features.getChildren()) {
-            if (item.getValue().id().equals(selectedFeature)) {
-                tree.getSelectionModel().select(item);
-            }
+        operationRows.getChildren().setAll(operations);
+        sketchRows.getChildren().setAll(sketches);
+        bodyRows.getChildren().setAll(bodies);
+        if (keepSketchRow && sketchRows.isExpanded()) {
+            sketches.stream()
+                    .filter(row -> row.getValue().id().equals(selectedFeature))
+                    .findFirst()
+                    .ifPresent(tree.getSelectionModel()::select);
         }
     }
 
     private void synchronizeTreeSelection() {
         if (tree.getRoot() == null) return;
         String id = selectedBody == null ? selectedFeature : selectedBody;
+        var current = tree.getSelectionModel().getSelectedItem();
+        if (id != null
+                && current != null
+                && current.getValue().body() == (selectedBody != null)
+                && id.equals(current.getValue().id())) {
+            return;
+        }
         for (var group : tree.getRoot().getChildren()) {
+            if (!group.isExpanded()) continue;
             for (var item : group.getChildren()) {
-                if (item.getValue().id().equals(id)) {
+                if (item.getValue().body() == (selectedBody != null)
+                        && item.getValue().id().equals(id)) {
                     tree.getSelectionModel().select(item);
                     return;
                 }
@@ -3153,6 +3175,18 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private VBox modelPanel() {
         tree.setId("model-tree");
+        var root = new TreeItem<>(new Entry(null, translations.translate("gui.document"), false));
+        operationRows.setValue(new Entry(null, translations.translate("gui.features"), false));
+        operationRows.setGraphic(OperationIcons.icon("features"));
+        sketchRows.setValue(new Entry(null, translations.translate("gui.sketches"), false));
+        sketchRows.setGraphic(OperationIcons.icon("constrained-sketch"));
+        bodyRows.setValue(new Entry(null, translations.translate("gui.bodies"), true));
+        bodyRows.setGraphic(OperationIcons.icon("bodies"));
+        for (var group : List.of(operationRows, bodyRows, sketchRows)) {
+            group.setExpanded(true);
+            root.getChildren().add(group);
+        }
+        tree.setRoot(root);
         tree.setShowRoot(false);
         tree.setEditable(true);
         tree.setCellFactory(view -> new BodyTreeCell());

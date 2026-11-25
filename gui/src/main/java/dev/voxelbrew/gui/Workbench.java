@@ -3308,6 +3308,17 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         });
     }
 
+    private void escape() {
+        if (printing.cancelPlateRename() || printing.cancelDrag()) return;
+        if (tree.getEditingItem() != null) {
+            tree.edit(null);
+        } else if (designTab.isSelected() && tool == Tool.NONE && selectedBody != null) {
+            selectFeature(null);
+        } else {
+            cancelTool();
+        }
+    }
+
     private void installShortcuts(
             MenuBar menuBar,
             MenuItem newItem,
@@ -3322,20 +3333,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             var focus = getScene().getFocusOwner();
             if (KeyboardShortcuts.textUndo(e, focus)) return;
             if (e.getCode() == KeyCode.ESCAPE) {
-                if (printing.cancelPlateRename() || printing.cancelDrag()) {
-                    e.consume();
-                    return;
-                }
-                if (tree.getEditingItem() != null) {
-                    tree.edit(null);
-                    e.consume();
-                    return;
-                }
-                if (designTab.isSelected() && tool == Tool.NONE && selectedBody != null) {
-                    selectFeature(null);
-                } else {
-                    cancelTool();
-                }
+                escape();
                 e.consume();
                 return;
             }

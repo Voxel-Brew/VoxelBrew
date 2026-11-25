@@ -1151,6 +1151,14 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             var styles = new LinkedHashMap<String, BodyStyle>();
             controller.build().bodies().forEach(b -> styles.put(b.id(), document.bodyStyle(b.id())));
             viewport.setBodyStyles(styles);
+            String extrusionId = tool == Tool.EDIT_PROFILE ? selectedFeature : controller.extrusionPreviewId();
+            viewport.highlightExtrusionBodies(
+                    extrusionId == null
+                            ? java.util.Set.of()
+                            : controller.build().bodyIds().entrySet().stream()
+                                    .filter(entry -> entry.getKey().featureId().equals(extrusionId))
+                                    .map(Map.Entry::getValue)
+                                    .collect(java.util.stream.Collectors.toSet()));
             synchronizeTreeSelection();
             if (tool != Tool.EDIT_PROFILE) {
                 viewport.showSketches(effective.subList(0, document.cursor()), selectedFeature);

@@ -3073,6 +3073,8 @@ class WorkbenchUiTest {
         click("extrude");
         ready();
         assertThat(volume()).isCloseTo(1500, org.assertj.core.data.Offset.offset(.001));
+        assertExtrusionBodyVisible(
+                fx(() -> workbench.controller().build().bodies().getFirst().id()));
         modelClick(4, 4, 0);
         ready();
         assertThat(volume()).isCloseTo(1000, org.assertj.core.data.Offset.offset(.001));
@@ -3234,6 +3236,8 @@ class WorkbenchUiTest {
         });
         doubleClick("history-1");
         assertThat(fx(() -> workbench.viewport().orientationProperty().get())).isEqualTo(ViewOrientation.named("Top"));
+        assertExtrusionBodyVisible(
+                fx(() -> workbench.controller().build().bodyIds().get(new Feature.BodyRef("first", "body"))));
         assertThat(fx(() -> ((CheckBox) node("#extrude-whole")).isSelected())).isFalse();
         modelClick(0, 0, 0);
         assertThat(fx(() -> node("#apply-extrusion-profile").isDisabled())).isTrue();
@@ -7463,6 +7467,21 @@ class WorkbenchUiTest {
         text("file-path", file.toString());
         click("file-confirm");
         ready();
+    }
+
+    private void assertExtrusionBodyVisible(String id) throws Exception {
+        fx(() -> {
+            var root = ((SubScene) node("#viewport-scene")).getRoot();
+            var mesh = root.lookupAll("MeshView").stream()
+                    .filter(n -> ("body-" + id).equals(n.getId()))
+                    .map(javafx.scene.shape.MeshView.class::cast)
+                    .findFirst();
+            assertThat(mesh).as("Visible mesh for body %s", id).isPresent();
+            assertThat(treeVisible(mesh.get())).isTrue();
+            assertThat(((javafx.scene.paint.PhongMaterial) mesh.get().getMaterial()).getDiffuseColor())
+                    .isEqualTo(javafx.scene.paint.Color.web("#efb865"));
+            return null;
+        });
     }
 
     private void checkTextAngleBounds(String fieldId) throws Exception {

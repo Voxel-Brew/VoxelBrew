@@ -517,6 +517,10 @@ public final class DocumentController implements AutoCloseable {
         return preview != null;
     }
 
+    String extrusionPreviewId() {
+        return preview != null && displayedPreview ? preview.id() : null;
+    }
+
     boolean canCommitExtrusion() {
         return preview != null
                 && (!BodyExtrusion.modifiesBody(preview) || !rebuilding && displayedPreview && build.valid());

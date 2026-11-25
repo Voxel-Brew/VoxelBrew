@@ -104,6 +104,7 @@ public final class Viewport extends StackPane {
     private boolean edgePickEnabled;
 
     private String selected;
+    private java.util.Set<String> extrusionBodies = java.util.Set.of();
 
     private List<Feature> shownSketches = List.of();
 
@@ -822,8 +823,7 @@ public final class Viewport extends StackPane {
         profileCurves = List.of();
         aids.setVisible(!isolate && rendering != Rendering.Style.TECHNICAL);
         viewCube.setVisible(!isolate);
-        bodies.setVisible(!isolate);
-        outlines.setVisible(!isolate);
+        bodies.setMouseTransparent(isolate);
         construction.setVisible(!isolate);
     }
 
@@ -1132,10 +1132,17 @@ public final class Viewport extends StackPane {
                 material = new PhongMaterial(key.equals(id) ? Color.web("#fff7e6") : Color.WHITE);
                 material.setSpecularColor(Color.BLACK);
             }
+            if (extrusionBodies.contains(key)) material.setDiffuseColor(Color.web("#efb865"));
             view.setMaterial(material);
         });
         edgeViews.forEach((key, view) ->
                 view.setMaterial(new PhongMaterial(key.equals(id) ? Color.web("#a86600") : Color.web("#202124"))));
+    }
+
+    void highlightExtrusionBodies(java.util.Set<String> ids) {
+        if (extrusionBodies.equals(ids)) return;
+        extrusionBodies = java.util.Set.copyOf(ids);
+        select(selected);
     }
 
     public void setBodyStyles(Map<String, dev.voxelbrew.api.model.BodyStyle> styles) {

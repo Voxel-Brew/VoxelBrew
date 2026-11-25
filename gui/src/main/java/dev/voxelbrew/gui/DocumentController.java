@@ -505,7 +505,11 @@ public final class DocumentController implements AutoCloseable {
     }
 
     public void replaceFeature(Feature feature) {
-        session.replace(feature);
+        replaceFeature(feature, session.document().parameters());
+    }
+
+    void replaceFeature(Feature feature, dev.voxelbrew.api.model.parameters.ParameterSet parameters) {
+        session.replace(feature, parameters);
         preview = null;
         schedule(session.document(), false);
     }

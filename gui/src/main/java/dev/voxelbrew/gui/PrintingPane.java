@@ -192,6 +192,8 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     private double viewScale, viewOx, viewOy;
 
     private PrintDepthBuffer placementRaster;
+    private javafx.scene.image.WritableImage placementImage;
+    private boolean workspaceActive;
 
     private double placementRasterScale = 1;
 
@@ -2067,6 +2069,18 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         updateJob();
     }
 
+    void setWorkspaceActive(boolean active) {
+        workspaceActive = active;
+        if (!active) {
+            navigationFrame.stop();
+            navigationIdle.stop();
+            placementRaster = null;
+            placementImage = null;
+            if (navigationView != null) navigationView.hide(null);
+            dragOverlay.setVisible(false);
+        }
+    }
+
     void documentChanged() {
         if (closed) return;
         var snapshot = document.snapshot().document();
@@ -2233,17 +2247,20 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     }
 
     private void draw(boolean movingCamera) {
+        if (!workspaceActive || closed) return;
         if (viewCube != null) viewCube.setOrientation(camera().orientation());
         selectedObjectTooltip.hide();
         selectedObjectName.setVisible(false);
-        placementRaster = null;
         var graphics = canvas.getGraphicsContext2D();
         localGizmoAxes.setVisible(false);
         double w = canvas.getWidth(), h = canvas.getHeight();
         graphics.setFill(dark ? Color.web("#182028") : Color.web("#edf1f4"));
         graphics.fillRect(0, 0, w, h);
         if (rotationDrag == null) rotationRings = List.of();
-        if (w < 1 || h < 1) return;
+        if (w < 1 || h < 1) {
+            placementRaster = null;
+            return;
+        }
         double extentX = threeDimensional ? Math.hypot(plateWidth, plateDepth) : plateWidth;
         double extentY = threeDimensional ? extentX : plateDepth;
         double scale = Math.max(0.001, Math.min((w - 48) / extentX, (h - 48) / extentY)) * camera().zoom();
@@ -2255,20 +2272,28 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         viewOy = oy;
         drawBed(ox, oy, scale);
         if (toolpathPreview.isSelected() && displayed != null && !previewLayers.isEmpty()) {
+            placementRaster = null;
             drawToolpath(ox, oy, scale);
         } else {
-            layerLabel.setText(translations.translate("gui.build_placement_slice_to_preview_actual_toolpaths"));
-            if (model == null) return;
-            if (movingCamera && navigationView != null) {
-                navigationView.show(
-                        model, document.build(), instances.getValue(), camera(), ox, oy, scale, Point2D.ZERO);
-                return;
-            }
-            renderPlacement(ox, oy, scale, (int) Math.ceil(w), (int) Math.ceil(h), movingCamera);
-            drawSelectedObjectName(ox, oy, scale, w, h);
-            drawSupportOutlines(graphics, ox, oy, scale);
-            drawRotationGizmo();
+            drawPlacedInstances(ox, oy, scale, w, h, movingCamera);
         }
+    }
+
+    private void drawPlacedInstances(double ox, double oy, double scale, double w, double h, boolean movingCamera) {
+        layerLabel.setText(translations.translate("gui.build_placement_slice_to_preview_actual_toolpaths"));
+        if (model == null || model.instances().isEmpty()) {
+            placementRaster = null;
+            return;
+        }
+        if (movingCamera && navigationView != null) {
+            placementRaster = null;
+            navigationView.show(model, document.build(), instances.getValue(), camera(), ox, oy, scale, Point2D.ZERO);
+            return;
+        }
+        renderPlacement(ox, oy, scale, (int) Math.ceil(w), (int) Math.ceil(h), movingCamera);
+        drawSelectedObjectName(ox, oy, scale, w, h);
+        drawSupportOutlines(canvas.getGraphicsContext2D(), ox, oy, scale);
+        drawRotationGizmo();
     }
 
     private PrintDepthBuffer.Point projected(double x, double y, double z, double ox, double oy, double scale) {
@@ -2282,9 +2307,12 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         double pixelScale =
                 Math.max(2, window == null ? 1 : Math.max(window.getOutputScaleX(), window.getOutputScaleY()));
         if (movingCamera) pixelScale = Math.min(1, Math.sqrt(250_000.0 / width / height));
+        // The depth/edge buffers use 48 bytes per pixel, in addition to the Prism texture.
+        pixelScale = Math.min(
+                pixelScale, Math.min(4096.0 / Math.max(width, height), Math.sqrt(2_000_000.0 / width / height)));
         int imageWidth = (int) Math.ceil(width * pixelScale);
         int imageHeight = (int) Math.ceil(height * pixelScale);
-        var raster = new PrintDepthBuffer(imageWidth, imageHeight, pixelScale);
+        var raster = preparePlacementRaster(imageWidth, imageHeight, pixelScale);
         ox *= pixelScale;
         oy *= pixelScale;
         scale *= pixelScale;
@@ -2317,20 +2345,23 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
             }
         }
         drawPlacementEdges(raster, ox, oy, scale);
-        var image = new javafx.scene.image.WritableImage(imageWidth, imageHeight);
-        image.getPixelWriter()
-                .setPixels(
-                        0,
-                        0,
-                        imageWidth,
-                        imageHeight,
-                        javafx.scene.image.PixelFormat.getIntArgbInstance(),
-                        raster.pixels(),
-                        0,
-                        imageWidth);
-        canvas.getGraphicsContext2D().drawImage(image, 0, 0, width, height);
+        raster.writeTo(placementImage.getPixelWriter());
+        canvas.getGraphicsContext2D().drawImage(placementImage, 0, 0, width, height);
         placementRaster = raster;
         placementRasterScale = pixelScale;
+    }
+
+    private PrintDepthBuffer preparePlacementRaster(int imageWidth, int imageHeight, double pixelScale) {
+        if (placementImage == null
+                || placementImage.getWidth() != imageWidth
+                || placementImage.getHeight() != imageHeight) {
+            placementImage = new javafx.scene.image.WritableImage(imageWidth, imageHeight);
+        }
+        if (placementRaster == null || !placementRaster.matches(imageWidth, imageHeight, pixelScale)) {
+            return new PrintDepthBuffer(imageWidth, imageHeight, pixelScale);
+        }
+        placementRaster.clear();
+        return placementRaster;
     }
 
     private void drawRotationGizmo() {

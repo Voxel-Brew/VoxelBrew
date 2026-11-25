@@ -3492,6 +3492,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         }
         workspaces.setId("workspaces");
         workspaces.getSelectionModel().selectedItemProperty().addListener((o, a, b) -> {
+            printing.setWorkspaceActive(b == printTab);
             quickMenus.forEach(QuickMenu::hide);
             if (b == printTab && printTab.isDisable()) {
                 workspaces.getSelectionModel().select(designTab);
@@ -3511,7 +3512,6 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 return;
             }
             cancelTool();
-            printing.documentChanged();
         });
     }
 

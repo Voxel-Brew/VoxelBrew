@@ -1138,6 +1138,16 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             }
             path.setValue(chosen.text().pathId());
             path.setPromptText(translations.translate("gui.no_path_baseline_position"));
+            var pickPath = new Button(translations.translate("sketch.pickTextPath"));
+            pickPath.setId("sketch-pick-text-path");
+            var picker = new Dialogs.CanvasPick(pickPath, canvas, point -> {
+                var hit = hitCurve(point.getX(), point.getY(), true);
+                if (hit == null) return false;
+                var id = hit.ref().entityId();
+                if (!path.getItems().contains(id)) path.getItems().add(id);
+                path.setValue(id);
+                return true;
+            });
             var style = new ComboBox<String>();
             style.setId("sketch-edit-text-style");
             style.getItems().setAll(textStyle.getItems());
@@ -1176,7 +1186,8 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             fields.addRow(3, new Label(translations.translate("gui.height_mm")), height);
             fields.addRow(4, new Label(translations.translate("sketch.text.horizontal")), horizontal);
             fields.addRow(5, new Label(translations.translate("sketch.text.vertical")), vertical);
-            fields.addRow(6, new Label(translations.translate("gui.path_blank_to_detach")), path);
+            fields.addRow(
+                    6, new Label(translations.translate("gui.path_blank_to_detach")), new VBox(4, path, pickPath));
             fields.addRow(7, flipX, flipY);
             fields.addRow(8, new Label(translations.translate("gui.angle_degrees")), angle);
             dialog.getDialogPane().setContent(new VBox(7, fields, message));
@@ -1191,6 +1202,9 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                             var position = new Vec(current.value(0), current.value(1));
                             if (!chosen.text().pathId().equals(path.getValue())) {
                                 var anchor = SketchText.anchor(geometry, current);
+                                if (!path.getValue().isEmpty()) {
+                                    geometry = withReferences(geometry, List.of(new Ref(path.getValue(), Part.OBJECT)));
+                                }
                                 position = path.getValue().isEmpty()
                                         ? anchor
                                         : new Vec(SketchTools.pathOffset(geometry.entity(path.getValue()), anchor), 0);
@@ -1233,7 +1247,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                         }
                     });
             dialog.setResultConverter(button -> button == ButtonType.OK ? result[0] : null);
-            Dialogs.show(dialog, getScene().getWindow(), translations)
+            Dialogs.show(dialog, getScene().getWindow(), translations, picker)
                     .ifPresent(e -> controller.edit(e.geometry(), e.parameters()));
         } catch (RuntimeException failure) {
             error.setText(failure.getMessage());

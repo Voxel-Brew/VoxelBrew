@@ -8554,6 +8554,26 @@ class WorkbenchUiTest {
         key(KeyCode.ENTER);
         sketchReady();
         assertThat(sketchGeometry().entity(text.id()).text().pathId()).isEqualTo("");
+        sketchReference(text.id());
+        click("sketch-edit-text");
+        text("sketch-edit-text-content", "CAM");
+        click("sketch-pick-text-path");
+        key(KeyCode.ESCAPE);
+        assertThat(fx(() -> ((ComboBox<?>) node("#sketch-edit-text-path")).getValue()))
+                .isEqualTo("");
+        click("sketch-pick-text-path");
+        var pick = moved.entity(arc).at(.55);
+        sketchClick(pick.x(), pick.y(), false);
+        assertThat(fx(() -> ((TextField) node("#sketch-edit-text-content")).getText()))
+                .isEqualTo("CAM");
+        assertThat(fx(() -> ((ComboBox<?>) node("#sketch-edit-text-path")).getValue()))
+                .isEqualTo(arc);
+        key(KeyCode.ENTER);
+        sketchReady();
+        assertThat(sketchGeometry().entity(text.id()).text().pathId()).isEqualTo(arc);
+        click("sketch-undo");
+        sketchReady();
+        assertThat(sketchGeometry().entity(text.id()).text().pathId()).isEmpty();
         click("sketch-undo");
         sketchReady();
         assertThat(sketchGeometry().entity(text.id()).text().pathId()).isEqualTo(arc);

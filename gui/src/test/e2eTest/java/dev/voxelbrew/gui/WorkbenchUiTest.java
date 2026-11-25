@@ -1026,6 +1026,41 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void dimensionFieldAdoptsCompatibleLiteralUnitsAndPersistsTheirScale() throws Exception {
+        openPrepared("plate-5mm.vxb");
+        click("history-1");
+        text("dimension-distance", "250 deg");
+        key(KeyCode.TAB);
+        var field = fx(() -> (FormulaField) node("#dimension-distance"));
+        assertThat(fx(() -> ((Label) field.lookup(".formula-unit")).getText())).isEqualTo("mm");
+        assertThat(fx(() -> field.getPseudoClassStates()
+                        .contains(javafx.css.PseudoClass.getPseudoClass("formula-invalid"))))
+                .isTrue();
+        text("dimension-distance", "250 cm");
+        key(KeyCode.TAB);
+        assertThat(fx(() -> field.getText())).isEqualTo("250");
+        assertThat(fx(() -> ((Label) field.lookup(".formula-unit")).getText())).isEqualTo("cm");
+        assertThat(fx(field::value)).isEqualTo(2500);
+        click("apply-distance");
+        ready();
+        var extrusion = (Feature.Extrude) document().features().get(1);
+        assertThat(document().parameters().binding(new ParameterSet.Target(extrusion.id(), "distance")))
+                .isEqualTo("250 cm");
+        click("history-0");
+        click("history-1");
+        assertThat(fx(() -> ((FormulaField) node("#dimension-distance")).value()))
+                .isEqualTo(2500);
+        assertThat(fx(() -> ((TextField) node("#dimension-distance")).getText()))
+                .isEqualTo("250");
+        fx(() -> {
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "dimension-display-unit.png"));
+            return null;
+        });
+    }
+
+    @Test
     void formulaUnitSuffixesFollowDeclaredUnitsWithoutChangingInput() throws Exception {
         fx(() -> {
             var selected = new javafx.beans.property.SimpleObjectProperty<>(ParameterUnit.MM);
@@ -1038,6 +1073,16 @@ class WorkbenchUiTest {
             field.setSkin(field.createDefaultSkin());
             field.refreshFormula();
             var label = (Label) field.lookup(".formula-unit");
+            selected.set(ParameterUnit.DEG);
+            field.setExpression("1 rad");
+            assertThat(label.getText()).isEqualTo("rad");
+            assertThat(field.value()).isCloseTo(Math.toDegrees(1), within(1e-9));
+            field.setExpression("5 cm");
+            assertThatThrownBy(field::value).isInstanceOf(IllegalArgumentException.class);
+            selected.set(ParameterUnit.NUMBER);
+            field.setExpression("5 rad");
+            assertThatThrownBy(field::value).isInstanceOf(IllegalArgumentException.class);
+            field.setExpression("5");
             for (var unit : ParameterUnit.values()) {
                 selected.set(unit);
                 assertThat(field.dragStep())

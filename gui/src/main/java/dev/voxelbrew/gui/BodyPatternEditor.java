@@ -96,7 +96,7 @@ final class BodyPatternEditor extends VBox {
     ParameterSet bindings() {
         var result = parameters;
         for (var entry : inputs.entrySet()) {
-            String text = entry.getValue().getText();
+            String text = entry.getValue().expression();
             result = result.bind(new ParameterSet.Target(id, entry.getKey()), Expressions.isNumber(text) ? "" : text);
         }
         return result;

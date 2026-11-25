@@ -1035,7 +1035,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
             try {
                 var meshes = new LinkedHashMap<String, MeshData>();
                 document.build().bodies().forEach(b -> meshes.put(b.id(), b.mesh()));
-                model = new ManufacturingModel(snapshot.id(), revision, setup(), PrintProfile.resolve(setup()), meshes);
+                model = ManufacturingModels.fromMeshes(snapshot.id(), revision, setup(), meshes);
                 var captured = model;
                 long ticket = ++validationSequence;
                 if (validationTask != null) validationTask.cancel(false);

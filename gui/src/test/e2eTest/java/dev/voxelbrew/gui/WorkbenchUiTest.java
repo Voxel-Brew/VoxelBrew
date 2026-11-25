@@ -8779,6 +8779,50 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void inwardFaceExtrusionCutsItsSupportUnlessManuallyOverridden() throws Exception {
+        openPrepared("plate-5mm.vxb");
+        double original = volume();
+        var body = fx(() -> workbench.controller().build().bodies().getFirst());
+        var face = body.planarFaces().stream()
+                .filter(f -> f.nz() > .99)
+                .findFirst()
+                .orElseThrow();
+        var plane = FaceSupport.attach(body.output(), body.planarFaces(), face.faceIndex());
+        fx(() -> {
+            workbench.controller().add(new Feature.Sketch("pocket", "profile", plane, new Feature.Circle(10, 10, 4)));
+            return null;
+        });
+        ready();
+        click("history-2");
+        click("extrude");
+        text("extrude-distance", "-2");
+        ready();
+        assertThat(volume()).isCloseTo(original - 8 * Math.PI, within(.001));
+        fx(() -> {
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "inward-face-extrusion.png"));
+            return null;
+        });
+        click("extrude-cut-inward");
+        choice("extrude-operation", BodyExtrusion.Operation.NEW_BODY.ordinal());
+        ready();
+        assertThat(volume()).isCloseTo(original + 8 * Math.PI, within(.001));
+        click("extrude-cut-inward");
+        text("extrude-distance", "2");
+        ready();
+        assertThat(volume()).isCloseTo(original + 8 * Math.PI, within(.001));
+        text("extrude-distance", "-2");
+        ready();
+        click("commit-extrusion");
+        ready();
+        var cut = BodyExtrusion.from(document().features().getLast());
+        assertThat(cut.operation()).isEqualTo(BodyExtrusion.Operation.CUT);
+        assertThat(cut.target()).isEqualTo(body.output());
+        assertThat(volume()).isCloseTo(original - 8 * Math.PI, within(.001));
+    }
+
+    @Test
     void extrudeCanJoinAndThenEditTheSameFeatureIntoABlindCut() throws Exception {
         openPrepared("plate-5mm.vxb");
         double original = volume();

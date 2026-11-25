@@ -2154,10 +2154,12 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         target.setId("extrude-target");
         target.getItems().setAll(controller.build().bodies());
         UiText.choices(target, b -> bodyLabel(b.id()));
+        var support = sketch.plane().support();
+        String preferredId = support == null
+                ? selectedBody
+                : controller.build().bodyIds().getOrDefault(support.body(), selectedBody);
         var preferred = target.getItems().stream()
-                .filter(b -> b.id().equals(selectedBody)
-                        || sketch.plane().support() != null
-                                && b.output().equals(sketch.plane().support().body()))
+                .filter(b -> b.id().equals(preferredId))
                 .findFirst();
         target.getSelectionModel()
                 .select(preferred.orElse(
@@ -2391,12 +2393,28 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         var regions = extrusionRegions(sketch, form);
         var operation = extrusionOperation(BodyExtrusion.Operation.NEW_BODY);
         var target = extrusionTarget(sketch);
+        var host = target.getValue();
+        var automatic = new CheckBox(translations.translate("extrude.cutInward"));
+        automatic.setId("extrude-cut-inward");
+        automatic.setWrapText(true);
+        automatic.setMinWidth(0);
+        var support = sketch.plane().support();
+        if (support != null
+                && sketch.plane().offsetZ() == 0
+                && host != null
+                && host.id().equals(controller.build().bodyIds().get(support.body()))) {
+            automatic.setSelected(true);
+            form.getChildren().add(automatic);
+        }
         var additional = additionalCutTargets(target);
         additional.visibleProperty().bind(operation.valueProperty().isEqualTo(BodyExtrusion.Operation.CUT));
-        operation.setDisable(target.getItems().isEmpty());
-        target.disableProperty().bind(operation.valueProperty().isEqualTo(BodyExtrusion.Operation.NEW_BODY));
+        operation
+                .disableProperty()
+                .bind(automatic.selectedProperty().or(javafx.beans.binding.Bindings.isEmpty(target.getItems())));
+        var newBody = operation.valueProperty().isEqualTo(BodyExtrusion.Operation.NEW_BODY);
+        target.disableProperty().bind(newBody.or(automatic.selectedProperty()));
         var targetField = InspectorDetails.field(new Label(translations.translate("gui.input_body")), target);
-        targetField.visibleProperty().bind(target.disableProperty().not());
+        targetField.visibleProperty().bind(newBody.not());
         targetField.managedProperty().bind(targetField.visibleProperty());
         form.getChildren()
                 .addAll(
@@ -2413,38 +2431,18 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 translations.translate("gui.drag_the_gold_handle_or_type_a_distance_enter_commits_escape_cancels"));
         hint.setWrapText(true);
         form.getChildren().add(hint);
-        Runnable updatePreview = () -> {
-            try {
-                double value = distance.value();
-                if (!regions.whole().isSelected() && regions.selectedIds().isEmpty()) {
-                    controller.cancelPreview();
-                    finish.setDisable(true);
-                    error.setText(translations.translate("gui.select_a_closed_sketch_profile"));
-                    return;
-                }
-                controller.previewExtrusion(
-                        sketch,
-                        regions.profileId(sketch),
-                        distance.expression().strip(),
-                        operation.getValue(),
-                        target.isDisabled() || target.getValue() == null
-                                ? null
-                                : target.getValue().output(),
-                        operation.getValue() == BodyExtrusion.Operation.CUT ? additional.selected() : List.of());
-                viewport.updateExtrusionDistance(value);
-                error.setText("");
-                finish.setDisable(!controller.canCommitExtrusion());
-            } catch (RuntimeException failure) {
-                controller.cancelPreview();
-                finish.setDisable(true);
-                error.setText(failure.getMessage());
-            }
-        };
+        Runnable updatePreview = () -> updateExtrusionPreview(
+                sketch, regions, operation, target, additional, distance, automatic.isSelected());
         distance.textProperty().addListener((o, a, b) -> updatePreview.run());
         regions.onChange(updatePreview);
         additional.onChange(updatePreview);
         target.setOnAction(event -> updatePreview.run());
+        automatic.setOnAction(event -> {
+            if (automatic.isSelected()) target.setValue(host);
+            updatePreview.run();
+        });
         operation.setOnAction(event -> {
+            if (automatic.isSelected()) return;
             if (operation.getValue() == BodyExtrusion.Operation.CUT
                     && sketch.plane().support() != null
                     && distance.expression().equals("5.0")) {
@@ -2466,6 +2464,44 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         distance.requestFocus();
         distance.selectAll();
         refresh();
+    }
+
+    private void updateExtrusionPreview(
+            Feature.Sketch sketch,
+            ProfileChoices regions,
+            ComboBox<BodyExtrusion.Operation> operation,
+            ComboBox<DocumentController.Body> target,
+            AdditionalCutTargets additional,
+            FormulaField distance,
+            boolean automatic) {
+        try {
+            double value = distance.value();
+            if (automatic) {
+                operation.setValue(value < 0 ? BodyExtrusion.Operation.CUT : BodyExtrusion.Operation.NEW_BODY);
+            }
+            if (!regions.whole().isSelected() && regions.selectedIds().isEmpty()) {
+                controller.cancelPreview();
+                finish.setDisable(true);
+                error.setText(translations.translate("gui.select_a_closed_sketch_profile"));
+                return;
+            }
+            controller.previewExtrusion(
+                    sketch,
+                    regions.profileId(sketch),
+                    distance.expression().strip(),
+                    operation.getValue(),
+                    operation.getValue() == BodyExtrusion.Operation.NEW_BODY || target.getValue() == null
+                            ? null
+                            : target.getValue().output(),
+                    operation.getValue() == BodyExtrusion.Operation.CUT ? additional.selected() : List.of());
+            viewport.updateExtrusionDistance(value);
+            error.setText("");
+            finish.setDisable(!controller.canCommitExtrusion());
+        } catch (RuntimeException failure) {
+            controller.cancelPreview();
+            finish.setDisable(true);
+            error.setText(failure.getMessage());
+        }
     }
 
     private void commitExtrusion() {

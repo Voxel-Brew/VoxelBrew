@@ -692,7 +692,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                 return Ref.parse(value);
             }
         });
-        var add = button(translations.translate("gui.add_to_selection"), "sketch-select-ref", () -> {
+        var add = button(translations.translate("gui.add"), "sketch-select-ref", () -> {
             if (dimensionTool && (dimensionEntry != null || selection.size() >= 2)) return;
             if (references.getValue() != null) {
                 constraints.getSelectionModel().clearSelection();
@@ -719,15 +719,18 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         dimensionValue.setId("sketch-dimension-value");
         dimensionValue.setOnAction(e -> dimension());
         var apply = button(translations.translate("gui.apply_dimension"), "sketch-apply-dimension", this::dimension);
-        valueCaption.setText(translations.translate("gui.driving_value_mm_degrees_ratio"));
+        valueCaption.setText(translations.translate("gui.dimensions"));
         constraints.setId("sketch-constraints");
-        constraints.setPrefHeight(140);
+        constraints.visibleProperty().bind(javafx.beans.binding.Bindings.isNotEmpty(constraints.getItems()));
+        constraints.managedProperty().bind(constraints.visibleProperty());
         constraints.setCellFactory(view -> new ListCell<>() {
             @Override
             protected void updateItem(Constraint value, boolean empty) {
                 super.updateItem(value, empty);
-                if (empty || value == null) setText(null);
-                else {
+                if (empty || value == null) {
+                    setText(null);
+                    setTooltip(null);
+                } else {
                     var screenType = viewBasis.mapAxisConstraint(value.type());
                     String label = symbol(screenType) + " " + translations.translate("constraint." + screenType.name());
                     if (SketchConstraints.referenceDimension(value)) {
@@ -736,10 +739,10 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                     } else if (value.type().dimension()) {
                         label += " = " + number(value.values().getFirst());
                     }
-                    setText(label + " · " + value.id());
+                    setText(label);
                 }
                 if (!empty && value != null) {
-                    setTooltip(UiHelp.tooltip(value.refs().toString()));
+                    setTooltip(UiHelp.tooltip(value.id() + " · " + value.refs()));
                 }
             }
         });
@@ -766,28 +769,43 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         showBadges.setId("sketch-show-badges");
         UiHelp.install(showBadges, translations);
         showBadges.setOnAction(e -> draw());
-        var content = new VBox(
-                8,
-                toolOptions,
-                new Label(translations.translate("gui.selected_geometry")),
-                selected,
-                references,
-                new HBox(5, add, clear),
+        references.setMinWidth(0);
+        HBox.setHgrow(references, Priority.ALWAYS);
+        add.setMinWidth(Region.USE_PREF_SIZE);
+        var picker = new HBox(6, references, add);
+        picker.setAlignment(Pos.CENTER_LEFT);
+        var selectionTitle = sectionTitle("sketch.selection");
+        var spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        var selectionHeader = new HBox(6, selectionTitle, spacer, clear);
+        selectionHeader.setAlignment(Pos.CENTER_LEFT);
+        clear.getStyleClass().add("sketch-clear");
+        var selectionList = new ScrollPane(selected);
+        selectionList.setFitToWidth(true);
+        selectionList.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        selectionList.setMaxHeight(72);
+        selectionList.getStyleClass().add("sketch-selected-refs");
+        var selectionSection = inspectorSection(selectionHeader, selectionList, picker);
+        apply.getStyleClass().add("primary");
+        valueCaption.getStyleClass().add("sketch-section-title");
+        valueCaption.setWrapText(true);
+        var dimensions = inspectorSection(valueCaption, dimension, dimensionValue, apply);
+        var applyConstraint =
                 button(translations.translate("gui.apply_active_constraint"), "sketch-apply-constraint", () -> {
                     if (activeConstraint != null) apply(activeConstraint);
-                }),
-                new Separator(),
-                valueCaption,
-                dimension,
-                dimensionValue,
-                apply,
-                new Separator(),
-                new Label(translations.translate("gui.constraints_")),
-                constraints,
-                button(translations.translate("gui.remove_unfix"), "sketch-remove-constraint", this::removeConstraint),
-                showBadges,
+                });
+        applyConstraint.managedProperty().bind(applyConstraint.visibleProperty());
+        var remove =
+                button(translations.translate("gui.remove_unfix"), "sketch-remove-constraint", this::removeConstraint);
+        remove.visibleProperty().bind(constraints.visibleProperty());
+        remove.managedProperty().bind(remove.visibleProperty());
+        remove.disableProperty()
+                .bind(constraints.getSelectionModel().selectedItemProperty().isNull());
+        var constraintSection =
+                inspectorSection(sectionTitle("gui.constraints"), constraints, applyConstraint, remove, showBadges);
+        var geometry = inspectorSection(
+                sectionTitle("formula.geometry"),
                 button(translations.translate("gui.edit_selected_text"), "sketch-edit-text", this::editText),
-                new Separator(),
                 button(
                         translations.translate("gui.toggle_construction"),
                         "sketch-toggle-construction",
@@ -806,13 +824,41 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                         translations.translate("gui.delete_selected_geometry"),
                         "sketch-delete-geometry",
                         this::deleteGeometry));
+        toolOptions.getStyleClass().add("sketch-inspector-section");
+        toolOptions.setMinWidth(0);
+        var content = new VBox(8, toolOptions, selectionSection, dimensions, constraintSection, geometry);
+        content.setMinWidth(0);
+        content.getStyleClass().add("sketch-inspector-content");
         var scroll = new ScrollPane(content);
         scroll.setFitToWidth(true);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        scroll.setPrefWidth(270);
+        scroll.getStyleClass().add("sketch-inspector");
+        scroll.setPrefWidth(280);
         scroll.setMinWidth(240);
         BorderPane.setMargin(scroll, new Insets(0, 0, 0, 10));
         return scroll;
+    }
+
+    private Label sectionTitle(String key) {
+        var title = new Label(translations.translate(key));
+        title.getStyleClass().add("sketch-section-title");
+        title.setWrapText(true);
+        return title;
+    }
+
+    private VBox inspectorSection(Node... children) {
+        var section = new VBox(7, children);
+        section.setMinWidth(0);
+        section.getStyleClass().add("sketch-inspector-section");
+        for (var child : children) {
+            if (child instanceof Region region) region.setMinWidth(0);
+            if (child instanceof Button button) {
+                button.setWrapText(true);
+                button.setMaxWidth(Double.MAX_VALUE);
+                button.setMinHeight(Region.USE_PREF_SIZE);
+            }
+        }
+        return section;
     }
 
     private void installGestures() {
@@ -898,7 +944,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             option(translations.translate("draw.POLYGON"), polygonMode);
             return;
         }
-        toolOptions.getChildren().add(new Label(translations.translate("tool." + advanced.name())));
+        toolOptions.getChildren().add(sectionTitle("tool." + advanced.name()));
         switch (advanced) {
             case CIRCLE_TWO_TANGENT -> option(translations.translate("gui.radius_mm"), toolRadius);
             case CONIC -> option(translations.translate("gui.rho_0_1"), toolRho);
@@ -937,11 +983,10 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                 .getChildren()
                 .add(button(
                         translations.translate("gui.complete_retry"), "sketch-complete-curve", this::finishAdvanced));
-        toolOptions.getChildren().add(new Separator());
     }
 
     private void option(String label, Node input) {
-        toolOptions.getChildren().addAll(new Label(label), input);
+        toolOptions.getChildren().add(InspectorDetails.field(new Label(label), input));
     }
 
     private FormulaField activeTextAngle() {
@@ -1586,8 +1631,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             }
         }
         dimensionValue.setDisable(readOnly);
-        valueCaption.setText(
-                translations.translate(readOnly ? "sketch.referenceDimension" : "gui.driving_value_mm_degrees_ratio"));
+        valueCaption.setText(translations.translate(readOnly ? "sketch.referenceDimension" : "gui.dimensions"));
     }
 
     private boolean fixedSelection() {
@@ -1683,7 +1727,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         selectionChanged();
         toolOptions.setManaged(true);
         toolOptions.setVisible(true);
-        toolOptions.getChildren().add(new Label(translations.translate(key)));
+        toolOptions.getChildren().add(sectionTitle(key));
         hint.setText(help);
         switch (key) {
             case "action.fillet" -> {
@@ -1853,6 +1897,8 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                     .setAll(controller.definition().constraints().stream()
                             .filter(c -> !SketchCopies.linked(c))
                             .toList());
+            constraints.setPrefHeight(
+                    4 + 24 * Math.min(6, constraints.getItems().size()));
             if (prior != null) {
                 constraints.getItems().stream()
                         .filter(c -> c.id().equals(prior.id()))
@@ -2827,6 +2873,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             }
         }
         shortcutActions.get("sketch-dimension").pseudoClassStateChanged(ACTIVE_TOOL, dimensionTool);
+        shortcutActions.get("sketch-apply-constraint").setVisible(activeConstraint != null);
     }
 
     private void drawGrid(GraphicsContext graphics, double w, double h) {

@@ -6033,6 +6033,48 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void polishSketchInspectorFitsLongActionsAtMinimumWidth() throws Exception {
+        rectangleDraft(60, 40, 0);
+        click("sketch-tool-select");
+        sketchReference(sketchGeometry().entities().getFirst().id());
+        fx(() -> {
+            var inspector = (ScrollPane) node(".sketch-inspector");
+            inspector.setPrefWidth(inspector.getMinWidth());
+            inspector.setVvalue(0);
+            return null;
+        });
+        fx(() -> {
+            var inspector = (ScrollPane) node(".sketch-inspector");
+            stage.getScene().getRoot().applyCss();
+            stage.getScene().getRoot().layout();
+            var action = (Button) node("#sketch-all-profile");
+            assertThat(action.isWrapText()).isTrue();
+            var viewport = inspector.lookup(".viewport");
+            double right = viewport.localToScene(viewport.getLayoutBounds()).getMaxX();
+            for (var id : List.of(
+                    "sketch-clear-selection", "sketch-select-ref", "sketch-dimension-value", "sketch-all-profile")) {
+                var control = node("#" + id);
+                assertThat(control.localToScene(control.getLayoutBounds()).getMaxX())
+                        .as(id)
+                        .isLessThanOrEqualTo(right);
+            }
+            assertThat(((javafx.scene.text.Text) action.lookup(".text")).getText())
+                    .isEqualTo(action.getText());
+            Screenshot.save(
+                    stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "sketch-inspector-pl.png"));
+            inspector.setVvalue(inspector.getVmax());
+            return null;
+        });
+        fx(() -> {
+            Screenshot.save(
+                    stage.getScene(),
+                    Path.of(System.getProperty("voxelbrew.ui.artifacts"), "sketch-geometry-actions-pl.png"));
+            return null;
+        });
+        click("constraint-cancel");
+    }
+
+    @Test
     void polishWorkbenchDialogsSketchPrintingAndLanguagePreferenceUseRealControls() throws Exception {
         ready();
         // One translated dialog wiring check; message/resource matrices live in UiTextTest.

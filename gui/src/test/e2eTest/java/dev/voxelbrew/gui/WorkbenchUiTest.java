@@ -4174,11 +4174,11 @@ class WorkbenchUiTest {
     void shadedDesignerDrawsFaceBoundariesWithoutTriangulationLines() throws Exception {
         var mesh = new dev.voxelbrew.api.model.mesh.MeshData(
                 new double[] {0, 0, 0, 30, 0, 0, 30, 20, 0, 0, 20, 0}, new int[] {0, 1, 2, 0, 2, 3}, new int[] {1, 1});
+        var plate = new DocumentController.Body("plate", new Feature.BodyRef("plate", "body"), mesh, 0);
         fx(() -> {
             var view = workbench.viewport();
             view.setRendering(Rendering.Style.SHADED);
-            view.showBodies(
-                    List.of(new DocumentController.Body("plate", new Feature.BodyRef("plate", "body"), mesh, 0)));
+            view.showBodies(List.of(plate));
             view.fit(Map.of("plate", mesh));
             return null;
         });
@@ -4187,6 +4187,11 @@ class WorkbenchUiTest {
             assertThat(outline.getParent().isVisible()).isTrue();
             var ribbons = (javafx.scene.shape.TriangleMesh) outline.getMesh();
             assertThat(ribbons.getFaces().size() / ribbons.getFaceElementSize()).isEqualTo(8);
+            var surface = findBodyView(workbench.viewport(), "body-plate");
+            var second = new DocumentController.Body("second", new Feature.BodyRef("second", "body"), mesh, 0);
+            workbench.viewport().showBodies(List.of(second, plate));
+            assertThat(findBodyView(workbench.viewport(), "body-plate")).isSameAs(surface);
+            assertThat(findBodyView(workbench.viewport(), "outline-plate")).isSameAs(outline);
             return null;
         });
     }

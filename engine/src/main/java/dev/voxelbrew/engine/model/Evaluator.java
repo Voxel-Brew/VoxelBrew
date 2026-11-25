@@ -404,7 +404,8 @@ public final class Evaluator {
                     continue;
                 }
                 try {
-                    for (String input : references(feature)) {
+                    for (var reference : GeometryInputs.of(feature)) {
+                        String input = reference.featureId();
                         if (!states.containsKey(input)) {
                             throw new ModelException(feature.id(), "missing or non-earlier input '" + input + "'");
                         }
@@ -466,48 +467,6 @@ public final class Evaluator {
         try (local) {
             return local.transformed(frame);
         }
-    }
-
-    private static List<String> cutReferences(Feature.ProfileRef profile, List<Feature.BodyRef> targets) {
-        return java.util.stream.Stream.concat(
-                        java.util.stream.Stream.of(profile.sketchId()),
-                        targets.stream().map(Feature.BodyRef::featureId))
-                .distinct()
-                .toList();
-    }
-
-    private static List<String> references(Feature feature) {
-        if (feature instanceof ConstructionFeature construction) return construction.dependencies();
-        if (feature instanceof Feature.Sketch s
-                && !s.plane().constructionSupport().isEmpty()) {
-            return List.of(s.plane().constructionSupport());
-        }
-        if (feature instanceof Feature.Sketch s && s.plane().support() != null) {
-            return List.of(s.plane().support().body().featureId());
-        }
-        if (feature instanceof Feature.Extrude e) {
-            return List.of(e.profile().sketchId());
-        }
-        if (BodyExtrusion.modifiesBody(feature)) {
-            var definition = BodyExtrusion.from(feature);
-            return cutReferences(definition.extrusion().profile(), definition.targets());
-        }
-        if (CutTargets.through(feature)) {
-            return cutReferences(
-                    CutTargets.firstThroughCut(feature).profile(),
-                    CutTargets.throughTargets(feature).bodies());
-        }
-        if (BodyPattern.matches(feature)) {
-            return List.of(BodyPattern.from(feature).source().featureId());
-        }
-        if (feature instanceof Feature.SplitBody split) {
-            return List.of(split.body().featureId());
-        }
-        if (feature instanceof Feature.EdgeFinish finish) {
-            return List.of(finish.body().featureId());
-        }
-        if (feature instanceof Feature.Shell shell) return List.of(shell.body().featureId());
-        return List.of();
     }
 
     private Evaluator() {}

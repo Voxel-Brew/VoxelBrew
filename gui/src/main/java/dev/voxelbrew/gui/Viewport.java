@@ -49,6 +49,8 @@ public final class Viewport extends StackPane {
             new GridAxis("z", toView(0, 0, 1), "#5b86d6"));
 
     private final Map<String, MeshView> bodyViews = new LinkedHashMap<>();
+    private final Map<String, DocumentController.Body> shownBodies = new LinkedHashMap<>();
+    private final java.util.Set<String> dirtyEdges = new java.util.HashSet<>();
 
     private final Map<String, MeshView> edgeViews = new LinkedHashMap<>();
 
@@ -990,14 +992,14 @@ public final class Viewport extends StackPane {
         var meshes = new LinkedHashMap<String, MeshData>();
         evaluated.forEach(body -> meshes.put(body.id(), body.mesh()));
         currentMeshes = Map.copyOf(meshes);
-        bodies.getChildren().clear();
-        bodyViews.clear();
-        outlines.getChildren().clear();
-        edgeViews.clear();
-        edgeData.clear();
-        edgeSamples.clear();
+        shownBodies.keySet().retainAll(meshes.keySet());
+        bodyViews.keySet().retainAll(meshes.keySet());
+        edgeViews.keySet().retainAll(meshes.keySet());
+        edgeData.keySet().retainAll(meshes.keySet());
+        edgeSamples.keySet().retainAll(meshes.keySet());
         selectedEdges.getChildren().clear();
         for (var body : evaluated) {
+            if (shownBodies.put(body.id(), body) == body) continue;
             edgeData.put(body.id(), body.edges());
             edgeSamples.put(body.id(), body.edgeSamples());
             var mesh = new TriangleMesh();
@@ -1006,55 +1008,63 @@ public final class Viewport extends StackPane {
             edges.setId("outline-" + body.id());
             edges.setCullFace(CullFace.NONE);
             edgeViews.put(body.id(), edges);
-            outlines.getChildren().add(edges);
+            dirtyEdges.add(body.id());
+            bodyViews.put(body.id(), bodyView(body));
         }
-        meshes.forEach((id, data) -> {
-            MeshView view = meshView(data);
-            bodyViews.put(id, view);
-            view.setId("body-" + id);
-            view.setOnMouseMoved(e -> {
-                if (planeHover != null) {
-                    int triangle = e.getPickResult().getIntersectedFace();
-                    planeHover.accept(id, triangle >= 0 ? data.faceIndex(triangle) : -1);
-                }
-            });
-            view.setOnMouseExited(e -> highlightFace(null, -1));
-            view.setOnMouseClicked(e -> {
-                if (e.getButton() == MouseButton.PRIMARY && e.isStillSincePress()) {
-                    int triangle = e.getPickResult().getIntersectedFace();
-                    if (edgePickEnabled) {
-                        var body = evaluated.stream()
-                                .filter(b -> b.id().equals(id))
-                                .findFirst()
-                                .orElseThrow();
-                        int edge = nearbyEdge(
-                                body.edgeSamples(),
-                                triangle < 0 ? java.util.List.of() : body.edgesOnFace(data.faceIndex(triangle)),
-                                e.getScreenX(),
-                                e.getScreenY());
-                        if (edge > 0) {
-                            edgeSelection.accept(id, edge);
-                            e.consume();
-                            return;
-                        }
-                    }
-                    selection.accept(id, triangle >= 0 ? data.faceIndex(triangle) : -1);
-                    e.consume();
-                }
-            });
-            bodies.getChildren().add(view);
-        });
+        bodies.getChildren().setAll(meshes.keySet().stream().map(bodyViews::get).toList());
+        outlines.getChildren()
+                .setAll(meshes.keySet().stream().map(edgeViews::get).toList());
         select(selected);
-        scheduleEdges();
+        queueEdges();
+    }
+
+    private MeshView bodyView(DocumentController.Body body) {
+        var id = body.id();
+        var data = body.mesh();
+        MeshView view = meshView(data);
+        view.setId("body-" + id);
+        view.setOnMouseMoved(e -> {
+            if (planeHover != null) {
+                int triangle = e.getPickResult().getIntersectedFace();
+                planeHover.accept(id, triangle >= 0 ? data.faceIndex(triangle) : -1);
+            }
+        });
+        view.setOnMouseExited(e -> highlightFace(null, -1));
+        view.setOnMouseClicked(e -> {
+            if (e.getButton() == MouseButton.PRIMARY && e.isStillSincePress()) {
+                int triangle = e.getPickResult().getIntersectedFace();
+                if (edgePickEnabled) {
+                    int edge = nearbyEdge(
+                            body.edgeSamples(),
+                            triangle < 0 ? java.util.List.of() : body.edgesOnFace(data.faceIndex(triangle)),
+                            e.getScreenX(),
+                            e.getScreenY());
+                    if (edge > 0) {
+                        edgeSelection.accept(id, edge);
+                        e.consume();
+                        return;
+                    }
+                }
+                selection.accept(id, triangle >= 0 ? data.faceIndex(triangle) : -1);
+                e.consume();
+            }
+        });
+        return view;
     }
 
     private void scheduleEdges() {
-        if (edgesPending || edgeData.isEmpty()) return;
+        dirtyEdges.addAll(edgeData.keySet());
+        queueEdges();
+    }
+
+    private void queueEdges() {
+        if (edgesPending || dirtyEdges.isEmpty()) return;
         edgesPending = true;
         // Coalesce the tilt/orbit/pan/fit transform changes into one update per UI pulse.
         javafx.application.Platform.runLater(() -> {
             edgesPending = false;
             updateEdges();
+            dirtyEdges.clear();
         });
     }
 
@@ -1071,6 +1081,7 @@ public final class Viewport extends StackPane {
                 .normalize();
         double pixelScale = 2 * Math.tan(Math.toRadians(camera.getFieldOfView() / 2)) / scene.getHeight();
         edgeData.forEach((id, data) -> {
+            if (!dirtyEdges.contains(id)) return;
             var visible = data.edges().stream()
                     .filter(edge -> edge.visibleFrom(sight))
                     .toList();

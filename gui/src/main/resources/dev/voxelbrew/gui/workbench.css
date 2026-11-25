@@ -375,6 +375,59 @@
   -fx-background-color: transparent;
   -fx-border-width: 0;
 }
+.sketch-inspector {
+  -fx-padding: 0;
+  -sketch-surface: #f5f6fa;
+  -sketch-divider: #dce0e8;
+  -inspector-caption: #535c70;
+}
+.dark .sketch-inspector {
+  -sketch-surface: #282b31;
+  -sketch-divider: #444954;
+  -inspector-caption: #b4bdcd;
+}
+.sketch-inspector > .viewport,
+.sketch-inspector-content {
+  -fx-background-color: -sketch-surface;
+}
+.sketch-inspector-content {
+  -fx-padding: 8;
+}
+.sketch-inspector-section {
+  -fx-padding: 10;
+  -fx-background-color: -fx-control-inner-background;
+  -fx-background-radius: 8;
+  -fx-border-color: -sketch-divider;
+  -fx-border-radius: 8;
+}
+.sketch-section-title {
+  -fx-font-size: 13px;
+  -fx-font-weight: bold;
+}
+.sketch-selected-refs,
+.sketch-selected-refs > .viewport {
+  -fx-background-color: -sketch-surface;
+  -fx-background-radius: 5;
+}
+.sketch-selected-refs {
+  -fx-padding: 5 7;
+}
+.sketch-inspector-section .combo-box-base,
+.sketch-inspector-section .list-view {
+  -fx-background-color: -fx-control-inner-background;
+  -fx-border-color: -sketch-divider;
+  -fx-border-radius: 5;
+  -fx-background-radius: 5;
+}
+.sketch-inspector-section .combo-box-base:focused,
+.sketch-inspector-section .list-view:focused {
+  -fx-border-color: -fx-focus-color;
+}
+.sketch-inspector-section .sketch-clear {
+  -fx-background-color: transparent;
+  -fx-text-fill: -fx-focus-color;
+  -fx-padding: 2 5;
+}
 .properties-panel {
   -fx-padding: 0;
   -fx-spacing: 0;

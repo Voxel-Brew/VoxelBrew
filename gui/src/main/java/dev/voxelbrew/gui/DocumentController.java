@@ -11,6 +11,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.IntFunction;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NonNull;
@@ -174,6 +175,40 @@ public final class DocumentController implements AutoCloseable {
         }
     }
 
+    public static final class BodyLabels {
+        private final Map<String, Integer> numbers = new HashMap<>();
+        private final Map<String, Evaluation.PatternCopy> copies;
+
+        BodyLabels(List<Body> bodies, Map<String, Evaluation.PatternCopy> copies) {
+            this.copies = Map.copyOf(copies);
+            for (int i = 0; i < bodies.size(); i++) numbers.put(bodies.get(i).id(), i + 1);
+        }
+
+        boolean isCopy(String id) {
+            return copies.containsKey(id);
+        }
+
+        String label(String id, CadDocument document, IntFunction<String> defaultName) {
+            var suffixes = new ArrayDeque<Integer>();
+            var source = id;
+            Integer sourceNumber = null;
+            while (!document.bodyNames().containsKey(source) && copies.containsKey(source)) {
+                var copy = copies.get(source);
+                suffixes.addFirst(copy.index());
+                source = copy.sourceId();
+                sourceNumber = copy.sourceNumber();
+            }
+            var name = document.bodyNames().get(source);
+            if (name == null) {
+                var number = numbers.getOrDefault(source, sourceNumber);
+                name = number == null ? source : defaultName.apply(number);
+            }
+            var label = new StringBuilder(name);
+            for (int index : suffixes) label.append(' ').append(index);
+            return label.toString();
+        }
+    }
+
     public record Build(
             List<Body> bodies,
             List<Evaluation.Diagnostic> diagnostics,
@@ -182,7 +217,29 @@ public final class DocumentController implements AutoCloseable {
             Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction,
             List<ConstructionFeature.Input> constructionInputs,
             Map<String, List<Entity>> projections,
-            Map<Feature.BodyRef, String> bodyIds) {
+            Map<Feature.BodyRef, String> bodyIds,
+            BodyLabels labels) {
+        public Build(
+                List<Body> bodies,
+                List<Evaluation.Diagnostic> diagnostics,
+                boolean valid,
+                List<Feature> features,
+                Map<String, dev.voxelbrew.api.model.construction.ConstructionGeometry.Datum> construction,
+                List<ConstructionFeature.Input> constructionInputs,
+                Map<String, List<Entity>> projections,
+                Map<Feature.BodyRef, String> bodyIds) {
+            this(
+                    bodies,
+                    diagnostics,
+                    valid,
+                    features,
+                    construction,
+                    constructionInputs,
+                    projections,
+                    bodyIds,
+                    new BodyLabels(bodies, Map.of()));
+        }
+
         public Build(
                 List<Body> bodies,
                 List<Evaluation.Diagnostic> diagnostics,
@@ -283,7 +340,8 @@ public final class DocumentController implements AutoCloseable {
                     evaluation.construction(),
                     inputs,
                     evaluation.projections(),
-                    evaluation.bodyIds());
+                    evaluation.bodyIds(),
+                    new BodyLabels(bodies, evaluation.patternCopies()));
         }
     }
 

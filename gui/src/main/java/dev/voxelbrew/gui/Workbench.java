@@ -1234,12 +1234,14 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 sketches.add(sketchRow);
             }
         }
-        int index = 1;
         for (var body : controller.build().bodies()) {
             bodies.add(new TreeItem<>(
                     new Entry(
                             body.id(),
-                            document.bodyName(body.id(), translations.translate("feature.body", index++)),
+                            controller
+                                    .build()
+                                    .labels()
+                                    .label(body.id(), document, i -> translations.translate("feature.body", i)),
                             true),
                     OperationIcons.icon("new-body")));
         }
@@ -1278,14 +1280,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     }
 
     private String bodyLabel(String id) {
-        int index = 1;
-        for (var body : controller.build().bodies()) {
-            if (body.id().equals(id)) {
-                return controller.snapshot().document().bodyName(id, translations.translate("feature.body", index));
-            }
-            index++;
-        }
-        return id;
+        return controller
+                .build()
+                .labels()
+                .label(id, controller.snapshot().document(), i -> translations.translate("feature.body", i));
     }
 
     private Feature selected() {
@@ -1594,6 +1592,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             String bodyId =
                     controller.build().bodyIds().getOrDefault(source, source.featureId() + "." + source.outputName());
             String featureName = document.featureNames().get(source.featureId());
+            if (controller.build().labels().isCopy(bodyId)) return bodyLabel(bodyId);
             return document.bodyName(bodyId, featureName == null ? bodyLabel(bodyId) : featureName);
         }
         return plane.isOrigin() ? plane.id().substring("origin-".length()).toUpperCase(Locale.ROOT) : plane.id();

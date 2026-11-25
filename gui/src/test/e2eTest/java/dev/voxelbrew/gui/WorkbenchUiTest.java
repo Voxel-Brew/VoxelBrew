@@ -9495,6 +9495,33 @@ class WorkbenchUiTest {
         click("pattern-apply");
         ready();
         assertThat(fx(() -> workbench.controller().build().bodies().size())).isEqualTo(count + 7);
+        fx(() -> {
+            var source = workbench.controller().build().bodies().getFirst();
+            workbench.controller().renameBody(source.id(), "Boazeria");
+            return null;
+        });
+        ready();
+        assertThat(fx(() -> {
+                    var tree = (TreeView<?>) node("#model-tree");
+                    return java.util.stream.IntStream.range(0, tree.getExpandedItemCount())
+                            .mapToObj(i -> tree.getTreeItem(i).getValue().toString())
+                            .filter(name -> name.startsWith("Boazeria"))
+                            .toList();
+                }))
+                .containsExactly(
+                        "Boazeria",
+                        "Boazeria 2",
+                        "Boazeria 3",
+                        "Boazeria 4",
+                        "Boazeria 5",
+                        "Boazeria 6",
+                        "Boazeria 7",
+                        "Boazeria 8");
+        fx(() -> {
+            Screenshot.save(
+                    stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "pattern-body-names.png"));
+            return null;
+        });
         click("history-" + (document().features().size() - 1));
         click("edit-body-pattern");
         assertThat(fx(() -> ((FormulaField) workbench.lookup("#pattern-step")).getText()))

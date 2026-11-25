@@ -46,12 +46,39 @@ final class ConstructionEditor extends VBox {
         return Double.parseDouble(field.getText().trim().replace(',', '.'));
     }
 
+    static String valueKey(Tool tool) {
+        return switch (tool) {
+            case OFFSET_PLANE -> "construction.distance";
+            case ANGLED_PLANE -> "construction.angle";
+            case TANGENT_PLANE, PLANE_ALONG_PATH, POINT_ALONG_PATH -> "construction.fraction";
+            default -> null;
+        };
+    }
+
+    static String inputLabel(Input input, DocumentController controller, TranslationService translations) {
+        if (input.selection() == Selection.ORIGIN_PLANE) return new String[] {"YZ", "XZ", "XY"}[input.index()];
+        if (input.selection() == Selection.ORIGIN_AXIS) return "XYZ".substring(input.index(), input.index() + 1);
+        if (input.selection() == Selection.DATUM) {
+            return controller.snapshot().document().featureName(input.source(), input.source())
+                    + (controller.build().construction().get(input.source())
+                                    instanceof
+                                    dev.voxelbrew.api.model.construction.ConstructionGeometry.CoordinateSystem
+                            ? " · " + new String[] {"O", "X", "Y", "Z", "YZ", "XZ", "XY"}[input.index()]
+                            : "");
+        }
+        String name = translations.translate("construction.selection." + input.selection());
+        return input.source().isEmpty()
+                ? name
+                : name + " " + (input.index() + 1) + " · " + input.source() + "/" + input.output();
+    }
+
     ConstructionEditor(
             Tool tool,
             ConstructionFeature original,
             DocumentController controller,
             Viewport viewport,
             TranslationService translations,
+            FlowPane actions,
             Runnable finished) {
         super(8);
         this.tool = tool;
@@ -63,20 +90,14 @@ final class ConstructionEditor extends VBox {
                 ? "construction-"
                         + controller.snapshot().document().uuidGenerator().next()
                 : original.id();
-        getChildren().add(new Label(translations.translate("construction." + tool.name())));
         var hint = new Label(translations.translate("construction.select"));
         hint.setWrapText(true);
         getChildren().add(hint);
         var choices = inputChoices();
         addInputSelectors(choices);
-        String key = switch (tool) {
-            case OFFSET_PLANE -> "construction.distance";
-            case ANGLED_PLANE -> "construction.angle";
-            case TANGENT_PLANE, PLANE_ALONG_PATH, POINT_ALONG_PATH -> "construction.fraction";
-            default -> null;
-        };
+        String key = valueKey(tool);
         if (key != null) {
-            getChildren().addAll(new Label(translations.translate(key)), value);
+            getChildren().add(InspectorDetails.field(new Label(translations.translate(key)), value));
         }
         value.setId("construction-value");
         if (original != null) value.setText(Double.toString(original.value()));
@@ -98,7 +119,9 @@ final class ConstructionEditor extends VBox {
         error.setWrapText(true);
         error.getStyleClass().add("error");
         error.setId("construction-error");
-        getChildren().addAll(new HBox(6, preview, apply, cancel), error);
+        apply.getStyleClass().add("primary");
+        actions.getChildren().setAll(preview, apply, cancel);
+        getChildren().add(error);
         Runnable invalidate = () -> {
             generation++;
             viewport.previewConstruction(null);
@@ -108,23 +131,6 @@ final class ConstructionEditor extends VBox {
                 row -> row.forEach(field -> field.textProperty().addListener((o, before, after) -> invalidate.run())));
         value.textProperty().addListener((o, before, after) -> invalidate.run());
         alternate.selectedProperty().addListener((o, before, after) -> invalidate.run());
-    }
-
-    private String label(Input input) {
-        if (input.selection() == Selection.ORIGIN_PLANE) return new String[] {"YZ", "XZ", "XY"}[input.index()];
-        if (input.selection() == Selection.ORIGIN_AXIS) return "XYZ".substring(input.index(), input.index() + 1);
-        if (input.selection() == Selection.DATUM) {
-            return controller.snapshot().document().featureName(input.source(), input.source())
-                    + (controller.build().construction().get(input.source())
-                                    instanceof
-                                    dev.voxelbrew.api.model.construction.ConstructionGeometry.CoordinateSystem
-                            ? " · " + new String[] {"O", "X", "Y", "Z", "YZ", "XZ", "XY"}[input.index()]
-                            : "");
-        }
-        String name = translations.translate("construction.selection." + input.selection());
-        return input.source().isEmpty()
-                ? name
-                : name + " " + (input.index() + 1) + " · " + input.source() + "/" + input.output();
     }
 
     void pick(String bodyId, int face) {
@@ -268,7 +274,7 @@ final class ConstructionEditor extends VBox {
             selector.setMinWidth(0);
             selector.setPrefWidth(220);
             selector.getItems().setAll(choices);
-            UiText.choices(selector, this::label);
+            UiText.choices(selector, input -> inputLabel(input, controller, translations));
             selector.setOnMousePressed(event -> active = slot);
             selector.focusedProperty().addListener((o, a, focused) -> {
                 if (focused) active = slot;
@@ -286,10 +292,10 @@ final class ConstructionEditor extends VBox {
             coordinates.add(xyz);
             getChildren()
                     .addAll(
-                            new Label((i + 1) + ". "
-                                    + translations.translate(
+                            InspectorDetails.field(
+                                    new Label(translations.translate(
                                             "construction.role." + tool.inputs().get(i))),
-                            selector,
+                                    selector),
                             row);
             if (original != null) {
                 var input = original.inputs().get(i);

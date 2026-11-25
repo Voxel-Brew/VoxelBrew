@@ -5054,6 +5054,37 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void sketchesListTracksNamesAndSelectsTheSourceSketch() throws Exception {
+        createRenameBodies();
+        bodyTreeClick("named-sketch1", MouseButton.PRIMARY, 1);
+        fx(() -> {
+            var tree = (TreeView<?>) node("#model-tree");
+            var row = tree.getSelectionModel().getSelectedItem();
+            assertThat(row.getParent().getValue().toString()).isEqualTo("Sketches");
+            assertThat(row.getParent().getChildren().stream()
+                            .map(item -> item.getValue().toString()))
+                    .containsExactly("named-sketch0", "named-sketch1");
+            assertThat(node("#history-2").getStyleClass()).contains("history-selected");
+            workbench.controller().renameFeature("named-sketch1", "Lid");
+            return null;
+        });
+        ready();
+        fx(() -> {
+            var tree = (TreeView<?>) node("#model-tree");
+            var row = tree.getSelectionModel().getSelectedItem();
+            assertThat(row.getValue().toString()).isEqualTo("Lid");
+            assertThat(row.getParent().getValue().toString()).isEqualTo("Sketches");
+            Screenshot.save(
+                    tree.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "model-sketches-list.png"));
+            return null;
+        });
+        bodyTreeClick("Lid", MouseButton.PRIMARY, 2);
+        sketchReady();
+        click("constraint-cancel");
+        ready();
+    }
+
+    @Test
     void bodyContextRenameAndInlineEditingPersistWithoutChangingGeometry() throws Exception {
         createRenameBodies();
         var original = document();
@@ -5116,7 +5147,12 @@ class WorkbenchUiTest {
                     .map(node -> (TreeCell<?>) node)
                     .filter(cell -> !cell.isEmpty())
                     .toList();
-            assertThat(rows).hasSize(tree.getExpandedItemCount());
+            for (int i = 0; i < tree.getExpandedItemCount(); i++) {
+                assertThat(tree.getTreeItem(i).getGraphic())
+                        .as("Icon for tree row %d", i)
+                        .isNotNull();
+            }
+            assertThat(rows).isNotEmpty();
             for (var row : rows) {
                 assertThat(row.getGraphic())
                         .as(row.getText())

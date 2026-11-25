@@ -73,6 +73,7 @@ public final class Viewport extends StackPane {
 
     private final Group handle = new Group();
     private final Group profileHighlights = new Group();
+    private final javafx.scene.canvas.Canvas sketchCanvas = new javafx.scene.canvas.Canvas();
 
     private final Group planeTargets = new Group(), faceHighlight = new Group(), selectedEdges = new Group();
 
@@ -81,6 +82,7 @@ public final class Viewport extends StackPane {
     private final ConstructionView construction = new ConstructionView(), constructionPreview = new ConstructionView();
 
     private Rendering.Style rendering = Rendering.Style.SHADED;
+    private List<Path> profileCurves = List.of();
 
     private boolean dark, edgesPending;
 
@@ -91,6 +93,7 @@ public final class Viewport extends StackPane {
     private boolean primaryOrbit;
 
     private double distance = 180;
+    private CameraView beforeProfileEdit;
 
     private BiConsumer<String, Integer> selection = (id, face) -> {};
 
@@ -126,9 +129,11 @@ public final class Viewport extends StackPane {
 
     private record SketchPick(String featureId, Point3D a, Point3D b) {}
 
-    private record SketchDisplay(String id, boolean selected) {}
+    private record SketchDisplay(String id, boolean selected, boolean outline) {}
 
     private record SketchOverlay(Group group, List<SketchPick> picks) {}
+
+    private record CameraView(ViewOrientation orientation, Point3D center, Point3D pan, double distance) {}
 
     public static Point3D toView(double x, double y, double z) {
         return new Point3D(x, -z, y);
@@ -250,8 +255,8 @@ public final class Viewport extends StackPane {
                         aids,
                         bodies,
                         outlines,
-                        sketches,
                         profileHighlights,
+                        sketches,
                         handle,
                         planeTargets,
                         faceHighlight,
@@ -288,7 +293,9 @@ public final class Viewport extends StackPane {
             axisLabels.put(axis, label);
             axisOverlay.getChildren().add(label);
         }
-        getChildren().addAll(scene, axisOverlay, planeLabels);
+        sketchCanvas.setManaged(false);
+        sketchCanvas.setMouseTransparent(true);
+        getChildren().addAll(scene, sketchCanvas, axisOverlay, planeLabels);
         world.localToSceneTransformProperty().addListener((o, a, b) -> {
             positionPlaneLabels();
             requestLayout();
@@ -531,6 +538,57 @@ public final class Viewport extends StackPane {
         super.layoutChildren();
         positionPlaneLabels();
         updateGrid();
+        drawProfile();
+    }
+
+    private void drawProfile() {
+        boolean visible =
+                !profileCurves.isEmpty() || !profileHighlights.getChildren().isEmpty();
+        sketchCanvas.setVisible(visible);
+        if (!visible) return;
+        sketchCanvas.setWidth(scene.getWidth());
+        sketchCanvas.setHeight(scene.getHeight());
+        var gc = sketchCanvas.getGraphicsContext2D();
+        gc.clearRect(0, 0, scene.getWidth(), scene.getHeight());
+        double focalLength = scene.getHeight() / (2 * Math.tan(Math.toRadians(camera.getFieldOfView() / 2)));
+        for (var node : profileHighlights.getChildren()) {
+            if (node.isVisible()) drawProfilePath((Path) node, focalLength);
+        }
+        profileCurves.forEach(path -> drawProfilePath(path, focalLength));
+    }
+
+    // Project vector geometry before drawing so line width and antialiasing are in screen pixels.
+    private void drawProfilePath(Path path, double focalLength) {
+        var projection = path.getLocalToSceneTransform();
+        var gc = sketchCanvas.getGraphicsContext2D();
+        gc.beginPath();
+        for (var element : path.getElements()) {
+            boolean start = element instanceof MoveTo;
+            Point3D point;
+            if (element instanceof MoveTo move) {
+                point = projection.transform(move.getX(), move.getY(), 0);
+            } else if (element instanceof LineTo line) {
+                point = projection.transform(line.getX(), line.getY(), 0);
+            } else {
+                gc.closePath();
+                continue;
+            }
+            double depth = distance + point.getZ();
+            if (depth < camera.getNearClip()) return;
+            double x = scene.getWidth() / 2 + point.getX() * focalLength / depth;
+            double y = scene.getHeight() / 2 + point.getY() * focalLength / depth;
+            if (start) gc.moveTo(x, y);
+            else gc.lineTo(x, y);
+        }
+        if (path.getFill() != null) {
+            gc.setFillRule(path.getFillRule());
+            gc.setFill(path.getFill());
+            gc.fill();
+        } else {
+            gc.setStroke(path.getStroke());
+            gc.setLineWidth(1.5);
+            gc.stroke();
+        }
     }
 
     private void positionPlaneLabels() {
@@ -617,7 +675,7 @@ public final class Viewport extends StackPane {
     }
 
     public void showSketches(List<Feature> features, String selectedSketch) {
-        sketches.setDepthTest(planeClick == null ? DepthTest.INHERIT : DepthTest.DISABLE);
+        sketches.setDepthTest(planeClick == null && beforeProfileEdit == null ? DepthTest.INHERIT : DepthTest.DISABLE);
         if (shownSketches.equals(features)) {
             if (java.util.Objects.equals(shownSketchSelection, selectedSketch)) return;
         } else {
@@ -628,37 +686,51 @@ public final class Viewport extends StackPane {
         sketches.getChildren().clear();
         sketchPicks.clear();
         pressedSketch = null;
-        var consumed = new java.util.HashSet<String>();
-        if (rendering == Rendering.Style.TECHNICAL) {
-            for (var feature : features) {
-                if (BodyExtrusion.modifiesBody(feature)) {
-                    consumed.add(
-                            BodyExtrusion.from(feature).extrusion().profile().sketchId());
-                } else if (feature instanceof Feature.Extrude extrude) {
-                    consumed.add(extrude.profile().sketchId());
-                } else if (feature instanceof Feature.ThroughCut cut) {
-                    consumed.add(cut.profile().sketchId());
-                }
-            }
-        }
+        String sourceSketch = features.stream()
+                .filter(f -> f.id().equals(selectedSketch))
+                .filter(f -> f instanceof Feature.Extrude || BodyExtrusion.modifiesBody(f))
+                .map(f -> BodyExtrusion.from(f).extrusion().profile().sketchId())
+                .findFirst()
+                .orElse(null);
+        var consumed = consumedSketches(features);
         for (var feature : features) {
             if (feature instanceof Feature.Sketch sketch) {
-                if (consumed.contains(sketch.id()) && !sketch.id().equals(selectedSketch)) continue;
+                boolean outline = beforeProfileEdit != null || sketch.id().equals(sourceSketch);
+                if (consumed.contains(sketch.id()) && !sketch.id().equals(selectedSketch) && !outline) continue;
                 if (sketch.profile() instanceof Feature.Constrained constrained) {
-                    var display = new SketchDisplay(sketch.id(), sketch.id().equals(selectedSketch));
+                    var display = new SketchDisplay(sketch.id(), sketch.id().equals(selectedSketch), outline);
                     var overlay = constrainedOverlays.computeIfAbsent(
-                            display, key -> constrainedOverlay(sketch, constrained.geometry(), key.selected()));
+                            display, key -> constrainedOverlay(sketch, constrained.geometry(), key));
                     sketches.getChildren().add(overlay.group());
                     sketchPicks.addAll(overlay.picks());
                     continue;
                 }
-                showProfile(sketch, selectedSketch);
+                showProfile(sketch, selectedSketch, outline);
             }
         }
+        profileCurves = sketches.lookupAll(".sketch-curves").stream()
+                .filter(Path.class::isInstance)
+                .map(Path.class::cast)
+                .toList();
+        requestLayout();
+    }
+
+    private java.util.Set<String> consumedSketches(List<Feature> features) {
+        if (rendering != Rendering.Style.TECHNICAL) return java.util.Set.of();
+        var consumed = new java.util.HashSet<String>();
+        for (var feature : features) {
+            if (feature instanceof Feature.Extrude || BodyExtrusion.modifiesBody(feature)) {
+                consumed.add(BodyExtrusion.from(feature).extrusion().profile().sketchId());
+            } else if (feature instanceof Feature.ThroughCut cut) {
+                consumed.add(cut.profile().sketchId());
+            }
+        }
+        return consumed;
     }
 
     private SketchOverlay constrainedOverlay(
-            Feature.Sketch sketch, dev.voxelbrew.api.model.sketch.SketchGeometry geometry, boolean chosen) {
+            Feature.Sketch sketch, dev.voxelbrew.api.model.sketch.SketchGeometry geometry, SketchDisplay display) {
+        boolean chosen = display.selected();
         var group = new Group();
         var picks = new java.util.ArrayList<SketchPick>();
         group.getTransforms().add(viewTransform(sketch.plane().frame()));
@@ -672,6 +744,18 @@ public final class Viewport extends StackPane {
             }
             var segments = sketchSegments(curves, entity.construction());
             if (!segments.isEmpty()) {
+                String stroke = entity.construction() ? "#8795a3" : "#2d839f";
+                if (display.outline()) {
+                    var path = new Path();
+                    for (var segment : segments) {
+                        path.getElements()
+                                .addAll(
+                                        new MoveTo(segment.a().x(), segment.a().y()),
+                                        new LineTo(segment.b().x(), segment.b().y()));
+                    }
+                    group.getChildren().add(profileOutline(path, sketch.plane(), stroke));
+                    continue;
+                }
                 for (var segment : segments) {
                     picks.add(new SketchPick(
                             sketch.id(),
@@ -680,7 +764,6 @@ public final class Viewport extends StackPane {
                 }
                 var view = meshView(SketchStrokes.mesh(segments, sketch.plane().offsetZ() + .04, chosen ? .14 : .075));
                 view.getStyleClass().add("sketch-curves");
-                String stroke = entity.construction() ? "#8795a3" : "#2d839f";
                 view.setMaterial(new PhongMaterial(Color.web(chosen ? "#dc8d18" : stroke)));
                 group.getChildren().add(view);
             }
@@ -694,6 +777,18 @@ public final class Viewport extends StackPane {
         return new SketchOverlay(group, List.copyOf(picks));
     }
 
+    private Path profileOutline(Path path, Feature.Plane plane, String stroke) {
+        path.setFill(null);
+        path.setStroke(Color.web(stroke));
+        path.setDepthTest(DepthTest.DISABLE);
+        path.getTransforms().add(new Rotate(90, Rotate.X_AXIS));
+        path.setOpacity(0);
+        path.setTranslateY(-plane.offsetZ());
+        path.setMouseTransparent(true);
+        path.getStyleClass().add("sketch-curves");
+        return path;
+    }
+
     void pickExtrusionRegion(Feature.Plane plane, Consumer<Point3D> pick) {
         var inverse = plane.placement().inverse();
         extrusionPick = event -> {
@@ -704,14 +799,64 @@ public final class Viewport extends StackPane {
     }
 
     void isolateProfile(boolean isolate) {
+        if (isolate == (beforeProfileEdit != null)) return;
+        if (isolate) {
+            beforeProfileEdit = new CameraView(
+                    orientation.get(),
+                    new Point3D(center.getX(), center.getY(), center.getZ()),
+                    new Point3D(pan.getX(), pan.getY(), 0),
+                    distance);
+        } else {
+            var saved = beforeProfileEdit;
+            beforeProfileEdit = null;
+            setOrientation(saved.orientation());
+            positionCamera(saved.center(), saved.pan(), saved.distance());
+        }
+        shownSketches = List.of();
+        constrainedOverlays.clear();
+        sketches.getChildren().clear();
+        sketchPicks.clear();
+        profileCurves = List.of();
+        aids.setVisible(!isolate && rendering != Rendering.Style.TECHNICAL);
+        viewCube.setVisible(!isolate);
         bodies.setVisible(!isolate);
         outlines.setVisible(!isolate);
         construction.setVisible(!isolate);
     }
 
+    void frameProfile(Feature.Sketch sketch) {
+        var frame = sketch.plane().frame().matrix();
+        var direction = ViewOrientation.lookingFrom(frame[2], frame[6], frame[10]);
+        profileHighlights.getTransforms().setAll(viewTransform(sketch.plane().frame()));
+        setOrientation(direction);
+        var bounds = sketches.getBoundsInLocal();
+        if (bounds.isEmpty()) return;
+        var middle = new Point3D(bounds.getCenterX(), bounds.getCenterY(), bounds.getCenterZ());
+        var projected = tilt.createConcatenation(orbit).transform(bounds);
+        double aspect = Math.max(1, scene.getWidth()) / Math.max(1, scene.getHeight());
+        double span = Math.max(projected.getHeight(), projected.getWidth() / aspect);
+        positionCamera(
+                middle.multiply(-1),
+                Point3D.ZERO,
+                Math.max(2, .6 * span / Math.tan(Math.toRadians(camera.getFieldOfView() / 2))));
+    }
+
+    private void positionCamera(Point3D translation, Point3D offset, double depth) {
+        center.setX(translation.getX());
+        center.setY(translation.getY());
+        center.setZ(translation.getZ());
+        pan.setX(offset.getX());
+        pan.setY(offset.getY());
+        distance = depth;
+        camera.setTranslateZ(-depth);
+    }
+
     Path editingHighlight(Feature.Plane plane, List<List<dev.voxelbrew.api.model.sketch.SketchGeometry.Vec>> rings) {
         var path = profileHighlight(rings, plane.offsetZ());
+        path.setOpacity(0);
+        path.visibleProperty().addListener(observable -> requestLayout());
         profileHighlights.getChildren().add(path);
+        requestLayout();
         return path;
     }
 
@@ -719,16 +864,19 @@ public final class Viewport extends StackPane {
             Feature.Sketch sketch,
             dev.voxelbrew.api.model.sketch.SketchGeometry geometry,
             javafx.beans.value.ObservableBooleanValue whole) {
-        profileHighlights.getTransforms().setAll(viewTransform(sketch.plane().frame()));
-        var group = new Group();
-        addProfileHighlight(group, geometry, sketch.plane().offsetZ());
-        group.visibleProperty().bind(whole);
-        profileHighlights.getChildren().add(group);
+        try {
+            editingHighlight(sketch.plane(), dev.voxelbrew.engine.sketch.SketchProfiles.profileContours(geometry))
+                    .visibleProperty()
+                    .bind(whole);
+        } catch (IllegalArgumentException incomplete) {
+            // Individual regions can still be selected when the entire sketch cannot form a profile.
+        }
     }
 
     public void clearHandle() {
         extrusionPick = null;
         profileHighlights.getChildren().clear();
+        requestLayout();
         handle.getChildren().clear();
     }
 
@@ -827,7 +975,7 @@ public final class Viewport extends StackPane {
     void setRendering(@NonNull Rendering.Style style) {
         rendering = style;
         boolean technical = style == Rendering.Style.TECHNICAL;
-        aids.setVisible(!technical);
+        aids.setVisible(!technical && beforeProfileEdit == null);
         requestLayout();
         setDark(dark);
         select(selected);
@@ -985,6 +1133,12 @@ public final class Viewport extends StackPane {
     }
 
     public void fit(Map<String, MeshData> meshes) {
+        if (beforeProfileEdit != null
+                && shownSketches.size() == 1
+                && shownSketches.getFirst() instanceof Feature.Sketch sketch) {
+            frameProfile(sketch);
+            return;
+        }
         if (meshes.isEmpty()) {
             center.setX(-30);
             center.setY(0);
@@ -1124,7 +1278,7 @@ public final class Viewport extends StackPane {
         requestFocus();
     }
 
-    private void showProfile(Feature.Sketch sketch, String selectedSketch) {
+    private void showProfile(Feature.Sketch sketch, String selectedSketch, boolean showOutline) {
         double[] xy;
         if (sketch.profile() instanceof Feature.Rectangle r) {
             xy = new double[] {
@@ -1169,6 +1323,16 @@ public final class Viewport extends StackPane {
         var group = new Group(profile);
         group.getTransforms().add(viewTransform(sketch.plane().frame()));
         sketches.getChildren().add(group);
+        if (showOutline) {
+            var outline = new Path();
+            outline.getElements().add(new MoveTo(xy[0], xy[1]));
+            for (int i = 1; i < count; i++) {
+                outline.getElements().add(new LineTo(xy[2 * i], xy[2 * i + 1]));
+            }
+            outline.getElements().add(new ClosePath());
+            group.getChildren().add(profileOutline(outline, sketch.plane(), "#2d839f"));
+            return;
+        }
         for (int i = 0; i < count; i++) {
             var line = line(
                     toView(xy[2 * i], xy[2 * i + 1], sketch.plane().offsetZ() + 0.04),

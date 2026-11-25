@@ -2068,7 +2068,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     .filter(s -> s.id().equals(sketches.getValue()))
                     .findFirst();
             viewport.showSketches(sketch.stream().map(Feature.class::cast).toList(), null);
-            sketch.ifPresent(s -> attempt(() -> editProfileRegions(definition, s, choices, apply)));
+            sketch.ifPresent(s -> attempt(() -> {
+                viewport.frameProfile(s);
+                editProfileRegions(definition, s, choices, apply);
+            }));
         };
         sketches.setOnAction(event -> update.run());
         update.run();

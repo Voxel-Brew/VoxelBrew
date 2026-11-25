@@ -3331,7 +3331,11 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                     e.consume();
                     return;
                 }
-                cancelTool();
+                if (designTab.isSelected() && tool == Tool.NONE && selectedBody != null) {
+                    selectFeature(null);
+                } else {
+                    cancelTool();
+                }
                 e.consume();
                 return;
             }

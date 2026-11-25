@@ -9547,6 +9547,27 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void escapeClearsDesignerBodySelection() throws Exception {
+        openPrepared("plate-5mm.vxb");
+        var snapshot = fx(() -> workbench.controller().snapshot());
+        var body = fx(() -> findBodyView(
+                workbench.viewport(),
+                "body-" + workbench.controller().build().bodies().getFirst().id()));
+        var normal = fx(() -> ((javafx.scene.paint.PhongMaterial) body.getMaterial()).getDiffuseColor());
+        bodyTreeClick("Body 1", MouseButton.PRIMARY, 1);
+        assertThat(fx(() -> ((javafx.scene.paint.PhongMaterial) body.getMaterial()).getDiffuseColor()))
+                .isNotEqualTo(normal);
+        key(KeyCode.ESCAPE);
+        assertThat(fx(() ->
+                        ((TreeView<?>) node("#model-tree")).getSelectionModel().getSelectedIndex()))
+                .isEqualTo(-1);
+        assertThat(fx(() -> ((javafx.scene.paint.PhongMaterial) body.getMaterial()).getDiffuseColor()))
+                .isEqualTo(normal);
+        assertThat(fx(() -> workbench.lookup("#body-material-name"))).isNull();
+        assertThat(fx(() -> workbench.controller().snapshot())).isEqualTo(snapshot);
+    }
+
+    @Test
     void keyboardModelingNavigationAndSketchDraftsRespectFocusAndModalBoundaries() throws Exception {
         ready();
         click("operations-menu");

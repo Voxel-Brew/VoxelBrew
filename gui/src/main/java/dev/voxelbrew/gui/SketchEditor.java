@@ -757,7 +757,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                 dimension.setValue(b.type());
                 String expression =
                         controller.parameters().binding(new ParameterSet.Target(featureId, "constraint:" + b.id()));
-                dimensionValue.setText(
+                dimensionValue.setExpression(
                         expression.isEmpty() ? number(dimensionValue(b, controller.definition())) : expression);
             }
             selectionChanged();
@@ -1023,7 +1023,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                                 Type.TEXT_SPACING,
                                 textSpacing)
                         .entrySet()) {
-                    if (Expressions.isNumber(entry.getValue().getText())) continue;
+                    if (Expressions.isNumber(entry.getValue().expression())) continue;
                     String constraintId = id("dimension");
                     next = next.add(SketchConstraints.create(
                             next,
@@ -1033,7 +1033,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                             entry.getValue().value()));
                     parameters = parameters.bind(
                             new ParameterSet.Target(featureId, "constraint:" + constraintId),
-                            entry.getValue().getText());
+                            entry.getValue().expression());
                 }
                 parameters.validate();
                 controller.edit(next, parameters);
@@ -1176,9 +1176,9 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                                             new TextMirror(flipX.isSelected(), flipY.isSelected()).apply(text)),
                                     bindText(controller.parameters(), chosen.id(), content, font));
                             edit = applyTextDimension(
-                                    edit, text, Type.TEXT_HEIGHT, heightConstraint, size, height.getText());
+                                    edit, text, Type.TEXT_HEIGHT, heightConstraint, size, height.expression());
                             edit = applyTextDimension(
-                                    edit, text, Type.ANGLE, angleConstraint, degrees, angle.getText());
+                                    edit, text, Type.ANGLE, angleConstraint, degrees, angle.expression());
                             SketchConstraints.validateGeometry(edit.geometry());
                             edit.parameters().validate();
                             result[0] = edit;
@@ -1441,7 +1441,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                     withReferences(controller.displayed(), selection), List.copyOf(selection), position);
             dimension.setValue(candidate.type());
             if (addReferenceDimension(candidate.type(), position)) return;
-            dimensionValue.setText(number(candidate.value()));
+            dimensionValue.setExpression(number(candidate.value()));
             editDimensionValue(position);
         } catch (RuntimeException failure) {
             error.setText(translations.translate("gui.dimension_hint") + "\n" + failure.getMessage());
@@ -1461,7 +1461,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         closeDimensionEntry();
         dimensionEntryPosition = position;
         var input = FormulaField.number(
-                dimensionValue.getText(), this::formulaParameters, this::dimensionUnit, translations);
+                dimensionValue.expression(), this::formulaParameters, this::dimensionUnit, translations);
         input.setId("sketch-inline-dimension");
         input.setPrefColumnCount(14);
         input.setMinWidth(200);
@@ -1473,7 +1473,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         UiHelp.describe(apply, translations.translate("gui.apply_dimension"));
         Runnable commit = () -> {
             if (controller.busy()) return;
-            dimensionValue.setText(input.getText());
+            dimensionValue.setExpression(input.expression());
             if (dimension()) {
                 closeDimensionEntry();
                 if (dimensionTool) selection.clear();
@@ -1538,7 +1538,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
     }
 
     private void driveDimension(SketchGeometry g, Constraint chosen, Type type) {
-        String expression = dimensionValue.getText().strip();
+        String expression = dimensionValue.expression().strip();
         double value = controller.parameters().value(expression, FeatureDimensions.unit(type));
         String id = chosen != null ? chosen.id() : id("dimension");
         SketchGeometry next;
@@ -1572,17 +1572,17 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         var chosen = constraints.getSelectionModel().getSelectedItem();
         boolean readOnly = chosen != null && SketchConstraints.referenceDimension(chosen);
         if (readOnly) {
-            dimensionValue.setText(number(SketchConstraints.measuredValue(controller.definition(), chosen)));
+            dimensionValue.setExpression(number(SketchConstraints.measuredValue(controller.definition(), chosen)));
         } else if (chosen == null && fixedSelection()) {
             readOnly = true;
             try {
                 var g = withReferences(controller.displayed(), selection);
                 var type = dimension.getValue();
                 var refs = SketchDimensions.drivingReferences(g, List.copyOf(selection), type);
-                dimensionValue.setText(
+                dimensionValue.setExpression(
                         number(SketchConstraints.measuredValue(g, new Constraint("preview", type, refs, List.of()))));
             } catch (IllegalArgumentException invalidSelection) {
-                dimensionValue.clear();
+                dimensionValue.setExpression("");
             }
         }
         dimensionValue.setDisable(readOnly);
@@ -1770,9 +1770,9 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
                     selection.getLast(),
                     value(radius, translations.translate("gui.radius")));
             var parameters = controller.parameters();
-            if (!Expressions.isNumber(radius.getText())) {
+            if (!Expressions.isNumber(radius.expression())) {
                 parameters = parameters.bind(
-                        new ParameterSet.Target(featureId, "constraint:" + arc + "-radius"), radius.getText());
+                        new ParameterSet.Target(featureId, "constraint:" + arc + "-radius"), radius.expression());
                 parameters.validate();
             }
             error.setText("");
@@ -2084,7 +2084,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
         double degrees = SketchRotationAngles.signed(Measurements.degrees(text.value(3)));
         rotationInput.setDisable(locked);
         if (!rotationInput.isFocused() || rotatingText != null) {
-            rotationInput.setText(java.math.BigDecimal.valueOf(degrees)
+            rotationInput.setExpression(java.math.BigDecimal.valueOf(degrees)
                     .setScale(4, java.math.RoundingMode.HALF_UP)
                     .stripTrailingZeros()
                     .toPlainString());
@@ -2325,7 +2325,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
 
     private ParameterSet bindText(ParameterSet parameters, String entityId, FormulaField content, FormulaField font) {
         for (var entry : Map.of("content", content, "font", font).entrySet()) {
-            String expression = entry.getValue().getText();
+            String expression = entry.getValue().expression();
             parameters = parameters.bind(
                     new ParameterSet.Target(featureId, FeatureText.key(entityId, entry.getKey())),
                     Expressions.isFormula(expression) ? expression : "");

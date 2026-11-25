@@ -64,13 +64,14 @@ final class ParameterDialog {
             rowExpression = FormulaField.number(
                     draft.expression(parameter, draft.active()), () -> draft, rowUnit::getValue, translations);
             rowExpression.setId("parameter-row-expression");
+            rowExpression.onUnitSelected(rowUnit::setValue);
             rowUnit.valueProperty().addListener(o -> rowExpression.refreshFormula());
             rowComment = FormulaField.text(Expressions.literalText(parameter.comment()), () -> draft, translations);
             rowComment.setId("parameter-row-comment");
             watchName(rowName, parameter);
             rowExpression.focusedProperty().addListener((o, before, focused) -> {
                 if (!focused && rowEditor == this) {
-                    attempt(() -> draft.value(rowExpression.getText(), rowUnit.getValue()));
+                    attempt(() -> draft.value(rowExpression.expression(), rowUnit.getValue()));
                 }
             });
             for (var editor : List.of(rowName, rowExpression, rowComment)) {
@@ -191,6 +192,7 @@ final class ParameterDialog {
         this.features = List.copyOf(features);
         draft = initial;
         expression = field("parameter-expression");
+        expression.onUnitSelected(unit::setValue);
         comment = field("parameter-comment");
         override = field("configuration-expression");
         binding = field("parameter-binding-expression");
@@ -208,7 +210,9 @@ final class ParameterDialog {
                 FormulaField.number(
                         "",
                         () -> draft.select(selectedConfig()),
-                        () -> requiredParameter().unit(),
+                        () -> overrideParameter.getValue() == null
+                                ? null
+                                : overrideParameter.getValue().unit(),
                         translations);
             case "parameter-binding-expression" ->
                 FormulaField.number(
@@ -270,8 +274,8 @@ final class ParameterDialog {
         unit.setMaxWidth(Double.MAX_VALUE);
         watchName(name, null);
         expression.focusedProperty().addListener((o, before, focused) -> {
-            if (!focused && !expression.isDisabled() && !expression.getText().isBlank()) {
-                attempt(() -> draft.value(expression.getText(), unit.getValue()));
+            if (!focused && !expression.isDisabled() && !expression.expression().isBlank()) {
+                attempt(() -> draft.value(expression.expression(), unit.getValue()));
             }
         });
         unit.setId("parameter-unit");
@@ -358,7 +362,8 @@ final class ParameterDialog {
                 button(
                         translations.translate("gui.set_override"),
                         "configuration-set",
-                        () -> update(draft.override(requiredParameter().id(), selectedConfig(), override.getText()))),
+                        () -> update(
+                                draft.override(requiredParameter().id(), selectedConfig(), override.expression()))),
                 button(
                         translations.translate("gui.inherit_default"),
                         "configuration-inherit",
@@ -393,7 +398,7 @@ final class ParameterDialog {
                         .flatMap(f -> FeatureDimensions.list(f).stream())
                         .toList());
         dimensions.getSelectionModel().selectedItemProperty().addListener((o, a, d) -> {
-            if (d != null) binding.setText(draft.binding(d.target()));
+            if (d != null) binding.setExpression(draft.binding(d.target()));
             binding.refreshFormula();
         });
         var dimensionsPane = new VBox(
@@ -414,7 +419,7 @@ final class ParameterDialog {
                             features.size(),
                             dev.voxelbrew.api.model.printing.PrintSetup.empty(),
                             draft);
-                    update(FeatureDimensions.bind(doc, chosen.target(), binding.getText()));
+                    update(FeatureDimensions.bind(doc, chosen.target(), binding.expression()));
                 }));
         var tabs = new TabPane(
                 new Tab(translations.translate("gui.parameters"), parameterPane),
@@ -468,7 +473,7 @@ final class ParameterDialog {
     private void updateOverride() {
         var p = overrideParameter.getValue();
         var id = configurations.getSelectionModel().getSelectedItem();
-        if (p != null && id != null) override.setText(draft.expression(p, id));
+        if (p != null && id != null) override.setExpression(draft.expression(p, id));
     }
 
     private void refresh() {
@@ -513,7 +518,7 @@ final class ParameterDialog {
                         if (!isEditing()) return;
                         editor = FormulaField.number(
                                 getItem(), () -> draft.select(getTableRow().getItem()), p.unit(), translations);
-                        editor.setOnAction(e -> commitEdit(editor.getText()));
+                        editor.setOnAction(e -> commitEdit(editor.expression()));
                         editor.setOnKeyPressed(e -> {
                             if (e.getCode() == javafx.scene.input.KeyCode.ESCAPE) cancelEdit();
                         });
@@ -662,14 +667,14 @@ final class ParameterDialog {
 
     private void addParameter() {
         String newName = validateName(name, null);
-        update(draft.put(newName, unit.getValue(), expression.getText().strip(), comment.evaluatedText()));
+        update(draft.put(newName, unit.getValue(), expression.expression().strip(), comment.evaluatedText()));
         clearFields();
     }
 
     private void clearFields() {
         name.pseudoClassStateChanged(INVALID, false);
         name.clear();
-        expression.clear();
+        expression.setExpression("");
         comment.clear();
         unit.setValue(ParameterUnit.MM);
         name.requestFocus();
@@ -726,7 +731,10 @@ final class ParameterDialog {
         String newName = validateName(row.rowName, row.parameter);
         var next = newName.equals(row.parameter.name()) ? draft : draft.rename(row.parameter.id(), newName);
         update(next.put(
-                newName, row.rowUnit.getValue(), row.rowExpression.getText().strip(), row.rowComment.evaluatedText()));
+                newName,
+                row.rowUnit.getValue(),
+                row.rowExpression.expression().strip(),
+                row.rowComment.evaluatedText()));
         cancelRow();
     }
 

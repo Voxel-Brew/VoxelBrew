@@ -1518,14 +1518,14 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 .binding(new dev.voxelbrew.api.model.parameters.ParameterSet.Target(feature.id(), name));
         var field = editableDimension(
                 name, translations.tryTranslate("dimension." + name).orElse(name), value, ParameterUnit.MM, input -> {
-                    String text = input.getText().strip();
+                    String text = input.expression().strip();
                     if (text.matches("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?")) {
                         controller.edit(feature.id(), name, number(input, name));
                     } else {
                         controller.expression(feature.id(), name, text);
                     }
                 });
-        if (!expression.isEmpty()) field.setText(expression);
+        if (!expression.isEmpty()) field.setExpression(expression);
     }
 
     private FormulaField editableDimension(
@@ -2187,11 +2187,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         form.getChildren().add(hint);
         Runnable updatePreview = () -> {
             try {
-                double value = controller
-                        .snapshot()
-                        .document()
-                        .parameters()
-                        .value(distance.getText(), dev.voxelbrew.api.model.parameters.ParameterUnit.MM);
+                double value = distance.value();
                 if (!regions.whole().isSelected() && regions.selectedIds().isEmpty()) {
                     controller.cancelPreview();
                     finish.setDisable(true);
@@ -2201,7 +2197,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 controller.previewExtrusion(
                         sketch,
                         regions.profileId(sketch),
-                        distance.getText().strip(),
+                        distance.expression().strip(),
                         operation.getValue(),
                         target.isDisabled() || target.getValue() == null
                                 ? null
@@ -2220,8 +2216,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         operation.setOnAction(event -> {
             if (operation.getValue() == BodyExtrusion.Operation.CUT
                     && sketch.plane().support() != null
-                    && distance.getText().equals("5.0")) {
-                distance.setText("-5");
+                    && distance.expression().equals("5.0")) {
+                distance.setExpression("-5");
             } else {
                 updatePreview.run();
             }
@@ -2233,7 +2229,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 configuration, name -> name.equals("Default") ? translations.translate("configuration.default") : name);
         viewport.standardView("Isometric");
         controller.previewExtrusion(sketch, 5);
-        viewport.extrusionHandle(sketch, 5, v -> distance.setText(format(v)), () -> {
+        viewport.extrusionHandle(sketch, 5, v -> distance.setExpression(format(v)), () -> {
             if (!finish.isDisabled()) commitExtrusion();
         });
         distance.requestFocus();
@@ -2365,9 +2361,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                             java.util.List.copyOf(edges));
                 }
                 var parameters = formulaParameters();
-                if (!Expressions.isNumber(size.getText())) {
+                if (!Expressions.isNumber(size.expression())) {
                     String key = feature instanceof Feature.Shell ? "thickness" : "size";
-                    parameters = parameters.bind(new ParameterSet.Target(id, key), size.getText());
+                    parameters = parameters.bind(new ParameterSet.Target(id, key), size.expression());
                 }
                 controller.add(feature, parameters);
                 selectedFeature = id;
@@ -2513,8 +2509,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                             axis.getValue().equals("Z") ? 1 : 0,
                             number(offset, "offset")));
             var parameters = formulaParameters();
-            if (!Expressions.isNumber(offset.getText())) {
-                parameters = parameters.bind(new ParameterSet.Target(id, "offset"), offset.getText());
+            if (!Expressions.isNumber(offset.expression())) {
+                parameters = parameters.bind(new ParameterSet.Target(id, "offset"), offset.expression());
             }
             controller.add(feature, parameters);
             selectedFeature = id;

@@ -839,7 +839,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
 
     private void bindWorkspaceSettings(
             ToggleGroup viewMode, RadioButton solidView, RadioButton topView, TitledPane legend) {
-        fields.forEach((key, field) -> workspace.add(key, field::getText, field::setText));
+        fields.forEach((key, field) -> workspace.add(key, field::expression, field::setExpression));
         for (var choice : List.of(bodies, instances, materials, supportIds, supportOwners, targetPlate)) {
             workspace.add(choice.getId(), choice::getValue, value -> choice.setValue(value.isEmpty() ? null : value));
         }
@@ -1004,7 +1004,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         };
         for (int i = 0; i < names.length; i++) {
             fields.get("print-" + names[i])
-                    .setText(java.math.BigDecimal.valueOf(values[i])
+                    .setExpression(java.math.BigDecimal.valueOf(values[i])
                             .setScale(4, java.math.RoundingMode.HALF_UP)
                             .stripTrailingZeros()
                             .toPlainString());
@@ -1904,7 +1904,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         };
         for (int i = 0; i < names.length; i++) {
             fields.get("print-" + names[i])
-                    .setText(java.math.BigDecimal.valueOf(values[i])
+                    .setExpression(java.math.BigDecimal.valueOf(values[i])
                             .setScale(4, java.math.RoundingMode.HALF_UP)
                             .stripTrailingZeros()
                             .toPlainString());
@@ -1972,7 +1972,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
                     double[] values = {s.x(), s.y(), s.z(), s.width(), s.depth(), s.height()};
                     for (int i = 0; i < names.length; i++) {
                         fields.get("print-support-" + names[i])
-                                .setText(java.math.BigDecimal.valueOf(values[i])
+                                .setExpression(java.math.BigDecimal.valueOf(values[i])
                                         .setScale(4, java.math.RoundingMode.HALF_UP)
                                         .stripTrailingZeros()
                                         .toPlainString());
@@ -2775,7 +2775,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         printerProfileLabel.setText(translations
                 .tryTranslate(deviceSelected ? "print.deviceProfile" : "print.printerSelector")
                 .orElseThrow());
-        if (!nozzle.isFocused()) nozzle.setText(Double.toString(p.nozzleMm()));
+        if (!nozzle.isFocused()) nozzle.setExpression(Double.toString(p.nozzleMm()));
         var entry = printerCatalog.entries().stream()
                 .filter(e -> e.definition().printer().id().equals(p.id()))
                 .findFirst()

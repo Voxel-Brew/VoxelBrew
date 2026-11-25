@@ -115,6 +115,63 @@ public final class DocumentController implements AutoCloseable {
     private java.util.function.Supplier<java.util.Map<String, String>> printWorkspace =
             () -> session.document().printSetup().workspaceSettings();
 
+    @RequiredArgsConstructor
+    static final class DisplayEvaluator implements Function<CadDocument, Build> {
+        private final Path pluginDirectory;
+        private String documentId;
+        private List<Feature> previousFeatures = List.of();
+        private Map<Feature.BodyRef, Body> previousBodies = Map.of();
+
+        @Override
+        public Build apply(CadDocument document) {
+            try (var evaluation = Evaluator.evaluate(document, pluginDirectory)) {
+                if (!evaluation.valid()) {
+                    return new Build(List.of(), evaluation.diagnostics(), false, evaluation.resolvedFeatures());
+                }
+                var active = evaluation.resolvedFeatures().subList(0, document.cursor());
+                var reusable = unchangedProducers(document.id(), active);
+                var bodies = dev.voxelbrew.util.concurrent.ParallelWork.map(evaluation.bodies(), b -> {
+                    var cached = previousBodies.get(b.output());
+                    if (cached != null
+                            && reusable.contains(b.output().featureId())
+                            && cached.id().equals(b.id())) {
+                        return cached;
+                    }
+                    return new Body(
+                            b.id(),
+                            b.output(),
+                            b.solid().tessellate(MeshOptions.DEFAULT),
+                            b.solid().volume(),
+                            b.solid().planarFaces(),
+                            b.solid().faceEdges(),
+                            b.solid().edgeSamples());
+                });
+                var result = build(evaluation, bodies);
+                documentId = document.id();
+                previousFeatures = List.copyOf(active);
+                previousBodies =
+                        bodies.stream().collect(java.util.stream.Collectors.toMap(Body::output, Function.identity()));
+                return result;
+            }
+        }
+
+        private Set<String> unchangedProducers(String id, List<Feature> active) {
+            if (!id.equals(documentId)) return Set.of();
+            var producers = new HashSet<String>();
+            for (int i = 0; i < Math.min(previousFeatures.size(), active.size()); i++) {
+                var feature = active.get(i);
+                if (!feature.equals(previousFeatures.get(i))) break;
+                // External feature providers can depend on state outside the document.
+                if (feature instanceof Feature.Custom
+                        && !BodyExtrusion.modifiesBody(feature)
+                        && !BodyPattern.matches(feature)
+                        && !CutTargets.through(feature)) break;
+                producers.add(feature.id());
+            }
+            return producers;
+        }
+    }
+
     public record Body(
             String id,
             Feature.BodyRef output,
@@ -298,51 +355,36 @@ public final class DocumentController implements AutoCloseable {
     }
 
     static Build evaluate(CadDocument document, Path pluginDirectory) {
-        try (var evaluation = Evaluator.evaluate(document, pluginDirectory)) {
-            if (!evaluation.valid()) {
-                return new Build(List.of(), evaluation.diagnostics(), false, evaluation.resolvedFeatures());
-            }
-            var bodies = dev.voxelbrew.util.concurrent.ParallelWork.map(
-                    evaluation.bodies(),
-                    b -> new Body(
-                            b.id(),
-                            b.output(),
-                            b.solid().tessellate(MeshOptions.DEFAULT),
-                            b.solid().volume(),
-                            b.solid().planarFaces(),
-                            b.solid().faceEdges(),
-                            b.solid().edgeSamples()));
-            var inputs = new ArrayList<ConstructionFeature.Input>();
-            var zero = new dev.voxelbrew.api.model.construction.ConstructionGeometry.Vector(0, 0, 0);
-            for (var body : evaluation.bodies()) {
-                for (int kind = 0; kind < 3; kind++) {
-                    int count = (int) body.solid().constructionInput(kind, -1, .5)[0];
-                    var selection = switch (kind) {
-                        case 0 -> ConstructionFeature.Selection.FACE;
-                        case 1 -> ConstructionFeature.Selection.EDGE;
-                        default -> ConstructionFeature.Selection.VERTEX;
-                    };
-                    for (int index = 0; index < count; index++) {
-                        inputs.add(new ConstructionFeature.Input(
-                                selection,
-                                body.output().featureId(),
-                                body.output().outputName(),
-                                index,
-                                zero));
-                    }
+        return new DisplayEvaluator(pluginDirectory).apply(document);
+    }
+
+    private static Build build(Evaluation evaluation, List<Body> bodies) {
+        var inputs = new ArrayList<ConstructionFeature.Input>();
+        var zero = new dev.voxelbrew.api.model.construction.ConstructionGeometry.Vector(0, 0, 0);
+        for (var body : evaluation.bodies()) {
+            for (int kind = 0; kind < 3; kind++) {
+                int count = (int) body.solid().constructionInput(kind, -1, .5)[0];
+                var selection = switch (kind) {
+                    case 0 -> ConstructionFeature.Selection.FACE;
+                    case 1 -> ConstructionFeature.Selection.EDGE;
+                    default -> ConstructionFeature.Selection.VERTEX;
+                };
+                for (int index = 0; index < count; index++) {
+                    inputs.add(new ConstructionFeature.Input(
+                            selection, body.output().featureId(), body.output().outputName(), index, zero));
                 }
             }
-            return new Build(
-                    bodies,
-                    evaluation.diagnostics(),
-                    true,
-                    evaluation.resolvedFeatures(),
-                    evaluation.construction(),
-                    inputs,
-                    evaluation.projections(),
-                    evaluation.bodyIds(),
-                    new BodyLabels(bodies, evaluation.patternCopies()));
         }
+        return new Build(
+                bodies,
+                evaluation.diagnostics(),
+                true,
+                evaluation.resolvedFeatures(),
+                evaluation.construction(),
+                inputs,
+                evaluation.projections(),
+                evaluation.bodyIds(),
+                new BodyLabels(bodies, evaluation.patternCopies()));
     }
 
     public DocumentController(Consumer<Runnable> dispatch) {
@@ -350,7 +392,7 @@ public final class DocumentController implements AutoCloseable {
     }
 
     public DocumentController(Consumer<Runnable> dispatch, Path pluginDirectory) {
-        this(dispatch, document -> evaluate(document, pluginDirectory), pluginDirectory);
+        this(dispatch, new DisplayEvaluator(pluginDirectory), pluginDirectory);
     }
 
     DocumentController(Consumer<Runnable> dispatch, Function<CadDocument, Build> evaluator) {
@@ -376,14 +418,7 @@ public final class DocumentController implements AutoCloseable {
             ExecutorService io,
             dev.voxelbrew.importer.DocumentSource documents,
             DocumentSave documentWriter) {
-        this(
-                dispatch,
-                document -> evaluate(document, pluginDirectory),
-                pluginDirectory,
-                worker,
-                io,
-                documents,
-                documentWriter);
+        this(dispatch, new DisplayEvaluator(pluginDirectory), pluginDirectory, worker, io, documents, documentWriter);
     }
 
     public ModelSession.Snapshot snapshot() {

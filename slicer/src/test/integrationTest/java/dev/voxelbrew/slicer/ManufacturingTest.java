@@ -26,6 +26,21 @@ class ManufacturingTest {
     Path directory;
 
     @Test
+    void preparingPlateIgnoresDeletedBodiesAndTheirSupports() {
+        var session = PrintingTest.reference();
+        var setup = session.document().printSetup();
+        var valid = setup.instances().getFirst();
+        var stale = new BodyInstance("obsolete", "extrude-12.body", valid.transform());
+        var support = new SupportVolume("old-support", stale.id(), SupportVolume.Role.BLOCKER, 0, 0, 0, 3, 3, 3);
+        session.setPrintSetup(setup.withInstances(List.of(stale, valid)).withSupports(List.of(support)));
+        var model = ManufacturingModels.evaluate(session.document(), MeshOptions.DEFAULT);
+        assertThat(model.instances()).containsExactly(valid);
+        assertThat(model.setup().supports()).isEmpty();
+        assertThat(PrintValidation.validate(model).diagnostics()).isEmpty();
+        assertThat(session.document().printSetup().instances()).containsExactly(stale, valid);
+    }
+
+    @Test
     void completeExportAdapterPreservesProfilesSupportsAndDetachedLifetime() throws Exception {
         var session = PrintingTest.reference();
         session.setPrintSetup(session.document()

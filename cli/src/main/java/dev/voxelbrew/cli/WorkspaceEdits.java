@@ -278,10 +278,11 @@ final class WorkspaceEdits {
         var regions = edit(root, "designer sketch regions", s -> {
             var doc = session(s).document();
             String id = value(s, "--sketch");
-            var sketch = (Feature.Sketch) doc.features().stream()
-                    .filter(f -> f.id().equals(id))
+            var sketch = doc.features().stream()
+                    .filter(f -> f instanceof Feature.Sketch && f.id().equals(id))
+                    .map(f -> SketchCommands.resolvedSketch(doc, (Feature.Sketch) f))
                     .findFirst()
-                    .orElseThrow();
+                    .orElseThrow(() -> new IllegalArgumentException("Unknown sketch " + id));
             String point = value(s, "--at");
             if (point != null) {
                 String[] xy = point.split(",", -1);

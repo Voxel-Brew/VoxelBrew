@@ -210,11 +210,7 @@ final class SketchCommands implements Runnable {
 
         SketchGeometry geometry(ModelSession session) {
             var document = session.document();
-            var sketch = (Feature.Sketch) dev.voxelbrew.engine.parameters.FeatureDimensions.resolve(
-                    selected(session),
-                    document.features(),
-                    document.parameters(),
-                    document.parameters().values());
+            var sketch = resolvedSketch(document, selected(session));
             return dev.voxelbrew.engine.parameters.FeatureDimensions.convert(sketch, document.parameters())
                     .geometry();
         }
@@ -558,6 +554,12 @@ final class SketchCommands implements Runnable {
             boundary.addAll(polygon.boundary());
             return publish(session, new SketchGeometry(entities, constraints, boundary));
         }
+    }
+
+    static Feature.Sketch resolvedSketch(CadDocument document, Feature.Sketch sketch) {
+        var parameters = document.parameters();
+        return (Feature.Sketch) dev.voxelbrew.engine.parameters.FeatureDimensions.resolve(
+                sketch, document.features(), parameters, parameters.values());
     }
 
     static void register(CommandLine cli) {

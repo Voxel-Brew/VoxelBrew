@@ -178,6 +178,31 @@ class WorkspaceIntegrationTest {
     }
 
     @Test
+    void regionPickUsesTheDiameterInTheActiveConfiguration() throws Exception {
+        var file = directory.resolve("configured-circle.vxb");
+        var session = new ModelSession(CadDocument.empty());
+        var circle = new Feature.Sketch("circle", "profile", Feature.Plane.origin("XY"), new Feature.Circle(0, 0, 4));
+        var converted = dev.voxelbrew.engine.parameters.FeatureDimensions.convert(
+                circle, session.document().parameters());
+        session.add(new Feature.Sketch(
+                circle.id(), circle.profileId(), circle.plane(), new Feature.Constrained(converted.geometry())));
+        session.setParameters(converted
+                .parameters()
+                .put("size", dev.voxelbrew.api.model.parameters.ParameterUnit.MM, "4", "")
+                .addConfiguration("Large", false)
+                .override("size", "Large", "20"));
+        session.bindExpression("circle", "constraint:diameter", "size");
+        DocumentWriter.save(session.document(), file, false);
+        String[] pick = {"designer", "sketch", "regions", file.toString(), "--sketch", "circle", "--at", "8,0"};
+        assertThat(run(pick)).isNotZero();
+        assertThat(output).contains("No closed region");
+        session.selectConfiguration("Large");
+        DocumentWriter.save(session.document(), file, true);
+        assertThat(run(pick)).as(output).isZero();
+        assertThat(output.strip()).startsWith("profile/region/");
+    }
+
+    @Test
     void regionPicksAndEnclosedSelectionSurviveReopen() throws Exception {
         var file = directory.resolve("regions.vxb");
         var session = new ModelSession(CadDocument.empty());

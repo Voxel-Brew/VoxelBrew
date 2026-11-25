@@ -4,6 +4,8 @@ import static dev.voxelbrew.api.model.sketch.SketchGeometry.*;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.voxelbrew.api.model.*;
+import dev.voxelbrew.api.model.mesh.MeshOptions;
+import dev.voxelbrew.api.model.mesh.MeshValidation;
 import dev.voxelbrew.api.model.sketch.*;
 import dev.voxelbrew.engine.model.*;
 import dev.voxelbrew.engine.sketch.*;
@@ -142,6 +144,36 @@ class ConstrainedSketchTest {
             assertThat(solid.contains(1, 7, 1)).isFalse();
         }
         assertThat(NativeKernel.liveHandles()).isEqualTo(handles);
+    }
+
+    @Test
+    void longBezierPrismKeepsItsChordToleranceWithoutSubdividingTheStraightSweep() {
+        // Uniformly spaced x poles give the analytic wall y = 6t(1-t), t = x/12.
+        var spline = Sketches.entity("curve", Kind.SPLINE, false, 0, 0, 4, 2, 8, 2, 12, 0);
+        var chord = Sketches.entity("chord", Kind.LINE, false, 12, 0, 0, 0);
+        var profile = SketchProfiles.profile(
+                new SketchGeometry(List.of(spline, chord), List.of(), List.of("curve", "chord")));
+        try (var solid = Solid.profilePrism(profile, 0, 600)) {
+            for (var options : List.of(MeshOptions.DEFAULT, new MeshOptions(.005, 2))) {
+                var mesh = solid.tessellate(options);
+                MeshValidation.requireClosed(mesh);
+                assertThat(java.util.Arrays.stream(mesh.faceIndices())
+                                .distinct()
+                                .count())
+                        .isEqualTo(4);
+                assertThat(mesh.triangleCount()).isLessThan(1500);
+                for (int i = 0; i < mesh.triangleCount(); i++) {
+                    int a = mesh.vertexIndex(i, 0), b = mesh.vertexIndex(i, 1), c = mesh.vertexIndex(i, 2);
+                    double z = mesh.coordinate(a, 2);
+                    if (z == mesh.coordinate(b, 2) && z == mesh.coordinate(c, 2)) continue;
+                    double y = (mesh.coordinate(a, 1) + mesh.coordinate(b, 1) + mesh.coordinate(c, 1)) / 3;
+                    if (y == 0) continue;
+                    double t = (mesh.coordinate(a, 0) + mesh.coordinate(b, 0) + mesh.coordinate(c, 0)) / 36;
+                    // The vertical error exceeds the normal error by at most sqrt(1 + 0.5^2).
+                    assertThat(y).isCloseTo(6 * t * (1 - t), within(options.chordToleranceMm() * Math.sqrt(1.25)));
+                }
+            }
+        }
     }
 
     @Test

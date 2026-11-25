@@ -3150,9 +3150,24 @@ class WorkbenchUiTest {
                 .feature("later");
         var path = directory.resolve("edit-through-cut.vxb");
         var history = List.of(base, plate, copy, sketch, cut, later);
-        DocumentWriter.save(new CadDocument("history", history, 6), path, false);
+        var session = new ModelSession(new CadDocument("history", history, 6));
+        session.renameBody("plate.body", "Panel");
+        DocumentWriter.save(session.document(), path, false);
         open(path);
         click("history-4");
+        fx(() -> {
+            var list = (javafx.scene.layout.VBox) node("#cut-target-list");
+            assertThat(list.getChildren().stream()
+                            .map(n -> ((Label) n).getText())
+                            .toList())
+                    .containsExactly("Panel 2", "Panel");
+            assertThat(workbench.lookup("#add-cut-target")).isNull();
+            assertThat(workbench.lookup("#remove-cut-target")).isNull();
+            assertThat(workbench.lookup("#repair-body")).isNull();
+            Screenshot.save(
+                    stage.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "through-cut-preview.png"));
+            return null;
+        });
         doubleClick("history-4");
         assertThat(fx(() -> ((ComboBox<?>) node("#cut-target")).getValue())).isEqualTo(targets.getFirst());
         assertThat(fx(() -> ((ComboBox<?>) node("#cut-target-2")).getValue())).isEqualTo(targets.getLast());
@@ -4482,8 +4497,9 @@ class WorkbenchUiTest {
                 assertThat(bodies.get(2).solid().volume()).isCloseTo(500, within(.001));
             }
             click("history-7");
+            if (through) click("edit-cut-profile");
             click("remove-cut-target");
-            click("repair");
+            click(through ? "apply-cut-profile" : "repair");
             ready();
             assertThat(fx(() -> workbench.controller().build().bodies().get(1).volume()))
                     .isCloseTo(500, within(.001));

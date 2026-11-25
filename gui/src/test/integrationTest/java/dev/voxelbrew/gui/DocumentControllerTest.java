@@ -44,6 +44,25 @@ class DocumentControllerTest {
     }
 
     @Test
+    void editingAnExtrusionReusesOnlyMeshesFromUnchangedHistory() {
+        var first = sketch("first", 0);
+        var second = sketch("second", 10);
+        var a = new Feature.Extrude("a", new Feature.ProfileRef("first", first.profileId()), 2);
+        var b = new Feature.Extrude("b", new Feature.ProfileRef("second", second.profileId()), 3);
+        var session = new ModelSession(new CadDocument("model", List.of(first, a, second, b), 4));
+        var evaluator = new DocumentController.DisplayEvaluator(directory);
+        var before = evaluator.apply(session.document()).bodies();
+        session.replace(new Feature.Extrude(b.id(), b.profile(), 4));
+        var after = evaluator.apply(session.document()).bodies();
+        assertThat(after.getFirst()).isSameAs(before.getFirst());
+        assertThat(after.getLast().volume()).isCloseTo(9600, within(.001));
+        session.replace(new Feature.Extrude(a.id(), a.profile(), 1));
+        var upstream = evaluator.apply(session.document()).bodies();
+        assertThat(upstream.getFirst().volume()).isCloseTo(2400, within(.001));
+        assertThat(upstream.getLast()).isNotSameAs(after.getLast());
+    }
+
+    @Test
     void changingNozzleRebuildsAnExtrusionBoundToThePrintProfile() throws Exception {
         try (var controller = new DocumentController(callbacks::add)) {
             var profile = sketch("base", 0);

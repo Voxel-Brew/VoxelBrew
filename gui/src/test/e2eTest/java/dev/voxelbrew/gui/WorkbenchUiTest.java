@@ -1423,13 +1423,13 @@ class WorkbenchUiTest {
         });
         ready();
         click("print-view-3d");
-        var before = fx(() -> node("#print-canvas").snapshot(null, null));
+        var before = fx(() -> placementMesh().snapshot(null, null));
         fx(() -> {
             workbench.controller().printSetup(document().printSetup().withInstances(List.of(rear, front)));
             return null;
         });
         ready();
-        var after = fx(() -> node("#print-canvas").snapshot(null, null));
+        var after = fx(() -> placementMesh().snapshot(null, null));
         assertThat(after.getWidth()).isEqualTo(before.getWidth());
         assertThat(after.getHeight()).isEqualTo(before.getHeight());
         for (int y = 0; y < (int) before.getHeight(); y++) {
@@ -2106,7 +2106,7 @@ class WorkbenchUiTest {
             assertThat(slicerHasRing("#57ad74")).isEqualTo(view.equals("print-view-3d"));
             var start = fx(() -> {
                 var canvas = (javafx.scene.canvas.Canvas) node("#print-canvas");
-                var image = canvas.snapshot(null, null);
+                var image = canvas.getParent().snapshot(null, null);
                 Point2D best = null;
                 for (int y = 0; y < image.getHeight(); y++) {
                     for (int x = 0; x < image.getWidth(); x++) {
@@ -2185,9 +2185,9 @@ class WorkbenchUiTest {
         click("print-place");
         ready();
         var tilted = document().printSetup();
-        long worldFrame = slicerCameraFrame();
+        long worldFrame = slicerFrame("#print-placement-overlay");
         choice("print-rotation-space", 1);
-        assertThat(slicerCameraFrame())
+        assertThat(slicerFrame("#print-placement-overlay"))
                 .as("Local rings follow object orientation")
                 .isNotEqualTo(worldFrame);
         assertThat(document().printSetup()).as("Coordinate mode is transient").isEqualTo(tilted);
@@ -2196,7 +2196,7 @@ class WorkbenchUiTest {
         click("print-gizmo-local");
         assertThat(fx(() -> ((ComboBox<?>) node("#print-rotation-space")).getValue()))
                 .isEqualTo(PrintRotationGizmo.Space.WORLD);
-        assertThat(slicerCameraFrame())
+        assertThat(slicerFrame("#print-placement-overlay"))
                 .as("World rings keep their plate alignment")
                 .isEqualTo(worldFrame);
         click("print-gizmo-local");
@@ -2276,7 +2276,7 @@ class WorkbenchUiTest {
     private boolean slicerHasRing(String hex) throws Exception {
         return fx(() -> {
             var expected = javafx.scene.paint.Color.web(hex);
-            var image = node("#print-canvas").snapshot(null, null);
+            var image = node("#print-canvas").getParent().snapshot(null, null);
             for (int y = 0; y < image.getHeight(); y++) {
                 for (int x = 0; x < image.getWidth(); x++) {
                     var color = image.getPixelReader().getColor(x, y);
@@ -2364,15 +2364,17 @@ class WorkbenchUiTest {
         for (String view : List.of("print-view-2d", "print-view-3d")) {
             click(view);
             for (var button : List.of(MouseButton.SECONDARY, MouseButton.MIDDLE, MouseButton.PRIMARY)) {
-                long before = slicerCameraFrame();
+                long before = slicerFrame("#print-canvas");
                 slicerCameraGesture(button, false);
-                assertThat(slicerCameraFrame()).as(view + " / " + button).isNotEqualTo(before);
+                assertThat(slicerFrame("#print-canvas"))
+                        .as(view + " / " + button)
+                        .isNotEqualTo(before);
                 assertThat(document()).as("Camera changes are transient").isEqualTo(initial);
             }
-            long before = slicerCameraFrame();
+            long before = slicerFrame("#print-canvas");
             slicerCameraGesture(MouseButton.MIDDLE, true);
-            assertThat(slicerCameraFrame()).as("Shift+middle pans").isNotEqualTo(before);
-            before = slicerCameraFrame();
+            assertThat(slicerFrame("#print-canvas")).as("Shift+middle pans").isNotEqualTo(before);
+            before = slicerFrame("#print-canvas");
             var center = centerOf("print-canvas");
             fx(() -> {
                 robot.mouseMove(center);
@@ -2380,12 +2382,12 @@ class WorkbenchUiTest {
                 return null;
             });
             Thread.sleep(150);
-            assertThat(slicerCameraFrame()).as("Wheel zooms").isNotEqualTo(before);
+            assertThat(slicerFrame("#print-canvas")).as("Wheel zooms").isNotEqualTo(before);
             assertThat(document()).isEqualTo(initial);
             click("print-fit-view");
             var part = fx(() -> {
                 var canvas = (javafx.scene.canvas.Canvas) node("#print-canvas");
-                var image = canvas.snapshot(null, null);
+                var image = canvas.getParent().snapshot(null, null);
                 double x = 0, y = 0;
                 int count = 0;
                 for (int row = 0; row < image.getHeight(); row++) {
@@ -2436,26 +2438,27 @@ class WorkbenchUiTest {
     }
 
     @Test
-    void slicerNavigationMeshCoversTheSamePartAsTheDetailedPlacementView() throws Exception {
+    void slicerKeepsTheSameSharpMeshAfterNavigationStops() throws Exception {
         ready();
         openPrepared("plate-5mm.vxb");
         click("workspace-print");
+        click("print-tab-placement");
         click("print-add");
         click("print-view-3d");
         ready();
         var rendered = new CompletableFuture<javafx.scene.image.Image>();
-        var detailed = fx(() -> {
+        var idle = new CompletableFuture<Boolean>();
+        fx(() -> {
             var canvas = node("#print-canvas");
-            var image = canvas.snapshot(null, null);
-            var moving = canvas.getParent().getChildrenUnmodifiable().stream()
-                    .filter(PrintNavigationView.class::isInstance)
-                    .findFirst()
-                    .orElseThrow();
-            moving.visibleProperty().addListener((o, before, visible) -> {
-                if (visible && !rendered.isDone()) {
-                    var parameters = new SnapshotParameters();
-                    parameters.setFill(javafx.scene.paint.Color.TRANSPARENT);
-                    rendered.complete(moving.snapshot(parameters, null));
+            var mesh = placementMesh();
+            var overlay = node("#print-placement-overlay");
+            assertThat(mesh.isVisible()).isTrue();
+            assertThat(overlay.isVisible()).isTrue();
+            overlay.visibleProperty().addListener((o, before, visible) -> {
+                if (!visible && !rendered.isDone()) {
+                    Platform.runLater(() -> rendered.complete(mesh.snapshot(null, null)));
+                } else if (visible && rendered.isDone()) {
+                    idle.complete(true);
                 }
             });
             // Trigger a navigation frame at the same zoom for a pixel-for-pixel projection comparison.
@@ -2481,67 +2484,38 @@ class WorkbenchUiTest {
                     0,
                     0,
                     null));
-            return image;
+            return null;
         });
         var moving = rendered.get(10, TimeUnit.SECONDS);
-        int interior = 0, matchingColor = 0;
-        // Edge antialiasing differs between the two renderers. Compare face colors inside the strokes.
-        var pixels = detailed.getPixelReader();
-        for (int y = 1; y + 1 < detailed.getHeight(); y++) {
-            for (int x = 1; x + 1 < detailed.getWidth(); x++) {
-                if (insideSelectedFace(pixels, x, y)) {
-                    interior++;
-                    if (moving.getPixelReader().getArgb(x, y) == 0xff4299c7) matchingColor++;
-                }
-            }
-        }
-        assertThat(interior).as("Selected part pixels in the detailed view").isGreaterThan(10);
-        assertThat((double) matchingColor / interior)
-                .as("Interior pixels retain their placement color during navigation")
-                .isGreaterThan(0.98);
-        var stationaryEdges = darkModelPixels(detailed, moving, .35);
-        var movingEdges = darkModelPixels(moving, moving, .35);
-        assertThat(stationaryEdges).isNotEmpty();
-        assertThat(movingEdges).isNotEmpty();
-        assertThat(edgeOverlap(stationaryEdges, darkModelPixels(moving, moving, .65)))
-                .as("Visible CAD boundaries survive navigation")
-                .isGreaterThan(.9);
-        assertThat(edgeOverlap(movingEdges, darkModelPixels(detailed, moving, .65)))
-                .as("Hidden edges and tessellation diagonals stay hidden")
-                .isGreaterThan(.9);
+        idle.get(10, TimeUnit.SECONDS);
+        var stationary = fx(() -> {
+            assertThat(placementMesh().isVisible()).isTrue();
+            return placementMesh().snapshot(null, null);
+        });
+        var pixels = placementPixels(stationary);
+        assertThat(pixels).containsExactly(placementPixels(moving));
+        assertThat(Arrays.stream(pixels).filter(color -> color == 0xff4299c7).count())
+                .as("Selected body face pixels")
+                .isGreaterThan(10);
+        assertThat(Arrays.stream(pixels).distinct().count())
+                .as("Antialiased shades between faces, outlines and background")
+                .isGreaterThan(3);
     }
 
-    private boolean insideSelectedFace(javafx.scene.image.PixelReader pixels, int x, int y) {
-        for (int dy = -1; dy <= 1; dy++) {
-            for (int dx = -1; dx <= 1; dx++) {
-                if (pixels.getArgb(x + dx, y + dy) != 0xff4299c7) return false;
-            }
-        }
-        return true;
+    private int[] placementPixels(javafx.scene.image.Image image) {
+        int width = (int) image.getWidth();
+        int height = (int) image.getHeight();
+        var pixels = new int[width * height];
+        image.getPixelReader()
+                .getPixels(0, 0, width, height, javafx.scene.image.PixelFormat.getIntArgbInstance(), pixels, 0, width);
+        return pixels;
     }
 
-    private Set<Point2D> darkModelPixels(
-            javafx.scene.image.Image image, javafx.scene.image.Image part, double brightness) {
-        var points = new HashSet<Point2D>();
-        for (int y = 0; y < image.getHeight(); y++) {
-            for (int x = 0; x < image.getWidth(); x++) {
-                var color = image.getPixelReader().getColor(x, y);
-                if (part.getPixelReader().getColor(x, y).getOpacity() > .45 && color.getBrightness() < brightness) {
-                    points.add(new Point2D(x, y));
-                }
-            }
-        }
-        return points;
-    }
-
-    private double edgeOverlap(Set<Point2D> edges, Set<Point2D> reference) {
-        var nearby = new HashSet<Point2D>();
-        for (var point : reference) {
-            for (int dy = -1; dy <= 1; dy++) {
-                for (int dx = -1; dx <= 1; dx++) nearby.add(point.add(dx, dy));
-            }
-        }
-        return (double) edges.stream().filter(nearby::contains).count() / edges.size();
+    private PrintNavigationView placementMesh() {
+        return (PrintNavigationView) node("#print-canvas").getParent().getChildrenUnmodifiable().stream()
+                .filter(PrintNavigationView.class::isInstance)
+                .findFirst()
+                .orElseThrow();
     }
 
     private void slicerCameraGesture(MouseButton button, boolean shift) throws Exception {
@@ -2566,9 +2540,9 @@ class WorkbenchUiTest {
         Thread.sleep(100);
     }
 
-    private long slicerCameraFrame() throws Exception {
+    private long slicerFrame(String selector) throws Exception {
         return fx(() -> {
-            var image = node("#print-canvas").snapshot(null, null);
+            var image = node(selector).snapshot(null, null);
             long hash = 1;
             for (int y = 0; y < image.getHeight(); y += 2) {
                 for (int x = 0; x < image.getWidth(); x += 2) {

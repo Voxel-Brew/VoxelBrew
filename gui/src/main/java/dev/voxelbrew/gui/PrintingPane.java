@@ -421,6 +421,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
             navigationView.heightProperty().bind(center.heightProperty());
             dragOverlay.widthProperty().bind(center.widthProperty());
             dragOverlay.heightProperty().bind(center.heightProperty());
+            dragOverlay.setId("print-placement-overlay");
             dragOverlay.setManaged(false);
             dragOverlay.setMouseTransparent(true);
             dragOverlay.setVisible(false);
@@ -2207,12 +2208,12 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
 
     private void drawTranslation() {
         if (model == null) return;
+        placementRaster = null;
         if (!dragOverlay.isVisible()) {
             var bed = canvas.getGraphicsContext2D();
             bed.setFill(dark ? Color.web("#182028") : Color.web("#edf1f4"));
             bed.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
             drawBed(viewOx, viewOy, viewScale);
-            placementRaster = null;
             dragOverlay.setVisible(true);
         }
         var offset = dragOffset();
@@ -2242,12 +2243,12 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         localGizmoAxes.setTranslateX(0);
         localGizmoAxes.setTranslateY(0);
         detailedDragOffset = dragOffset();
-        if (navigationView != null) navigationView.hide(model);
         draw(false);
     }
 
     private void draw(boolean movingCamera) {
         if (!workspaceActive || closed) return;
+        dragOverlay.setVisible(false);
         if (viewCube != null) viewCube.setOrientation(camera().orientation());
         selectedObjectTooltip.hide();
         selectedObjectName.setVisible(false);
@@ -2258,6 +2259,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         graphics.fillRect(0, 0, w, h);
         if (rotationDrag == null) rotationRings = List.of();
         if (w < 1 || h < 1) {
+            if (navigationView != null) navigationView.hide(model);
             placementRaster = null;
             return;
         }
@@ -2272,6 +2274,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         viewOy = oy;
         drawBed(ox, oy, scale);
         if (toolpathPreview.isSelected() && displayed != null && !previewLayers.isEmpty()) {
+            if (navigationView != null) navigationView.hide(model);
             placementRaster = null;
             drawToolpath(ox, oy, scale);
         } else {
@@ -2282,18 +2285,27 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     private void drawPlacedInstances(double ox, double oy, double scale, double w, double h, boolean movingCamera) {
         layerLabel.setText(translations.translate("gui.build_placement_slice_to_preview_actual_toolpaths"));
         if (model == null || model.instances().isEmpty()) {
+            if (navigationView != null) navigationView.hide(model);
             placementRaster = null;
             return;
         }
-        if (movingCamera && navigationView != null) {
-            placementRaster = null;
-            navigationView.show(model, document.build(), instances.getValue(), camera(), ox, oy, scale, Point2D.ZERO);
-            return;
+        if (navigationView != null && rotationDrag != null) navigationView.hide(model);
+        boolean meshVisible = navigationView != null && rotationDrag == null;
+        var graphics = canvas.getGraphicsContext2D();
+        if (meshVisible) {
+            navigationView.show(model, document.build(), instances.getValue(), camera(), ox, oy, scale, dragOffset());
+            if (movingCamera) {
+                placementRaster = null;
+                return;
+            }
+            dragOverlay.setVisible(true);
+            graphics = dragOverlay.getGraphicsContext2D();
+            graphics.clearRect(0, 0, w, h);
         }
-        renderPlacement(ox, oy, scale, (int) Math.ceil(w), (int) Math.ceil(h), movingCamera);
+        renderPlacement(ox, oy, scale, (int) Math.ceil(w), (int) Math.ceil(h), movingCamera, meshVisible);
         drawSelectedObjectName(ox, oy, scale, w, h);
-        drawSupportOutlines(canvas.getGraphicsContext2D(), ox, oy, scale);
-        drawRotationGizmo();
+        drawSupportOutlines(graphics, ox, oy, scale);
+        drawRotationGizmo(graphics);
     }
 
     private PrintDepthBuffer.Point projected(double x, double y, double z, double ox, double oy, double scale) {
@@ -2301,12 +2313,14 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
                 ox + projectX(x, y) * scale, oy - projectY(x, y, z) * scale, camera().depth(x, y, z));
     }
 
-    private void renderPlacement(double ox, double oy, double scale, int width, int height, boolean movingCamera) {
+    private void renderPlacement(
+            double ox, double oy, double scale, int width, int height, boolean movingCamera, boolean pickingOnly) {
         // Render at physical-pixel resolution, with supersampling for smooth silhouettes.
         var window = canvas.getScene() == null ? null : canvas.getScene().getWindow();
         double pixelScale =
                 Math.max(2, window == null ? 1 : Math.max(window.getOutputScaleX(), window.getOutputScaleY()));
         if (movingCamera) pixelScale = Math.min(1, Math.sqrt(250_000.0 / width / height));
+        if (pickingOnly) pixelScale = 1;
         // The depth/edge buffers use 48 bytes per pixel, in addition to the Prism texture.
         pixelScale = Math.min(
                 pixelScale, Math.min(4096.0 / Math.max(width, height), Math.sqrt(2_000_000.0 / width / height)));
@@ -2344,19 +2358,25 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
                         owner);
             }
         }
-        drawPlacementEdges(raster, ox, oy, scale);
-        raster.writeTo(placementImage.getPixelWriter());
-        canvas.getGraphicsContext2D().drawImage(placementImage, 0, 0, width, height);
         placementRaster = raster;
         placementRasterScale = pixelScale;
+        if (!pickingOnly) {
+            drawPlacementEdges(raster, ox, oy, scale);
+            paintPlacementRaster(imageWidth, imageHeight, width, height);
+        }
     }
 
-    private PrintDepthBuffer preparePlacementRaster(int imageWidth, int imageHeight, double pixelScale) {
+    private void paintPlacementRaster(int imageWidth, int imageHeight, int width, int height) {
         if (placementImage == null
                 || placementImage.getWidth() != imageWidth
                 || placementImage.getHeight() != imageHeight) {
             placementImage = new javafx.scene.image.WritableImage(imageWidth, imageHeight);
         }
+        placementRaster.writeTo(placementImage.getPixelWriter());
+        canvas.getGraphicsContext2D().drawImage(placementImage, 0, 0, width, height);
+    }
+
+    private PrintDepthBuffer preparePlacementRaster(int imageWidth, int imageHeight, double pixelScale) {
         if (placementRaster == null || !placementRaster.matches(imageWidth, imageHeight, pixelScale)) {
             return new PrintDepthBuffer(imageWidth, imageHeight, pixelScale);
         }
@@ -2364,7 +2384,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         return placementRaster;
     }
 
-    private void drawRotationGizmo() {
+    private void drawRotationGizmo(GraphicsContext graphics) {
         if (!showRotationGizmos.isSelected() || !document.canExport() || jobs.running()) return;
         var instance = model.instances().stream()
                 .filter(i -> i.id().equals(instances.getValue()))
@@ -2373,7 +2393,6 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         if (rotationDrag == null) {
             projectRotationRings(instance.get());
         }
-        var graphics = canvas.getGraphicsContext2D();
         graphics.save();
         for (var ring : rotationRings) {
             paintRotationRing(graphics, ring);

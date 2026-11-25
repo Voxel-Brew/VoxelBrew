@@ -50,14 +50,19 @@ final class CustomFeatureEditor extends VBox {
                         Double.toString(p.defaultValue()), () -> parameters, FormulaField.unit(p.unit()), translations);
                 input.setId("custom-" + p.key());
                 fields.put(p.key(), input);
-                form.getChildren().addAll(new Label(p.label()), input);
+                form.getChildren().add(InspectorDetails.field(new Label(p.label()), input));
             }
         });
         type.getSelectionModel().selectFirst();
         var location = new Label(translations.translate("plugin.directory", directory));
         location.setWrapText(true);
         getChildren()
-                .addAll(new Label(translations.translate("gui.feature_type")), type, form, errors, location, details);
+                .addAll(
+                        InspectorDetails.field(new Label(translations.translate("gui.feature_type")), type),
+                        form,
+                        errors,
+                        location,
+                        details);
         if (!available()) {
             errors.setText(translations.translate(
                     "gui.no_feature_providers_installed_add_a_trusted_jar_to_this_directory_and_reopen_features"));

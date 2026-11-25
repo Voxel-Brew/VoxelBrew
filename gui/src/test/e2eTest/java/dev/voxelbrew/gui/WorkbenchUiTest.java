@@ -4498,6 +4498,7 @@ class WorkbenchUiTest {
             }
             click("history-7");
             if (through) click("edit-cut-profile");
+            else click("operation-references");
             click("remove-cut-target");
             click(through ? "apply-cut-profile" : "repair");
             ready();
@@ -5463,7 +5464,10 @@ class WorkbenchUiTest {
         });
         ready();
         click("history-3");
-        assertThat(fx(() -> ((Label) node("#sketch-plane-name")).getText())).isEqualTo("Plane: Main casing");
+        assertThat(fx(() -> node(".inspector-details").lookupAll(".label").stream()
+                        .map(n -> ((Label) n).getText())
+                        .toList()))
+                .contains("Main casing");
         assertThat(((Feature.Sketch) document().features().get(2)).plane()).isEqualTo(plane);
     }
 
@@ -5479,8 +5483,10 @@ class WorkbenchUiTest {
         assertThat(fx(() -> ((Label) node(".selection-title")).getText())).contains("Base profile");
         click("cancel-tool");
         click("history-1");
-        assertThat(fx(() -> ((javafx.scene.control.ListCell<?>) node("#repair-sketch .list-cell")).getText()))
-                .isEqualTo("Base profile");
+        assertThat(fx(() -> node(".inspector-details").lookupAll(".label").stream()
+                        .map(n -> ((Label) n).getText())
+                        .toList()))
+                .contains("Base profile");
         assertThat(((Feature.Extrude) document().features().get(1)).profile().sketchId())
                 .isEqualTo("named-sketch0");
     }
@@ -8689,6 +8695,7 @@ class WorkbenchUiTest {
         ready();
         assertThat(volume()).isCloseTo(original + 8 * Math.PI, within(.001));
         click("history-3");
+        click("operation-references");
         choice("extrude-operation", 2);
         assertThat(fx(() -> ((FormulaField) workbench.lookup("#repair-output")).expressionType()))
                 .isEqualTo(FormulaField.ExpressionType.STRING);
@@ -9716,6 +9723,8 @@ class WorkbenchUiTest {
             return null;
         });
         click("history-" + (document().features().size() - 1));
+        assertThat(fx(() -> ((InspectorDetails) node(".inspector-details")).getRowCount()))
+                .isEqualTo(3);
         click("edit-body-pattern");
         assertThat(fx(() -> ((FormulaField) workbench.lookup("#pattern-step")).getText()))
                 .isEqualTo("5+5");

@@ -17,6 +17,27 @@ final class BodyPatternEditor extends VBox {
     private final ComboBox<BodyPattern.Axis> axis = new ComboBox<>();
     private final Map<String, FormulaField> inputs = new LinkedHashMap<>();
 
+    static String axisName(BodyPattern.Axis axis, boolean circular) {
+        return circular
+                ? axis.name()
+                : switch (axis) {
+                    case X -> "YZ";
+                    case Y -> "XZ";
+                    case Z -> "XY";
+                };
+    }
+
+    static String caption(String key, BodyPattern.Kind kind, BodyPattern.Axis normal, TranslationService tr) {
+        boolean count = key.equals("count") || key.equals("rows");
+        if (kind == BodyPattern.Kind.MIRROR) return tr.translate("gui.offset_mm");
+        if (kind == BodyPattern.Kind.CIRCULAR) {
+            return count ? tr.translate("sketch.copy.count") : tr.translate("pattern.sweep") + " (°)";
+        }
+        String plane = axisName(normal, false);
+        char direction = plane.charAt(key.equals("rows") || key.equals("spacing") ? 1 : 0);
+        return count ? tr.translate("sketch.copy.count") + " (" + direction + ")" : direction + " Δ (mm)";
+    }
+
     BodyPatternEditor(
             String id,
             BodyPattern initial,
@@ -35,21 +56,12 @@ final class BodyPatternEditor extends VBox {
         axis.getItems().setAll(BodyPattern.Axis.values());
         axis.setValue(initial.axis());
         boolean circular = initial.kind() == BodyPattern.Kind.CIRCULAR;
-        UiText.choices(
-                axis,
-                a -> circular
-                        ? a.name()
-                        : switch (a) {
-                            case X -> "YZ";
-                            case Y -> "XZ";
-                            case Z -> "XY";
-                        });
+        UiText.choices(axis, a -> axisName(a, circular));
         getChildren()
                 .addAll(
-                        new Label(tr.translate("gui.input_body")),
-                        source,
-                        new Label(tr.translate(circular ? "pattern.axis" : "pattern.plane")),
-                        axis);
+                        InspectorDetails.field(new Label(tr.translate("gui.input_body")), source),
+                        InspectorDetails.field(
+                                new Label(tr.translate(circular ? "pattern.axis" : "pattern.plane")), axis));
         for (var dim : FeatureDimensions.list(initial.feature(id))) {
             String key = dim.target().field();
             var binding = parameters.binding(dim.target());
@@ -59,24 +71,9 @@ final class BodyPatternEditor extends VBox {
             inputs.put(key, field);
             var label = new Label();
             label.setLabelFor(field);
-            label.textProperty().bind(axis.valueProperty().map(a -> caption(key, a, tr)));
-            getChildren().addAll(label, field);
+            label.textProperty().bind(axis.valueProperty().map(a -> caption(key, initial.kind(), a, tr)));
+            getChildren().add(InspectorDetails.field(label, field));
         }
-    }
-
-    private String caption(String key, BodyPattern.Axis normal, TranslationService tr) {
-        boolean count = key.equals("count") || key.equals("rows");
-        if (initial.kind() == BodyPattern.Kind.MIRROR) return tr.translate("gui.offset_mm");
-        if (initial.kind() == BodyPattern.Kind.CIRCULAR) {
-            return count ? tr.translate("sketch.copy.count") : tr.translate("pattern.sweep") + " (°)";
-        }
-        String plane = switch (normal) {
-            case X -> "YZ";
-            case Y -> "XZ";
-            case Z -> "XY";
-        };
-        char direction = plane.charAt(key.equals("rows") || key.equals("spacing") ? 1 : 0);
-        return count ? tr.translate("sketch.copy.count") + " (" + direction + ")" : direction + " Δ (mm)";
     }
 
     Feature feature() {

@@ -87,7 +87,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private final VBox featureDiagnostics = new VBox(6);
 
-    private final HBox toolActions = new HBox(8);
+    private final FlowPane toolActions = new FlowPane(8, 5);
 
     private final Label status, error, selectionLabel;
 
@@ -569,6 +569,12 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         return String.format(Locale.ROOT, "%.3f", value);
     }
 
+    private static String numericText(double value) {
+        var format = java.text.NumberFormat.getNumberInstance();
+        format.setMaximumFractionDigits(15);
+        return format.format(value);
+    }
+
     static int parseNotificationDuration(String value) {
         int millis = Integer.parseInt(value.strip());
         if (millis <= 0) throw new IllegalArgumentException("Notification duration must be positive");
@@ -870,22 +876,26 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         toolbar.getStyleClass().add("command-strip");
         constrainedSketch.getStyleClass().add("primary");
         var left = modelPanel();
-        inspector.getStyleClass().add("side-panel");
+        inspector.getStyleClass().addAll("side-panel", "properties-panel");
         inspector.setPrefWidth(270);
         inspector.setMinWidth(240);
         error.setWrapText(true);
         error.setId("tool-error");
         error.getStyleClass().add("error");
         selectionLabel.getStyleClass().add("selection-title");
+        selectionLabel.setWrapText(true);
+        var header = new VBox(5, heading(translations.translate("gui.properties")), selectionLabel);
+        header.getStyleClass().add("inspector-header");
+        form.getStyleClass().add("inspector-form");
+        toolActions.getStyleClass().add("inspector-actions");
+        toolActions.managedProperty().bind(javafx.beans.binding.Bindings.isNotEmpty(toolActions.getChildren()));
         var scroll = new ScrollPane(form);
         scroll.setFitToWidth(true);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         VBox.setVgrow(scroll, Priority.ALWAYS);
         error.managedProperty().bind(error.textProperty().isNotEmpty());
         error.visibleProperty().bind(error.managedProperty());
-        inspector
-                .getChildren()
-                .addAll(heading(translations.translate("gui.properties")), selectionLabel, scroll, error, toolActions);
+        inspector.getChildren().addAll(header, scroll, error, toolActions);
         var center = new BorderPane(viewport);
         center.getStyleClass().add("viewport-panel");
         var split = new SplitPane(left, center, inspector);
@@ -1145,6 +1155,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             if (tool != Tool.EDIT_PROFILE) {
                 viewport.showSketches(effective.subList(0, document.cursor()), selectedFeature);
             }
+            if (tool != Tool.NONE) {
+                selectionLabel.setGraphic(null);
+                selectionLabel.setTooltip(null);
+            }
             if (tool == Tool.NONE && (changed || selectedBody != null && buildStateChanged)) inspect();
             lastRebuilding = controller.rebuilding();
             lastIoBusy = controller.ioBusy();
@@ -1347,6 +1361,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         fields.clear();
         error.setText("");
         var feature = selected();
+        selectionLabel.setGraphic(feature == null ? null : FeatureTimeline.featureIcon(feature));
+        selectionLabel.setTooltip(feature == null ? null : new Tooltip(feature.id()));
         if (feature == null) {
             selectionLabel.setText(translations.translate("gui.start_a_design"));
             var hint = new Label(
@@ -1357,53 +1373,62 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             return;
         }
         selectionLabel.setText(selectedBody == null ? shortName(feature) : bodyLabel(selectedBody));
-        var identity = new Label(feature.id());
-        identity.setWrapText(true);
-        identity.getStyleClass().add("muted");
-        form.getChildren().add(identity);
         if (selectedBody != null) bodyStyleEditor(selectedBody);
         inspectFeature(feature);
     }
 
+    private void inspectSketch(Feature.Sketch s) {
+        sketchNameEditor(s);
+        if (s.profile() instanceof Feature.Rectangle r) {
+            dimension(s, "x", r.x());
+            dimension(s, "y", r.y());
+            dimension(s, "width", r.width());
+            dimension(s, "height", r.height());
+        } else if (s.profile() instanceof Feature.Circle c) {
+            dimension(s, "centerX", c.centerX());
+            dimension(s, "centerY", c.centerY());
+            dimension(s, "diameter", c.diameter());
+        } else if (s.profile() instanceof Feature.Constrained c) {
+            var info = new Label(translations.translate(
+                    "feature.sketchSummary",
+                    c.geometry().entities().size(),
+                    c.geometry().constraints().size()));
+            info.setWrapText(true);
+            form.getChildren().add(info);
+            var hint = new Label(translations.translate(
+                    "gui.edit_sketch_to_change_driving_dimensions_constraints_or_the_profile_boundary"));
+            hint.setWrapText(true);
+            form.getChildren().add(hint);
+        }
+        form.getChildren()
+                .add(button(
+                        translations.translate("gui.edit_sketch_constraints"),
+                        "edit-sketch-constraints",
+                        () -> editSketch(s)));
+
+        var plane = sketchPlaneLabel(s);
+        var changePlane =
+                button(translations.translate("plane.change"), "change-sketch-plane", () -> beginPlaneSelection(s));
+        form.getChildren().add(new FlowPane(6, 4, plane, changePlane));
+    }
+
     private void inspectFeature(Feature feature) {
         if (feature instanceof ConstructionFeature construction) {
+            var details = new InspectorDetails();
+            for (var input : construction.inputs()) {
+                details.row(
+                        translations.translate("construction.input"),
+                        ConstructionEditor.inputLabel(input, controller, translations));
+            }
+            var valueKey = ConstructionEditor.valueKey(construction.tool());
+            if (valueKey != null) details.row(translations.translate(valueKey), numericText(construction.value()));
+            form.getChildren().add(details);
             var edit = new Button(translations.translate("construction.edit"));
             edit.setId("construction-edit");
             edit.setOnAction(event -> beginConstruction(construction.tool(), construction));
             form.getChildren().add(edit);
         } else if (feature instanceof Feature.Sketch s) {
-            sketchNameEditor(s);
-            if (s.profile() instanceof Feature.Rectangle r) {
-                dimension(feature, "x", r.x());
-                dimension(feature, "y", r.y());
-                dimension(feature, "width", r.width());
-                dimension(feature, "height", r.height());
-            } else if (s.profile() instanceof Feature.Circle c) {
-                dimension(feature, "centerX", c.centerX());
-                dimension(feature, "centerY", c.centerY());
-                dimension(feature, "diameter", c.diameter());
-            } else if (s.profile() instanceof Feature.Constrained c) {
-                var info = new Label(translations.translate(
-                        "feature.sketchSummary",
-                        c.geometry().entities().size(),
-                        c.geometry().constraints().size()));
-                info.setWrapText(true);
-                form.getChildren().add(info);
-                var hint = new Label(translations.translate(
-                        "gui.edit_sketch_to_change_driving_dimensions_constraints_or_the_profile_boundary"));
-                hint.setWrapText(true);
-                form.getChildren().add(hint);
-            }
-            form.getChildren()
-                    .add(button(
-                            translations.translate("gui.edit_sketch_constraints"),
-                            "edit-sketch-constraints",
-                            () -> editSketch(s)));
-
-            var plane = sketchPlaneLabel(s);
-            var changePlane =
-                    button(translations.translate("plane.change"), "change-sketch-plane", () -> beginPlaneSelection(s));
-            form.getChildren().add(new FlowPane(6, 4, plane, changePlane));
+            inspectSketch(s);
         } else if (feature instanceof Feature.Extrude || BodyExtrusion.modifiesBody(feature)) {
             var definition = BodyExtrusion.from(feature);
             dimension(feature, "distance", definition.extrusion().distance());
@@ -1421,6 +1446,18 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             referenceEditor(feature, null, s.body());
         } else if (BodyPattern.matches(feature)) {
             var pattern = BodyPattern.from(feature);
+            var details = new InspectorDetails();
+            details.row(translations.translate("gui.input_body"), targetLabel(pattern.source()));
+            boolean circular = pattern.kind() == BodyPattern.Kind.CIRCULAR;
+            details.row(
+                    translations.translate(circular ? "pattern.axis" : "pattern.plane"),
+                    BodyPatternEditor.axisName(pattern.axis(), circular));
+            for (var dim : FeatureDimensions.list(feature)) {
+                var caption =
+                        BodyPatternEditor.caption(dim.target().field(), pattern.kind(), pattern.axis(), translations);
+                details.row(caption, numericText(dim.value()));
+            }
+            form.getChildren().add(details);
             form.getChildren()
                     .add(button(
                             translations.translate("parameter.edit"),
@@ -1494,7 +1531,12 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         var hint = new Label(translations.translate("body.cadHint"));
         hint.setWrapText(true);
         hint.getStyleClass().add("muted");
-        var content = new VBox(6, materialLabel, material, colorLabel, color, new HBox(6, apply, reset), hint);
+        var content = new VBox(
+                9,
+                InspectorDetails.field(materialLabel, material),
+                InspectorDetails.field(colorLabel, color),
+                new HBox(6, apply, reset),
+                hint);
         // Properties remain readable while rebuilding; editing requires a current body.
         content.setDisable(
                 !controller.canExport() || controller.build().bodies().stream().noneMatch(b -> b.id().equals(bodyId)));
@@ -1549,7 +1591,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         label.setLabelFor(input);
         var row = new HBox(6, input, apply);
         row.setAlignment(Pos.CENTER_LEFT);
-        form.getChildren().addAll(label, row);
+        form.getChildren().add(InspectorDetails.field(label, row));
         return input;
     }
 
@@ -1622,10 +1664,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         });
         name.setOnAction(event -> rename.fire());
         HBox.setHgrow(name, Priority.ALWAYS);
-        form.getChildren().addAll(label, new HBox(6, name, rename));
+        form.getChildren().add(InspectorDetails.field(label, new HBox(6, name, rename)));
     }
 
-    private ComboBox<String> sketchInput(List<Feature> earlier, Feature.ProfileRef profile) {
+    private ComboBox<String> sketchInput(List<Feature> earlier, Feature.ProfileRef profile, VBox container) {
         var sketches = new ComboBox<String>();
         sketches.setId("repair-sketch");
         UiText.choices(sketches, this::sketchReferenceName);
@@ -1633,7 +1675,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 .filter(f -> f instanceof Feature.Sketch)
                 .forEach(f -> sketches.getItems().add(f.id()));
         if (profile != null) {
-            form.getChildren().addAll(new Label(translations.translate("gui.input_sketch")), sketches);
+            container
+                    .getChildren()
+                    .add(InspectorDetails.field(new Label(translations.translate("gui.input_sketch")), sketches));
             var plane = new Label();
             plane.setId("sketch-plane-name");
             plane.setWrapText(true);
@@ -1647,39 +1691,76 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                         .orElse(""));
             });
             sketches.setValue(profile.sketchId());
-            form.getChildren().add(plane);
+            container.getChildren().add(plane);
         }
         return sketches;
     }
 
     private void inspectThroughCut(Feature feature) {
         var sketch = CutTargets.firstThroughCut(feature).profile().sketchId();
+        var details = new InspectorDetails();
+        details.row(translations.translate("gui.input_sketch"), sketchReferenceName(sketch));
         var targets = new VBox(4);
         targets.setId("cut-target-list");
-        var ids = controller.build().bodyIds();
         for (var target : CutTargets.throughTargets(feature).bodies()) {
-            var id = ids.getOrDefault(target, target.featureId() + "." + target.outputName());
-            var name = new Label(bodyLabel(id));
+            var name = new Label(targetLabel(target));
             name.setWrapText(true);
             targets.getChildren().add(name);
         }
+        details.row(translations.translate("gui.bodies"), targets);
         form.getChildren()
                 .addAll(
-                        new Label(translations.translate("gui.input_sketch")),
-                        new Label(sketchReferenceName(sketch)),
-                        new Label(translations.translate("gui.bodies")),
-                        targets,
+                        details,
                         button(
                                 translations.translate("parameter.edit"),
                                 "edit-cut-profile",
                                 () -> beginProfileEdit(feature, sketch)));
     }
 
+    private String targetLabel(Feature.BodyRef target) {
+        return bodyLabel(
+                controller.build().bodyIds().getOrDefault(target, target.featureId() + "." + target.outputName()));
+    }
+
     private void referenceEditor(Feature feature, Feature.ProfileRef profile, Feature.BodyRef body) {
         var earlier = controller.snapshot().document().features().stream()
                 .takeWhile(f -> !f.id().equals(feature.id()))
                 .toList();
-        var sketches = sketchInput(earlier, profile);
+        referenceSummary(feature, profile, body, earlier);
+        var inputs = new VBox(9);
+        var sketches = sketchInput(earlier, profile, inputs);
+        referenceControls(feature, profile, body, earlier, inputs, sketches);
+    }
+
+    private void referenceSummary(
+            Feature feature, Feature.ProfileRef profile, Feature.BodyRef body, List<Feature> earlier) {
+        var details = new InspectorDetails();
+        if (profile != null) {
+            details.row(translations.translate("gui.input_sketch"), sketchReferenceName(profile.sketchId()));
+            earlier.stream()
+                    .filter(f -> f instanceof Feature.Sketch && f.id().equals(profile.sketchId()))
+                    .map(Feature.Sketch.class::cast)
+                    .findFirst()
+                    .ifPresent(s -> details.row(translations.translate("pattern.plane"), planeName(s.plane())));
+        }
+        if (body != null) {
+            var targets = BodyExtrusion.modifiesBody(feature)
+                    ? BodyExtrusion.from(feature).targets()
+                    : List.of(body);
+            details.row(
+                    translations.translate("gui.bodies"),
+                    targets.stream().map(this::targetLabel).collect(java.util.stream.Collectors.joining("\n")));
+        }
+        form.getChildren().add(details);
+    }
+
+    private void referenceControls(
+            Feature feature,
+            Feature.ProfileRef profile,
+            Feature.BodyRef body,
+            List<Feature> earlier,
+            VBox inputs,
+            ComboBox<String> sketches) {
         var bodies = new ComboBox<String>();
         bodies.setId("repair-body");
         var output =
@@ -1690,33 +1771,39 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 extrusion ? extrusionOperation(BodyExtrusion.from(feature).operation()) : null;
         if (extrusion) {
             form.getChildren()
-                    .addAll(
-                            button(
-                                    translations.translate("extrude.editProfile"),
-                                    "edit-extrusion-profile",
-                                    () -> beginProfileEdit(feature, sketches.getValue())),
-                            new Label(translations.translate("extrude.operation")),
-                            operation);
+                    .add(button(
+                            translations.translate("extrude.editProfile"),
+                            "edit-extrusion-profile",
+                            () -> beginProfileEdit(feature, sketches.getValue())));
+            inputs.getChildren()
+                    .add(InspectorDetails.field(new Label(translations.translate("extrude.operation")), operation));
         }
-        if (body != null || extrusion) {
-            earlier.stream()
-                    .filter(f -> !(f instanceof Feature.Sketch || f instanceof ConstructionFeature))
-                    .forEach(f -> bodies.getItems().add(f.id()));
-            if (body != null) bodies.setValue(body.featureId());
-            else bodies.getSelectionModel().selectLast();
-            if (extrusion) {
-                bodies.disableProperty().bind(operation.valueProperty().isEqualTo(BodyExtrusion.Operation.NEW_BODY));
-                output.disableProperty().bind(bodies.disableProperty());
-            }
-            form.getChildren()
-                    .addAll(
-                            new Label(translations.translate("gui.input_body_feature")),
-                            bodies,
-                            new Label(translations.translate("gui.named_output_body_negative_or_positive")),
-                            output);
+        earlier.stream()
+                .filter(f -> !(f instanceof Feature.Sketch || f instanceof ConstructionFeature))
+                .forEach(f -> bodies.getItems().add(f.id()));
+        if (body != null) bodies.setValue(body.featureId());
+        else bodies.getSelectionModel().selectLast();
+        if (extrusion) {
+            bodies.disableProperty().bind(operation.valueProperty().isEqualTo(BodyExtrusion.Operation.NEW_BODY));
+            output.disableProperty().bind(bodies.disableProperty());
         }
+        var targetFields = new VBox(
+                8,
+                InspectorDetails.field(new Label(translations.translate("gui.input_body_feature")), bodies),
+                InspectorDetails.field(new Label(translations.translate("inspector.output")), output));
+        if (extrusion) {
+            targetFields.visibleProperty().bind(bodies.disableProperty().not());
+            targetFields.managedProperty().bind(targetFields.visibleProperty());
+        }
+        inputs.getChildren().add(targetFields);
         var additional = historicalCutTargets(feature, earlier, bodies, output, operation);
-        form.getChildren()
+        if (additional != null) inputs.getChildren().add(additional);
+        var disclosure = new TitledPane(translations.translate("inspector.editInputs"), inputs);
+        disclosure.setId("operation-references");
+        disclosure.setAnimated(false);
+        disclosure.setExpanded(!controller.build().valid());
+        form.getChildren().add(disclosure);
+        inputs.getChildren()
                 .add(button(translations.translate(extrusion ? "gui.apply" : "gui.repair_inputs"), "repair", () -> {
                     boolean useTarget =
                             extrusion ? operation.getValue() != BodyExtrusion.Operation.NEW_BODY : body != null;
@@ -1752,7 +1839,6 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 selected,
                 translations);
         picker.visibleProperty().bind(operation.valueProperty().isEqualTo(BodyExtrusion.Operation.CUT));
-        form.getChildren().add(picker);
         return picker;
     }
 
@@ -1819,7 +1905,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         var input = numericField(id, initial, ParameterUnit.MM);
         var caption = new Label(label);
         caption.setLabelFor(input);
-        form.getChildren().addAll(caption, input);
+        form.getChildren().add(InspectorDetails.field(caption, input));
         return input;
     }
 
@@ -2164,7 +2250,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                         .filter(f -> f instanceof Feature.Sketch s && canCut(s))
                         .toList()
                 : earlier;
-        var sketches = sketchInput(sketchCandidates, original);
+        var sketches = sketchInput(sketchCandidates, original, form);
         sketches.setValue(sketches.getItems().contains(initialSketch) ? initialSketch : original.sketchId());
         var replaceProfile = profileReplacement(definition, earlier);
         var choices = new VBox(5);
@@ -2301,12 +2387,13 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         additional.visibleProperty().bind(operation.valueProperty().isEqualTo(BodyExtrusion.Operation.CUT));
         operation.setDisable(target.getItems().isEmpty());
         target.disableProperty().bind(operation.valueProperty().isEqualTo(BodyExtrusion.Operation.NEW_BODY));
+        var targetField = InspectorDetails.field(new Label(translations.translate("gui.input_body")), target);
+        targetField.visibleProperty().bind(target.disableProperty().not());
+        targetField.managedProperty().bind(targetField.visibleProperty());
         form.getChildren()
                 .addAll(
-                        new Label(translations.translate("extrude.operation")),
-                        operation,
-                        new Label(translations.translate("gui.input_body_feature")),
-                        target,
+                        InspectorDetails.field(new Label(translations.translate("extrude.operation")), operation),
+                        targetField,
                         additional);
         var distance = field("extrude-distance", translations.translate("gui.signed_distance_mm"), 5);
         finish = button(translations.translate("gui.commit"), "commit-extrusion", this::commitExtrusion);
@@ -2404,7 +2491,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         }
         target.setId("cut-target");
         var additional = additionalCutTargets(target);
-        form.getChildren().setAll(new Label(translations.translate("gui.choose_the_target_body")), target, additional);
+        form.getChildren()
+                .setAll(
+                        InspectorDetails.field(new Label(translations.translate("gui.input_body")), target),
+                        additional);
         operationPanel(translations.translate("gui.through_all_cut"), "cut-confirm", () -> {
             String id =
                     "cut-" + controller.snapshot().document().uuidGenerator().next();
@@ -2632,12 +2722,9 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         offset.setId("split-offset");
         form.getChildren()
                 .setAll(
-                        new Label(translations.translate("gui.input_body")),
-                        body,
-                        new Label(translations.translate("gui.plane_normal")),
-                        axis,
-                        new Label(translations.translate("gui.offset_mm")),
-                        offset);
+                        InspectorDetails.field(new Label(translations.translate("gui.input_body")), body),
+                        InspectorDetails.field(new Label(translations.translate("gui.plane_normal")), axis),
+                        InspectorDetails.field(new Label(translations.translate("gui.offset_mm")), offset));
         operationPanel(translations.translate("action.split"), "split-confirm", () -> {
             String id =
                     "split-" + controller.snapshot().document().uuidGenerator().next();
@@ -2668,9 +2755,10 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         }
         cancelTool();
         tool = Tool.CONSTRUCTION;
+        selectionLabel.setText(translations.translate("construction." + command.name()));
         viewport.pickEdges(true);
-        constructionEditor =
-                new ConstructionEditor(command, original, controller, viewport, translations, this::cancelTool);
+        constructionEditor = new ConstructionEditor(
+                command, original, controller, viewport, translations, toolActions, this::cancelTool);
         form.getChildren().setAll(constructionEditor);
         refresh();
     }

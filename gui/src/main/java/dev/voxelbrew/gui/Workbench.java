@@ -2042,6 +2042,22 @@ public final class Workbench extends BorderPane implements AutoCloseable {
                 } else {
                     container.getChildren().add(choices);
                 }
+                var include = new Button(translations.translate("extrude.includeEnclosed"));
+                include.setId("extrude-include-enclosed");
+                include.disableProperty().bind(whole.selectedProperty());
+                include.setOnAction(event -> {
+                    var selection = new ProfileChoices(whole, regions);
+                    var filled =
+                            SketchProfiles.includingEnclosedRegions(constrained.geometry(), selection.selectedIds());
+                    var additional = regions.entrySet().stream()
+                            .filter(e -> !e.getKey().isSelected() && filled.contains(e.getValue()))
+                            .map(Map.Entry::getKey)
+                            .toList();
+                    if (additional.isEmpty()) return;
+                    additional.subList(1, additional.size()).forEach(box -> box.setSelected(true));
+                    additional.getFirst().fire();
+                });
+                container.getChildren().add(include);
                 viewport.pickExtrusionRegion(
                         sketch.plane(),
                         point -> SketchProfiles.regionAt(

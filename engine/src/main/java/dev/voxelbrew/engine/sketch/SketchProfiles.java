@@ -35,6 +35,9 @@ public final class SketchProfiles {
     }
 
     private static int[] enclosingLoops(List<List<Edge>> loops, List<List<Vec>> polygons, double[] areas) {
+        var boundaries = loops.stream()
+                .map(loop -> loop.stream().map(Edge::entity).collect(java.util.stream.Collectors.toSet()))
+                .toList();
         int[] parent = new int[loops.size()];
         Arrays.fill(parent, -1);
         for (int i = 0; i < loops.size(); i++) {
@@ -45,6 +48,7 @@ public final class SketchProfiles {
             for (int j = 0; j < loops.size(); j++) {
                 if (Math.abs(areas[j]) > Math.abs(areas[i])
                         && Math.abs(areas[j]) < size
+                        && Collections.disjoint(boundaries.get(i), boundaries.get(j))
                         && inside(loops.get(i).getFirst().start(), polygons.get(j))) {
                     parent[i] = j;
                     size = Math.abs(areas[j]);
@@ -61,6 +65,27 @@ public final class SketchProfiles {
     /** Individual bounded faces, including faces separated by a shared sketch edge. */
     public static List<Region> selectableRegions(SketchGeometry g) {
         return regions(g, true);
+    }
+
+    /** Include all nested faces of the selection, so their shared contours cancel during extrusion. */
+    public static Set<String> includingEnclosedRegions(SketchGeometry geometry, Collection<String> selected) {
+        var loops = profileLoops(geometry, true);
+        var polygons = loops.stream().map(SketchProfiles::samples).toList();
+        var parents = enclosingLoops(
+                loops,
+                polygons,
+                polygons.stream().mapToDouble(SketchProfiles::area).toArray());
+        var ids = loops.stream().map(SketchProfiles::regionId).toList();
+        var result = new HashSet<>(selected);
+        for (int i = 0; i < parents.length; i++) {
+            for (int parent = parents[i]; parent >= 0; parent = parents[parent]) {
+                if (result.contains(ids.get(parent))) {
+                    result.add(ids.get(i));
+                    break;
+                }
+            }
+        }
+        return Set.copyOf(result);
     }
 
     /** Pick the innermost bounded face at a point in sketch coordinates. */

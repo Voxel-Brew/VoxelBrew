@@ -3081,8 +3081,9 @@ class WorkbenchUiTest {
     void editsAnEarlierExtrusionProfileAndRebuildsItsDependents() throws Exception {
         var entities = List.of(
                 Sketches.entity("small", SketchGeometry.Kind.CIRCLE, false, 0, 0, 2),
-                Sketches.entity("large", SketchGeometry.Kind.CIRCLE, false, 15, 0, 4));
-        var geometry = new SketchGeometry(entities, List.of(), List.of("small", "large"));
+                Sketches.entity("large", SketchGeometry.Kind.CIRCLE, false, 15, 0, 4),
+                Sketches.entity("center", SketchGeometry.Kind.CIRCLE, false, 15, 0, 1));
+        var geometry = new SketchGeometry(entities, List.of(), List.of("small", "large", "center"));
         var sketch =
                 new Feature.Sketch("base", "profile", Feature.Plane.origin("XY"), new Feature.Constrained(geometry));
         var small = dev.voxelbrew.engine.sketch.SketchProfiles.regionAt(geometry, new SketchGeometry.Vec(0, 0))
@@ -3100,7 +3101,7 @@ class WorkbenchUiTest {
                         .getRoot()
                         .lookupAll(".sketch-curves")
                         .size()))
-                .isEqualTo(2);
+                .isEqualTo(3);
         fx(() -> {
             workbench.viewport().standardView("Front");
             return null;
@@ -3110,7 +3111,8 @@ class WorkbenchUiTest {
         assertThat(fx(() -> ((CheckBox) node("#extrude-whole")).isSelected())).isFalse();
         modelClick(0, 0, 0);
         assertThat(fx(() -> node("#apply-extrusion-profile").isDisabled())).isTrue();
-        modelClick(15, 0, 0);
+        modelClick(18, 0, 0);
+        click("extrude-include-enclosed");
         fx(() -> {
             var view = workbench.viewport();
             var p = view.screenToLocal(view.modelToScreen(new Point3D(2, 0, 0)));

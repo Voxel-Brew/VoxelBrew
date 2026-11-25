@@ -138,6 +138,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     private final StyleClassedTextArea diagnostics = new StyleClassedTextArea();
 
     private final Hyperlink jobDetails = new Hyperlink();
+    private final Hyperlink copyErrors = new Hyperlink();
 
     private final EnumMap<GcodeJob.Role, CheckBox> roles = new EnumMap<>(GcodeJob.Role.class);
 
@@ -218,6 +219,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     private ManufacturingModel model;
 
     private PrintValidation.Result validation;
+    private String placementError = "";
 
     private PrintSetup lastSetup;
 
@@ -519,7 +521,15 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         preview.setBottom(placementHint);
         setCenter(preview);
         var legend = configurePreviewControls();
-        var statusLine = new HBox(4, status, jobDetails);
+        copyErrors.setId("print-copy-errors");
+        copyErrors.setText(translations.translate("print.copyErrors"));
+        copyErrors.managedProperty().bind(copyErrors.visibleProperty());
+        copyErrors.setOnAction(event -> {
+            var content = new javafx.scene.input.ClipboardContent();
+            content.putString(errorText());
+            javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
+        });
+        var statusLine = new HBox(4, status, jobDetails, copyErrors);
         statusLine.setAlignment(javafx.geometry.Pos.BASELINE_LEFT);
         var jobStatus = new VBox(4, statusLine, validationLabel);
         jobStatus.setMinWidth(0);
@@ -1023,6 +1033,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     private void validateDocument(dev.voxelbrew.api.model.CadDocument snapshot) {
         String revision = DocumentCodec.fingerprint(snapshot);
         if (!document.canExport()) {
+            placementError = "";
             model = null;
             validation = null;
             validatedRevision = "";
@@ -1030,6 +1041,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
             validationLabel.setText(
                     translations.translate("gui.finish_rebuilding_the_complete_document_before_preparing_a_print"));
         } else if (!revision.equals(validatedRevision)) {
+            placementError = "";
             validatedRevision = revision;
             validation = null;
             try {
@@ -1049,12 +1061,14 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
                                 result.valid()
                                         ? translations.translate("gui.print_setup_valid_millimeters")
                                         : PrintValidationMessages.format(result, translations, this::instanceName));
+                        placementError = result.valid() ? "" : validationLabel.getText();
                         updateJob();
                     });
                 });
             } catch (RuntimeException failure) {
                 model = null;
-                validationLabel.setText(failure.getMessage());
+                placementError = Objects.toString(failure.getMessage(), failure.toString());
+                validationLabel.setText(placementError);
             }
         }
     }
@@ -2169,10 +2183,17 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         boolean failed = jobs.state() == PrintController.State.FAILED;
         status.setText(failed ? translations.translate("print.slicingFailed") : stateLabel + ": " + jobMessage());
         jobDetails.setVisible(failed);
+        copyErrors.setVisible(!errorText().isEmpty());
         status.setTooltip(failed ? null : UiHelp.tooltip(jobs.message()));
         showDiagnostics(jobs.failureDiagnostic(), String.join("\n", jobs.progressDiagnostics()));
         updateJobPreview();
         draw();
+    }
+
+    private String errorText() {
+        String failure = jobs.state() == PrintController.State.FAILED ? jobs.failureDiagnostic() : "";
+        if (placementError.isEmpty()) return failure;
+        return failure.isEmpty() ? placementError : placementError + "\n" + failure;
     }
 
     void setDark(boolean value) {

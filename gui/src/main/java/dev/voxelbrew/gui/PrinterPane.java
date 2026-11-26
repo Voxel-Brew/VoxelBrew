@@ -611,7 +611,7 @@ final class PrinterPane extends VBox implements AutoCloseable {
                 .add(new FileChooser.ExtensionFilter("Print artifact (*." + format + ")", "*." + format));
         var chosen = chooser.showSaveDialog(getScene().getWindow());
         if (chosen == null) return;
-        var path = chosen.toPath();
+        var path = ExportDialog.withExtension(chosen.toPath(), format);
         boolean overwrite = Files.exists(path);
         if (overwrite) {
             var confirmation = new Alert(

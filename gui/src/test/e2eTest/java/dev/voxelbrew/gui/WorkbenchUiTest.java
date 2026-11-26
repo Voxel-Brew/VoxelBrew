@@ -5908,7 +5908,12 @@ class WorkbenchUiTest {
     void saveAndExportOfferTheirOwnOutputFolder() throws Exception {
         ready();
         var design = directory.resolve("project.vxb");
-        save(design);
+        click("save-as");
+        text("file-path", directory.resolve("project").toString());
+        click("file-confirm");
+        ready();
+        assertThat(design).isRegularFile();
+        assertThat(fx(() -> workbench.controller().path())).isEqualTo(design);
         assertOutputFolder(directory);
         click("export-notification-close");
         click("save");
@@ -5918,9 +5923,10 @@ class WorkbenchUiTest {
         var folder = Files.createDirectory(directory.resolve("export results"));
         click("export");
         chooseExporter("json");
-        text("export-path", folder.resolve("copy.json").toString());
+        text("export-path", folder.resolve("copy").toString());
         click("export-confirm");
         ready();
+        assertThat(folder.resolve("copy.json")).isRegularFile();
         assertOutputFolder(folder);
     }
 

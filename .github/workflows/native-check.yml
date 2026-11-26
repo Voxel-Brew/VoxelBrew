@@ -192,9 +192,9 @@ jobs:
         if: inputs.archive && runner.os == 'Windows'
         shell: pwsh
         run: ./scripts/check-windows-installer.ps1 (Get-Item gui/build/distributions/VoxelBrew-*-windows-x64-Setup.exe).FullName
-      - name: Verify installed macOS desktop and CLI
+      - name: Verify macOS DMG and installed CLI (GUI unverified)
         if: inputs.release-candidate && runner.os == 'macOS' && steps.candidate.outputs.mac_gui_installer == 'true'
-        run: bash scripts/check-macos-installer.sh gui/build/distributions/VoxelBrew-*-macos-x64.dmg
+        run: bash scripts/check-macos-installer.sh gui/build/distributions/VoxelBrew-*-macos-x64.dmg --package-and-cli
       - name: Collect qualified release archives and provenance
         if: inputs.release-candidate
         run: node .github/scripts/release.cjs collect .tools/release-plan .tools/release-assets

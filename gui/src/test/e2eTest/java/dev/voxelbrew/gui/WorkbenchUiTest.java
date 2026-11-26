@@ -23,6 +23,8 @@ import dev.voxelbrew.printer.DefaultPrinterProfileCatalog;
 import dev.voxelbrew.printer.FilePrinterStore;
 import dev.voxelbrew.printer.ProfileHardware;
 import dev.voxelbrew.printer.moonraker.MoonrakerDriverGui;
+import dev.voxelbrew.slicer.SlicerInstallation;
+import dev.voxelbrew.slicer.SlicerInstallationStore;
 import dev.voxelbrew.slicer.prusa.PrusaSlicerBackend;
 import dev.voxelbrew.util.Version;
 import dev.voxelbrew.util.concurrent.SerialExecutor;
@@ -2693,6 +2695,73 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void processUsesTheDefaultSlicerAndFallsBackAfterRemoval() throws Exception {
+        var prepared = PreparedDocuments.copy("plate-5mm.vxb", directory);
+        fx(() -> workbench.controller().open(prepared)).get(20, TimeUnit.SECONDS);
+        ready();
+        var store = new SlicerInstallationStore(configuration);
+        var first = new SlicerInstallation(UUID.randomUUID(), "prusa-slicer", "First slicer", "2.7.2", "", Map.of());
+        var second = new SlicerInstallation(UUID.randomUUID(), "prusa-slicer", "Lab slicer", "2.7.2", "", Map.of());
+        store.save(first);
+        store.save(second);
+        Runnable closeSettings = () -> node(".dialog-overlay").lookupAll(".button").stream()
+                .filter(Button.class::isInstance)
+                .map(Button.class::cast)
+                .filter(button -> "Close".equals(button.getText()))
+                .findFirst()
+                .orElseThrow()
+                .fire();
+        fx(() -> {
+            ((TabPane) node("#workspaces")).getSelectionModel().select(1);
+            workbench.applyCss();
+            workbench.layout();
+            var tabs = (TabPane) node("#print-controls");
+            tabs.getSelectionModel()
+                    .select(tabs.getTabs().stream()
+                            .filter(tab -> "print-tab-process".equals(tab.getId()))
+                            .findFirst()
+                            .orElseThrow());
+            ((PrintingPane) node("#printing-workspace")).reloadSlicers();
+            workbench.applyCss();
+            workbench.layout();
+            assertThat(((ComboBox<?>) node("#print-backend")).getValue()).isEqualTo(first);
+            return null;
+        });
+
+        Platform.runLater(() -> command(workbench, "slicer-settings").fire());
+        fx(() -> {
+            var list = (ListView<?>) node("#slicer-installations");
+            list.getSelectionModel().select(list.getItems().indexOf(second));
+            var setDefault = (Button) node("#slicer-installation-set-default");
+            setDefault.fire();
+            assertThat(setDefault.isDisabled()).isTrue();
+            list.getScene().getRoot().applyCss();
+            list.getScene().getRoot().layout();
+            Screenshot.save(
+                    list.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "default-slicer.png"));
+            closeSettings.run();
+            assertThat(((ComboBox<?>) node("#print-backend")).getValue()).isEqualTo(second);
+            return null;
+        });
+
+        Platform.runLater(() -> command(workbench, "slicer-settings").fire());
+        Platform.runLater(() -> {
+            var list = (ListView<?>) node("#slicer-installations");
+            list.getSelectionModel().select(list.getItems().indexOf(second));
+            ((Button) node("#slicer-installation-remove")).fire();
+        });
+        fx(() -> {
+            ((Button) node("#slicer-installation-remove-confirm")).fire();
+            return null;
+        });
+        fx(() -> {
+            closeSettings.run();
+            assertThat(((ComboBox<?>) node("#print-backend")).getValue()).isEqualTo(first);
+            return null;
+        });
+    }
+
+    @Test
     void namedSlicerInstallationsAreCheckedBeforeTheyCanBeSelected() throws Exception {
         ready();
         openPrepared("plate-5mm.vxb");
@@ -2798,15 +2867,12 @@ class WorkbenchUiTest {
                 .hasSize(2);
         assertThat(fx(() -> ((Label) node("#slicer-installation-status")).getText()))
                 .isEqualTo(executable);
-        click("slicer-installation-set-default");
-        assertThat(fx(() -> node("#slicer-installation-set-default").isDisabled()))
-                .isTrue();
         fx(() -> {
             var list = node("#slicer-installations");
             assertThat(list.lookupAll(".slicer-state-ready").stream()
                             .map(Label.class::cast)
                             .map(Label::getText))
-                    .contains("Ready", "Ready · Default");
+                    .contains("Ready");
             assertThat(list.lookupAll(".slicer-installation-version").stream()
                             .map(Label.class::cast)
                             .map(Label::getText))
@@ -2816,7 +2882,7 @@ class WorkbenchUiTest {
                     Path.of(System.getProperty("voxelbrew.ui.artifacts"), "slicer-installations.png"));
             assertThat(list.lookupAll(".scroll-bar").stream().map(ScrollBar.class::cast))
                     .noneMatch(bar -> bar.getOrientation() == Orientation.HORIZONTAL && bar.isVisible());
-            for (String id : List.of("set-default", "edit", "remove", "add")) {
+            for (String id : List.of("edit", "remove", "add")) {
                 var button = (Button) node("#slicer-installation-" + id);
                 assertThat(button.getWidth()).isGreaterThanOrEqualTo(button.prefWidth(-1));
             }
@@ -2835,12 +2901,6 @@ class WorkbenchUiTest {
                 .containsAll(bundled.stream()
                         .map(installation -> installation.name())
                         .toList());
-        assertThat(fx(() -> ((ComboBox<?>) node("#print-backend")).getValue()))
-                .isEqualTo(store.load().stream()
-                        .filter(installation -> installation.name().equals("Prusa second"))
-                        .findFirst()
-                        .orElseThrow());
-        choice("print-backend", slicerNames.indexOf("Prusa first"));
         choice("print-backend", slicerNames.indexOf("Prusa second"));
         ready();
         var selected = store.require(
@@ -2876,8 +2936,8 @@ class WorkbenchUiTest {
                 .containsExactly("Prusa first");
         key(KeyCode.ESCAPE);
         click("print-tab-process");
-        assertThat(fx(() -> ((ComboBox<?>) node("#print-backend")).getValue()))
-                .isEqualTo(store.defaultInstallation(store.load()).orElseThrow());
+        assertThat(fx(() -> ((ComboBox<?>) node("#print-backend")).getItems().contains(selected)))
+                .isFalse();
 
         choice("appearance", 2);
         click("menu-slicer");
@@ -4914,7 +4974,10 @@ class WorkbenchUiTest {
         updates = new UpdateFixture(directory.resolve("update fixture"));
         configuration = new UserConfigServiceImpl(directory, CONFIG_FILE_NAME);
         String testName = info.getTestMethod().orElseThrow().getName();
-        if (!testName.equals("namedSlicerInstallationsAreCheckedBeforeTheyCanBeSelected")) {
+        if (!Set.of(
+                        "namedSlicerInstallationsAreCheckedBeforeTheyCanBeSelected",
+                        "processUsesTheDefaultSlicerAndFallsBackAfterRemoval")
+                .contains(testName)) {
             var store = new dev.voxelbrew.slicer.SlicerInstallationStore(configuration);
             store.save(new dev.voxelbrew.slicer.SlicerInstallation(
                     UUID.randomUUID(), "prusa-slicer", "PrusaSlicer", "test installation", "", Map.of()));

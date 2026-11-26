@@ -3,6 +3,7 @@ package dev.voxelbrew.gui;
 import dev.voxelbrew.api.exporter.ExporterDescriptor;
 import dev.voxelbrew.api.exporter.ExporterProviderRegistry;
 import dev.voxelbrew.api.i18n.TranslationService;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
@@ -53,8 +54,22 @@ final class ExportDialog {
         Path filename = source.getFileName();
         if (filename == null) throw new IllegalArgumentException("Expected a project file: " + source);
         String name = filename.toString();
+        if (hasSuffix(name, "." + extension)) return source;
         int dot = name.lastIndexOf('.');
         return source.resolveSibling((dot > 0 ? name.substring(0, dot) : name) + "." + extension);
+    }
+
+    static Path withExtension(Path destination, String extension) {
+        Path filename = destination.getFileName();
+        if (filename == null) return destination;
+        String name = filename.toString();
+        String suffix = "." + extension;
+        if (hasSuffix(name, suffix) || Files.isDirectory(destination)) return destination;
+        return destination.resolveSibling(name + suffix);
+    }
+
+    private static boolean hasSuffix(String name, String suffix) {
+        return name.regionMatches(true, name.length() - suffix.length(), suffix, 0, suffix.length());
     }
 
     private ExportDialog() {}

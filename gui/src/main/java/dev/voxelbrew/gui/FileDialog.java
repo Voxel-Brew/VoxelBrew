@@ -120,8 +120,11 @@ final class FileDialog {
         button.addEventFilter(ActionEvent.ACTION, e -> {
             validatePath(e, save, path, error, translations);
         });
-        dialog.setResultConverter(
-                b -> b == confirm ? Path.of(path.evaluatedText()).toAbsolutePath() : null);
+        dialog.setResultConverter(b -> {
+            if (b != confirm) return null;
+            Path selected = Path.of(path.evaluatedText()).toAbsolutePath();
+            return save ? ExportDialog.withExtension(selected, extension) : selected;
+        });
         return Dialogs.show(dialog, owner, translations);
     }
 

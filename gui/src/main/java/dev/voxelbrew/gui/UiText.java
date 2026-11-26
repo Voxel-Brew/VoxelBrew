@@ -1,6 +1,7 @@
 package dev.voxelbrew.gui;
 
 import dev.voxelbrew.api.i18n.TranslationService;
+import dev.voxelbrew.engine.sketch.SketchProfiles;
 import java.util.function.Function;
 import javafx.scene.control.ComboBox;
 import javafx.util.StringConverter;
@@ -31,6 +32,12 @@ final class UiText {
         return java.util.Arrays.stream(name.split(" "))
                 .map(part -> translations.tryTranslate("view." + part).orElse(part))
                 .collect(java.util.stream.Collectors.joining(" "));
+    }
+
+    static String sketchProfileIssue(TranslationService translations, String message) {
+        return SketchProfiles.OPEN_CONNECTING_EDGE.equals(message)
+                ? translations.translate("sketch.profile.openConnection")
+                : message;
     }
 
     private UiText() {}

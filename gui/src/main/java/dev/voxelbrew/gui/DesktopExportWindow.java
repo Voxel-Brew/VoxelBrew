@@ -157,6 +157,17 @@ public final class DesktopExportWindow implements ExportWindow {
         return values;
     }
 
+    private static String destinationValue(String text, String extension) {
+        if (text.isBlank()) return text;
+        try {
+            return dev.voxelbrew.gui.ExportDialog.withExtension(Path.of(text), extension)
+                    .toString();
+        } catch (InvalidPathException failure) {
+            // Let the exporter's validator report malformed paths on the destination field.
+            return text;
+        }
+    }
+
     private static void displayErrors(Map<String, InputBinding> inputs, Map<String, String> errors, Label general) {
         inputs.forEach((id, input) -> input.display(errors.get(id)));
         var unbound = new java.util.ArrayList<String>();
@@ -463,12 +474,12 @@ public final class DesktopExportWindow implements ExportWindow {
                 if (filename != null) chooser.setInitialFileName(filename.toString());
             }
             var chosen = chooser.showSaveDialog(owner);
-            if (chosen != null) path.setText(chosen.toString());
+            if (chosen != null) path.setText(destinationValue(chosen.toString(), destination.extension()));
         });
         return bind(
                 inputs,
                 destination.id(),
-                path::getText,
+                () -> destinationValue(path.getText(), destination.extension()),
                 path,
                 field(translations.translate("gui.destination"), Dialogs.pathRow(path, browse)),
                 path.textProperty(),

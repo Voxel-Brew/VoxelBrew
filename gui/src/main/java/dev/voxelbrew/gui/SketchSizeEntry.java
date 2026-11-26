@@ -63,7 +63,7 @@ final class SketchSizeEntry extends HBox {
 
     private static double readValue(TextField field, boolean validate, double minimum) {
         try {
-            double value = Double.parseDouble(field.getText().strip().replace(',', '.'));
+            double value = DecimalInput.parse(field.getText());
             if (Double.isFinite(value) && value >= minimum) return value;
         } catch (NumberFormatException invalid) {
             // Select the invalid entry so the next keystroke replaces it.

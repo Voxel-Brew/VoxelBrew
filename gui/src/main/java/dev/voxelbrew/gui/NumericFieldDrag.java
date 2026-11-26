@@ -67,16 +67,17 @@ final class NumericFieldDrag {
 
     private void start(MouseEvent event) {
         original = null;
-        if (event.getButton() != MouseButton.MIDDLE || !editable() || !Expressions.isNumber(field.getText())) {
-            return;
-        }
+        if (event.getButton() != MouseButton.MIDDLE || !editable()) return;
+        String input = field.getText();
+        String normalized = DecimalInput.expression(input);
+        if (!Expressions.isNumber(normalized)) return;
         try {
-            startValue = new BigDecimal(field.getText().strip());
+            startValue = new BigDecimal(normalized.strip());
             if (!Double.isFinite(startValue.doubleValue())) return;
         } catch (NumberFormatException invalid) {
             return;
         }
-        original = field.getText();
+        original = input;
         step = BigDecimal.valueOf(field.dragStep());
         startX = event.getScreenX();
         field.requestFocus();
@@ -94,10 +95,9 @@ final class NumericFieldDrag {
         if (Double.isFinite(pixels)) {
             var value = constrain(startValue.add(BigDecimal.valueOf(pixels).multiply(step)));
             if (field.bounds().accepts(value.doubleValue())) {
-                field.setText(
-                        value.compareTo(startValue) == 0
-                                ? original
-                                : value.stripTrailingZeros().toPlainString());
+                String text = value.stripTrailingZeros().toPlainString();
+                if (original.indexOf(',') >= 0) text = text.replace('.', ',');
+                field.setText(value.compareTo(startValue) == 0 ? original : text);
             }
         }
         event.consume();

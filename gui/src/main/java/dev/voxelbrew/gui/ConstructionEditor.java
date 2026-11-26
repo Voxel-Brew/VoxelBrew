@@ -43,7 +43,7 @@ final class ConstructionEditor extends VBox {
     private boolean closed;
 
     private static double number(TextField field) {
-        return Double.parseDouble(field.getText().trim().replace(',', '.'));
+        return DecimalInput.parse(field.getText());
     }
 
     static String valueKey(Tool tool) {

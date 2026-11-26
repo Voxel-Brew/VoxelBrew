@@ -551,9 +551,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
 
     private static double number(TextField field, String name) {
         try {
-            double value = field instanceof FormulaField formula
-                    ? formula.value()
-                    : Double.parseDouble(field.getText().trim());
+            double value =
+                    field instanceof FormulaField formula ? formula.value() : DecimalInput.parse(field.getText());
             if (!Double.isFinite(value)) throw new NumberFormatException();
             field.getStyleClass().remove("invalid");
             return value;

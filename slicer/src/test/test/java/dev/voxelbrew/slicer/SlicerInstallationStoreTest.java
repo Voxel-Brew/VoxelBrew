@@ -7,6 +7,7 @@ import dev.voxelbrew.util.preferences.UserConfigServiceImpl;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -65,6 +66,36 @@ class SlicerInstallationStoreTest {
         assertThatThrownBy(() -> replacement.executionWindow(Map.of("executable", "replacement.exe")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("read-only");
+    }
+
+    @Test
+    void keepsTheDefaultUntilItIsChangedOrRemoved() throws IOException {
+        var store = new SlicerInstallationStore(new UserConfigServiceImpl(directory, "config.properties"));
+        assertThat(store.defaultInstallation(List.of())).isEmpty();
+        var first = new SlicerInstallation(UUID.randomUUID(), "cura", "C slicer", "1", "", Map.of());
+        var second = new SlicerInstallation(UUID.randomUUID(), "cura", "A slicer", "1", "", Map.of());
+        var third = new SlicerInstallation(UUID.randomUUID(), "cura", "B slicer", "1", "", Map.of());
+
+        store.save(first);
+        store.save(second);
+        store.save(third);
+        var reopened = new SlicerInstallationStore(new UserConfigServiceImpl(directory, "config.properties"));
+        var custom = reopened.load().stream()
+                .filter(installation -> !installation.bundled())
+                .toList();
+        assertThat(reopened.defaultInstallation(custom)).contains(first);
+        assertThat(reopened.defaultInstallation(List.of(second, third))).contains(second);
+
+        reopened.setDefaultInstallation(third.id());
+        assertThat(store.defaultInstallation(custom)).contains(third);
+        reopened.remove(third.id());
+        var remaining = reopened.load().stream()
+                .filter(installation -> !installation.bundled())
+                .toList();
+        assertThat(reopened.defaultInstallation(remaining)).contains(second);
+        assertThatThrownBy(() -> reopened.setDefaultInstallation(third.id()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(reopened.defaultInstallation(remaining.reversed())).contains(second);
     }
 
     @Test

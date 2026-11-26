@@ -2798,12 +2798,15 @@ class WorkbenchUiTest {
                 .hasSize(2);
         assertThat(fx(() -> ((Label) node("#slicer-installation-status")).getText()))
                 .isEqualTo(executable);
+        click("slicer-installation-set-default");
+        assertThat(fx(() -> node("#slicer-installation-set-default").isDisabled()))
+                .isTrue();
         fx(() -> {
             var list = node("#slicer-installations");
             assertThat(list.lookupAll(".slicer-state-ready").stream()
                             .map(Label.class::cast)
                             .map(Label::getText))
-                    .contains("Ready");
+                    .contains("Ready", "Ready · Default");
             assertThat(list.lookupAll(".slicer-installation-version").stream()
                             .map(Label.class::cast)
                             .map(Label::getText))
@@ -2813,7 +2816,7 @@ class WorkbenchUiTest {
                     Path.of(System.getProperty("voxelbrew.ui.artifacts"), "slicer-installations.png"));
             assertThat(list.lookupAll(".scroll-bar").stream().map(ScrollBar.class::cast))
                     .noneMatch(bar -> bar.getOrientation() == Orientation.HORIZONTAL && bar.isVisible());
-            for (String id : List.of("edit", "remove", "add")) {
+            for (String id : List.of("set-default", "edit", "remove", "add")) {
                 var button = (Button) node("#slicer-installation-" + id);
                 assertThat(button.getWidth()).isGreaterThanOrEqualTo(button.prefWidth(-1));
             }
@@ -2832,6 +2835,12 @@ class WorkbenchUiTest {
                 .containsAll(bundled.stream()
                         .map(installation -> installation.name())
                         .toList());
+        assertThat(fx(() -> ((ComboBox<?>) node("#print-backend")).getValue()))
+                .isEqualTo(store.load().stream()
+                        .filter(installation -> installation.name().equals("Prusa second"))
+                        .findFirst()
+                        .orElseThrow());
+        choice("print-backend", slicerNames.indexOf("Prusa first"));
         choice("print-backend", slicerNames.indexOf("Prusa second"));
         ready();
         var selected = store.require(
@@ -2867,8 +2876,8 @@ class WorkbenchUiTest {
                 .containsExactly("Prusa first");
         key(KeyCode.ESCAPE);
         click("print-tab-process");
-        assertThat(fx(() -> ((ComboBox<?>) node("#print-backend")).getItems().contains(selected)))
-                .isFalse();
+        assertThat(fx(() -> ((ComboBox<?>) node("#print-backend")).getValue()))
+                .isEqualTo(store.defaultInstallation(store.load()).orElseThrow());
 
         choice("appearance", 2);
         click("menu-slicer");

@@ -23,6 +23,8 @@ import dev.voxelbrew.printer.DefaultPrinterProfileCatalog;
 import dev.voxelbrew.printer.FilePrinterStore;
 import dev.voxelbrew.printer.ProfileHardware;
 import dev.voxelbrew.printer.moonraker.MoonrakerDriverGui;
+import dev.voxelbrew.slicer.SlicerInstallation;
+import dev.voxelbrew.slicer.SlicerInstallationStore;
 import dev.voxelbrew.slicer.prusa.PrusaSlicerBackend;
 import dev.voxelbrew.util.Version;
 import dev.voxelbrew.util.concurrent.SerialExecutor;
@@ -2693,6 +2695,73 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void processUsesTheDefaultSlicerAndFallsBackAfterRemoval() throws Exception {
+        var prepared = PreparedDocuments.copy("plate-5mm.vxb", directory);
+        fx(() -> workbench.controller().open(prepared)).get(20, TimeUnit.SECONDS);
+        ready();
+        var store = new SlicerInstallationStore(configuration);
+        var first = new SlicerInstallation(UUID.randomUUID(), "prusa-slicer", "First slicer", "2.7.2", "", Map.of());
+        var second = new SlicerInstallation(UUID.randomUUID(), "prusa-slicer", "Lab slicer", "2.7.2", "", Map.of());
+        store.save(first);
+        store.save(second);
+        Runnable closeSettings = () -> node(".dialog-overlay").lookupAll(".button").stream()
+                .filter(Button.class::isInstance)
+                .map(Button.class::cast)
+                .filter(button -> "Close".equals(button.getText()))
+                .findFirst()
+                .orElseThrow()
+                .fire();
+        fx(() -> {
+            ((TabPane) node("#workspaces")).getSelectionModel().select(1);
+            workbench.applyCss();
+            workbench.layout();
+            var tabs = (TabPane) node("#print-controls");
+            tabs.getSelectionModel()
+                    .select(tabs.getTabs().stream()
+                            .filter(tab -> "print-tab-process".equals(tab.getId()))
+                            .findFirst()
+                            .orElseThrow());
+            ((PrintingPane) node("#printing-workspace")).reloadSlicers();
+            workbench.applyCss();
+            workbench.layout();
+            assertThat(((ComboBox<?>) node("#print-backend")).getValue()).isEqualTo(first);
+            return null;
+        });
+
+        Platform.runLater(() -> command(workbench, "slicer-settings").fire());
+        fx(() -> {
+            var list = (ListView<?>) node("#slicer-installations");
+            list.getSelectionModel().select(list.getItems().indexOf(second));
+            var setDefault = (Button) node("#slicer-installation-set-default");
+            setDefault.fire();
+            assertThat(setDefault.isDisabled()).isTrue();
+            list.getScene().getRoot().applyCss();
+            list.getScene().getRoot().layout();
+            Screenshot.save(
+                    list.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "default-slicer.png"));
+            closeSettings.run();
+            assertThat(((ComboBox<?>) node("#print-backend")).getValue()).isEqualTo(second);
+            return null;
+        });
+
+        Platform.runLater(() -> command(workbench, "slicer-settings").fire());
+        Platform.runLater(() -> {
+            var list = (ListView<?>) node("#slicer-installations");
+            list.getSelectionModel().select(list.getItems().indexOf(second));
+            ((Button) node("#slicer-installation-remove")).fire();
+        });
+        fx(() -> {
+            ((Button) node("#slicer-installation-remove-confirm")).fire();
+            return null;
+        });
+        fx(() -> {
+            closeSettings.run();
+            assertThat(((ComboBox<?>) node("#print-backend")).getValue()).isEqualTo(first);
+            return null;
+        });
+    }
+
+    @Test
     void namedSlicerInstallationsAreCheckedBeforeTheyCanBeSelected() throws Exception {
         ready();
         openPrepared("plate-5mm.vxb");
@@ -4905,7 +4974,10 @@ class WorkbenchUiTest {
         updates = new UpdateFixture(directory.resolve("update fixture"));
         configuration = new UserConfigServiceImpl(directory, CONFIG_FILE_NAME);
         String testName = info.getTestMethod().orElseThrow().getName();
-        if (!testName.equals("namedSlicerInstallationsAreCheckedBeforeTheyCanBeSelected")) {
+        if (!Set.of(
+                        "namedSlicerInstallationsAreCheckedBeforeTheyCanBeSelected",
+                        "processUsesTheDefaultSlicerAndFallsBackAfterRemoval")
+                .contains(testName)) {
             var store = new dev.voxelbrew.slicer.SlicerInstallationStore(configuration);
             store.save(new dev.voxelbrew.slicer.SlicerInstallation(
                     UUID.randomUUID(), "prusa-slicer", "PrusaSlicer", "test installation", "", Map.of()));
@@ -5908,7 +5980,12 @@ class WorkbenchUiTest {
     void saveAndExportOfferTheirOwnOutputFolder() throws Exception {
         ready();
         var design = directory.resolve("project.vxb");
-        save(design);
+        click("save-as");
+        text("file-path", directory.resolve("project").toString());
+        click("file-confirm");
+        ready();
+        assertThat(design).isRegularFile();
+        assertThat(fx(() -> workbench.controller().path())).isEqualTo(design);
         assertOutputFolder(directory);
         click("export-notification-close");
         click("save");
@@ -5918,9 +5995,10 @@ class WorkbenchUiTest {
         var folder = Files.createDirectory(directory.resolve("export results"));
         click("export");
         chooseExporter("json");
-        text("export-path", folder.resolve("copy.json").toString());
+        text("export-path", folder.resolve("copy").toString());
         click("export-confirm");
         ready();
+        assertThat(folder.resolve("copy.json")).isRegularFile();
         assertOutputFolder(folder);
     }
 
@@ -7851,7 +7929,7 @@ class WorkbenchUiTest {
         Path artifacts = Path.of(System.getProperty("voxelbrew.ui.artifacts"));
         choice("appearance", 1);
         click("parameters");
-        parameter("width", "=60");
+        parameter("width", "=59,5 + ,5");
         click("parameters-apply");
         ready();
         var before = document();
@@ -7886,12 +7964,12 @@ class WorkbenchUiTest {
                         .getPseudoClassStates()
                         .contains(javafx.css.PseudoClass.getPseudoClass("formula-invalid"))))
                 .isTrue();
-        sketchDimension(0, "=20+20");
+        sketchDimension(0, "=20,5 + 19,5");
         click("constraint-finish");
         ready();
         assertThat(document().parameters().bindings().size()).isEqualTo(2);
         click("extrude");
-        text("extrude-distance", "=1+2/3");
+        text("extrude-distance", "=1,5 + 1/6");
         click("commit-extrusion");
         ready();
         assertThat(volume()).isCloseTo(2000, org.assertj.core.data.Offset.offset(.01));
@@ -8824,6 +8902,9 @@ class WorkbenchUiTest {
         click("extrude");
         fx(() -> {
             var operations = (ComboBox<?>) node("#extrude-operation");
+            var root = operations.getScene().getRoot();
+            root.applyCss();
+            root.layout();
             assertThat(operations.getButtonCell().getGraphic()).isNotNull();
             operations.show();
             return null;
@@ -8831,6 +8912,9 @@ class WorkbenchUiTest {
         fx(() -> {
             var operations = (ComboBox<?>) node("#extrude-operation");
             var skin = (javafx.scene.control.skin.ComboBoxListViewSkin<?>) operations.getSkin();
+            var popup = skin.getPopupContent().getScene().getRoot();
+            popup.applyCss();
+            popup.layout();
             var rows = skin.getPopupContent().lookupAll(".list-cell").stream()
                     .map(row -> (javafx.scene.control.ListCell<?>) row)
                     .filter(cell -> !cell.isEmpty())

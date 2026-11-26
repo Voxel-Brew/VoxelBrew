@@ -334,9 +334,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
 
     private static double value(TextField field, String label) {
         try {
-            double v = field instanceof FormulaField formula
-                    ? formula.value()
-                    : Double.parseDouble(field.getText().strip());
+            double v = field instanceof FormulaField formula ? formula.value() : DecimalInput.parse(field.getText());
             if (!Double.isFinite(v)) throw new NumberFormatException();
             field.getStyleClass().remove("invalid");
             return v;
@@ -1857,7 +1855,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             SketchProfiles.profile(next);
             edit(next);
         } catch (RuntimeException failure) {
-            error.setText(failure.getMessage());
+            error.setText(UiText.sketchProfileIssue(translations, failure.getMessage()));
         }
     }
 
@@ -1935,8 +1933,10 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
             finish.setDisable(!controller.canFinish()
                     || controller.definition().entities().isEmpty());
             status.setText(solverStatus());
-            profileWarning.setVisible(!controller.extrusionIssue().isEmpty());
-            profileWarning.setText(translations.translate("action.extrude") + ": " + controller.extrusionIssue());
+            String issue = controller.extrusionIssue();
+            profileWarning.setVisible(!issue.isEmpty());
+            profileWarning.setText(
+                    translations.translate("action.extrude") + ": " + UiText.sketchProfileIssue(translations, issue));
             if (!controller.busy() && !controller.interactionError().isEmpty()) {
                 error.setText(controller.interactionError());
             } else if (!controller.busy()

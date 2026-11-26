@@ -11,6 +11,8 @@ import java.util.*;
  * Resolves selected curves into exact regions; screen samples only classify nesting/orientation.
  */
 public final class SketchProfiles {
+    public static final String OPEN_CONNECTING_EDGE = "Profile contains an open connecting edge";
+
     public record Region(String id, PlanarProfile profile) {}
 
     private record Junction(String id, Vec position) {}
@@ -189,12 +191,47 @@ public final class SketchProfiles {
             endpoints.add(new Junction(entity.id(), entity.at(1)));
         }
         var remaining = new ArrayList<Entity>();
+        var lineSpans = new ArrayList<Entity>();
         for (var entity : boundary) {
-            if (entity.kind() == Kind.LINE) remaining.addAll(splitAtJunctions(entity, endpoints));
-            else remaining.addAll(g.curves(entity));
+            if (entity.kind() == Kind.LINE) {
+                var spans = splitAtJunctions(entity, endpoints);
+                lineSpans.addAll(spans);
+                remaining.addAll(spans);
+            } else {
+                remaining.addAll(g.curves(entity));
+            }
         }
         if (remaining.isEmpty()) throw new IllegalArgumentException("Profile has no curves");
+        var duplicates = coincidentLineDuplicates(lineSpans, g.boundary());
+        remaining.removeIf(duplicates::contains);
         return boundaryLoops(remaining, individual);
+    }
+
+    private static Set<Entity> coincidentLineDuplicates(List<Entity> spans, Collection<String> boundaryIds) {
+        var originalIds = new HashSet<>(boundaryIds);
+        // Prefer an existing unsplit edge so its selectable region keeps the same reference.
+        var lines = spans.stream()
+                .sorted(Comparator.comparing((Entity line) -> !originalIds.contains(line.id()))
+                        .thenComparing(Entity::id))
+                .map(line -> new Edge(line, false))
+                .toList();
+        var retained = new ArrayList<Edge>();
+        var duplicates = Collections.newSetFromMap(new IdentityHashMap<Entity, Boolean>());
+        for (var line : lines) {
+            if (retained.stream().anyMatch(other -> coincidentLines(line, other))) {
+                duplicates.add(line.entity());
+            } else {
+                retained.add(line);
+            }
+        }
+        return duplicates;
+    }
+
+    private static boolean coincidentLines(Edge first, Edge second) {
+        return (first.start().distance(second.start()) <= TOLERANCE
+                        && first.end().distance(second.end()) <= TOLERANCE)
+                || (first.start().distance(second.end()) <= TOLERANCE
+                        && first.end().distance(second.start()) <= TOLERANCE);
     }
 
     /** Reports profile problems while the sketch can still be edited or saved as an open sketch. */
@@ -369,13 +406,11 @@ public final class SketchProfiles {
             } while (!edge.equals(start));
             double signedArea = area(samples(path));
             if (Math.abs(signedArea) < 1e-12) throw new IllegalArgumentException("Profile has zero or invalid area");
-            if (signedArea < 0 && path.stream().map(Edge::entity).distinct().count() != path.size()) {
-                throw new IllegalArgumentException("Profile contains an open connecting edge");
+            if ((signedArea < 0 || individual)
+                    && path.stream().map(Edge::entity).distinct().count() != path.size()) {
+                throw new IllegalArgumentException(OPEN_CONNECTING_EDGE);
             }
             if (individual ? signedArea > 0 : signedArea < 0) {
-                if (path.stream().map(Edge::entity).distinct().count() != path.size()) {
-                    throw new IllegalArgumentException("Profile contains an open connecting edge");
-                }
                 loops.add(path);
             }
         }

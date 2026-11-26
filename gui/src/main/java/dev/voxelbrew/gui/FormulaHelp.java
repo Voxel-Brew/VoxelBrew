@@ -73,7 +73,7 @@ final class FormulaHelp {
                         reference(
                                 "rounding",
                                 "abs   floor   ceil / ceiling   round   min   max   clamp",
-                                "ceiling(-2.3) → -2"),
+                                "ceiling(-2,3) → -2      max(1,5; 2,5) → 2.5"),
                         reference("logs", "log(1000) → 3      ln(e) → 1", "sqrt($foo)"),
                         reference("angles", "sin   cos   tan   asin   acos   atan", "(tau rad) / $count"),
                         reference(

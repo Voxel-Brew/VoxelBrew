@@ -892,7 +892,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
                 if (!focused) saveProcess();
             });
         }
-        backends.setOnAction(event -> saveProcess());
+        backends.setOnAction(event -> saveProcess(true));
         materials.setOnAction(event -> saveProcess());
         autoSupports.setOnAction(event -> saveProcess());
         bedOnly.setOnAction(event -> saveProcess());
@@ -1929,8 +1929,8 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
         }
     }
 
-    private void applyProcess() {
-        var backend = backends.getValue();
+    private void applyProcess(boolean selectSlicer) {
+        var backend = selectSlicer ? backends.getValue() : null;
         var process = new ProcessSettings(
                 number("print-layer-height"),
                 integer("print-walls"),
@@ -2018,7 +2018,7 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
                     translations.translate("gui.slice_requires_a_complete_successful_rebuild_at_the_timeline_end"));
         }
         applyNozzle();
-        applyProcess();
+        applyProcess(true);
         tabs.getSelectionModel().select(3);
         document.captureSlicerWorkspace();
         var snapshot = document.snapshot().document();
@@ -2058,18 +2058,11 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
 
     private SlicerInstallation selectedSlicer() {
         String selected = SlicerInstallation.selectedId(setup());
-        if (!selected.isBlank()) {
-            return backends.getItems().stream()
-                    .filter(entry -> entry.id().toString().equals(selected))
-                    .findFirst()
-                    .orElse(null);
-        }
-        var matching = backends.getItems().stream()
-                .filter(entry -> entry.providerId().equals(setup().backendId()))
-                .toList();
-        var custom = matching.stream().filter(entry -> !entry.bundled()).toList();
-        if (custom.size() == 1) return custom.getFirst();
-        return custom.isEmpty() && matching.size() == 1 ? matching.getFirst() : null;
+        return backends.getItems().stream()
+                .filter(entry -> entry.id().toString().equals(selected))
+                .findFirst()
+                .or(() -> slicerSettings.defaultInstallation(backends.getItems()))
+                .orElse(null);
     }
 
     void reloadSlicers() {
@@ -2557,9 +2550,13 @@ final class PrintingPane extends BorderPane implements AutoCloseable {
     }
 
     private void saveProcess() {
+        saveProcess(false);
+    }
+
+    private void saveProcess(boolean selectSlicer) {
         if (updating || materials.getValue() == null) return;
         try {
-            applyProcess();
+            applyProcess(selectSlicer);
         } catch (IllegalArgumentException failure) {
             status.setText(failure.getMessage());
         }

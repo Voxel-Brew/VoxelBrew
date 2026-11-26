@@ -15,9 +15,11 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
@@ -42,7 +44,10 @@ final class SlicerSettings {
     private record Check(String version, String failure) {}
 
     private static ListCell<SlicerInstallation> installationCell(
-            Map<String, SlicerDescriptor> providers, String appVersion, TranslationService text) {
+            Map<String, SlicerDescriptor> providers,
+            String appVersion,
+            TranslationService text,
+            Supplier<UUID> defaultId) {
         var name = new Label();
         name.getStyleClass().add("slicer-installation-name");
         var version = new Label();
@@ -103,7 +108,11 @@ final class SlicerSettings {
                 } else {
                     status = "unavailable";
                 }
-                state.setText(text.translate("slicer.installation.state." + status));
+                String stateText = text.translate("slicer.installation.state." + status);
+                if (item.id().equals(defaultId.get())) {
+                    stateText += " · " + text.translate("slicer.installation.default");
+                }
+                state.setText(stateText);
                 state.getStyleClass().setAll("label", "slicer-installation-state", "slicer-state-" + status);
                 setTooltip(item.version().isBlank() ? null : new Tooltip(item.version()));
                 setAccessibleText(displayName + " · " + subtitle + " · " + state.getText());
@@ -146,6 +155,10 @@ final class SlicerSettings {
         }
     }
 
+    Optional<SlicerInstallation> defaultInstallation(List<SlicerInstallation> installations) {
+        return store.defaultInstallation(installations);
+    }
+
     void configure(SlicerProviderRegistry registry, Window owner, TranslationService text, Runnable refresh) {
         var manager = new Dialog<ButtonType>();
         manager.setTitle(text.translate("slicer.settings.heading"));
@@ -164,12 +177,21 @@ final class SlicerSettings {
         installations.setPlaceholder(empty);
         installations.setFixedCellSize(INSTALLATION_ROW_HEIGHT);
         var items = installations.getItems();
+        var defaultId = new SimpleObjectProperty<UUID>();
+        Runnable refreshDefault = () -> {
+            var available = items.stream()
+                    .filter(item -> providers.containsKey(item.providerId()))
+                    .toList();
+            defaultId.set(
+                    defaultInstallation(available).map(SlicerInstallation::id).orElse(null));
+        };
         installations
                 .prefHeightProperty()
                 .bind(Bindings.createDoubleBinding(
                         () -> 10.0 + INSTALLATION_ROW_HEIGHT * Math.max(1, Math.min(4, items.size())), items));
-        installations.setCellFactory(ignored -> installationCell(providers, appVersion, text));
-        installations.getItems().setAll(installations());
+        installations.setCellFactory(ignored -> installationCell(providers, appVersion, text, defaultId::get));
+        items.setAll(installations());
+        refreshDefault.run();
         var status = new Label();
         status.setId("slicer-installation-status");
         status.getStyleClass().add("slicer-installation-detail");
@@ -219,8 +241,27 @@ final class SlicerSettings {
                 .orElse(true);
         edit.disableProperty().bind(readOnly);
         remove.disableProperty().bind(readOnly);
+        var setDefault = new Button(text.translate("slicer.installation.setDefault"));
+        setDefault.setId("slicer-installation-set-default");
+        setDefault.getStyleClass().add("slicer-manager-action");
+        setDefault.setMinWidth(Region.USE_PREF_SIZE);
+        var selection = installations.getSelectionModel().selectedItemProperty();
+        setDefault
+                .disableProperty()
+                .bind(Bindings.createBooleanBinding(
+                        () -> {
+                            var selected = selection.get();
+                            return selected == null
+                                    || !selected.operational()
+                                    || !providers.containsKey(selected.providerId())
+                                    || selected.id().equals(defaultId.get());
+                        },
+                        selection,
+                        defaultId));
         java.util.function.Consumer<SlicerInstallation> update = saved -> {
-            installations.getItems().setAll(installations());
+            items.setAll(installations());
+            refreshDefault.run();
+            installations.refresh();
             if (saved == null) installations.getSelectionModel().selectFirst();
             else {
                 installations.getSelectionModel().select(saved);
@@ -234,10 +275,23 @@ final class SlicerSettings {
         });
         remove.setOnAction(event -> removeSafely(
                 installations.getSelectionModel().getSelectedItem(), owner, text, () -> update.accept(null)));
+        setDefault.setOnAction(event -> {
+            var selected = selection.get();
+            try {
+                store.setDefaultInstallation(selected.id());
+                update.accept(selected);
+            } catch (IllegalArgumentException | UncheckedIOException | UserConfigException failure) {
+                Dialogs.show(
+                        new Alert(
+                                Alert.AlertType.ERROR, text.translate("slicer.settings.failed", failure.getMessage())),
+                        owner,
+                        text);
+            }
+        });
         types.setMaxWidth(Double.MAX_VALUE);
         types.setMinWidth(0);
         HBox.setHgrow(types, Priority.ALWAYS);
-        var actions = new HBox(8, status, edit, remove);
+        var actions = new HBox(8, status, setDefault, edit, remove);
         actions.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(status, Priority.ALWAYS);
         var typeLabel = new Label(text.translate("slicer.installation.provider"));
@@ -461,7 +515,11 @@ final class SlicerSettings {
                 version,
                 "",
                 values);
-        store.save(installation);
+        try {
+            store.save(installation);
+        } catch (IOException failure) {
+            throw new UncheckedIOException(failure);
+        }
         return installation;
     }
 

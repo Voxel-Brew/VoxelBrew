@@ -12,7 +12,7 @@ import java.util.*;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 
-/** Stores named installations, their check results, and provider defaults. */
+/** Stores named installations, their check results, and slicer defaults. */
 @Slf4j
 public final class SlicerInstallationStore {
     private static final String PREFIX = "installation-";
@@ -20,6 +20,8 @@ public final class SlicerInstallationStore {
     private static final String EXTENSION = ".properties";
 
     private static final String INPUT_PREFIX = "input.";
+
+    private static final String DEFAULT_INSTALLATION = "slicer.defaultInstallation";
 
     private final Path directory;
 
@@ -35,6 +37,16 @@ public final class SlicerInstallationStore {
         } catch (IllegalArgumentException failure) {
             throw new IOException("Cannot open slicer settings " + home.resolve(fileName), failure);
         }
+    }
+
+    private static Optional<SlicerInstallation> defaultInstallation(
+            List<SlicerInstallation> installations, String saved) {
+        var available =
+                installations.stream().filter(SlicerInstallation::operational).toList();
+        return available.stream()
+                .filter(installation -> installation.id().toString().equals(saved))
+                .findFirst()
+                .or(() -> available.stream().findFirst());
     }
 
     @SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "The injected service provides current preferences.")
@@ -90,6 +102,7 @@ public final class SlicerInstallationStore {
         var download = dev.voxelbrew.slicer.internal.SlicerDownload.find(provider)
                 .orElseThrow(() -> new IllegalArgumentException("No download for " + provider + " on this platform"));
         download.install(directory, cancellation, progress);
+        reconcileDefault();
     }
 
     public List<SlicerInstallation> load() throws IOException {
@@ -131,7 +144,20 @@ public final class SlicerInstallationStore {
         return read(key);
     }
 
-    public void save(SlicerInstallation installation) {
+    /** Resolves the default among the caller's available installations, in display order. */
+    public Optional<SlicerInstallation> defaultInstallation(List<SlicerInstallation> installations) {
+        return defaultInstallation(
+                installations,
+                configuration.readUserConfig(DEFAULT_INSTALLATION).orElse(""));
+    }
+
+    public void setDefaultInstallation(@NonNull UUID id) {
+        var installation = require(id.toString());
+        if (!installation.operational()) throw new IllegalArgumentException("Slicer installation must pass its check");
+        configuration.saveUserConfig(DEFAULT_INSTALLATION, id.toString());
+    }
+
+    public void save(SlicerInstallation installation) throws IOException {
         if (installation.bundled()) throw new IllegalArgumentException("Bundled slicer settings are read-only");
         if (!installation.operational()) throw new IllegalArgumentException("Slicer installation must pass its check");
         var values = new LinkedHashMap<String, String>();
@@ -144,11 +170,23 @@ public final class SlicerInstallationStore {
         var removed = new HashSet<>(configuration.readUserConfig().keySet());
         removed.removeAll(values.keySet());
         configuration.update(values, removed);
+        reconcileDefault();
     }
 
     public void remove(@NonNull UUID id) throws IOException {
         if (BundledSlicers.reserved(id)) throw new IllegalArgumentException("Bundled slicer settings are read-only");
         Files.deleteIfExists(path(id));
+        reconcileDefault();
+    }
+
+    private void reconcileDefault() throws IOException {
+        String saved = configuration.readUserConfig(DEFAULT_INSTALLATION).orElse("");
+        String effective = defaultInstallation(load(), saved)
+                .map(installation -> installation.id().toString())
+                .orElse("");
+        if (!effective.equals(saved)) {
+            configuration.saveUserConfig(DEFAULT_INSTALLATION, effective.isEmpty() ? null : effective);
+        }
     }
 
     private Path path(UUID id) {

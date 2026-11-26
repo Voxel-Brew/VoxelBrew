@@ -103,6 +103,15 @@ class UiTextTest {
     }
 
     @Test
+    void openConnectingEdgeUsesTheSelectedLanguage() {
+        var en = TranslationCatalogs.forLocale(Locale.ENGLISH, directory);
+        var pl = TranslationCatalogs.forLocale(Locale.forLanguageTag("pl"), directory);
+        String issue = SketchProfiles.OPEN_CONNECTING_EDGE;
+        assertThat(UiText.sketchProfileIssue(en, issue)).isEqualTo(issue);
+        assertThat(UiText.sketchProfileIssue(pl, issue)).isEqualTo("Profil zawiera otwartą krawędź łączącą");
+    }
+
+    @Test
     void actionDescriptionsCoverButtonFactoriesAndDynamicSketchActions() throws Exception {
         var ids = new java.util.HashSet<String>();
         try (var sources = Files.list(Path.of("src/main/java/dev/voxelbrew/gui"))) {

@@ -1104,7 +1104,8 @@ public final class Workbench extends BorderPane implements AutoCloseable {
             error.setText("");
             action.run();
         } catch (RuntimeException failure) {
-            error.setText(Objects.toString(failure.getMessage(), failure.toString()));
+            error.setText(UiText.sketchProfileIssue(
+                    translations, Objects.toString(failure.getMessage(), failure.toString())));
         }
     }
 
@@ -2499,7 +2500,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         } catch (RuntimeException failure) {
             controller.cancelPreview();
             finish.setDisable(true);
-            error.setText(failure.getMessage());
+            error.setText(UiText.sketchProfileIssue(translations, failure.getMessage()));
         }
     }
 
@@ -3809,7 +3810,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
         progress.setVisible(controller.rebuilding() || controller.ioBusy());
         String diagnostics = controller.build().diagnostics().stream()
                 .filter(d -> d.state() == Evaluation.State.FAILED || d.state() == Evaluation.State.BLOCKED)
-                .map(d -> d.featureId() + ": " + d.message())
+                .map(d -> d.featureId() + ": " + UiText.sketchProfileIssue(translations, d.message()))
                 .reduce((a, b) -> a + " | " + b)
                 .orElse("");
         status.setText(buildStatus(diagnostics));
@@ -3830,7 +3831,7 @@ public final class Workbench extends BorderPane implements AutoCloseable {
     }
 
     private String buildStatus(String diagnostics) {
-        if (!controller.error().isBlank()) return controller.error();
+        if (!controller.error().isBlank()) return UiText.sketchProfileIssue(translations, controller.error());
         if (controller.ioBusy()) {
             return translations.translate("gui.working_with_file");
         }

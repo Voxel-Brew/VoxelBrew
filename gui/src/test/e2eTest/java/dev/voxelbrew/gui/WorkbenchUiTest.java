@@ -8824,6 +8824,9 @@ class WorkbenchUiTest {
         click("extrude");
         fx(() -> {
             var operations = (ComboBox<?>) node("#extrude-operation");
+            var root = operations.getScene().getRoot();
+            root.applyCss();
+            root.layout();
             assertThat(operations.getButtonCell().getGraphic()).isNotNull();
             operations.show();
             return null;
@@ -8831,6 +8834,9 @@ class WorkbenchUiTest {
         fx(() -> {
             var operations = (ComboBox<?>) node("#extrude-operation");
             var skin = (javafx.scene.control.skin.ComboBoxListViewSkin<?>) operations.getSkin();
+            var popup = skin.getPopupContent().getScene().getRoot();
+            popup.applyCss();
+            popup.layout();
             var rows = skin.getPopupContent().lookupAll(".list-cell").stream()
                     .map(row -> (javafx.scene.control.ListCell<?>) row)
                     .filter(cell -> !cell.isEmpty())

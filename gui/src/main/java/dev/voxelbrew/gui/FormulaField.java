@@ -21,7 +21,7 @@ import lombok.RequiredArgsConstructor;
 /** A normal editable TextField with explicit formula affordance and non-destructive previews. */
 final class FormulaField extends TextField {
     private static final Pattern QUANTITY =
-            Pattern.compile("([+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?)\\s*([a-zA-Z]+|°)");
+            Pattern.compile("([+-]?(?:[0-9]+(?:[.,][0-9]*)?|[.,][0-9]+)(?:[eE][+-]?[0-9]+)?)\\s*([a-zA-Z]+|°)");
     private static final PseudoClass FORMULA = PseudoClass.getPseudoClass("formula");
 
     private static final PseudoClass INVALID = PseudoClass.getPseudoClass("formula-invalid");
@@ -158,13 +158,16 @@ final class FormulaField extends TextField {
 
     /** Expression for model bindings and evaluation, including a literal's chosen unit. */
     String expression() {
+        String text = getText();
+        if (unit == null && !Expressions.isFormula(text)) return text;
+        String normalized = DecimalInput.expression(text);
         if (enteredUnit != null
                 && enteredUnit != unit.get()
                 && declaredAtEntry == unit.get()
-                && Expressions.isNumber(getText())) {
-            return getText().strip() + " " + enteredUnit;
+                && Expressions.isNumber(normalized)) {
+            return normalized.strip() + " " + enteredUnit;
         }
-        return getText();
+        return normalized;
     }
 
     private ParameterUnit shownUnit() {
@@ -172,7 +175,7 @@ final class FormulaField extends TextField {
         var declared = unit.get();
         if (declared != declaredAtEntry) enteredUnit = null;
         return enteredUnit != null
-                        && (Expressions.isNumber(getText())
+                        && (Expressions.isNumber(DecimalInput.expression(getText()))
                                 || QUANTITY.matcher(getText().strip()).matches())
                 ? enteredUnit
                 : declared;
@@ -282,13 +285,13 @@ final class FormulaField extends TextField {
     /** Evaluated input for one-time settings; getText() always retains the user's formula. */
     String evaluatedText() {
         return unit == null
-                ? parameters.get().text(getText())
+                ? parameters.get().text(expression())
                 : Expressions.format(Measurements.quantity(value(), Measurements.ONE));
     }
 
     void refreshFormula() {
         boolean formula = Expressions.isFormula(getText())
-                || (unit != null && !getText().isBlank() && !Expressions.isNumber(getText()));
+                || (unit != null && !getText().isBlank() && !Expressions.isNumber(DecimalInput.expression(getText())));
         pseudoClassStateChanged(FORMULA, formula);
         try {
             var selected = shownUnit();

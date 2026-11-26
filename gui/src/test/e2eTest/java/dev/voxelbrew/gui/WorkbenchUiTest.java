@@ -7857,7 +7857,7 @@ class WorkbenchUiTest {
         Path artifacts = Path.of(System.getProperty("voxelbrew.ui.artifacts"));
         choice("appearance", 1);
         click("parameters");
-        parameter("width", "=60");
+        parameter("width", "=59,5 + ,5");
         click("parameters-apply");
         ready();
         var before = document();
@@ -7892,12 +7892,12 @@ class WorkbenchUiTest {
                         .getPseudoClassStates()
                         .contains(javafx.css.PseudoClass.getPseudoClass("formula-invalid"))))
                 .isTrue();
-        sketchDimension(0, "=20+20");
+        sketchDimension(0, "=20,5 + 19,5");
         click("constraint-finish");
         ready();
         assertThat(document().parameters().bindings().size()).isEqualTo(2);
         click("extrude");
-        text("extrude-distance", "=1+2/3");
+        text("extrude-distance", "=1,5 + 1/6");
         click("commit-extrusion");
         ready();
         assertThat(volume()).isCloseTo(2000, org.assertj.core.data.Offset.offset(.01));

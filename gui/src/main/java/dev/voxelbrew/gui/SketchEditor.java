@@ -334,9 +334,7 @@ final class SketchEditor extends BorderPane implements AutoCloseable {
 
     private static double value(TextField field, String label) {
         try {
-            double v = field instanceof FormulaField formula
-                    ? formula.value()
-                    : Double.parseDouble(field.getText().strip());
+            double v = field instanceof FormulaField formula ? formula.value() : DecimalInput.parse(field.getText());
             if (!Double.isFinite(v)) throw new NumberFormatException();
             field.getStyleClass().remove("invalid");
             return v;

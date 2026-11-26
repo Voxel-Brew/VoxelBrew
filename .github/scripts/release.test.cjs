@@ -169,6 +169,10 @@ test("published candidate uses tested commit, patch bump and version-preserving 
     return "";
   };
   publisher.publish(m, f.assets);
+  assert.match(
+    fs.readFileSync(path.join(f.assets, "release-notes.md"), "utf8"),
+    /GUI 3D rendering and picking are unverified on macOS/,
+  );
   assert.deepEqual(
     calls.map((args) => args[1]),
     ["create", "upload", "edit"],

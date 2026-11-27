@@ -2308,12 +2308,16 @@ class WorkbenchUiTest {
     }
 
     private void doubleClick(String id) throws Exception {
-        var point = centerOf(id);
+        doubleClick(centerOf(id));
+    }
+
+    private void doubleClick(Point2D point) throws Exception {
         fx(() -> {
             robot.mouseMove(point);
             robot.mouseClick(MouseButton.PRIMARY);
             return null;
         });
+        // Give GTK time to deliver the first native click before sending the second.
         Thread.sleep(90);
         fx(() -> {
             robot.mouseClick(MouseButton.PRIMARY);
@@ -8495,15 +8499,13 @@ class WorkbenchUiTest {
         click("sketch-undo");
         sketchReady();
         assertThat(sketchGeometry()).isEqualTo(beforeRotation);
-        fx(() -> {
+        var outlinePoint = fx(() -> {
             var editor = (SketchEditor) node("#sketch-editor");
             var geometry = editor.controller().definition();
             var outline = geometry.curves(geometry.entity(textId)).getLast();
-            robot.mouseMove(editor.modelToScreen(outline.at(.5)));
-            robot.mouseClick(MouseButton.PRIMARY);
-            robot.mouseClick(MouseButton.PRIMARY);
-            return null;
+            return editor.modelToScreen(outline.at(.5));
         });
+        doubleClick(outlinePoint);
         text("sketch-edit-text-content", "OC");
         checkTextAngleBounds("sketch-edit-text-angle");
         text("sketch-edit-text-angle", "181");

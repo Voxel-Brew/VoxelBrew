@@ -31,6 +31,7 @@ import dev.voxelbrew.util.concurrent.SerialExecutor;
 import dev.voxelbrew.util.i18n.TranslationCatalogs;
 import dev.voxelbrew.util.i18n.TranslationServiceImpl;
 import dev.voxelbrew.util.preferences.UserConfigServiceImpl;
+import dev.voxelbrew.util.update.ReleaseVersion;
 import java.nio.ByteBuffer;
 import java.nio.file.*;
 import java.security.MessageDigest;
@@ -7225,6 +7226,35 @@ class WorkbenchUiTest {
         assertThat(fx(() -> ((Label) node("#about-status")).getText().contains(message)))
                 .as(message)
                 .isTrue();
+    }
+
+    @Test
+    void polishStartupUpdatePromptUsesWorkbenchPaletteAndActions() throws Exception {
+        var translations = startupTranslations(configuration, CONFIG_FILE_NAME);
+        var version = ReleaseVersion.release("1.1.0");
+        for (int palette : List.of(1, 2)) {
+            choice("appearance", palette);
+            var prompt = new FutureTask<>(() -> UpdateDialog.showAvailable(stage, translations, version));
+            Platform.runLater(prompt);
+            fx(() -> {
+                var overlay = stage.getScene().lookup(".dialog-overlay");
+                assertThat(overlay).isNotNull();
+                assertThat(overlay.lookupAll(".label").stream().map(label -> ((Label) label).getText()))
+                        .anyMatch(text -> text.startsWith("Dostępna aktualizacja:") && text.endsWith(" → 1.1.0"));
+                assertThat(((Button) overlay.lookup("#update-prompt-download")).getText())
+                        .isEqualTo("Pobierz");
+                assertThat(((Button) overlay.lookup("#update-prompt-cancel")).getText())
+                        .isEqualTo("Anuluj");
+                Screenshot.save(
+                        stage.getScene(),
+                        Path.of(System.getProperty("voxelbrew.ui.artifacts"), "update-startup-" + palette + ".png"));
+                return null;
+            });
+            boolean download = palette == 2;
+            click(download ? "update-prompt-download" : "update-prompt-cancel");
+            assertThat(prompt.get(20, TimeUnit.SECONDS)).isEqualTo(download);
+            assertThat(fx(() -> stage.getScene().lookup(".dialog-overlay"))).isNull();
+        }
     }
 
     @Test

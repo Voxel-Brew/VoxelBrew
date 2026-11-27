@@ -71,16 +71,7 @@ public class UpdateHelper {
         long deadline = System.nanoTime() + java.time.Duration.ofMinutes(2).toNanos();
         try (var updateLock = waitLock(original.updateLock(), false, deadline)) {
             status(stage, "READY", "Waiting for application exit");
-            while (ProcessHandle.of(pid)
-                    .filter(h -> h.isAlive()
-                            && h.info().startInstant().map(start::equals).orElse(true))
-                    .isPresent()) {
-                if (System.nanoTime() > deadline) {
-                    throw new IOException(
-                            "Application did not exit; no files replaced. Close all instances and retry.");
-                }
-                Thread.sleep(100);
-            }
+            waitForApplicationExit(pid, start, deadline);
             try (var runningLock = waitLock(original.runningLock(), false, deadline)) {
                 var current = ApplicationImage.open(target, component, platform);
                 if (!current.version().equals(original.version())) {
@@ -104,6 +95,19 @@ public class UpdateHelper {
                 }
             }
             status(stage, "SUCCESS", message);
+        }
+    }
+
+    private static void waitForApplicationExit(long pid, Instant start, long deadline)
+            throws IOException, InterruptedException {
+        while (ProcessHandle.of(pid)
+                .filter(h -> h.isAlive()
+                        && h.info().startInstant().map(start::equals).orElse(true))
+                .isPresent()) {
+            if (System.nanoTime() > deadline) {
+                throw new IOException("Application did not exit; no files replaced. Close all instances and retry.");
+            }
+            Thread.sleep(100);
         }
     }
 

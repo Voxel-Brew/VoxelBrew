@@ -47,7 +47,8 @@ public class UpdateHelper {
         }
         Properties p = ApplicationImage.read(job);
         Path target = Path.of(p.getProperty("target")).toAbsolutePath().normalize();
-        if (!java.util.Objects.equals(target.getParent(), stage.getParent()) || Files.isSymbolicLink(target)) {
+        Path installParent = target.getParent();
+        if (installParent == null || !installParent.equals(stage.getParent()) || Files.isSymbolicLink(target)) {
             throw new IOException("Update must remain beside its original installation");
         }
         var component = ApplicationImage.Component.valueOf(p.getProperty("component"));
@@ -87,8 +88,22 @@ public class UpdateHelper {
                 }
                 status(stage, "INSTALLING", "Installing " + replacement.version());
                 replace(target, source, backup, UpdateHelper::move);
-                status(stage, "SUCCESS", "Installed " + replacement.version() + "; backup: " + backup);
             }
+            String message = "Installed " + replacement.version() + "; backup: " + backup;
+            if (component == ApplicationImage.Component.GUI) {
+                // The new launcher takes a shared running lock at startup.
+                try {
+                    new ProcessBuilder(original.launcher().toString())
+                            .directory(installParent.toFile())
+                            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                            .redirectError(ProcessBuilder.Redirect.DISCARD)
+                            .start();
+                } catch (IOException failure) {
+                    failure.printStackTrace(System.err);
+                    message += ". Automatic restart failed; open VoxelBrew manually: " + failure.getMessage();
+                }
+            }
+            status(stage, "SUCCESS", message);
         }
     }
 

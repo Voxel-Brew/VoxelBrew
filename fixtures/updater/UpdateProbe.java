@@ -8,6 +8,16 @@ import java.nio.file.*;
 public final class UpdateProbe {
     @SuppressWarnings("try")
     public static void main(String[] args) throws Exception {
+        if (args.length == 0) {
+            var gui = ApplicationImage.Component.GUI;
+            try (var running = ApplicationImage.running(gui)) {
+                var image = ApplicationImage.detect(gui).orElseThrow();
+                Files.writeString(
+                        Path.of(System.getenv("VOXELBREW_TEST_RESTART_RECORD")),
+                        image.version().toString());
+            }
+            return;
+        }
         var component = ApplicationImage.Component.valueOf(args[0]);
         if (args[1].equals("write-document")) {
             verifyDocumentVersion(args[2], Path.of(args[3]));

@@ -18,11 +18,12 @@ class UpdateHelperTest {
         Path installed = Files.createDirectory(directory.resolve("VoxelBrew"));
         Path backup = directory.resolve("backup");
         Files.writeString(installed.resolve("version"), "old");
-        Process holder = new ProcessBuilder("cmd.exe", "/d", "/q")
+        Process holder = new ProcessBuilder("cmd.exe", "/d", "/q", "/c", "echo ready& set /p line=")
                 .directory(installed.toFile())
                 .start();
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             try {
+                assertThat(holder.inputReader().readLine()).isEqualTo("ready");
                 assertThatThrownBy(() -> Files.move(installed, backup, StandardCopyOption.ATOMIC_MOVE))
                         .isExactlyInstanceOf(FileSystemException.class);
                 var move = executor.submit(() -> {

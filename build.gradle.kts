@@ -400,8 +400,13 @@ tasks.register("headlessWorkflowCheck") {
 
 tasks.register("headlessPackageCheck") {
     group = "verification"
-    description = "Verify CLI app images, updates and release archives on a headless CI runner."
-    dependsOn(":cli:packageCheck", ":cli:updatePackageCheck", ":cli:releaseArchiveCheck")
+    description = "Verify CLI packaging and packaged CLI and GUI updates on a headless CI runner."
+    dependsOn(
+        ":cli:packageCheck",
+        ":cli:updatePackageCheck",
+        ":cli:releaseArchiveCheck",
+        ":gui:updatePackageCheck",
+    )
 }
 
 tasks.wrapper {

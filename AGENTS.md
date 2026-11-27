@@ -84,12 +84,15 @@ For automatic release merge-backs, configure the Actions secret `RELEASE_PR_TOKE
 with access to this repository. A fine-grained token needs Contents, Workflows,
 and Pull requests write permissions to push workflow changes and open the PR.
 
+When a commit addresses a known GitHub issue, include the issue number in the
+commit subject as the scope, for example `feat(#1337): foo boo bar baz`.
+
 When a pull request resolves a known GitHub issue, add `Closes #123` to the PR description,
 using the actual issue number. For an issue in another repository, use
 `Closes owner/repository#123`. Add the closing reference to the PR targeting
 `master` so GitHub closes the issue when the PR is merged.
 
-Start every commit subject with `feat:`, `fix:`, or `chore:` and follow it with a concise,
+Use `feat`, `fix`, or `chore` as the commit type and follow it with a concise,
 imperative description, for example `fix: preserve tessellation face mapping`. Keep commits scoped
 to one coherent change. Pull requests should explain the motivation and behavior, link relevant
 issues, list exact verification commands, and include screenshots for visible GUI changes. Do not

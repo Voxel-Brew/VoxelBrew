@@ -58,6 +58,18 @@ new_version = ".".join(map(str, numeric))
 marker = payload / app_relative / "voxelbrew-install.properties"
 marker.write_text(marker.read_text().replace("version=" + old_version, "version=" + new_version), encoding="utf-8")
 metadata = dict(line.split("=", 1) for line in marker.read_text().splitlines() if "=" in line)
+classes = workspace / "probe classes"
+classes.mkdir()
+javac = Path(os.environ["VOXELBREW_TEST_JDK"]) / "bin" / ("javac.exe" if os.name == "nt" else "javac")
+subprocess.run([str(javac), "--release", "21", "-encoding", "UTF-8", "-cp", str(install / app_relative / "*"), "-d", str(classes), str(root / "fixtures/updater/UpdateProbe.java")], check=True)
+if kind == "gui":
+    # Let the actual replacement launcher report its installation without opening a desktop window in CI.
+    config = payload / app_relative / "VoxelBrew.cfg"
+    launcher_config = config.read_text(encoding="utf-8")
+    assert "app.mainclass=dev.voxelbrew.gui.Launcher" in launcher_config
+    config.write_text(launcher_config.replace("app.mainclass=dev.voxelbrew.gui.Launcher", "app.mainclass=UpdateProbe"), encoding="utf-8")
+    with zipfile.ZipFile(payload / app_relative / metadata["mainJar"], "a") as main_jar:
+        main_jar.write(classes / "UpdateProbe.class", "UpdateProbe.class")
 for module in ("engine", "util", "import", "export"):
     jar_path = payload / app_relative / metadata[module + "Jar"]
     temporary = jar_path.with_suffix(".new")
@@ -137,10 +149,8 @@ env["_JAVA_OPTIONS"] = '-Dvoxelbrew.home="' + str(workspace / "settings") + '" -
 env["VOXELBREW_GH"] = str(workspace / "gh-does-not-exist")
 env["GH_CONFIG_DIR"] = str(workspace / "no-gh-configuration")
 env["PATH"] = str(workspace)
-classes = workspace / "probe classes"
-classes.mkdir()
-javac = Path(os.environ["VOXELBREW_TEST_JDK"]) / "bin" / ("javac.exe" if os.name == "nt" else "javac")
-subprocess.run([str(javac), "--release", "21", "-encoding", "UTF-8", "-cp", str(install / app_relative / "*"), "-d", str(classes), str(root / "fixtures/updater/UpdateProbe.java")], check=True)
+restart_record = workspace / "restarted-version.txt"
+env["VOXELBREW_TEST_RESTART_RECORD"] = str(restart_record)
 java = install / runtime_relative / "bin" / ("java.exe" if os.name == "nt" else "java")
 probe = [str(java), "-cp", str(classes) + os.pathsep + str(install / app_relative / "*"), "UpdateProbe", kind.upper()]
 commands = []
@@ -197,6 +207,7 @@ try:
     # The updater must wait for another application instance even after its parent has exited.
     time.sleep(1)
     assert "state=READY" in status_path.read_text()
+    assert not restart_record.exists()
     (workspace / "release-holder").touch()
     assert holder.wait(timeout=15) == 0
     wait_for(lambda: terminal_status(status_path), 60)
@@ -211,6 +222,7 @@ try:
         assert "Already current" in run([install / launcher_relative, "settings", "update", "check"])
         assert "Update available" in run([install / launcher_relative, "settings", "update", "check", "--force"])
     else:
+        wait_for(lambda: restart_record.exists() and restart_record.read_text() == new_version)
         assert new_version in run([java, "-cp", str(install / app_relative / "*"), "dev.voxelbrew.gui.Launcher", "--version"])
     assert "DOCUMENT_READ_PASS" in run(probe + ["read-document", older_document])
     assert older_document.read_bytes() == older_document_bytes, "Opening must not modify an older document"

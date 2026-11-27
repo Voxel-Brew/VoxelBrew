@@ -7320,6 +7320,13 @@ class WorkbenchUiTest {
         waitForUpdate("Update available");
         click("update-download");
         waitForUpdate("Verified and ready");
+        fx(() -> {
+            var restart = (Button) node("#update-install");
+            assertThat(restart.getText()).isEqualTo("Install and restart");
+            Screenshot.save(
+                    restart.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "update-restart.png"));
+            return null;
+        });
         click("update-install");
         click("unsaved-cancel");
         assertThat(document()).isEqualTo(before);

@@ -236,9 +236,7 @@ final class UpdateDialog {
                         return;
                     }
                     prepared = ready;
-                    status.setText(
-                            translations.translate(
-                                    "gui.verified_and_ready_install_and_quit_will_close_this_application_and_retain_the_previous_install"));
+                    status.setText(translations.translate("update.ready"));
                     busy(false);
                 });
             } catch (Exception failure) {

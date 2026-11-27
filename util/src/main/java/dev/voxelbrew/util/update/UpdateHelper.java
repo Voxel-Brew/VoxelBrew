@@ -124,14 +124,18 @@ public class UpdateHelper {
         }
     }
 
-    private static void move(Path from, Path to) throws IOException {
+    static void move(Path from, Path to) throws IOException {
         long deadline = System.nanoTime() + java.time.Duration.ofSeconds(5).toNanos();
         while (true) {
             try {
                 Files.move(from, to, StandardCopyOption.ATOMIC_MOVE);
                 return;
-            } catch (java.nio.file.AccessDeniedException locked) {
-                if (System.nanoTime() > deadline) throw locked;
+            } catch (FileSystemException locked) {
+                // Windows reports sharing violations as plain FileSystemException with a localized reason.
+                boolean sharingViolationPossible = locked.getClass() == FileSystemException.class
+                        && System.getProperty("os.name").startsWith("Windows");
+                if (!(locked instanceof AccessDeniedException) && !sharingViolationPossible) throw locked;
+                if (System.nanoTime() >= deadline) throw locked;
                 try {
                     Thread.sleep(100);
                 } catch (InterruptedException interrupted) {

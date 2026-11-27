@@ -10,8 +10,6 @@ import java.nio.file.Path;
 import javafx.application.Application;
 import javafx.application.ConditionalFeature;
 import javafx.application.Platform;
-import javafx.scene.control.Alert;
-import javafx.scene.control.ButtonType;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 
@@ -117,11 +115,9 @@ public final class WorkbenchApplication extends Application {
                 if (!result.available() || !result.installable()) return;
                 Platform.runLater(() -> {
                     if (!stage.isShowing()) return;
-                    var download = new ButtonType(translations.translate("update.download"));
-                    var prompt = new Alert(Alert.AlertType.INFORMATION, result.message(), download, ButtonType.CANCEL);
-                    prompt.setTitle(translations.translate("update.title"));
-                    prompt.setHeaderText(translations.translate("update.heading"));
-                    if (Dialogs.showStandalone(prompt).filter(download::equals).isPresent() && stage.isShowing()) {
+                    if (UpdateDialog.showAvailable(
+                                    stage, translations, result.release().version())
+                            && stage.isShowing()) {
                         workbench.openUpdates();
                     }
                 });

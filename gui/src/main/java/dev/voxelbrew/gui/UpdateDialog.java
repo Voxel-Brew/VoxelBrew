@@ -51,6 +51,24 @@ final class UpdateDialog {
         UpdateDialog create(Consumer<Runnable> beforeInstall);
     }
 
+    static boolean showAvailable(Window owner, TranslationService translations, ReleaseVersion version) {
+        var download = new ButtonType(translations.translate("update.download"), ButtonBar.ButtonData.OK_DONE);
+        String versions = BuildVersion.current() + " → " + version;
+        var prompt = new Alert(
+                Alert.AlertType.INFORMATION,
+                translations.translate("update.available", versions),
+                download,
+                ButtonType.CANCEL);
+        prompt.setHeaderText(translations.translate("update.heading"));
+        var pane = prompt.getDialogPane();
+        pane.setPrefWidth(480);
+        pane.lookupButton(download).setId("update-prompt-download");
+        pane.lookupButton(ButtonType.CANCEL).setId("update-prompt-cancel");
+        return Dialogs.show(prompt, owner, translations)
+                .filter(download::equals)
+                .isPresent();
+    }
+
     static boolean show(Window owner, Factory factory, Consumer<Runnable> beforeInstall) {
         var updates = factory.create(beforeInstall);
         try {

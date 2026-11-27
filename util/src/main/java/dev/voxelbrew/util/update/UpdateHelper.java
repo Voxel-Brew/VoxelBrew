@@ -47,7 +47,8 @@ public class UpdateHelper {
         }
         Properties p = ApplicationImage.read(job);
         Path target = Path.of(p.getProperty("target")).toAbsolutePath().normalize();
-        if (!java.util.Objects.equals(target.getParent(), stage.getParent()) || Files.isSymbolicLink(target)) {
+        Path installParent = target.getParent();
+        if (installParent == null || !installParent.equals(stage.getParent()) || Files.isSymbolicLink(target)) {
             throw new IOException("Update must remain beside its original installation");
         }
         var component = ApplicationImage.Component.valueOf(p.getProperty("component"));
@@ -70,16 +71,7 @@ public class UpdateHelper {
         long deadline = System.nanoTime() + java.time.Duration.ofMinutes(2).toNanos();
         try (var updateLock = waitLock(original.updateLock(), false, deadline)) {
             status(stage, "READY", "Waiting for application exit");
-            while (ProcessHandle.of(pid)
-                    .filter(h -> h.isAlive()
-                            && h.info().startInstant().map(start::equals).orElse(true))
-                    .isPresent()) {
-                if (System.nanoTime() > deadline) {
-                    throw new IOException(
-                            "Application did not exit; no files replaced. Close all instances and retry.");
-                }
-                Thread.sleep(100);
-            }
+            waitForApplicationExit(pid, start, deadline);
             try (var runningLock = waitLock(original.runningLock(), false, deadline)) {
                 var current = ApplicationImage.open(target, component, platform);
                 if (!current.version().equals(original.version())) {
@@ -87,8 +79,35 @@ public class UpdateHelper {
                 }
                 status(stage, "INSTALLING", "Installing " + replacement.version());
                 replace(target, source, backup, UpdateHelper::move);
-                status(stage, "SUCCESS", "Installed " + replacement.version() + "; backup: " + backup);
             }
+            String message = "Installed " + replacement.version() + "; backup: " + backup;
+            if (component == ApplicationImage.Component.GUI) {
+                // The new launcher takes a shared running lock at startup.
+                try {
+                    new ProcessBuilder(original.launcher().toString())
+                            .directory(installParent.toFile())
+                            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                            .redirectError(ProcessBuilder.Redirect.DISCARD)
+                            .start();
+                } catch (IOException failure) {
+                    failure.printStackTrace(System.err);
+                    message += ". Automatic restart failed; open VoxelBrew manually: " + failure.getMessage();
+                }
+            }
+            status(stage, "SUCCESS", message);
+        }
+    }
+
+    private static void waitForApplicationExit(long pid, Instant start, long deadline)
+            throws IOException, InterruptedException {
+        while (ProcessHandle.of(pid)
+                .filter(h -> h.isAlive()
+                        && h.info().startInstant().map(start::equals).orElse(true))
+                .isPresent()) {
+            if (System.nanoTime() > deadline) {
+                throw new IOException("Application did not exit; no files replaced. Close all instances and retry.");
+            }
+            Thread.sleep(100);
         }
     }
 
@@ -124,14 +143,18 @@ public class UpdateHelper {
         }
     }
 
-    private static void move(Path from, Path to) throws IOException {
+    static void move(Path from, Path to) throws IOException {
         long deadline = System.nanoTime() + java.time.Duration.ofSeconds(5).toNanos();
         while (true) {
             try {
                 Files.move(from, to, StandardCopyOption.ATOMIC_MOVE);
                 return;
-            } catch (java.nio.file.AccessDeniedException locked) {
-                if (System.nanoTime() > deadline) throw locked;
+            } catch (FileSystemException locked) {
+                // Windows reports sharing violations as plain FileSystemException with a localized reason.
+                boolean sharingViolationPossible = locked.getClass() == FileSystemException.class
+                        && System.getProperty("os.name").startsWith("Windows");
+                if (!(locked instanceof AccessDeniedException) && !sharingViolationPossible) throw locked;
+                if (System.nanoTime() >= deadline) throw locked;
                 try {
                     Thread.sleep(100);
                 } catch (InterruptedException interrupted) {

@@ -31,6 +31,7 @@ import dev.voxelbrew.util.concurrent.SerialExecutor;
 import dev.voxelbrew.util.i18n.TranslationCatalogs;
 import dev.voxelbrew.util.i18n.TranslationServiceImpl;
 import dev.voxelbrew.util.preferences.UserConfigServiceImpl;
+import dev.voxelbrew.util.update.ReleaseVersion;
 import java.nio.ByteBuffer;
 import java.nio.file.*;
 import java.security.MessageDigest;
@@ -2308,12 +2309,16 @@ class WorkbenchUiTest {
     }
 
     private void doubleClick(String id) throws Exception {
-        var point = centerOf(id);
+        doubleClick(centerOf(id));
+    }
+
+    private void doubleClick(Point2D point) throws Exception {
         fx(() -> {
             robot.mouseMove(point);
             robot.mouseClick(MouseButton.PRIMARY);
             return null;
         });
+        // Give GTK time to deliver the first native click before sending the second.
         Thread.sleep(90);
         fx(() -> {
             robot.mouseClick(MouseButton.PRIMARY);
@@ -7224,6 +7229,35 @@ class WorkbenchUiTest {
     }
 
     @Test
+    void polishStartupUpdatePromptUsesWorkbenchPaletteAndActions() throws Exception {
+        var translations = startupTranslations(configuration, CONFIG_FILE_NAME);
+        var version = ReleaseVersion.release("1.1.0");
+        for (int palette : List.of(1, 2)) {
+            choice("appearance", palette);
+            var prompt = new FutureTask<>(() -> UpdateDialog.showAvailable(stage, translations, version));
+            Platform.runLater(prompt);
+            fx(() -> {
+                var overlay = stage.getScene().lookup(".dialog-overlay");
+                assertThat(overlay).isNotNull();
+                assertThat(overlay.lookupAll(".label").stream().map(label -> ((Label) label).getText()))
+                        .anyMatch(text -> text.startsWith("Dostępna aktualizacja:") && text.endsWith(" → 1.1.0"));
+                assertThat(((Button) overlay.lookup("#update-prompt-download")).getText())
+                        .isEqualTo("Pobierz");
+                assertThat(((Button) overlay.lookup("#update-prompt-cancel")).getText())
+                        .isEqualTo("Anuluj");
+                Screenshot.save(
+                        stage.getScene(),
+                        Path.of(System.getProperty("voxelbrew.ui.artifacts"), "update-startup-" + palette + ".png"));
+                return null;
+            });
+            boolean download = palette == 2;
+            click(download ? "update-prompt-download" : "update-prompt-cancel");
+            assertThat(prompt.get(20, TimeUnit.SECONDS)).isEqualTo(download);
+            assertThat(fx(() -> stage.getScene().lookup(".dialog-overlay"))).isNull();
+        }
+    }
+
+    @Test
     void polishUpdateCheckShowsLocalizedCurrentRelease() throws Exception {
         updates.current = true;
         updates.development = true;
@@ -7286,6 +7320,13 @@ class WorkbenchUiTest {
         waitForUpdate("Update available");
         click("update-download");
         waitForUpdate("Verified and ready");
+        fx(() -> {
+            var restart = (Button) node("#update-install");
+            assertThat(restart.getText()).isEqualTo("Install and restart");
+            Screenshot.save(
+                    restart.getScene(), Path.of(System.getProperty("voxelbrew.ui.artifacts"), "update-restart.png"));
+            return null;
+        });
         click("update-install");
         click("unsaved-cancel");
         assertThat(document()).isEqualTo(before);
@@ -8495,15 +8536,13 @@ class WorkbenchUiTest {
         click("sketch-undo");
         sketchReady();
         assertThat(sketchGeometry()).isEqualTo(beforeRotation);
-        fx(() -> {
+        var outlinePoint = fx(() -> {
             var editor = (SketchEditor) node("#sketch-editor");
             var geometry = editor.controller().definition();
             var outline = geometry.curves(geometry.entity(textId)).getLast();
-            robot.mouseMove(editor.modelToScreen(outline.at(.5)));
-            robot.mouseClick(MouseButton.PRIMARY);
-            robot.mouseClick(MouseButton.PRIMARY);
-            return null;
+            return editor.modelToScreen(outline.at(.5));
         });
+        doubleClick(outlinePoint);
         text("sketch-edit-text-content", "OC");
         checkTextAngleBounds("sketch-edit-text-angle");
         text("sketch-edit-text-angle", "181");

@@ -33,8 +33,8 @@ jobs:
   native:
     name: ${{ inputs.suite }} (${{ inputs.os }})
     runs-on: ${{ inputs.os }}
-    # Ubuntu platform shards and jobs that archive packages need extra runner time.
-    timeout-minutes: ${{ inputs.release-candidate && 90 || (inputs.archive || (inputs.os == 'ubuntu-24.04' && inputs.suite == ':gui:e2eTest')) && 30 || 20 }}
+    # Release jobs run the full suite and package installers. Leave time to upload evidence.
+    timeout-minutes: ${{ inputs.release-candidate && 60 || (inputs.archive || (inputs.os == 'ubuntu-24.04' && inputs.suite == ':gui:e2eTest')) && 30 || 20 }}
     env:
       ORG_GRADLE_PROJECT_uiTestShard: ${{ inputs.ui-shard }}
       ORG_GRADLE_PROJECT_uiTestShardCount: ${{ inputs.ui-shard-count }}
@@ -145,17 +145,20 @@ jobs:
         run: ./gradlew --build-cache integrationTest
       - name: Platform checks (Ubuntu)
         if: (inputs.suite == 'platformCheck' || inputs.suite == 'check' || inputs.suite == ':gui:e2eTest') && runner.os == 'Linux'
+        timeout-minutes: ${{ inputs.release-candidate && 50 || 25 }}
         env:
           GRADLE_SUITE: ${{ inputs.suite }}
-        run: bash scripts/with-virtual-desktop.sh ./gradlew ${{ inputs.release-candidate && '--refresh-dependencies' || '' }} --build-cache "$GRADLE_SUITE"
+        run: bash scripts/with-virtual-desktop.sh ./gradlew --build-cache "$GRADLE_SUITE"
       - name: Platform checks (Windows, v142 toolchain)
         if: (inputs.suite == 'platformCheck' || inputs.suite == 'check' || inputs.suite == ':gui:e2eTest') && runner.os == 'Windows'
+        timeout-minutes: ${{ inputs.release-candidate && 50 || 25 }}
         env:
           GRADLE_SUITE: ${{ inputs.suite }}
         shell: pwsh
         run: ./gradlew.bat --build-cache $env:GRADLE_SUITE '-PvsGenerator=Visual Studio 17 2022'
       - name: Headless platform checks (macOS; GUI qualification deferred)
         if: (inputs.suite == 'headlessPlatformCheck' || inputs.suite == 'headlessWorkflowCheck' || inputs.suite == 'headlessPackageCheck') && runner.os == 'macOS'
+        timeout-minutes: ${{ inputs.release-candidate && 50 || 25 }}
         env:
           GRADLE_SUITE: ${{ inputs.suite }}
         run: ./gradlew --build-cache "$GRADLE_SUITE"

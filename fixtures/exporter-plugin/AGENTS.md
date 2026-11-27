@@ -19,6 +19,13 @@ the application root to prepare the fixture dependencies. Then run
 `./gradlew -p fixtures/exporter-plugin spotbugsMain spotbugsFeatures`.
 Use `.\gradlew.bat` in place of `./gradlew` on Windows.
 
+## Pull requests
+
+When a pull request resolves a known GitHub issue, add `Closes #123` to the PR description,
+using the actual issue number. For an issue in another repository, use
+`Closes owner/repository#123`. Add the closing reference to the PR targeting
+`master` so GitHub closes the issue when the PR is merged.
+
 ## Lombok in Java code
 
 Use Lombok where it removes routine Java boilerplate without obscuring a public contract. Apply these annotations in Java-bearing repositories and modules; the website has no Java production code.
